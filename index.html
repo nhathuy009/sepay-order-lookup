@@ -125,10 +125,10 @@ async function doLookup() {
   btn.disabled = true;
   box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
   try {
-    const resp = await fetch("/api/lookup", {
+    const resp = await fetch("/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, access_token: getToken() }),
+      body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
     });
     const data = await resp.json();
     if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
@@ -159,10 +159,10 @@ async function doExcel() {
   box.innerHTML = '<span class="spinner"></span> Đang xử lý, vui lòng đợi…';
   try {
     const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/excel", {
+    const resp = await fetch("/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_base64: b64, access_token: getToken() }),
+      body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }),
     });
     const data = await resp.json();
     if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
@@ -200,7 +200,7 @@ function escapeHtml(s) {
 }
 
 // Ẩn ô mật khẩu nếu backend báo không bật bảo vệ.
-fetch("/api/lookup").then(r => r.json()).then(d => {
+fetch("/api/index").then(r => r.json()).then(d => {
   if (d && d.auth_required === false) document.getElementById("authCard").classList.add("hidden");
 }).catch(() => {});
 </script>
