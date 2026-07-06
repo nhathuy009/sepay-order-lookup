@@ -97,8 +97,8 @@ def handle_update(update):
     text = (message.get("text") or "").strip()
     if not text:
         return
-    if text.startswith("/start") or text.startswith("/help"):
-        send_message(chat_id, HELP_TEXT)
+    if text.startswith("/start") or text.startswith("/help") or text.startswith("/id"):
+        send_message(chat_id, HELP_TEXT + f"\n\n🆔 ID Telegram của bạn: <code>{esc(user_id)}</code>")
         return
 
     codes = [c.strip() for c in text.split("\n") if c.strip()][:20]

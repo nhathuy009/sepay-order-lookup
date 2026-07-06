@@ -31,6 +31,25 @@ requirements.txt requests, openpyxl
 
 > Sau khi thêm/đổi Environment Variables phải **Redeploy** để có hiệu lực.
 
+## Bot Telegram (@sepaycheckbot)
+
+Endpoint webhook: `POST /api/telegram` (`api/telegram.py`), dùng chung logic tra cứu.
+Gửi mã đơn (DH… / BIZ…) cho bot → nhận kết quả. Gửi nhiều mã, mỗi mã một dòng.
+
+Env vars cần thêm trên Vercel:
+- `TELEGRAM_BOT_TOKEN` — token bot (BotFather)
+- `TELEGRAM_WEBHOOK_SECRET` — chuỗi bí mật, phải khớp `secret_token` khi set webhook
+- `TELEGRAM_ALLOWED_IDS` — (tùy chọn) danh sách user id được phép, ngăn bằng dấu phẩy;
+  để trống = ai cũng dùng được. Gõ `/id` cho bot để lấy ID Telegram của mình.
+
+Set webhook (chạy 1 lần, thay TOKEN và SECRET):
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://sepay-order-lookup.vercel.app/api/telegram","secret_token":"<SECRET>","allowed_updates":["message","edited_message"]}'
+```
+
 ## Bảo mật
 
 - App có URL công khai → **bắt buộc** nên đặt `APP_ACCESS_TOKEN` để tránh lộ dữ liệu
