@@ -58,13 +58,22 @@ def format_result(d):
     if d.get("status_msg") != "Thành công":
         return f"❌ <b>{esc(d.get('order_code'))}</b>: {esc(d.get('status_msg'))}"
 
+    # Lấy số tiền, ép kiểu về float (mặc định là 0 nếu None hoặc rỗng)
+    try:
+        amount = float(d.get('orders_amount') or 0)
+        # Định dạng dấu phẩy hàng ngàn rồi đổi thành dấu chấm
+        formatted_amount = f"{amount:,.0f}".replace(",", ".")
+    except (ValueError, TypeError):
+        # Phòng trường hợp orders_amount là chuỗi không thể ép kiểu thành số
+        formatted_amount = d.get('orders_amount')
+
     lines = [
         f"✅ <b>{esc(d.get('order_code'))}</b> ({esc(d.get('system'))})",
         f"📧 Email KH: <code>{esc(d.get('lead_email'))}</code>",
         f"📞 SĐT KH: <code>{esc(d.get('lead_phone'))}</code>",
         f"👤 Username: <code>{esc(d.get('username'))}</code>",
         f"🧑 Họ tên: {esc(d.get('users_name'))}",
-        f"💰 Số tiền: {esc(d.get('orders_amount'))}",
+        f"💰 Số tiền: {esc(formatted_amount)}",  # <-- Đã thay đổi ở đây
         f"🗓 Ngày TT: {esc(d.get('einvoice_created_at'))}",
         f"🧾 Số hóa đơn: {esc(d.get('invoice_number'))}",
     ]
@@ -75,7 +84,6 @@ def format_result(d):
     else:
         lines.append("🤝 Ref: (không có)")
     return "\n".join(lines)
-
 
 def handle_update(update):
     message = update.get("message") or update.get("edited_message")
