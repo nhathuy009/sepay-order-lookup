@@ -1,24 +1,28 @@
 # Công cụ tra cứu đơn hàng (10X + SOLOBIZ) — Web app trên Vercel
 
 Web app tra cứu đơn hàng: nhập từng mã (DH… / BIZ…) hoặc upload Excel xử lý hàng loạt.
-Backend là các serverless function Python trên Vercel.
+Backend là serverless function Python trên Vercel.
 
 ## Cấu trúc
 
 ```
 api/_core.py     Logic tra cứu dùng chung (đăng nhập, gọi API, cache token in-memory)
-api/lookup.py    Serverless function: tra cứu 1 mã đơn
-api/excel.py     Serverless function: xử lý file Excel hàng loạt
-index.html       Giao diện web (2 tab: tra cứu / Excel)
-vercel.json      Cấu hình (maxDuration cho function)
+api/index.py     Serverless function duy nhất; phân nhánh theo body.action ("lookup"/"excel")
+index.html       Giao diện web (2 tab: tra cứu / Excel), gọi POST /api/index
+vercel.json      Legacy builds: build api/index.py (@vercel/python) + index.html (static),
+                 route /api/* -> api/index.py, còn lại -> index.html
 requirements.txt requests, openpyxl
 ```
+
+> Ghi chú: gộp thành 1 function `api/index.py` và dùng `@vercel/python@4.8.0` (mô hình
+> multi-file cũ) vì runtime Python mới (6.x) đổi sang bắt buộc 1 entrypoint và làm hỏng
+> việc phục vụ trang tĩnh khi ghim runtime kiểu zero-config.
 
 ## Deploy lên Vercel
 
 1. Đẩy repo này lên GitHub.
 2. Vào https://vercel.com → **Add New… → Project** → chọn repo.
-3. Framework Preset để **Other** (Vercel tự nhận `api/*.py` + `index.html`).
+3. Framework Preset để **Other** (đã có `vercel.json` cấu hình build + route).
 4. Mở **Settings → Environment Variables**, thêm:
    - `SEPAY_EMAIL` — email đăng nhập hệ thống
    - `SEPAY_PASSWORD` — mật khẩu đăng nhập hệ thống
