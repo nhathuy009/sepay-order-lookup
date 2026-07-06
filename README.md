@@ -24,8 +24,8 @@ requirements.txt requests, openpyxl
 2. Vào https://vercel.com → **Add New… → Project** → chọn repo.
 3. Framework Preset để **Other** (đã có `vercel.json` cấu hình build + route).
 4. Mở **Settings → Environment Variables**, thêm:
-   - `SEPAY_EMAIL` — email đăng nhập hệ thống
-   - `SEPAY_PASSWORD` — mật khẩu đăng nhập hệ thống
+   - `LOGIN_EMAIL` — email đăng nhập hệ thống (10X/SOLOBIZ)
+   - `LOGIN_PASSWORD` — mật khẩu đăng nhập hệ thống (10X/SOLOBIZ)
    - `APP_ACCESS_TOKEN` — mật khẩu bảo vệ truy cập web app (khuyến nghị)
 5. **Deploy**. Xong sẽ có URL dạng `https://<project>.vercel.app`.
 
@@ -49,5 +49,5 @@ Hoặc chỉ test logic:
 
 ```bash
 pip install -r requirements.txt
-SEPAY_EMAIL=... SEPAY_PASSWORD=... python -c "from api._core import lookup_order; print(lookup_order('DH18700'))"
+LOGIN_EMAIL=... LOGIN_PASSWORD=... python -c "from api._core import lookup_order; print(lookup_order('DH18700'))"
 ```

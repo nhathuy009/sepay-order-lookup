@@ -11,8 +11,8 @@ import requests
 
 REQUEST_TIMEOUT = 15
 
-LOGIN_EMAIL = os.environ.get("SEPAY_EMAIL", "")
-LOGIN_PASSWORD = os.environ.get("SEPAY_PASSWORD", "")
+LOGIN_EMAIL = os.environ.get("LOGIN_EMAIL", "")
+LOGIN_PASSWORD = os.environ.get("LOGIN_PASSWORD", "")
 
 # Mật khẩu bảo vệ truy cập app. Nếu để trống -> app mở công khai (không khuyến nghị).
 APP_ACCESS_TOKEN = os.environ.get("APP_ACCESS_TOKEN", "")
@@ -231,7 +231,7 @@ class SepayClient:
         with self._lock:
             if not self.token and not self.login():
                 d = empty_details()
-                d["status_msg"] = "Không đăng nhập được (thiếu SEPAY_EMAIL/SEPAY_PASSWORD?)"
+                d["status_msg"] = "Không đăng nhập được (thiếu LOGIN_EMAIL/LOGIN_PASSWORD?)"
                 return d
 
         result = self._build_details(order_code)
