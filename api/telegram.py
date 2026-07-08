@@ -11,7 +11,7 @@ import urllib.request
 import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
-VERCEL_DOMAIN = "https://sepay-order-lookup-git-main-nhathuyvn-2345s-projects.vercel.app"
+VERCEL_DOMAIN = "https://sepay-order-lookup.vercel.app"
 
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  # noqa: E402
