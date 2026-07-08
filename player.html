@@ -5,67 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trình phát phim</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.3/hls.min.js"></script>
+    
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
-        video { width: 100%; height: 100%; outline: none; object-fit: contain; }
         
-        /* Chỉnh lại giao diện lỗi để chứa text dài và có thể bôi đen copy */
-        #error-msg { 
-            color: white; 
-            display: none; 
-            text-align: center; 
-            padding: 20px; 
-            z-index: 10; 
-            max-width: 90%; 
-            background: rgba(0,0,0,0.8);
-            border-radius: 8px;
-            user-select: text; /* Cho phép bôi đen text để copy */
-            word-wrap: break-word;
-        }
-        .debug-url { color: #f87171; font-size: 13px; margin-top: 10px; text-align: left; background: #1e293b; padding: 10px; border-radius: 4px; }
-        .debug-url span { color: #34d399; font-weight: bold; }
+        /* Cấu hình màu Plyr giống trang gốc */
+        :root { --plyr-color-main: #fe628e; --plyr-captions-background: rgba(0, 0, 0, 0.5); }
+        .plyr { width: 100%; height: 100%; }
         
-        /* Giao diện thanh công cụ nổi */
+        #error-msg { color: #f87171; display: none; text-align: center; padding: 20px; z-index: 10; max-width: 90%; background: rgba(0,0,0,0.8); border-radius: 8px; }
+        
+        /* Thanh công cụ */
         #search-box {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-            display: flex;
-            gap: 8px;
-            background: rgba(30, 41, 59, 0.9);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(4px);
-            transition: opacity 0.3s;
-            flex-wrap: wrap;
-            justify-content: center;
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20;
+            display: flex; gap: 8px; background: rgba(30, 41, 59, 0.9); padding: 10px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(4px); transition: opacity 0.3s; flex-wrap: wrap; justify-content: center;
         }
-        #search-box:not(:hover):not(:focus-within) { opacity: 0.4; }
-        #search-box input {
-            padding: 10px 14px;
-            border: none;
-            border-radius: 6px;
-            outline: none;
-            background: #0f172a;
-            color: #e2e8f0;
-            font-size: 14px;
-        }
-        #search-box #accessToken { width: 140px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        #search-box:not(:hover):not(:focus-within) { opacity: 0; pointer-events: none; } /* Ẩn hoàn toàn khi không rê chuột */
+        body:hover #search-box { opacity: 1; pointer-events: auto; }
+        
+        #search-box input { padding: 10px 14px; border: none; border-radius: 6px; outline: none; background: #0f172a; color: #e2e8f0; font-size: 14px; }
+        #search-box #accessToken { width: 140px; }
         #search-box #movieCode { width: 180px; }
-        #search-box button {
-            padding: 10px 18px;
-            border: none;
-            border-radius: 6px;
-            background: #3b82f6;
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-        }
+        #search-box button { padding: 10px 18px; border: none; border-radius: 6px; background: #3b82f6; color: white; font-weight: 600; cursor: pointer; font-size: 14px; }
         #search-box button:disabled { background: #64748b; cursor: not-allowed; }
     </style>
 </head>
@@ -76,7 +41,7 @@
         <button id="playBtn" onclick="fetchAndPlay()">Xem</button>
     </div>
 
-    <video id="video" controls autoplay playsinline></video>
+    <video id="video" playsinline crossorigin="anonymous"></video>
     <div id="error-msg"></div>
 
     <script {nonce}>
@@ -89,31 +54,23 @@
         const video = document.getElementById('video');
         const errorDiv = document.getElementById('error-msg');
         let hlsInstance = null;
+        let plyrInstance = null;
 
         document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
 
-        // CHÚ Ý: Thay bằng đường dẫn Cloudflare Worker Proxy của bạn
-        const PROXY_BASE = "https://round-dawn-0365.nhathuy-vn.workers.dev/?url=";
-
         const urlParams = new URLSearchParams(window.location.search);
         const rawVidUrl = urlParams.get('vid');
-        if (rawVidUrl) {
-            playStream(rawVidUrl);
-        }
+        if (rawVidUrl) { playStream(rawVidUrl); }
 
         async function fetchAndPlay() {
             const codeInput = document.getElementById('movieCode').value.trim();
             const tokenInput = document.getElementById('accessToken').value.trim();
-            
             if (!codeInput) return;
 
             localStorage.setItem("sepay_access_token", tokenInput);
-
             const btn = document.getElementById('playBtn');
-            btn.disabled = true;
-            btn.innerText = "Đang tìm...";
+            btn.disabled = true; btn.innerText = "Đang tìm...";
             errorDiv.style.display = 'none';
-            video.style.display = 'block';
 
             try {
                 const res = await fetch('/api/index', {
@@ -123,61 +80,54 @@
                 });
                 const data = await res.json();
                 
-                if (!res.ok) {
-                    showError("❌ " + (data.error || "Lỗi API không xác định"));
-                } else if (!data.stream_url) {
-                    showError("❌ API trả về thành công nhưng không tìm thấy stream_url. Dữ liệu: " + JSON.stringify(data));
-                } else {
-                    playStream(data.stream_url);
-                }
-            } catch (err) {
-                showError("❌ Lỗi kết nối API: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Xem";
-            }
+                if (!res.ok) { showError("❌ " + (data.error || "Lỗi API")); }
+                else if (!data.stream_url) { showError("❌ Không tìm thấy stream_url."); }
+                else { playStream(data.stream_url); }
+            } catch (err) { showError("❌ Lỗi kết nối API"); } 
+            finally { btn.disabled = false; btn.innerText = "Xem"; }
         }
 
-        function playStream(rawUrl) {
-            const vidUrl = PROXY_BASE + encodeURIComponent(rawUrl);
+        function playStream(streamUrl) {
             errorDiv.style.display = 'none';
-            video.style.display = 'block';
-
-            if (hlsInstance) {
-                hlsInstance.destroy();
-            }
+            
+            // Xóa HLS cũ nếu có
+            if (hlsInstance) { hlsInstance.destroy(); }
+            
+            // Cấu hình UI Plyr
+            const playerSettings = {
+                controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'settings', 'fullscreen', 'volume'],
+                speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] },
+                autoplay: true
+            };
 
             if (Hls.isSupported()) {
-                hlsInstance = new Hls({ maxBufferLength: 30 });
-                hlsInstance.loadSource(vidUrl);
-                hlsInstance.attachMedia(video);
-                hlsInstance.on(Hls.Events.ERROR, function (event, data) {
-                    if (data.fatal) {
-                        showError("⚠️ HLS.js Lỗi Fatal: " + data.type + " - " + data.details, rawUrl, vidUrl);
+                hlsInstance = new Hls({ autoStartLoad: true });
+                
+                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.networkDetails && data.networkDetails.status === 429) {
+                        hlsInstance.loadSource(streamUrl); // Tự động thử lại nếu quá tải
                     }
                 });
+
+                hlsInstance.loadSource(streamUrl);
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (!plyrInstance) { plyrInstance = new Plyr(video, playerSettings); }
+                    video.play();
+                });
+                hlsInstance.attachMedia(video);
+                
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = vidUrl;
-                video.onerror = function() {
-                    showError("⚠️ Lỗi phát video nguyên bản (Native Player Error).", rawUrl, vidUrl);
-                };
+                // Cho iOS Safari Native
+                video.src = streamUrl;
+                if (!plyrInstance) { plyrInstance = new Plyr(video, playerSettings); }
+                video.play();
             } else {
-                showError("Trình duyệt hiện tại không hỗ trợ định dạng luồng HLS này.", rawUrl, vidUrl);
+                showError("Trình duyệt không hỗ trợ luồng HLS.");
             }
         }
 
-        function showError(msg, rawUrl = "", proxyUrl = "") {
-            video.style.display = 'none';
-            let htmlContent = `<b>${msg}</b>`;
-            
-            if (rawUrl || proxyUrl) {
-                htmlContent += `<div class="debug-url">`;
-                if (rawUrl) htmlContent += `<span>[RAW URL từ API]</span><br>${rawUrl}<br><br>`;
-                if (proxyUrl) htmlContent += `<span>https://github.com/BH3GEI/CloudflareWorkerProxy</span><br>${proxyUrl}`;
-                htmlContent += `</div>`;
-            }
-            
-            errorDiv.innerHTML = htmlContent;
+        function showError(msg) {
+            errorDiv.innerHTML = `<b>${msg}</b>`;
             errorDiv.style.display = 'block';
         }
     </script>
