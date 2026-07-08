@@ -9,7 +9,22 @@
     <style>
         body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
         video { width: 100%; height: 100%; outline: none; object-fit: contain; }
-        #error-msg { color: white; display: none; text-align: center; padding: 20px; z-index: 10; }
+        
+        /* Chỉnh lại giao diện lỗi để chứa text dài và có thể bôi đen copy */
+        #error-msg { 
+            color: white; 
+            display: none; 
+            text-align: center; 
+            padding: 20px; 
+            z-index: 10; 
+            max-width: 90%; 
+            background: rgba(0,0,0,0.8);
+            border-radius: 8px;
+            user-select: text; /* Cho phép bôi đen text để copy */
+            word-wrap: break-word;
+        }
+        .debug-url { color: #f87171; font-size: 13px; margin-top: 10px; text-align: left; background: #1e293b; padding: 10px; border-radius: 4px; }
+        .debug-url span { color: #34d399; font-weight: bold; }
         
         /* Giao diện thanh công cụ nổi */
         #search-box {
@@ -29,9 +44,7 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-        /* Tự động mờ thanh công cụ khi không di chuột để tránh che mắt khi xem phim */
         #search-box:not(:hover):not(:focus-within) { opacity: 0.4; }
-        
         #search-box input {
             padding: 10px 14px;
             border: none;
@@ -41,15 +54,8 @@
             color: #e2e8f0;
             font-size: 14px;
         }
-        /* Ô nhập mật khẩu truy cập */
-        #search-box #accessToken {
-            width: 140px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        /* Ô nhập mã phim */
-        #search-box #movieCode {
-            width: 180px;
-        }
+        #search-box #accessToken { width: 140px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        #search-box #movieCode { width: 180px; }
         #search-box button {
             padding: 10px 18px;
             border: none;
@@ -74,7 +80,6 @@
     <div id="error-msg"></div>
 
     <script {nonce}>
-        // Thiết lập Mini App Telegram
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
@@ -85,27 +90,23 @@
         const errorDiv = document.getElementById('error-msg');
         let hlsInstance = null;
 
-        // Tự động đồng bộ mật khẩu đã lưu từ localStorage (dùng chung với index.html)
         document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
 
         // CHÚ Ý: Thay bằng đường dẫn Cloudflare Worker Proxy của bạn
         const PROXY_BASE = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
 
-        // Xử lý tự động phát nếu mở từ nút bấm Bot Telegram gửi sang (?vid=...)
         const urlParams = new URLSearchParams(window.location.search);
         const rawVidUrl = urlParams.get('vid');
         if (rawVidUrl) {
             playStream(rawVidUrl);
         }
 
-        // Hàm gọi API lấy dữ liệu luồng m3u8 từ mã phim
         async function fetchAndPlay() {
             const codeInput = document.getElementById('movieCode').value.trim();
             const tokenInput = document.getElementById('accessToken').value.trim();
             
             if (!codeInput) return;
 
-            // Lưu lại mật khẩu vào cấu hình trình duyệt để không phải nhập lại lần sau
             localStorage.setItem("sepay_access_token", tokenInput);
 
             const btn = document.getElementById('playBtn');
@@ -118,28 +119,25 @@
                 const res = await fetch('/api/index', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        action: 'movie', 
-                        code: codeInput,
-                        access_token: tokenInput // Gửi kèm token lên serverless function để kiểm tra APP_ACCESS_TOKEN
-                    })
+                    body: JSON.stringify({ action: 'movie', code: codeInput, access_token: tokenInput })
                 });
                 const data = await res.json();
                 
                 if (!res.ok) {
-                    showError("❌ " + (data.error || "Lỗi không xác định"));
+                    showError("❌ " + (data.error || "Lỗi API không xác định"));
+                } else if (!data.stream_url) {
+                    showError("❌ API trả về thành công nhưng không tìm thấy stream_url. Dữ liệu: " + JSON.stringify(data));
                 } else {
                     playStream(data.stream_url);
                 }
             } catch (err) {
-                showError("❌ Lỗi kết nối đến hệ thống API.");
+                showError("❌ Lỗi kết nối API: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Xem";
             }
         }
 
-        // Hàm phát luồng HLS video
         function playStream(rawUrl) {
             const vidUrl = PROXY_BASE + encodeURIComponent(rawUrl);
             errorDiv.style.display = 'none';
@@ -155,20 +153,31 @@
                 hlsInstance.attachMedia(video);
                 hlsInstance.on(Hls.Events.ERROR, function (event, data) {
                     if (data.fatal) {
-                        showError("⚠️ Luồng phim bị lỗi hoặc bị chặn bởi máy chủ lưu trữ gốc.");
+                        showError("⚠️ HLS.js Lỗi Fatal: " + data.type + " - " + data.details, rawUrl, vidUrl);
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Tương thích trực tiếp với iOS Safari
                 video.src = vidUrl;
+                video.onerror = function() {
+                    showError("⚠️ Lỗi phát video nguyên bản (Native Player Error).", rawUrl, vidUrl);
+                };
             } else {
-                showError("Trình duyệt hiện tại không hỗ trợ định dạng luồng HLS này.");
+                showError("Trình duyệt hiện tại không hỗ trợ định dạng luồng HLS này.", rawUrl, vidUrl);
             }
         }
 
-        function showError(msg) {
+        function showError(msg, rawUrl = "", proxyUrl = "") {
             video.style.display = 'none';
-            errorDiv.innerText = msg;
+            let htmlContent = `<b>${msg}</b>`;
+            
+            if (rawUrl || proxyUrl) {
+                htmlContent += `<div class="debug-url">`;
+                if (rawUrl) htmlContent += `<span>[RAW URL từ API]</span><br>${rawUrl}<br><br>`;
+                if (proxyUrl) htmlContent += `<span>https://github.com/BH3GEI/CloudflareWorkerProxy</span><br>${proxyUrl}`;
+                htmlContent += `</div>`;
+            }
+            
+            errorDiv.innerHTML = htmlContent;
             errorDiv.style.display = 'block';
         }
     </script>
