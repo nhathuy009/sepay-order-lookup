@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trình phát phim</title>
+    <!-- SDK Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        video { width: 100%; height: 100%; outline: none; object-fit: contain; }
+        #error-msg { color: white; display: none; font-family: sans-serif; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <video id="video" controls autoplay playsinline></video>
+    <div id="error-msg">Không thể tải luồng phim. Vui lòng thử lại sau.</div>
+
+    <script>
+        // Mở rộng Mini App full màn hình Telegram
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        window.Telegram.WebApp.setHeaderColor('#000000');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawVidUrl = urlParams.get('vid');
+        
+        // BẮT BUỘC: Đưa URL gốc qua Cloudflare Worker Proxy để chèn Referer
+        // Chú ý: Thay "TEN-WORKER-CUA-BAN" bằng địa chỉ thực tế sau khi thiết lập ở Bước 3
+        const proxyBase = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
+        const vidUrl = proxyBase + encodeURIComponent(rawVidUrl);
+
+        const video = document.getElementById('video');
+        const errorDiv = document.getElementById('error-msg');
+
+        if (Hls.isSupported()) {
+            const hls = new Hls({ maxBufferLength: 30 });
+            hls.loadSource(vidUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    errorDiv.style.display = 'block';
+                    video.style.display = 'none';
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Dành cho iOS Safari (Hỗ trợ HLS mặc định)
+            video.src = vidUrl;
+        } else {
+            errorDiv.innerHTML = "Trình duyệt không hỗ trợ định dạng này.";
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
