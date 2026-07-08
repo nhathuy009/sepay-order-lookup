@@ -7,6 +7,29 @@ HEADERS = {
     "Referer": "https://missav.media/",
 }
 
+def normalize_html(html):
+    """
+    Chuẩn hóa HTML giống cơ chế của plugin JS (PluginUtils.normalizeHtml).
+    Gỡ bỏ các prefix (như missav_media-) mà MissAV chèn vào class CSS để chống bóc tách.
+    """
+    if not html:
+        return ""
+    
+    def repl(match):
+        class_val = match.group(1)
+        # Xóa prefix missav_media- y hệt JS Plugin
+        class_val = class_val.replace('missav_media-', '')
+        
+        # Mở rộng an toàn: Quét xóa mọi prefix ngẫu nhiên dính với các class key của trang
+        class_val = re.sub(r'[a-zA-Z0-9_]+-(thumbnail)', r'\1', class_val)
+        class_val = re.sub(r'[a-zA-Z0-9_]+-(group)', r'\1', class_val)
+        class_val = re.sub(r'[a-zA-Z0-9_]+-(text-nord13)', r'\1', class_val)
+        
+        return f'class="{class_val}"'
+        
+    # Tìm và xử lý tất cả các nội dung nằm trong class="..."
+    return re.sub(r'class="([^"]*)"', repl, html)
+
 def clean_text(text):
     if not text:
         return ""
@@ -22,9 +45,10 @@ def get_category_list(slug):
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         if resp.status_code != 200: return []
-        html = resp.text
         
-        # Bóc tách HTML tối ưu như plugin JS
+        # BƯỚC QUAN TRỌNG: Làm sạch HTML trước khi cắt chuỗi
+        html = normalize_html(resp.text)
+        
         parts = html.split('thumbnail group')
         if len(parts) <= 1:
             parts = html.split('class="thumbnail')
@@ -57,7 +81,9 @@ def search_missav(keyword):
         resp = requests.get(url, headers=HEADERS, timeout=15)
         if resp.status_code != 200:
             return []
-        html = resp.text
+            
+        # BƯỚC QUAN TRỌNG: Làm sạch HTML trước khi cắt chuỗi
+        html = normalize_html(resp.text)
         
         parts = html.split('thumbnail group')
         if len(parts) <= 1:
