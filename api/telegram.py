@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  # noqa: E402
-from _missav import search_missav, get_movie_detail, get_category_list  # Ngăn nắp các hàm import
+from _missav import search_missav, get_movie_detail, get_category_list  # Import đầy đủ các hàm cần thiết
 
 VERCEL_DOMAIN = "https://sepay-order-lookup.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -38,7 +38,7 @@ HELP_TEXT = (
     "• Gửi mã <code>BIZ02120</code> (Hệ thống SOLOBIZ)\n"
     "<i>(Có thể gửi nhiều mã đơn hàng, mỗi mã một dòng)</i>\n\n"
     "<b>2. Tra cứu phim:</b>\n"
-    "• Gửi lệnh <code>/menu</code> để xem danh mục Hot.\n"
+    "• Gửi lệnh <code>/menu</code> để hiển thị các danh mục phim Hot.\n"
     "• Gửi trực tiếp mã phim (Ví dụ: <code>snos-056</code>) để lấy link xem.\n"
     "• Gửi từ khóa bất kỳ để tìm kiếm danh sách phim."
 )
@@ -69,7 +69,7 @@ def show_main_menu(chat_id):
         ])
     tg_call("sendMessage", {
         "chat_id": chat_id, 
-        "text": "🍿 <b>Chọn danh mục phim bạn muốn xem:</b>", 
+        "text": "🍿 <b>Chọn danh mục phim để xem danh sách:</b>", 
         "parse_mode": "HTML",
         "reply_markup": keyboard
     })
@@ -110,7 +110,7 @@ def format_result(d):
 
 
 def handle_update(update):
-    # 1. Xử lý Callback Query (Khi bấm nút danh mục phim)
+    # 1. Xử lý Callback (Khi người dùng bấm nút danh mục phim)
     if "callback_query" in update:
         query = update["callback_query"]
         chat_id = query["message"]["chat"]["id"]
@@ -120,15 +120,15 @@ def handle_update(update):
             slug = data.replace("cat_", "")
             movies = get_category_list(slug)
             
-            # Lấy tên hiển thị danh mục
-            cat_title = next((c['title'] for c in CATEGORIES if c['slug'] == slug), "Danh mục")
+            # Lấy tiêu đề danh mục hiển thị cho đẹp
+            cat_title = next((c['title'] for c in CATEGORIES if c['slug'] == slug), "Danh sách phim")
             
             if movies:
                 text = f"<b>{cat_title} (Top 10):</b>\n"
                 for m in movies:
                     text += f"\n• <code>{m['code']}</code>\n  👉 {esc(m['title'])}\n"
             else:
-                text = "⚠️ Không thể tải danh sách phim từ hệ thống vào lúc này."
+                text = "⚠️ Hệ thống không lấy được danh sách phim từ danh mục này. Vui lòng thử lại sau!"
             
             tg_call("answerCallbackQuery", {"callback_query_id": query["id"]})
             send_message(chat_id, text)
@@ -155,17 +155,16 @@ def handle_update(update):
     if not text:
         return
         
-    # Các lệnh hệ thống hệ thống
     if text.startswith("/start") or text.startswith("/help") or text.startswith("/id"):
         send_message(chat_id, HELP_TEXT + f"\n\n🆔 ID Telegram của bạn: <code>{esc(user_id)}</code>")
         return
-        
-    # Lệnh gọi Menu danh mục phim độc lập
+
+    # Thêm điều kiện bắt lệnh gõ /menu để gọi danh mục
     if text.lower() == "/menu":
         show_main_menu(chat_id)
         return
 
-    # Phân tách dòng tin nhắn để kiểm tra danh sách mã đơn hàng SePay
+    # Phân tách dòng tin nhắn để kiểm tra danh sách mã đơn hàng
     lines = [l.strip() for l in text.split("\n") if l.strip()]
     
     # Trường hợp 1: Nhập nhiều dòng HOẶC dòng đầu tiên khớp định dạng mã đơn hàng nội bộ (SePay)
@@ -180,22 +179,25 @@ def handle_update(update):
         send_message(chat_id, "\n\n".join(replies) if replies else HELP_TEXT)
         return
 
-    # Trường hợp 2: Tin nhắn đơn dòng và KHÔNG PHẢI mã đơn hàng -> Xử lý luồng phim
+    # Trường hợp 2: Tin nhắn đơn dòng và KHÔNG PHẢI mã đơn hàng -> Xử lý luồng phim tĩnh
     target = lines[0]
     
-    # Thử quét chi tiết phim trực tiếp (Sửa lại chuẩn thụt lề Indent)
+    # Thử quét chi tiết phim trực tiếp (Đã sửa thụt lề chuẩn vào trong IF)
     movie_detail = get_movie_detail(target)
     if movie_detail:
         stream_url = movie_detail['stream_url']
-        # Tạo URL cho player2.html trên máy tính hoặc player.html trên điện thoại tùy ý bạn
+        # Tạo URL cho Mini App, mã hóa đường link m3u8 sạch
         web_app_url = f"{VERCEL_DOMAIN}/player2.html?vid={urllib.parse.quote(stream_url)}"
         
-        reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem trực tiếp!"
+        reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem!"
+        
+        # Tạo nút Mini App
         keyboard = {
             "inline_keyboard": [[
-                {"text": "▶️ Xem Phim (Giao diện gốc)", "web_app": {"url": web_app_url}}
+                {"text": "▶️ Xem Phim (Mini App)", "web_app": {"url": web_app_url}}
             ]]
         }
+        
         tg_call("sendMessage", {
             "chat_id": chat_id, 
             "text": reply, 
@@ -204,11 +206,11 @@ def handle_update(update):
         })
         return
 
-    # Nếu không phải mã phim trực tiếp -> Tiến hành tìm kiếm danh sách theo từ khóa
+    # Nếu không phải mã phim trực tiếp, tiến hành tìm kiếm danh sách theo từ khóa
     search_results = search_missav(target)
     if search_results:
         output_lines = [f"🔍 <b>Kết quả tìm kiếm phim cho: {esc(target)}</b>\n"]
-        for res in search_results[:8]:  # Giới hạn hiển thị 8 kết quả
+        for res in search_results[:8]:  # Giới hạn hiển thị 8 kết quả phù hợp nhất
             short_code = res['slug'].replace("vi/", "")
             output_lines.append(f"• <b>{esc(res['code'])}</b> - {esc(res['title'])}\n  👉 <i>Gửi lại mã:</i> <code>{short_code}</code>")
         send_message(chat_id, "\n".join(output_lines))
