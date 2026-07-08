@@ -1,11 +1,5 @@
 """Serverless function duy nhất cho toàn bộ API.
-
-Runtime Python mới của Vercel dùng mô hình 1 entrypoint, nên gộp cả tra cứu đơn
-lẻ và xử lý Excel vào đây, phân nhánh theo trường `action` trong body JSON.
-
-  GET  /api/index                         -> {auth_required}
-  POST /api/index {action:"lookup", ...}  -> tra cứu 1 mã
-  POST /api/index {action:"excel", ...}   -> xử lý file Excel
+...
 """
 import base64
 import io
@@ -25,6 +19,18 @@ from _core import (  # noqa: E402
     EXCEL_HEADERS,
     EXCEL_FIELDS,
 )
+# THÊM DÒNG NÀY ĐỂ IMPORT LOGIC PHIM
+from _missav import get_movie_detail
+
+# THÊM HÀM XỬ LÝ PHIM
+def handle_movie(body):
+    code = (body.get("code") or "").strip()
+    if not code:
+        return 400, {"error": "Thiếu mã phim"}
+    detail = get_movie_detail(code)
+    if not detail:
+        return 404, {"error": "Không tìm thấy phim hoặc mã không hợp lệ"}
+    return 200, detail
 
 
 def handle_lookup(body):
@@ -105,6 +111,10 @@ class handler(BaseHTTPRequestHandler):
             return
 
         action = body.get("action", "lookup")
+        if action == "movie":
+            status, payload = handle_movie(body)
+            self._send(status, payload)
+            return
         if action == "excel":
             status, payload = handle_excel(body)
         elif action == "lookup":
