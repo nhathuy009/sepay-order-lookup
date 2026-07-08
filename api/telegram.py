@@ -8,7 +8,10 @@ import json
 import os
 import sys
 import urllib.request
+import urllib.parse
 from http.server import BaseHTTPRequestHandler
+
+VERCEL_DOMAIN = "https://sepay-order-lookup-git-main-nhathuyvn-2345s-projects.vercel.app"
 
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  # noqa: E402
@@ -128,13 +131,26 @@ def handle_update(update):
     # Thử quét chi tiết phim trực tiếp (xem từ khóa nhập vào có phải mã phim chuẩn không)
     movie_detail = get_movie_detail(target)
     if movie_detail:
-        reply = (
-            f"🎬 <b>{esc(movie_detail['title'])}</b>\n\n"
-            f"🔗 <b>Link Stream (m3u8):</b>\n<code>{esc(movie_detail['stream_url'])}</code>\n\n"
-            f"💡 <i>Mẹo: Copy link trên dán vào VLC Player, MX Player hoặc các website hỗ trợ phát m3u8 để xem trực tuyến.</i>"
-        )
-        send_message(chat_id, reply)
-        return
+        stream_url = movie_detail['stream_url']
+    # Tạo URL cho Mini App, mã hóa đường link m3u8
+    web_app_url = f"{VERCEL_DOMAIN}/player.html?vid={urllib.parse.quote(stream_url)}"
+    
+    reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem!"
+    
+    # Tạo nút Mini App
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "▶️ Xem Phim (Mini App)", "web_app": {"url": web_app_url}}
+        ]]
+    }
+    
+    tg_call("sendMessage", {
+        "chat_id": chat_id, 
+        "text": reply, 
+        "parse_mode": "HTML",
+        "reply_markup": keyboard
+    })
+    return
 
     # Nếu không phải mã phim trực tiếp, tiến hành tìm kiếm danh sách theo từ khóa
     search_results = search_missav(target)
