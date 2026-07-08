@@ -1,12 +1,8 @@
 """Webhook Telegram cho bot @sepaycheckbot.
 
-Nhận update từ Telegram, tra cứu mã đơn (DH… / BIZ…) và trả kết quả về chat.
-Dùng chung logic với web app qua `_core.lookup_order`.
-
-Env vars:
-  TELEGRAM_BOT_TOKEN      (bắt buộc) token bot
-  TELEGRAM_ALLOWED_IDS    (tùy chọn) danh sách user id được phép, ngăn cách bằng dấu phẩy
-  TELEGRAM_WEBHOOK_SECRET (tùy chọn) chuỗi bí mật khớp với secret_token khi set webhook
+Nhận update từ Telegram, tự động phân phối xử lý:
+- Mã đơn hàng (DH… / BIZ…) -> Tra cứu đơn hệ thống nội bộ.
+- Từ khóa/Mã phim -> Tra cứu luồng stream phim (MissAV).
 """
 import json
 import os
@@ -16,6 +12,7 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  # noqa: E402
+from _missav import search_missav, get_movie_detail  # Tích hợp module mới
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 ALLOWED_IDS = set(
@@ -24,11 +21,14 @@ ALLOWED_IDS = set(
 WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
 HELP_TEXT = (
-    "👋 <b>Bot tra cứu đơn hàng (10X + SOLOBIZ)</b>\n\n"
-    "Gửi mã đơn để tra cứu:\n"
-    "• <code>DH18700</code> (hệ thống 10X)\n"
-    "• <code>BIZ02120</code> (hệ thống SOLOBIZ)\n\n"
-    "Có thể gửi nhiều mã, mỗi mã một dòng."
+    "👋 <b>Bot tích hợp Đơn hàng & Giải trí</b>\n\n"
+    "<b>1. Tra cứu đơn hàng:</b>\n"
+    "• Gửi mã <code>DH18700</code> (Hệ thống 10X)\n"
+    "• Gửi mã <code>BIZ02120</code> (Hệ thống SOLOBIZ)\n"
+    "<i>(Có thể gửi nhiều mã đơn hàng, mỗi mã một dòng)</i>\n\n"
+    "<b>2. Tra cứu phim:</b>\n"
+    "• Gửi trực tiếp mã phim (Ví dụ: <code>snos-056</code>) để lấy link stream m3u8.\n"
+    "• Gửi từ khóa bất kỳ để tìm kiếm danh sách phim."
 )
 
 
@@ -58,13 +58,10 @@ def format_result(d):
     if d.get("status_msg") != "Thành công":
         return f"❌ <b>{esc(d.get('order_code'))}</b>: {esc(d.get('status_msg'))}"
 
-    # Lấy số tiền, ép kiểu về float (mặc định là 0 nếu None hoặc rỗng)
     try:
         amount = float(d.get('orders_amount') or 0)
-        # Định dạng dấu phẩy hàng ngàn rồi đổi thành dấu chấm
         formatted_amount = f"{amount:,.0f}".replace(",", ".")
     except (ValueError, TypeError):
-        # Phòng trường hợp orders_amount là chuỗi không thể ép kiểu thành số
         formatted_amount = d.get('orders_amount')
 
     lines = [
@@ -73,7 +70,7 @@ def format_result(d):
         f"📞 SĐT KH: <code>{esc(d.get('lead_phone'))}</code>",
         f"👤 Username: <code>{esc(d.get('username'))}</code>",
         f"🧑 Họ tên: {esc(d.get('users_name'))}",
-        f"💰 Số tiền: {esc(formatted_amount)}",  # <-- Đã thay đổi ở đây
+        f"💰 Số tiền: {esc(formatted_amount)}",
         f"🗓 Ngày TT: {esc(d.get('einvoice_created_at'))}",
         f"🧾 Số hóa đơn: {esc(d.get('invoice_number'))}",
     ]
@@ -84,6 +81,7 @@ def format_result(d):
     else:
         lines.append("🤝 Ref: (không có)")
     return "\n".join(lines)
+
 
 def handle_update(update):
     message = update.get("message") or update.get("edited_message")
@@ -109,14 +107,45 @@ def handle_update(update):
         send_message(chat_id, HELP_TEXT + f"\n\n🆔 ID Telegram của bạn: <code>{esc(user_id)}</code>")
         return
 
-    codes = [c.strip() for c in text.split("\n") if c.strip()][:20]
-    replies = []
-    for code in codes:
-        if detect_system(code) is None:
-            replies.append(f"⚠️ <b>{esc(code)}</b>: mã không hợp lệ (phải bắt đầu bằng DH/BIZ)")
-            continue
-        replies.append(format_result(lookup_order(code)))
-    send_message(chat_id, "\n\n".join(replies) if replies else HELP_TEXT)
+    # Phân tách dòng tin nhắn để kiểm tra danh sách mã đơn hàng
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    
+    # Trường hợp 1: Nhập nhiều dòng HOẶC dòng đầu tiên khớp định dạng mã đơn hàng nội bộ
+    if len(lines) > 1 or detect_system(lines[0]) is not None:
+        codes = lines[:20]
+        replies = []
+        for code in codes:
+            if detect_system(code) is None:
+                replies.append(f"⚠️ <b>{esc(code)}</b>: mã không hợp lệ (phải bắt đầu bằng DH/BIZ)")
+                continue
+            replies.append(format_result(lookup_order(code)))
+        send_message(chat_id, "\n\n".join(replies) if replies else HELP_TEXT)
+        return
+
+    # Trường hợp 2: Tin nhắn đơn dòng và KHÔNG PHẢI mã đơn hàng -> Xử lý luồng phim tĩnh
+    target = lines[0]
+    
+    # Thử quét chi tiết phim trực tiếp (xem từ khóa nhập vào có phải mã phim chuẩn không)
+    movie_detail = get_movie_detail(target)
+    if movie_detail:
+        reply = (
+            f"🎬 <b>{esc(movie_detail['title'])}</b>\n\n"
+            f"🔗 <b>Link Stream (m3u8):</b>\n<code>{esc(movie_detail['stream_url'])}</code>\n\n"
+            f"💡 <i>Mẹo: Copy link trên dán vào VLC Player, MX Player hoặc các website hỗ trợ phát m3u8 để xem trực tuyến.</i>"
+        )
+        send_message(chat_id, reply)
+        return
+
+    # Nếu không phải mã phim trực tiếp, tiến hành tìm kiếm danh sách theo từ khóa
+    search_results = search_missav(target)
+    if search_results:
+        output_lines = [f"🔍 <b>Kết quả tìm kiếm phim cho: {esc(target)}</b>\n"]
+        for res in search_results[:8]:  # Giới hạn hiển thị 8 kết quả phù hợp nhất
+            short_code = res['slug'].replace("vi/", "")
+            output_lines.append(f"• <b>{esc(res['code'])}</b> - {esc(res['title'])}\n  👉 <i>Gửi lại mã:</i> <code>{short_code}</code>")
+        send_message(chat_id, "\n".join(output_lines))
+    else:
+        send_message(chat_id, f"⚠️ Hệ thống không tìm thấy đơn hàng hoặc dữ liệu phim tương ứng với: <b>{esc(target)}</b>")
 
 
 class handler(BaseHTTPRequestHandler):
@@ -132,11 +161,10 @@ class handler(BaseHTTPRequestHandler):
         self._ok()
 
     def do_POST(self):
-        # Xác thực secret_token của Telegram nếu có cấu hình.
         if WEBHOOK_SECRET:
             got = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
             if got != WEBHOOK_SECRET:
-                self._ok()  # bỏ qua request không hợp lệ, vẫn trả 200
+                self._ok()
                 return
         try:
             length = int(self.headers.get("Content-Length", 0))
