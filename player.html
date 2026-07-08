@@ -28,7 +28,7 @@
         
         // BẮT BUỘC: Đưa URL gốc qua Cloudflare Worker Proxy để chèn Referer
         // Chú ý: Thay "TEN-WORKER-CUA-BAN" bằng địa chỉ thực tế sau khi thiết lập ở Bước 3
-        const proxyBase = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
+        const proxyBase = "https://round-dawn-0365.nhathuy-vn.workers.dev/?url=";
         const vidUrl = proxyBase + encodeURIComponent(rawVidUrl);
 
         const video = document.getElementById('video');
