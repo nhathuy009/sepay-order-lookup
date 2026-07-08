@@ -189,7 +189,7 @@ def handle_update(update):
     if movie_detail:
         stream_url = movie_detail['stream_url']
         # Tạo URL cho Mini App, mã hóa đường link m3u8 sạch
-        web_app_url = f"{VERCEL_DOMAIN}/player2.html?vid={urllib.parse.quote(stream_url)}"
+        web_app_url = f"{VERCEL_DOMAIN}/player.html?vid={urllib.parse.quote(stream_url)}"
         
         reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem!"
         
