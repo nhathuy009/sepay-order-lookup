@@ -110,7 +110,7 @@ def format_result(d):
 
 
 def handle_update(update):
-    # 1. Xử lý Callback (Khi người dùng bấm nút danh mục phim)
+    # 1. Xử lý Callback Query (Khi bấm nút danh mục phim)
     if "callback_query" in update:
         query = update["callback_query"]
         chat_id = query["message"]["chat"]["id"]
