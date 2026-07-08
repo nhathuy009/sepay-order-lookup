@@ -10,6 +10,7 @@ import sys
 import urllib.request
 import urllib.parse
 from http.server import BaseHTTPRequestHandler
+from _missav import get_category_list
 
 VERCEL_DOMAIN = "https://sepay-order-lookup.vercel.app"
 
