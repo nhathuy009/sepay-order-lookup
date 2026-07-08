@@ -118,6 +118,8 @@ def handle_update(update):
         
         if data.startswith("cat_"):
             slug = data.replace("cat_", "")
+            # --- CHUYỂN LÊN ĐÂY: Tắt vòng xoay loading của nút bấm ngay lập tức ---
+            tg_call("answerCallbackQuery", {"callback_query_id": query["id"]})
             movies = get_category_list(slug)
             
             # Lấy tiêu đề danh mục hiển thị cho đẹp
