@@ -2,7 +2,7 @@
   "builds": [
     { "src": "api/index.py", "use": "@vercel/python@4.8.0" },
     { "src": "api/telegram.py", "use": "@vercel/python@4.8.0" },
-    { "src": "index.html", "use": "@vercel/static" }
+    { "src": "index.html", "use": "@vercel/static" },
     { "src": "player.html", "use": "@vercel/static" }
   ],
   "routes": [
