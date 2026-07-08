@@ -93,7 +93,7 @@
         document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
 
         // CHÚ Ý: Thay bằng đường dẫn Cloudflare Worker Proxy của bạn
-        const PROXY_BASE = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
+        const PROXY_BASE = "https://round-dawn-0365.nhathuy-vn.workers.dev/?url=";
 
         const urlParams = new URLSearchParams(window.location.search);
         const rawVidUrl = urlParams.get('vid');
