@@ -4,47 +4,51 @@ import requests
 BASE_URL = "https://missav.media"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Referer": "https://missav123.com/",
+    "Referer": "https://missav.media/",
 }
 
+def clean_text(text):
+    if not text:
+        return ""
+    text = re.sub(r'<[^>]*>', '', text)
+    replacements = {"&amp;": "&", "&quot;": '"', "&#039;": "'", "&lt;": "<", "&gt;": ">"}
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    return " ".join(text.split()).strip()
+
 def get_category_list(slug):
-    """Lấy danh sách phim theo slug danh mục (ví dụ: vi/today-hot)"""
+    """Lấy danh sách phim theo slug danh mục"""
     url = f"{BASE_URL}/{slug}"
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         if resp.status_code != 200: return []
         html = resp.text
         
-        # MissAV dùng cấu trúc thumbnail cho danh sách
-        parts = html.split('class="thumbnail')
+        # Bóc tách HTML tối ưu như plugin JS
+        parts = html.split('thumbnail group')
+        if len(parts) <= 1:
+            parts = html.split('class="thumbnail')
+            
         results = []
         for part in parts[1:]:
             link_match = re.search(r'<a[^>]+href="[^"]*/vi/([^"/\ ?]+)"', part)
             if not link_match: continue
-            
             code_str = link_match.group(1)
-            title_match = re.search(r'alt="([^"]+)"', part)
-            title = clean_text(title_match.group(1)) if title_match else code_str
+            
+            # Ưu tiên lấy tiêu đề phim nằm trong thuộc tính alt của ảnh
+            title_match = re.search(r'<img[^>]+(?:alt|title)="([^"]+)"', part, re.IGNORECASE)
+            title = clean_text(title_match.group(1)) if title_match else code_str.upper()
             
             results.append({
                 "code": code_str.upper(),
                 "title": title
             })
-            if len(results) >= 10: break # Giới hạn 10 phim/lần để tránh bot quá dài
+            
+            # Lấy 15 phim mỗi dòng để đủ hiển thị cuộn trên web
+            if len(results) >= 15: break 
         return results
-    except Exception:
+    except Exception as e:
         return []
-        
-def clean_text(text):
-    if not text:
-        return ""
-    # Xóa các thẻ HTML
-    text = re.sub(r'<[^>]*>', '', text)
-    # Giải mã thực thể HTML cơ bản
-    replacements = {"&amp;": "&", "&quot;": '"', "&#039;": "'", "&lt;": "<", "&gt;": ">"}
-    for k, v in replacements.items():
-        text = text.replace(k, v)
-    return " ".join(text.split()).strip()
 
 def search_missav(keyword):
     """Tìm kiếm danh sách phim theo từ khóa"""
@@ -55,7 +59,6 @@ def search_missav(keyword):
             return []
         html = resp.text
         
-        # Cắt chuỗi theo cụm class tương tự như mã nguồn JS plugin
         parts = html.split('thumbnail group')
         if len(parts) <= 1:
             parts = html.split('class="thumbnail')
@@ -63,8 +66,7 @@ def search_missav(keyword):
         results = []
         for part in parts[1:]:
             link_match = re.search(r'<a[^>]+href="[^"]*/vi/([^"/\ ?]+)"', part)
-            if not link_match:
-                continue
+            if not link_match: continue
             code_str = link_match.group(1)
             
             code_match = re.search(r'class="[^"]*text-nord13[^"]*"[^>]*>([\s\S]*?)<\/a>', part)
@@ -93,29 +95,22 @@ def get_movie_detail(slug_or_code):
             return None
         html = resp.text
         
-        # Chiến lược 1: Quét trực tiếp domain chứa UUID
         uuid = None
-        domain_match = re.search(r'(?:surrit|sixyik|nineyu|fourhoi)\.com/([0-9a-f-]{36})', html, re.IGNORECASE)
-        if domain_match:
-            uuid = domain_match.group(1)
+        uuid_matches = re.findall(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', html, re.IGNORECASE)
+        blacklist = ["snaptrckr", "user_uuid", "popunder", "banner", "monitoring", "crypto", "randomuuid", "generateuuid"]
+        
+        for u in uuid_matches:
+            idx = html.find(u)
+            if idx != -1:
+                context = html[max(0, idx - 80):min(len(html), idx + 80)].lower()
+                if any(b in context for b in blacklist):
+                    continue
+            uuid = u
+            break
             
-        # Chiến lược 2: Deep Scan UUID (Fallback nếu không khớp domain)
-        if not uuid:
-            uuid_matches = re.findall(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', html, re.IGNORECASE)
-            blacklist = ["snaptrckr", "user_uuid", "popunder", "banner", "monitoring", "crypto", "randomuuid", "generateuuid"]
-            for u in uuid_matches:
-                idx = html.find(u)
-                if idx != -1:
-                    context = html[max(0, idx - 80):min(len(html), idx + 80)].lower()
-                    if any(b in context for b in blacklist):
-                        continue
-                uuid = u
-                break
-                
         if not uuid:
             return None
             
-        # Trích xuất tiêu đề og:title
         title_match = re.search(r'property="og:title"\s+content="([^"]+)"', html, re.IGNORECASE)
         title = clean_text(title_match.group(1)) if title_match else code_clean.upper()
         
