@@ -4,51 +4,147 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trình phát phim</title>
-    <!-- SDK Telegram Web App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
         video { width: 100%; height: 100%; outline: none; object-fit: contain; }
-        #error-msg { color: white; display: none; font-family: sans-serif; text-align: center; padding: 20px; }
+        #error-msg { color: white; display: none; text-align: center; padding: 20px; z-index: 10; }
+        
+        /* Giao diện thanh tìm kiếm nổi */
+        #search-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 8px;
+            background: rgba(30, 41, 59, 0.85);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s;
+        }
+        /* Tự động mờ thanh tìm kiếm khi không di chuột để đỡ vướng màn hình */
+        #search-box:not(:hover):not(:focus-within) { opacity: 0.3; }
+        
+        #search-box input {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            outline: none;
+            width: 200px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        #search-box button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #search-box button:disabled { background: #64748b; cursor: not-allowed; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
+    <div id="search-box">
+        <input type="text" id="movieCode" placeholder="Mã phim (VD: snos-056)" onkeydown="if(event.key==='Enter') fetchAndPlay()">
+        <button id="playBtn" onclick="fetchAndPlay()">Xem</button>
+    </div>
+
     <video id="video" controls autoplay playsinline></video>
-    <div id="error-msg">Không thể tải luồng phim. Vui lòng thử lại sau.</div>
+    <div id="error-msg"></div>
 
     <script>
-        // Mở rộng Mini App full màn hình Telegram
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-        window.Telegram.WebApp.setHeaderColor('#000000');
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const rawVidUrl = urlParams.get('vid');
-        
-        // BẮT BUỘC: Đưa URL gốc qua Cloudflare Worker Proxy để chèn Referer
-        // Chú ý: Thay "TEN-WORKER-CUA-BAN" bằng địa chỉ thực tế sau khi thiết lập ở Bước 3
-        const proxyBase = "https://round-dawn-0365.nhathuy-vn.workers.dev/?url=";
-        const vidUrl = proxyBase + encodeURIComponent(rawVidUrl);
+        // Thiết lập Mini App
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+            window.Telegram.WebApp.setHeaderColor('#000000');
+        }
 
         const video = document.getElementById('video');
         const errorDiv = document.getElementById('error-msg');
+        let hlsInstance = null;
 
-        if (Hls.isSupported()) {
-            const hls = new Hls({ maxBufferLength: 30 });
-            hls.loadSource(vidUrl);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    errorDiv.style.display = 'block';
-                    video.style.display = 'none';
+        // Chú ý: Thay bằng link Cloudflare Worker của bạn
+        const PROXY_BASE = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
+
+        // Xử lý khi mở bằng link có sẵn ?vid=... từ Telegram Bot
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawVidUrl = urlParams.get('vid');
+        if (rawVidUrl) {
+            playStream(rawVidUrl);
+        }
+
+        // Hàm gọi API lấy link m3u8 từ mã phim
+        async function fetchAndPlay() {
+            const codeInput = document.getElementById('movieCode').value.trim();
+            if (!codeInput) return;
+
+            const btn = document.getElementById('playBtn');
+            btn.disabled = true;
+            btn.innerText = "Đang tìm...";
+            errorDiv.style.display = 'none';
+            video.style.display = 'block';
+
+            try {
+                const res = await fetch('/api/index', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'movie', code: codeInput })
+                });
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    showError("❌ " + (data.error || "Lỗi không xác định"));
+                } else {
+                    playStream(data.stream_url);
                 }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Dành cho iOS Safari (Hỗ trợ HLS mặc định)
-            video.src = vidUrl;
-        } else {
-            errorDiv.innerHTML = "Trình duyệt không hỗ trợ định dạng này.";
+            } catch (err) {
+                showError("❌ Lỗi kết nối đến máy chủ.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Xem";
+            }
+        }
+
+        // Hàm phát video
+        function playStream(rawUrl) {
+            const vidUrl = PROXY_BASE + encodeURIComponent(rawUrl);
+            errorDiv.style.display = 'none';
+            video.style.display = 'block';
+
+            if (hlsInstance) {
+                hlsInstance.destroy();
+            }
+
+            if (Hls.isSupported()) {
+                hlsInstance = new Hls({ maxBufferLength: 30 });
+                hlsInstance.loadSource(vidUrl);
+                hlsInstance.attachMedia(video);
+                hlsInstance.on(Hls.Events.ERROR, function (event, data) {
+                    if (data.fatal) {
+                        showError("⚠️ Luồng phim bị lỗi hoặc bị chặn bởi máy chủ gốc.");
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Hỗ trợ iOS Safari
+                video.src = vidUrl;
+            } else {
+                showError("Trình duyệt không hỗ trợ định dạng video này.");
+            }
+        }
+
+        function showError(msg) {
+            video.style.display = 'none';
+            errorDiv.innerText = msg;
             errorDiv.style.display = 'block';
         }
     </script>
