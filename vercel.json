@@ -10,7 +10,7 @@
     { "src": "/api/telegram", "dest": "/api/telegram.py" },
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/player.html", "dest": "/player.html" },
-    { "src": "/player2.html", "dest": "/player2.html" },
+    { "src": "/jav", "dest": "/player2.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
