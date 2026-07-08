@@ -11,7 +11,7 @@
         video { width: 100%; height: 100%; outline: none; object-fit: contain; }
         #error-msg { color: white; display: none; text-align: center; padding: 20px; z-index: 10; }
         
-        /* Giao diện thanh tìm kiếm nổi */
+        /* Giao diện thanh công cụ nổi */
         #search-box {
             position: absolute;
             top: 20px;
@@ -20,24 +20,35 @@
             z-index: 20;
             display: flex;
             gap: 8px;
-            background: rgba(30, 41, 59, 0.85);
+            background: rgba(30, 41, 59, 0.9);
             padding: 10px;
             border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
             backdrop-filter: blur(4px);
             transition: opacity 0.3s;
+            flex-wrap: wrap;
+            justify-content: center;
         }
-        /* Tự động mờ thanh tìm kiếm khi không di chuột để đỡ vướng màn hình */
-        #search-box:not(:hover):not(:focus-within) { opacity: 0.3; }
+        /* Tự động mờ thanh công cụ khi không di chuột để tránh che mắt khi xem phim */
+        #search-box:not(:hover):not(:focus-within) { opacity: 0.4; }
         
         #search-box input {
             padding: 10px 14px;
             border: none;
             border-radius: 6px;
             outline: none;
-            width: 200px;
             background: #0f172a;
             color: #e2e8f0;
+            font-size: 14px;
+        }
+        /* Ô nhập mật khẩu truy cập */
+        #search-box #accessToken {
+            width: 140px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Ô nhập mã phim */
+        #search-box #movieCode {
+            width: 180px;
         }
         #search-box button {
             padding: 10px 18px;
@@ -47,13 +58,14 @@
             color: white;
             font-weight: 600;
             cursor: pointer;
+            font-size: 14px;
         }
         #search-box button:disabled { background: #64748b; cursor: not-allowed; }
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div id="search-box">
+        <input type="password" id="accessToken" placeholder="Mật khẩu truy cập" />
         <input type="text" id="movieCode" placeholder="Mã phim (VD: snos-056)" onkeydown="if(event.key==='Enter') fetchAndPlay()">
         <button id="playBtn" onclick="fetchAndPlay()">Xem</button>
     </div>
@@ -61,8 +73,8 @@
     <video id="video" controls autoplay playsinline></video>
     <div id="error-msg"></div>
 
-    <script>
-        // Thiết lập Mini App
+    <script {nonce}>
+        // Thiết lập Mini App Telegram
         if (window.Telegram && window.Telegram.WebApp) {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
@@ -73,20 +85,28 @@
         const errorDiv = document.getElementById('error-msg');
         let hlsInstance = null;
 
-        // Chú ý: Thay bằng link Cloudflare Worker của bạn
+        // Tự động đồng bộ mật khẩu đã lưu từ localStorage (dùng chung với index.html)
+        document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
+
+        // CHÚ Ý: Thay bằng đường dẫn Cloudflare Worker Proxy của bạn
         const PROXY_BASE = "https://TEN-WORKER-CUA-BAN.workers.dev/?url=";
 
-        // Xử lý khi mở bằng link có sẵn ?vid=... từ Telegram Bot
+        // Xử lý tự động phát nếu mở từ nút bấm Bot Telegram gửi sang (?vid=...)
         const urlParams = new URLSearchParams(window.location.search);
         const rawVidUrl = urlParams.get('vid');
         if (rawVidUrl) {
             playStream(rawVidUrl);
         }
 
-        // Hàm gọi API lấy link m3u8 từ mã phim
+        // Hàm gọi API lấy dữ liệu luồng m3u8 từ mã phim
         async function fetchAndPlay() {
             const codeInput = document.getElementById('movieCode').value.trim();
+            const tokenInput = document.getElementById('accessToken').value.trim();
+            
             if (!codeInput) return;
+
+            // Lưu lại mật khẩu vào cấu hình trình duyệt để không phải nhập lại lần sau
+            localStorage.setItem("sepay_access_token", tokenInput);
 
             const btn = document.getElementById('playBtn');
             btn.disabled = true;
@@ -98,7 +118,11 @@
                 const res = await fetch('/api/index', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'movie', code: codeInput })
+                    body: JSON.stringify({ 
+                        action: 'movie', 
+                        code: codeInput,
+                        access_token: tokenInput // Gửi kèm token lên serverless function để kiểm tra APP_ACCESS_TOKEN
+                    })
                 });
                 const data = await res.json();
                 
@@ -108,14 +132,14 @@
                     playStream(data.stream_url);
                 }
             } catch (err) {
-                showError("❌ Lỗi kết nối đến máy chủ.");
+                showError("❌ Lỗi kết nối đến hệ thống API.");
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Xem";
             }
         }
 
-        // Hàm phát video
+        // Hàm phát luồng HLS video
         function playStream(rawUrl) {
             const vidUrl = PROXY_BASE + encodeURIComponent(rawUrl);
             errorDiv.style.display = 'none';
@@ -131,14 +155,14 @@
                 hlsInstance.attachMedia(video);
                 hlsInstance.on(Hls.Events.ERROR, function (event, data) {
                     if (data.fatal) {
-                        showError("⚠️ Luồng phim bị lỗi hoặc bị chặn bởi máy chủ gốc.");
+                        showError("⚠️ Luồng phim bị lỗi hoặc bị chặn bởi máy chủ lưu trữ gốc.");
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Hỗ trợ iOS Safari
+                // Tương thích trực tiếp với iOS Safari
                 video.src = vidUrl;
             } else {
-                showError("Trình duyệt không hỗ trợ định dạng video này.");
+                showError("Trình duyệt hiện tại không hỗ trợ định dạng luồng HLS này.");
             }
         }
 
