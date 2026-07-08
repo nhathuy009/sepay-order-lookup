@@ -22,17 +22,18 @@
         #welcome-screen { position: absolute; color: #475569; text-align: center; font-size: 18px; font-weight: 500; z-index: 1; user-select: none; }
         #welcome-screen span { font-size: 40px; display: block; margin-bottom: 10px; }
 
-        /* Thanh công cụ tìm kiếm */
+        /* Thanh công cụ tìm kiếm mặc định */
         #search-box {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20;
             display: flex; gap: 8px; background: rgba(30, 41, 59, 0.9); padding: 10px; border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(4px); transition: opacity 0.3s; flex-wrap: wrap; justify-content: center;
-            opacity: 0.95; /* Luôn hiển thị khi chưa có phim */
+            opacity: 1; pointer-events: auto; /* Luôn hiện và thao tác được */
         }
-        #search-box:hover, #search-box:focus-within { opacity: 1; }
         
-        /* Chế độ rạp chiếu: Chỉ tàng hình thanh tìm kiếm khi phim ĐANG PHÁT và KHÔNG thao tác chuột */
-        body.video-active #search-box:not(:hover):not(:focus-within) { opacity: 0; pointer-events: none; }
+        /* Chế độ rạp chiếu: Khi có class hide-ui, thanh công cụ sẽ ẩn đi */
+        body.video-active.hide-ui #search-box {
+            opacity: 0; pointer-events: none;
+        }
         
         #search-box input { padding: 10px 14px; border: none; border-radius: 6px; outline: none; background: #0f172a; color: #e2e8f0; font-size: 14px; }
         #search-box #accessToken { width: 140px; border: 1px solid rgba(255,255,255,0.1); }
@@ -61,11 +62,43 @@
         const video = document.getElementById('player');
         const errorDiv = document.getElementById('error-msg');
         const welcomeScreen = document.getElementById('welcome-screen');
+        const searchBox = document.getElementById('search-box');
         let hlsInstance = null;
         let plyrInstance = null;
+        let uiTimeout; // Biến lưu bộ đếm thời gian ẩn UI
 
         // Tự động tải mật khẩu đã lưu
         document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
+
+        // ----- HỆ THỐNG HIỂN THỊ UI THÔNG MINH -----
+        function wakeUpUI() {
+            // Xóa class ẩn UI để hiện lại thanh công cụ
+            document.body.classList.remove('hide-ui');
+            
+            // Xóa bộ đếm cũ nếu có
+            clearTimeout(uiTimeout);
+            
+            // Chỉ thiết lập đếm ngược ẩn UI nếu đang trong chế độ xem phim
+            if (document.body.classList.contains('video-active')) {
+                uiTimeout = setTimeout(() => {
+                    // Chú ý: Không ẩn UI nếu người dùng đang nhấp chuột vào ô nhập liệu
+                    const activeElement = document.activeElement;
+                    if (activeElement.tagName !== 'INPUT') {
+                        document.body.classList.add('hide-ui');
+                    }
+                }, 3000); // Ẩn sau 3 giây không cử động
+            }
+        }
+
+        // Đánh thức UI khi có bất kỳ cử động nào
+        document.addEventListener('mousemove', wakeUpUI);
+        document.addEventListener('touchstart', wakeUpUI);
+        document.addEventListener('keydown', wakeUpUI);
+
+        // Đánh thức UI khi chuột di chuyển hẳn vào thanh công cụ để không bị biến mất giữa chừng
+        searchBox.addEventListener('mouseenter', () => clearTimeout(uiTimeout));
+        searchBox.addEventListener('mouseleave', wakeUpUI);
+        // -------------------------------------------
 
         // Chạy ngay nếu URL có tham số (từ bot gửi qua)
         const urlParams = new URLSearchParams(window.location.search);
@@ -112,7 +145,10 @@
         function playStream(streamUrl) {
             errorDiv.style.display = 'none';
             welcomeScreen.style.display = 'none'; // Xóa màn hình chờ
-            document.body.classList.add('video-active'); // Kích hoạt chế độ chiếu phim (ẩn thanh search)
+            
+            // Kích hoạt chế độ chiếu phim, bắt đầu đếm ngược ẩn UI
+            document.body.classList.add('video-active');
+            wakeUpUI(); 
             
             // Xóa HLS cũ nếu đang xem dở phim trước đó
             if (hlsInstance) { hlsInstance.destroy(); }
@@ -143,7 +179,6 @@
                 hlsInstance.attachMedia(video);
                 
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                // Tương thích thẳng cho Safari/iOS
                 video.src = streamUrl;
                 if (!plyrInstance) { plyrInstance = new Plyr(video, playerSettings); }
                 video.play();
