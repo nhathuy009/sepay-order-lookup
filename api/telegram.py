@@ -13,6 +13,28 @@ from http.server import BaseHTTPRequestHandler
 
 VERCEL_DOMAIN = "https://sepay-order-lookup.vercel.app"
 
+# Danh sách menu cấu hình
+CATEGORIES = [
+    {'slug': 'vi/today-hot', 'title': '🔥 Hot Hôm Nay'},
+    {'slug': 'vi/weekly-hot', 'title': '📅 Hot Trong Tuần'},
+    {'slug': 'vi/monthly-hot', 'title': '📆 Hot Trong Tháng'},
+    {'slug': 'vi/uncensored-leak', 'title': '🔞 Không Che'},
+    {'slug': 'vi/release', 'title': '🆕 Mới Cập Nhật'}
+]
+
+def show_main_menu(chat_id):
+    keyboard = {"inline_keyboard": []}
+    for cat in CATEGORIES:
+        # Callback data phải ngắn gọn để tránh quá ký tự (Telegram giới hạn 64 bytes)
+        keyboard["inline_keyboard"].append([
+            {"text": cat['title'], "callback_data": f"cat_{cat['slug']}"}
+        ])
+    tg_call("sendMessage", {
+        "chat_id": chat_id, 
+        "text": "Chọn danh mục phim:", 
+        "reply_markup": keyboard
+    })
+
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  # noqa: E402
 from _missav import search_missav, get_movie_detail  # Tích hợp module mới
@@ -87,6 +109,29 @@ def format_result(d):
 
 
 def handle_update(update):
+    def handle_update(update):
+    # 1. Xử lý Callback (Khi người dùng bấm nút menu)
+    if "callback_query" in update:
+        query = update["callback_query"]
+        chat_id = query["message"]["chat"]["id"]
+        data = query["data"]
+        
+        if data.startswith("cat_"):
+            slug = data.replace("cat_", "")
+            movies = get_category_list(slug)
+            
+            if movies:
+                text = f"Top phim {slug.split('/')[-1].replace('-', ' ')}:\n"
+                for m in movies:
+                    text += f"\n• <code>{m['code']}</code>: {esc(m['title'])}"
+            else:
+                text = "⚠️ Không lấy được danh sách."
+            
+            tg_call("answerCallbackQuery", {"callback_query_id": query["id"]})
+            send_message(chat_id, text)
+        return
+
+    # 2. Xử lý tin nhắn văn bản thông thường (như trước)
     message = update.get("message") or update.get("edited_message")
     if not message:
         return
