@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
-
+from _missav import get_movie_detail, get_category_list
 import openpyxl
 
 sys.path.append(os.path.dirname(__file__))
@@ -19,9 +19,14 @@ from _core import (  # noqa: E402
     EXCEL_HEADERS,
     EXCEL_FIELDS,
 )
-# THÊM DÒNG NÀY ĐỂ IMPORT LOGIC PHIM
-from _missav import get_movie_detail
 
+def handle_category(body):
+    slug = (body.get("slug") or "").strip()
+    if not slug:
+        return 400, {"error": "Thiếu slug danh mục"}
+    movies = get_category_list(slug)
+    return 200, {"movies": movies}
+    
 # THÊM HÀM XỬ LÝ PHIM
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -113,6 +118,10 @@ class handler(BaseHTTPRequestHandler):
         action = body.get("action", "lookup")
         if action == "movie":
             status, payload = handle_movie(body)
+            self._send(status, payload)
+            return
+        if action == "category":
+            status, payload = handle_category(body)
             self._send(status, payload)
             return
         if action == "excel":
