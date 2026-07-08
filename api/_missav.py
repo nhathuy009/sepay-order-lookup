@@ -7,6 +7,34 @@ HEADERS = {
     "Referer": "https://missav123.com/",
 }
 
+def get_category_list(slug):
+    """Lấy danh sách phim theo slug danh mục (ví dụ: vi/today-hot)"""
+    url = f"{BASE_URL}/{slug}"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200: return []
+        html = resp.text
+        
+        # MissAV dùng cấu trúc thumbnail cho danh sách
+        parts = html.split('class="thumbnail')
+        results = []
+        for part in parts[1:]:
+            link_match = re.search(r'<a[^>]+href="[^"]*/vi/([^"/\ ?]+)"', part)
+            if not link_match: continue
+            
+            code_str = link_match.group(1)
+            title_match = re.search(r'alt="([^"]+)"', part)
+            title = clean_text(title_match.group(1)) if title_match else code_str
+            
+            results.append({
+                "code": code_str.upper(),
+                "title": title
+            })
+            if len(results) >= 10: break # Giới hạn 10 phim/lần để tránh bot quá dài
+        return results
+    except Exception:
+        return []
+        
 def clean_text(text):
     if not text:
         return ""
