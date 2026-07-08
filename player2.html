@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trình phát phim (Bản sao gốc)</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.6.8/plyr.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.3/hls.min.js"></script>
+    
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
+        
+        /* Cấu hình màu Plyr giống trang gốc MissAV */
+        :root { --plyr-color-main: #fe628e; --plyr-captions-background: rgba(0, 0, 0, 0.5); }
+        .plyr { width: 100%; height: 100%; }
+        
+        #error-msg { position: absolute; color: #f87171; display: none; text-align: center; padding: 20px; z-index: 10; max-width: 90%; background: rgba(0,0,0,0.8); border-radius: 8px; }
+        
+        /* Thanh công cụ tìm kiếm mờ ảo */
+        #search-box {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20;
+            display: flex; gap: 8px; background: rgba(30, 41, 59, 0.9); padding: 10px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(4px); transition: opacity 0.3s; flex-wrap: wrap; justify-content: center;
+        }
+        
+        /* Ẩn thanh tìm kiếm khi không rê chuột vào màn hình (tối ưu xem phim) */
+        #search-box:not(:hover):not(:focus-within) { opacity: 0; pointer-events: none; }
+        body:hover #search-box { opacity: 1; pointer-events: auto; }
+        
+        #search-box input { padding: 10px 14px; border: none; border-radius: 6px; outline: none; background: #0f172a; color: #e2e8f0; font-size: 14px; }
+        #search-box #accessToken { width: 140px; border: 1px solid rgba(255,255,255,0.1); }
+        #search-box #movieCode { width: 180px; text-transform: uppercase; }
+        #search-box button { padding: 10px 18px; border: none; border-radius: 6px; background: #3b82f6; color: white; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;}
+        #search-box button:hover { background: #2563eb; }
+        #search-box button:disabled { background: #64748b; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="search-box">
+        <input type="password" id="accessToken" placeholder="Mật khẩu truy cập" />
+        <input type="text" id="movieCode" placeholder="Mã phim (VD: SNOS-056)" onkeydown="if(event.key==='Enter') fetchAndPlay()">
+        <button id="playBtn" onclick="fetchAndPlay()">Phát Video</button>
+    </div>
+
+    <video id="player" playsinline crossorigin="anonymous"></video>
+    <div id="error-msg"></div>
+
+    <script>
+        const video = document.getElementById('player');
+        const errorDiv = document.getElementById('error-msg');
+        let hlsInstance = null;
+        let plyrInstance = null;
+
+        // Tự động tải mật khẩu đã lưu
+        document.getElementById("accessToken").value = localStorage.getItem("sepay_access_token") || "";
+
+        // Cho phép nhận link trực tiếp từ URL (?vid=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        const rawVidUrl = urlParams.get('vid');
+        if (rawVidUrl) { playStream(rawVidUrl); }
+
+        async function fetchAndPlay() {
+            const codeInput = document.getElementById('movieCode').value.trim();
+            const tokenInput = document.getElementById('accessToken').value.trim();
+            if (!codeInput) return;
+
+            // Lưu mật khẩu cho lần sau
+            localStorage.setItem("sepay_access_token", tokenInput);
+            
+            const btn = document.getElementById('playBtn');
+            btn.disabled = true; 
+            btn.innerText = "Đang tìm...";
+            errorDiv.style.display = 'none';
+
+            try {
+                // Gọi API backend lấy luồng m3u8 sạch (mrstcdn.store)
+                const res = await fetch('/api/index', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'movie', code: codeInput, access_token: tokenInput })
+                });
+                const data = await res.json();
+                
+                if (!res.ok) { 
+                    showError("❌ " + (data.error || "Lỗi API")); 
+                } else if (!data.stream_url) { 
+                    showError("❌ Không tìm thấy stream_url."); 
+                } else { 
+                    // Bắt đầu phát
+                    playStream(data.stream_url); 
+                }
+            } catch (err) { 
+                showError("❌ Lỗi kết nối API"); 
+            } finally { 
+                btn.disabled = false; 
+                btn.innerText = "Phát Video"; 
+            }
+        }
+
+        function playStream(streamUrl) {
+            errorDiv.style.display = 'none';
+            
+            // Xóa HLS cũ nếu có để tránh đè luồng
+            if (hlsInstance) { hlsInstance.destroy(); }
+            
+            // Cấu hình giao diện Plyr (Màu hồng, tốc độ phát, nút download...)
+            const playerSettings = {
+                controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'settings', 'fullscreen', 'volume'],
+                speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] },
+                autoplay: true,
+                i18n: {
+                    speed: 'Tốc độ',
+                    normal: 'Bình thường',
+                    quality: 'Chất lượng',
+                    qualityLabel: { 0: 'Tự động' }
+                }
+            };
+
+            if (Hls.isSupported()) {
+                // Cấu hình HLS tối ưu bộ đệm (giống web gốc)
+                hlsInstance = new Hls({ 
+                    autoStartLoad: true,
+                    maxBufferSize: 1 * 1000 * 1000 
+                });
+                
+                // Thuật toán chống chặn (tự động thử lại khi gặp mã 429)
+                let parsedManifest = false;
+                hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                    if (!parsedManifest && data.networkDetails && data.networkDetails.status === 429) {
+                        hlsInstance.loadSource(streamUrl);
+                    }
+                });
+
+                hlsInstance.loadSource(streamUrl);
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    parsedManifest = true;
+                    // Bọc Plyr vào thẻ Video
+                    if (!plyrInstance) { plyrInstance = new Plyr(video, playerSettings); }
+                    video.play();
+                });
+                hlsInstance.attachMedia(video);
+                
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Hỗ trợ nguyên bản cho iOS/Safari
+                video.src = streamUrl;
+                if (!plyrInstance) { plyrInstance = new Plyr(video, playerSettings); }
+                video.play();
+            } else {
+                showError("Trình duyệt không hỗ trợ luồng HLS.");
+            }
+        }
+
+        function showError(msg) {
+            errorDiv.innerHTML = `<b>${msg}</b>`;
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
