@@ -1,13 +1,11 @@
-"""Serverless function duy nhất cho toàn bộ API.
-...
-"""
+"""Serverless function duy nhất cho toàn bộ API."""
 import base64
 import io
 import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
-from _missav import get_movie_detail, get_category_list
+
 import openpyxl
 
 sys.path.append(os.path.dirname(__file__))
@@ -19,15 +17,8 @@ from _core import (  # noqa: E402
     EXCEL_HEADERS,
     EXCEL_FIELDS,
 )
+from _missav import get_movie_detail, get_category_list
 
-def handle_category(body):
-    slug = (body.get("slug") or "").strip()
-    if not slug:
-        return 400, {"error": "Thiếu slug danh mục"}
-    movies = get_category_list(slug)
-    return 200, {"movies": movies}
-    
-# THÊM HÀM XỬ LÝ PHIM
 def handle_movie(body):
     code = (body.get("code") or "").strip()
     if not code:
@@ -37,6 +28,12 @@ def handle_movie(body):
         return 404, {"error": "Không tìm thấy phim hoặc mã không hợp lệ"}
     return 200, detail
 
+def handle_category(body):
+    slug = (body.get("slug") or "").strip()
+    if not slug:
+        return 400, {"error": "Thiếu slug danh mục"}
+    movies = get_category_list(slug)
+    return 200, {"movies": movies}
 
 def handle_lookup(body):
     code = (body.get("code") or "").strip()
@@ -44,13 +41,12 @@ def handle_lookup(body):
         return 400, {"error": "Thiếu mã đơn hàng"}
     return 200, lookup_order(code)
 
-
 def handle_excel(body):
     file_b64 = body.get("file_base64", "")
     if not file_b64:
         return 400, {"error": "Thiếu file Excel"}
     try:
-        if "," in file_b64:  # bỏ tiền tố data:...;base64,
+        if "," in file_b64: 
             file_b64 = file_b64.split(",", 1)[1]
         wb = openpyxl.load_workbook(io.BytesIO(base64.b64decode(file_b64)))
         sheet = wb.active
@@ -88,7 +84,6 @@ def handle_excel(body):
         "success": success,
     }
 
-
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -116,18 +111,17 @@ class handler(BaseHTTPRequestHandler):
             return
 
         action = body.get("action", "lookup")
+        
+        # Đã tích hợp luồng lấy danh sách Category
         if action == "movie":
             status, payload = handle_movie(body)
-            self._send(status, payload)
-            return
-        if action == "category":
+        elif action == "category":
             status, payload = handle_category(body)
-            self._send(status, payload)
-            return
-        if action == "excel":
+        elif action == "excel":
             status, payload = handle_excel(body)
         elif action == "lookup":
             status, payload = handle_lookup(body)
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}
+            
         self._send(status, payload)
