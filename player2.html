@@ -259,7 +259,7 @@
             };
 
             if (Hls.isSupported()) {
-                hlsInstance = new Hls({ autoStartLoad: true, maxBufferSize: 1 * 1000 * 1000 });
+                hlsInstance = new Hls({ autoStartLoad: true});
                 let parsedManifest = false;
                 hlsInstance.on(Hls.Events.ERROR, (event, data) => { if (!parsedManifest && data.networkDetails && data.networkDetails.status === 429) hlsInstance.loadSource(streamUrl); });
                 hlsInstance.loadSource(streamUrl);
