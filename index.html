@@ -53,7 +53,18 @@
   .content-area { flex-grow: 1; min-width: 0; }
   .hidden { display:none; }
   
-  /* CSS Table tối ưu copy/paste */
+  /* CSS Nhóm Checkbox chọn cột */
+  .checkbox-group { 
+    display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 16px; 
+    background: #0b1220; padding: 14px; border-radius: 8px; border: 1px solid var(--line); 
+  }
+  .checkbox-item { 
+    display: flex; align-items: center; gap: 6px; font-size: 13px; 
+    cursor: pointer; user-select: none; margin: 0; color: var(--text);
+  }
+  .checkbox-item input { cursor: pointer; accent-color: var(--accent); width: auto; }
+
+  /* CSS Table tối ưu */
   table { width:100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
   td, th { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
   td.k { color: var(--muted); width: 200px; }
@@ -116,7 +127,11 @@
       <div class="card hidden" id="tabBulk">
         <label>Nhập danh sách mã đơn (ngăn cách bằng dấu phẩy hoặc xuống dòng)</label>
         <textarea id="bulkCodes" rows="6" placeholder="VD:&#10;DH18700&#10;BIZ02120&#10;DH19999"></textarea>
-        <div style="margin-top: 12px;">
+        
+        <label style="margin-top: 16px;">Tùy chọn cột hiển thị (các cột bị ẩn sẽ không được Copy sang Excel):</label>
+        <div id="colSelector" class="checkbox-group"></div>
+
+        <div style="margin-top: 8px;">
           <button id="bulkBtn" onclick="doBulkLookup()">Tra cứu hàng loạt</button>
         </div>
         <div class="hint">Bảng kết quả sẽ hiển thị ngay bên dưới sau khi tra cứu.</div>
@@ -153,7 +168,6 @@ const FIELDS = [
   ["ref_name", "Ref tên"],
 ];
 
-// XỬ LÝ AN TOÀN TRÁNH CRASH TRÌNH DUYỆT (Ẩn danh, chặn Cookie...)
 function getToken() { 
   try { return localStorage.getItem("sepay_access_token") || ""; } 
   catch(e) { return ""; } 
@@ -166,11 +180,10 @@ function saveToken() {
     document.getElementById("accessToken").value = "";
     document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu (nhập lại để đổi)";
   } catch(e) {
-    alert("Không thể lưu mật khẩu: Trình duyệt của bạn đang chặn tính năng lưu trữ (localStorage).");
+    alert("Không thể lưu mật khẩu: Trình duyệt đang chặn lưu trữ.");
   }
 }
 
-// Chạy khởi tạo ban đầu sau khi load DOM an toàn
 document.addEventListener("DOMContentLoaded", () => {
   try {
     const inputToken = document.getElementById("accessToken");
@@ -185,9 +198,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if(authCard) authCard.classList.add("hidden");
     }
   }).catch(() => {});
+
+  // Khởi tạo giao diện Checkbox chọn cột
+  initColumnSelector();
 });
 
-// HÀM CHUYỂN TAB
 function switchTab(which) {
   try {
     document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
@@ -197,9 +212,37 @@ function switchTab(which) {
     document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
     document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
     document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
-  } catch(e) {
-    console.error("Lỗi chuyển tab:", e);
-  }
+  } catch(e) {}
+}
+
+/* --- LOGIC HIỂN THỊ CỘT --- */
+function initColumnSelector() {
+  const container = document.getElementById('colSelector');
+  if (!container) return;
+  
+  // Mặc định luôn có cột Trạng thái
+  let html = `<label class="checkbox-item"><input type="checkbox" value="status" checked onchange="toggleCol('status')"> Trạng thái</label>`;
+  
+  FIELDS.forEach(f => {
+    html += `<label class="checkbox-item"><input type="checkbox" value="${f[0]}" checked onchange="toggleCol('${f[0]}')"> ${f[1]}</label>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+// Kiểm tra xem cột có đang được chọn bật không
+function isColVisible(key) {
+  const cb = document.querySelector(`input[value="${key}"]`);
+  return cb ? cb.checked : true;
+}
+
+// Ẩn/Hiện cột ngay lập tức (Real-time)
+function toggleCol(key) {
+  const isVisible = isColVisible(key);
+  const cells = document.querySelectorAll(`.col-${key}`);
+  cells.forEach(cell => {
+    cell.style.display = isVisible ? '' : 'none';
+  });
 }
 
 /* --- TAB 1: TRA CỨU 1 MÃ --- */
@@ -248,7 +291,14 @@ async function doBulkLookup() {
 
   btn.disabled = true;
 
-  let theadHTML = `<tr><th>Trạng thái</th>` + FIELDS.map(f => `<th>${f[1]}</th>`).join("") + `</tr>`;
+  // Tạo Thead với class để điều khiển ẩn/hiện
+  const displayStatus = isColVisible('status') ? '' : 'display:none;';
+  let theadHTML = `<tr><th class="col-status" style="${displayStatus}">Trạng thái</th>`;
+  FIELDS.forEach(f => {
+    const display = isColVisible(f[0]) ? '' : 'display:none;';
+    theadHTML += `<th class="col-${f[0]}" style="${display}">${f[1]}</th>`;
+  });
+  theadHTML += `</tr>`;
   
   box.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px;">
@@ -289,14 +339,20 @@ async function doBulkLookup() {
         const badge = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` 
                          : `<span class="badge err">${escapeHtml(badgeText)}</span>`;
         
-        let tds = `<td>${badge}</td>`;
-        tds += FIELDS.map(f => `<td>${escapeHtml(data[f[0]] || "")}</td>`).join("");
+        const dStatus = isColVisible('status') ? '' : 'display:none;';
+        let tds = `<td class="col-status" style="${dStatus}">${badge}</td>`;
+        
+        FIELDS.forEach(f => {
+          const dCol = isColVisible(f[0]) ? '' : 'display:none;';
+          tds += `<td class="col-${f[0]}" style="${dCol}">${escapeHtml(data[f[0]] || "")}</td>`;
+        });
+        
         tr.innerHTML = tds;
       } else {
-        tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(data.error || "Lỗi server")} (${code})</td>`;
+        tr.innerHTML = `<td class="col-status"><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(data.error || "Lỗi server")} (${code})</td>`;
       }
     } catch (e) {
-      tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(e.message)} (${code})</td>`;
+      tr.innerHTML = `<td class="col-status"><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(e.message)} (${code})</td>`;
     }
     
     tbody.appendChild(tr);
@@ -307,19 +363,22 @@ async function doBulkLookup() {
   btn.disabled = false;
 }
 
-/* --- HÀM COPY DỮ LIỆU SANG EXCEL --- */
+/* --- HÀM COPY DỮ LIỆU SANG EXCEL (CHỈ LẤY CỘT HIỂN THỊ) --- */
 function copyTableToExcel() {
   try {
     const table = document.getElementById('bulkTable');
     if (!table) return;
 
     let tsv = "";
-    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
-    tsv += headers.join("\t") + "\n";
-
-    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    
+    // Quét toàn bộ dòng (cả Thead và Tbody)
+    const rows = Array.from(table.querySelectorAll('tr'));
     rows.forEach(row => {
-      const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.trim());
+      // Chỉ lọc và lấy nội dung từ các ô (th, td) KHÔNG BỊ ẨN
+      const cells = Array.from(row.querySelectorAll('th, td'))
+                         .filter(cell => cell.style.display !== 'none')
+                         .map(td => td.innerText.trim());
+      
       tsv += cells.join("\t") + "\n";
     });
 
@@ -329,7 +388,7 @@ function copyTableToExcel() {
       btn.innerText = "✅ Đã Copy!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
     }).catch(err => {
-      alert("Không thể tự động copy. Vui lòng bôi đen bảng và copy thủ công.");
+      alert("Không thể tự động copy. Vui lòng thử lại.");
     });
   } catch(e) {
     alert("Đã xảy ra lỗi khi copy: " + e.message);
@@ -366,7 +425,6 @@ async function doExcel() {
   }
 }
 
-/* --- HÀM TIỆN ÍCH --- */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
