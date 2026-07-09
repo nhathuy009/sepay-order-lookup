@@ -75,18 +75,18 @@
             if (Hls.isSupported()) {
                 hlsInstance = new Hls({
                     autoStartLoad: true,
-                    maxBufferLength: 30,         // Chỉ đệm tối đa 30 giây để tránh tải quá nhiều
-                    maxMaxBufferLength: 60,
+                    maxBufferLength: 20,         // Chỉ đệm tối đa 30 giây để tránh tải quá nhiều
+                    maxMaxBufferLength: 40,
+                    maxBufferSize: 15 * 1000 * 1000,
     
                 // TỐI ƯU CHO MẠNG CHẬM / TELEGRAM MINI APP:
                     fragLoadingTimeOut: 20000,   // Tăng thời gian chờ mỗi phân mảnh lên 20 giây (tránh bị Abort vì timeout)
-                    fragLoadingMaxRetry: 4,      // Cho phép thử lại 4 lần nếu lỗi
-                    fragLoadingRetryDelay: 500,  // Đợi 0.5s rồi mới thử lại
+                    fragLoadingMaxRetry: 2,      // Cho phép thử lại 4 lần nếu lỗi
+                    fragLoadingRetryDelay: 1000,  // Đợi 0.5s rồi mới thử lại
                     manifestLoadingTimeOut: 20000,
                     levelLoadingTimeOut: 20000,
     
                 // Ngăn hls.js mở quá nhiều kết nối song song gây nghẽn
-                    maxStarvationDelay: 2,
                     enableWorker: true
             });
                 
