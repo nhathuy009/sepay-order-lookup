@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
-
+from _subtitle import search_subtitle
 import openpyxl
 
 sys.path.append(os.path.dirname(__file__))
@@ -26,6 +26,7 @@ def handle_movie(body):
     detail = get_movie_detail(code)
     if not detail:
         return 404, {"error": "Không tìm thấy phim hoặc mã không hợp lệ"}
+    detail["subtitle_url"] = search_subtitle(code)
     return 200, detail
 
 def handle_category(body):
