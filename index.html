@@ -35,7 +35,6 @@
   /* Cấu trúc Layout 2 cột */
   .main-layout { display: flex; gap: 24px; align-items: flex-start; }
   
-  /* Đã thu nhỏ width từ 240px xuống 160px */
   .sidebar-tabs { 
     display: flex; 
     flex-direction: column; 
@@ -154,17 +153,242 @@ const FIELDS = [
   ["ref_name", "Ref tên"],
 ];
 
-function getToken() { return localStorage.getItem("sepay_access_token") || ""; }
-function saveToken() {
-  localStorage.setItem("sepay_access_token", document.getElementById("accessToken").value.trim());
-  document.getElementById("accessToken").value = "";
-  document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu (nhập lại để đổi)";
+// XỬ LÝ AN TOÀN TRÁNH CRASH TRÌNH DUYỆT (Ẩn danh, chặn Cookie...)
+function getToken() { 
+  try { return localStorage.getItem("sepay_access_token") || ""; } 
+  catch(e) { return ""; } 
 }
 
-document.getElementById("accessToken").placeholder = 
-  getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
+function saveToken() {
+  const token = document.getElementById("accessToken").value.trim();
+  try {
+    localStorage.setItem("sepay_access_token", token);
+    document.getElementById("accessToken").value = "";
+    document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu (nhập lại để đổi)";
+  } catch(e) {
+    alert("Không thể lưu mật khẩu: Trình duyệt của bạn đang chặn tính năng lưu trữ (localStorage).");
+  }
+}
 
+// Chạy khởi tạo ban đầu sau khi load DOM an toàn
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    const inputToken = document.getElementById("accessToken");
+    if(inputToken) {
+      inputToken.placeholder = getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
+    }
+  } catch(e) {}
+
+  fetch("/api/index").then(r => r.json()).then(d => {
+    if (d && d.auth_required === false) {
+      const authCard = document.getElementById("authCard");
+      if(authCard) authCard.classList.add("hidden");
+    }
+  }).catch(() => {});
+});
+
+// HÀM CHUYỂN TAB
 function switchTab(which) {
-  document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
-  document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
-  document.getElementById("tabExcel").classList.toggle("hidden
+  try {
+    document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
+    document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
+    document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
+    
+    document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
+    document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
+    document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
+  } catch(e) {
+    console.error("Lỗi chuyển tab:", e);
+  }
+}
+
+/* --- TAB 1: TRA CỨU 1 MÃ --- */
+async function doLookup() {
+  const code = document.getElementById("orderCode").value.trim();
+  const box = document.getElementById("singleResult");
+  const btn = document.getElementById("lookupBtn");
+  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã đơn.</div>'; return; }
+  
+  btn.disabled = true;
+  box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
+  
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
+    
+    const ok = data.status_msg === "Thành công";
+    let rows = FIELDS.map(([k, label]) => 
+      `<tr><td class="k">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
+    const badge = ok ? '<span class="badge ok">Thành công</span>' 
+                     : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
+    box.innerHTML = `<div class="msg">${badge}</div><table>${rows}</table>`;
+  } catch (e) {
+    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* --- TAB 2: TRA CỨU NHIỀU MÃ --- */
+async function doBulkLookup() {
+  const rawInput = document.getElementById("bulkCodes").value;
+  const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
+  const box = document.getElementById("bulkResultArea");
+  const btn = document.getElementById("bulkBtn");
+
+  if (codes.length === 0) { 
+    box.innerHTML = '<div class="msg err">Vui lòng nhập ít nhất 1 mã đơn.</div>'; 
+    return; 
+  }
+
+  btn.disabled = true;
+
+  let theadHTML = `<tr><th>Trạng thái</th>` + FIELDS.map(f => `<th>${f[1]}</th>`).join("") + `</tr>`;
+  
+  box.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px;">
+      <div class="msg" id="bulkProgress" style="margin-top:0"><span class="spinner"></span> Đang xử lý 0/${codes.length}...</div>
+      <button id="copyExcelBtn" class="hidden" onclick="copyTableToExcel()" style="background: #10b981; padding: 6px 12px; font-size: 13px; display: none;">📋 Copy cho Excel / Sheets</button>
+    </div>
+    <div class="table-responsive">
+      <table class="bulk-table" id="bulkTable">
+        <thead>${theadHTML}</thead>
+        <tbody id="bulkTbody"></tbody>
+      </table>
+    </div>
+  `;
+
+  const tbody = document.getElementById("bulkTbody");
+  const progress = document.getElementById("bulkProgress");
+  const copyBtn = document.getElementById("copyExcelBtn");
+  let successCount = 0;
+
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i];
+    progress.innerHTML = `<span class="spinner"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
+    
+    let tr = document.createElement("tr");
+    
+    try {
+      const resp = await fetch("/api/index", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
+      });
+      const data = await resp.json();
+
+      if (resp.ok) {
+        const ok = data.status_msg === "Thành công";
+        if (ok) successCount++;
+        const badgeText = ok ? 'Thành công' : (data.status_msg || 'Thất bại');
+        const badge = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` 
+                         : `<span class="badge err">${escapeHtml(badgeText)}</span>`;
+        
+        let tds = `<td>${badge}</td>`;
+        tds += FIELDS.map(f => `<td>${escapeHtml(data[f[0]] || "")}</td>`).join("");
+        tr.innerHTML = tds;
+      } else {
+        tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(data.error || "Lỗi server")} (${code})</td>`;
+      }
+    } catch (e) {
+      tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(e.message)} (${code})</td>`;
+    }
+    
+    tbody.appendChild(tr);
+  }
+
+  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--ok)">${successCount}/${codes.length}</strong> đơn.`;
+  copyBtn.style.display = "inline-block"; 
+  btn.disabled = false;
+}
+
+/* --- HÀM COPY DỮ LIỆU SANG EXCEL --- */
+function copyTableToExcel() {
+  try {
+    const table = document.getElementById('bulkTable');
+    if (!table) return;
+
+    let tsv = "";
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+    tsv += headers.join("\t") + "\n";
+
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll('td')).map(td => td.innerText.trim());
+      tsv += cells.join("\t") + "\n";
+    });
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyExcelBtn");
+      const originalText = btn.innerText;
+      btn.innerText = "✅ Đã Copy!";
+      setTimeout(() => { btn.innerText = originalText; }, 2000);
+    }).catch(err => {
+      alert("Không thể tự động copy. Vui lòng bôi đen bảng và copy thủ công.");
+    });
+  } catch(e) {
+    alert("Đã xảy ra lỗi khi copy: " + e.message);
+  }
+}
+
+/* --- TAB 3: XỬ LÝ EXCEL --- */
+async function doExcel() {
+  const fileInput = document.getElementById("excelFile");
+  const box = document.getElementById("excelResult");
+  const btn = document.getElementById("excelBtn");
+  if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
+  
+  const file = fileInput.files[0];
+  btn.disabled = true;
+  box.innerHTML = '<span class="spinner"></span> Đang xử lý, vui lòng đợi…';
+  
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
+    
+    downloadBase64(data.file_base64, "ket_qua_" + file.name);
+    box.innerHTML = `🎉 Hoàn tất! Thành công ${data.success}/${data.total} đơn. File đã tải về.`;
+  } catch (e) {
+    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* --- HÀM TIỆN ÍCH --- */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(",", 2)[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function downloadBase64(b64, filename) {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+</script>
+</body>
+</html>
