@@ -4,6 +4,9 @@ import io
 import json
 import os
 import sys
+import urllib.parse
+import requests
+import re
 from http.server import BaseHTTPRequestHandler
 
 import openpyxl
@@ -100,6 +103,33 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        # ------ TRẠM TRUNG CHUYỂN PHỤ ĐỀ (CORS & SRT to VTT Proxy) ------
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/subtitle":
+            qs = urllib.parse.parse_qs(parsed.query)
+            url = qs.get("url", [""])[0]
+            if url:
+                try:
+                    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+                    if resp.status_code == 200:
+                        # Biến đổi SRT sang WebVTT chuẩn xác (Chỉ thay đổi dấu phẩy ở mốc thời gian thành dấu chấm)
+                        vtt_text = "WEBVTT\n\n" + re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', resp.text)
+                        body = vtt_text.encode("utf-8")
+                        
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/vtt; charset=utf-8")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.send_header("Access-Control-Allow-Origin", "*") # Mở khóa CORS
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                except Exception:
+                    pass
+            self.send_response(404)
+            self.end_headers()
+            return
+        # -----------------------------------------------------------------
+
         self._send(200, {"auth_required": bool(APP_ACCESS_TOKEN)})
 
     def do_POST(self):
@@ -118,7 +148,6 @@ class handler(BaseHTTPRequestHandler):
 
         action = body.get("action", "lookup")
         
-        # Đã tích hợp đầy đủ 4 luồng xử lý
         if action == "movie":
             status, payload = handle_movie(body)
         elif action == "category":
