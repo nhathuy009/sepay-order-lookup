@@ -11,7 +11,6 @@
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; 
          background: var(--bg); color: var(--text); }
          
-  /* Tăng max-width lên 1400px để mở rộng không gian hiển thị bảng */
   .wrap { max-width: 1400px; width: 96%; margin: 0 auto; padding: 24px 16px 64px; }
   
   h1 { font-size: 20px; margin: 0 0 4px; }
@@ -33,40 +32,35 @@
   button:hover { filter: brightness(1.1); }
   button:disabled { opacity: .6; cursor: not-allowed; }
   
-  /* Cấu trúc Layout 2 cột (Menu trái - Nội dung phải) */
+  /* Cấu trúc Layout 2 cột */
   .main-layout { display: flex; gap: 24px; align-items: flex-start; }
   
-  /* CSS cho Menu Tabs bên trái */
+  /* Đã thu nhỏ width từ 240px xuống 160px */
   .sidebar-tabs { 
     display: flex; 
     flex-direction: column; 
     gap: 10px; 
-    width: 240px; /* Độ rộng cố định của menu trái */
+    width: 160px; 
     flex-shrink: 0; 
   }
   .tab { 
-    padding: 12px 16px; border-radius: 8px; background: var(--card); 
-    border:1px solid var(--line); cursor:pointer; font-size:14px; 
+    padding: 10px 12px; border-radius: 8px; background: var(--card); 
+    border:1px solid var(--line); cursor:pointer; font-size:13px; 
     text-align: left; font-weight: 500; transition: 0.2s;
   }
   .tab:hover { background: #283548; }
   .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
   
-  /* CSS cho vùng nội dung bên phải */
-  .content-area { 
-    flex-grow: 1; 
-    min-width: 0; /* Ngăn bảng phá vỡ layout flex */
-  }
-
+  .content-area { flex-grow: 1; min-width: 0; }
   .hidden { display:none; }
   
-  /* CSS cho Table */
+  /* CSS Table tối ưu copy/paste */
   table { width:100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
   td, th { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
   td.k { color: var(--muted); width: 200px; }
   
-  .table-responsive { overflow-x: auto; margin-top: 14px; border-radius: 8px; border: 1px solid var(--line); }
-  .bulk-table { width: 100%; min-width: 1100px; white-space: nowrap; margin-top: 0; }
+  .table-responsive { overflow-x: auto; margin-top: 10px; border-radius: 8px; border: 1px solid var(--line); }
+  .bulk-table { width: 100%; min-width: 1100px; white-space: nowrap; margin-top: 0; user-select: text;}
   .bulk-table th { background: #0b1220; border-bottom: 2px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; padding: 12px 8px;}
   .bulk-table tr:hover td { background: rgba(255,255,255,0.03); }
 
@@ -80,7 +74,6 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-  /* Giao diện điện thoại: Chuyển Tabs nằm ngang lại để dễ vuốt */
   @media (max-width: 768px) {
     .main-layout { flex-direction: column; }
     .sidebar-tabs { width: 100%; flex-direction: row; overflow-x: auto; padding-bottom: 5px; }
@@ -142,7 +135,8 @@
       </div>
     </div>
     
-  </div> </div>
+  </div>
+</div>
 
 <script>
 const FIELDS = [
@@ -170,172 +164,7 @@ function saveToken() {
 document.getElementById("accessToken").placeholder = 
   getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
 
-// Hàm chuyển Tab
 function switchTab(which) {
   document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
   document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
-  document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
-  
-  document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
-  document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
-  document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
-}
-
-/* --- TAB 1: TRA CỨU 1 MÃ --- */
-async function doLookup() {
-  const code = document.getElementById("orderCode").value.trim();
-  const box = document.getElementById("singleResult");
-  const btn = document.getElementById("lookupBtn");
-  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã đơn.</div>'; return; }
-  btn.disabled = true;
-  box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
-  try {
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
-    
-    const ok = data.status_msg === "Thành công";
-    let rows = FIELDS.map(([k, label]) => 
-      `<tr><td class="k">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
-    const badge = ok ? '<span class="badge ok">Thành công</span>' 
-                     : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
-    box.innerHTML = `<div class="msg">${badge}</div><table>${rows}</table>`;
-  } catch (e) {
-    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối: ${e.message}</div>`;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/* --- TAB 2: TRA CỨU NHIỀU MÃ (TEXTAREA -> TABLE) --- */
-async function doBulkLookup() {
-  const rawInput = document.getElementById("bulkCodes").value;
-  const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
-  const box = document.getElementById("bulkResultArea");
-  const btn = document.getElementById("bulkBtn");
-
-  if (codes.length === 0) { 
-    box.innerHTML = '<div class="msg err">Vui lòng nhập ít nhất 1 mã đơn.</div>'; 
-    return; 
-  }
-
-  btn.disabled = true;
-
-  let theadHTML = `<tr><th>Trạng thái</th>` + FIELDS.map(f => `<th>${f[1]}</th>`).join("") + `</tr>`;
-  
-  box.innerHTML = `
-    <div class="msg" id="bulkProgress"><span class="spinner"></span> Đang xử lý 0/${codes.length}...</div>
-    <div class="table-responsive">
-      <table class="bulk-table">
-        <thead>${theadHTML}</thead>
-        <tbody id="bulkTbody"></tbody>
-      </table>
-    </div>
-  `;
-
-  const tbody = document.getElementById("bulkTbody");
-  const progress = document.getElementById("bulkProgress");
-  let successCount = 0;
-
-  for (let i = 0; i < codes.length; i++) {
-    const code = codes[i];
-    progress.innerHTML = `<span class="spinner"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
-    
-    let tr = document.createElement("tr");
-    
-    try {
-      const resp = await fetch("/api/index", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
-      });
-      const data = await resp.json();
-
-      if (resp.ok) {
-        const ok = data.status_msg === "Thành công";
-        if (ok) successCount++;
-        const badge = ok ? '<span class="badge ok">Thành công</span>' 
-                         : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
-        
-        let tds = `<td>${badge}</td>`;
-        tds += FIELDS.map(f => `<td>${escapeHtml(data[f[0]] || "")}</td>`).join("");
-        tr.innerHTML = tds;
-      } else {
-        tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(data.error || "Lỗi server")} (${code})</td>`;
-      }
-    } catch (e) {
-      tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(e.message)} (${code})</td>`;
-    }
-    
-    tbody.appendChild(tr);
-  }
-
-  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--ok)">${successCount}/${codes.length}</strong> đơn.`;
-  btn.disabled = false;
-}
-
-/* --- TAB 3: XỬ LÝ EXCEL --- */
-async function doExcel() {
-  const fileInput = document.getElementById("excelFile");
-  const box = document.getElementById("excelResult");
-  const btn = document.getElementById("excelBtn");
-  if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
-  
-  const file = fileInput.files[0];
-  btn.disabled = true;
-  box.innerHTML = '<span class="spinner"></span> Đang xử lý, vui lòng đợi…';
-  
-  try {
-    const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
-    
-    downloadBase64(data.file_base64, "ket_qua_" + file.name);
-    box.innerHTML = `🎉 Hoàn tất! Thành công ${data.success}/${data.total} đơn. File đã tải về.`;
-  } catch (e) {
-    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/* --- HÀM TIỆN ÍCH --- */
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result.split(",", 2)[1]);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-
-function downloadBase64(b64, filename) {
-  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function escapeHtml(s) {
-  if (s === null || s === undefined) return "";
-  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
-}
-
-// Ẩn ô mật khẩu nếu backend báo không bật bảo vệ.
-fetch("/api/index").then(r => r.json()).then(d => {
-  if (d && d.auth_required === false) document.getElementById("authCard").classList.add("hidden");
-}).catch(() => {});
-</script>
-</body>
-</html>
+  document.getElementById("tabExcel").classList.toggle("hidden
