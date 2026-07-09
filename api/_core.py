@@ -46,6 +46,7 @@ UNAUTHORIZED = "UNAUTHORIZED"
 FIELD_ORDER = [
     "lead_email",
     "lead_phone",
+    "lead_cccd",
     "username",
     "users_name",
     "orders_amount",
@@ -60,6 +61,7 @@ EXCEL_HEADERS = [
     "Mã Đơn (Cột A)",
     "Email KH",
     "SĐT KH",
+    "Số CCCD",
     "Username",
     "Họ Tên",
     "Số Tiền",
@@ -74,6 +76,7 @@ EXCEL_FIELDS = [
     None,
     "lead_email",
     "lead_phone",
+    "lead_cccd",
     "username",
     "users_name",
     "orders_amount",
@@ -195,6 +198,7 @@ class SepayClient:
         lead = order.get("lead") or {}
         details["lead_email"] = lead.get("email", "")
         details["lead_phone"] = lead.get("phone", "")
+        details["lead_cccd"] = lead.get("cccd", "")
         details["orders_amount"] = order.get("amount", "")
 
         einvoice = order.get("einvoice") or {}
