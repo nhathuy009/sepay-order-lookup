@@ -1,5 +1,6 @@
 import re
 import requests
+from _subtitle import search_subtitle
 
 BASE_URL = "https://missav.media"
 HEADERS = {
