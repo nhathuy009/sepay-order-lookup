@@ -111,6 +111,7 @@
       <div class="tab active" id="tabSingleBtn" onclick="switchTab('single')">🔍 Tra cứu 1 mã</div>
       <div class="tab" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Nhập nhiều mã</div>
       <div class="tab" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý Excel</div>
+      <div class="tab" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
     </div>
 
     <div class="content-area">
@@ -148,6 +149,15 @@
         </div>
         <div class="hint">File kết quả sẽ tự tải về sau khi xử lý xong. Có thể mất vài phút với danh sách lớn.</div>
         <div id="excelResult" class="msg"></div>
+      </div>
+      <div class="card hidden" id="tabBank">
+        <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
+        <div class="row">
+          <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
+          <button id="bankBtn" onclick="doBankStatement()">Tổng hợp GD & tải về</button>
+        </div>
+        <div class="hint" style="margin-top: 10px; color: var(--ok);">Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.</div>
+        <div id="bankResult" class="msg"></div>
       </div>
     </div>
     
@@ -213,10 +223,12 @@ function switchTab(which) {
     document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
     document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
     document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
+    document.getElementById("tabBank").classList.toggle("hidden", which !== "bank"); // Thêm dòng này
     
     document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
     document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
     document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
+    document.getElementById("tabBankBtn").classList.toggle("active", which === "bank"); // Thêm dòng này
   } catch(e) {}
 }
 
@@ -513,6 +525,37 @@ async function doExcel() {
   }
 }
 
+/* --- TAB 4: TỔNG HỢP SAO KÊ NGÂN HÀNG --- */
+async function doBankStatement() {
+  const fileInput = document.getElementById("bankExcelFile");
+  const box = document.getElementById("bankResult");
+  const btn = document.getElementById("bankBtn");
+  
+  if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file sao kê.</span>'; return; }
+  
+  const file = fileInput.files[0];
+  btn.disabled = true;
+  box.innerHTML = '<span class="spinner"></span> Đang xử lý sao kê, vui lòng đợi…';
+  
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
+    
+    downloadBase64(data.file_base64, "TongHop_" + file.name);
+    box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
+  } catch (e) {
+    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+  
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
