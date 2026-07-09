@@ -140,11 +140,12 @@ def get_movie_detail(slug_or_code):
             
         title_match = re.search(r'property="og:title"\s+content="([^"]+)"', html, re.IGNORECASE)
         title = clean_text(title_match.group(1)) if title_match else code_clean.upper()
-        detail["subtitle_url"] = search_subtitle(code_clean.upper())       
+        subtitle_url = search_subtitle(code_clean.upper())       
         return {
             "title": title,
             "stream_url": f"https://surrit.mrstcdn.store/{uuid}/playlist.m3u8",
             "code": code_clean.upper()
+            "subtitle_url": subtitle_url
         }
     except Exception:
         return None
