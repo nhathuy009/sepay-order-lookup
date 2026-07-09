@@ -22,6 +22,7 @@ from _core import (  # noqa: E402
 )
 from _missav import get_movie_detail, get_category_list
 from _subtitle import search_subtitle
+from collections import defaultdict
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -93,6 +94,109 @@ def handle_excel(body):
         "success": success,
     }
 
+def handle_bank_statement(body):
+    file_b64 = body.get("file_base64", "")
+    if not file_b64:
+        return 400, {"error": "Thiếu file Excel"}
+    try:
+        if "," in file_b64:
+            file_b64 = file_b64.split(",", 1)[1]
+        # Đọc file từ chuỗi base64 trong bộ nhớ
+        wb = openpyxl.load_workbook(io.BytesIO(base64.b64decode(file_b64)), data_only=True)
+        sheet = wb.active
+    except Exception as e:
+        return 400, {"error": f"Không đọc được file Excel: {e}"}
+
+    dem_gui_vao = defaultdict(int)
+    dem_rut_ra = defaultdict(int)
+
+    current_row = 9
+    while True:
+        rut_ra = sheet.cell(row=current_row, column=5).value
+        gui_vao = sheet.cell(row=current_row, column=6).value
+        ngay_gd = sheet.cell(row=current_row, column=1).value 
+
+        if ngay_gd is None and rut_ra is None and gui_vao is None:
+            break
+
+        if rut_ra is not None:
+            try:
+                val = float(rut_ra)
+                if val > 0: dem_rut_ra[val] += 1
+            except ValueError: pass 
+
+        if gui_vao is not None:
+            try:
+                val = float(gui_vao)
+                if val > 0: dem_gui_vao[val] += 1
+            except ValueError: pass
+
+        current_row += 1
+
+    tat_ca_gia_tri = set(dem_gui_vao.keys()).union(set(dem_rut_ra.keys()))
+    tat_ca_gia_tri = sorted(list(tat_ca_gia_tri), reverse=True) 
+
+    # Tạo file Excel mới trong bộ nhớ
+    wb_new = openpyxl.Workbook()
+    ws = wb_new.active
+    ws.title = "Tong_Hop_Sao_Ke"
+
+    ws.append(["Nội dung diễn giải", "Gửi vào", "Rút ra", "Số dư lũy kế", "Ghi chú (Để bạn dò số)"])
+    ws.append(["Số dư đầu kỳ STK ...", "", "", 0, "<-- Hãy nhập số dư đầu kỳ của bạn vào ô D2"])
+
+    current_excel_row = 3
+    for gia_tri in tat_ca_gia_tri:
+        sl_vao = dem_gui_vao[gia_tri]
+        sl_ra = dem_rut_ra[gia_tri]
+        
+        tong_vao = (gia_tri * sl_vao) if sl_vao > 0 else ""
+        tong_ra = -(gia_tri * sl_ra) if sl_ra > 0 else "" 
+        
+        ghi_chu = []
+        if sl_vao > 0: ghi_chu.append(f"Vào: {gia_tri:,.0f} x {sl_vao}")
+        if sl_ra > 0: ghi_chu.append(f"Ra: {gia_tri:,.0f} x {sl_ra}")
+        
+        ws.append([
+            "", 
+            tong_vao, 
+            tong_ra, 
+            f"=D{current_excel_row-1}+SUM(B{current_excel_row}:C{current_excel_row})", 
+            " | ".join(ghi_chu)
+        ])
+        current_excel_row += 1
+
+    ws.append([
+        "Số dư cuối kỳ", 
+        f"=SUM(B3:B{current_excel_row-1})", 
+        f"=SUM(C3:C{current_excel_row-1})", 
+        f"=D{current_excel_row-1}", 
+        ""
+    ])
+
+    for row in ws.iter_rows(min_row=2, max_row=current_excel_row, min_col=2, max_col=4):
+        for cell in row:
+            if isinstance(cell.value, (int, float)):
+                cell.number_format = '#,##0;(#,##0)'
+    
+    for col in range(1, 6):
+        ws.cell(row=1, column=col).font = openpyxl.styles.Font(bold=True)
+        ws.cell(row=current_excel_row, column=col).font = openpyxl.styles.Font(bold=True)
+    ws.cell(row=2, column=1).font = openpyxl.styles.Font(bold=True) 
+
+    ws.column_dimensions['A'].width = 35
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 20
+    ws.column_dimensions['E'].width = 40
+
+    # Xuất ra base64
+    out = io.BytesIO()
+    wb_new.save(out)
+    out.seek(0)
+    return 200, {
+        "file_base64": base64.b64encode(out.read()).decode("ascii")
+    }
+    
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -154,6 +258,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_category(body)
         elif action == "excel":
             status, payload = handle_excel(body)
+        elif action == "bank_statement":
+            status, payload = handle_bank_statement(body)
         elif action == "lookup":
             status, payload = handle_lookup(body)
         else:
