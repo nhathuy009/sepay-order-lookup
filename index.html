@@ -10,44 +10,67 @@
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; 
          background: var(--bg); color: var(--text); }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 64px; }
+         
+  /* Tăng max-width lên 1400px để mở rộng không gian hiển thị bảng */
+  .wrap { max-width: 1400px; width: 96%; margin: 0 auto; padding: 24px 16px 64px; }
+  
   h1 { font-size: 20px; margin: 0 0 4px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; 
           padding: 18px; margin-bottom: 16px; }
   label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   
-  /* Bổ sung thêm css cho textarea */
   input[type=text], input[type=password], input[type=file], textarea {
     width: 100%; padding: 10px 12px; border-radius: 8px; border:1px solid var(--line);
     background:#0b1220; color: var(--text); font-size: 14px; font-family: inherit;
   }
-  textarea { resize: vertical; } /* Cho phép kéo giãn chiều cao */
+  textarea { resize: vertical; }
 
   .row { display:flex; gap:10px; flex-wrap: wrap; align-items:flex-end; }
   .row > div { flex:1; min-width: 200px; }
   button { background: var(--accent); color:white; border:none; padding: 10px 18px; 
-           border-radius: 8px; font-size: 14px; cursor: pointer; font-weight:600; }
+           border-radius: 8px; font-size: 14px; cursor: pointer; font-weight:600; transition: 0.2s;}
+  button:hover { filter: brightness(1.1); }
   button:disabled { opacity: .6; cursor: not-allowed; }
   
-  /* CSS cho Tabs */
-  .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap: wrap;}
-  .tab { padding: 8px 16px; border-radius: 8px; background: var(--card); 
-         border:1px solid var(--line); cursor:pointer; font-size:14px; }
-  .tab.active { background: var(--accent); border-color: var(--accent); }
+  /* Cấu trúc Layout 2 cột (Menu trái - Nội dung phải) */
+  .main-layout { display: flex; gap: 24px; align-items: flex-start; }
+  
+  /* CSS cho Menu Tabs bên trái */
+  .sidebar-tabs { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    width: 240px; /* Độ rộng cố định của menu trái */
+    flex-shrink: 0; 
+  }
+  .tab { 
+    padding: 12px 16px; border-radius: 8px; background: var(--card); 
+    border:1px solid var(--line); cursor:pointer; font-size:14px; 
+    text-align: left; font-weight: 500; transition: 0.2s;
+  }
+  .tab:hover { background: #283548; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  
+  /* CSS cho vùng nội dung bên phải */
+  .content-area { 
+    flex-grow: 1; 
+    min-width: 0; /* Ngăn bảng phá vỡ layout flex */
+  }
+
   .hidden { display:none; }
   
-  /* CSS cho Table chung */
+  /* CSS cho Table */
   table { width:100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
-  td, th { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
-  td.k { color: var(--muted); width: 42%; }
+  td, th { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
+  td.k { color: var(--muted); width: 200px; }
   
-  /* Bổ sung CSS cho Table hàng loạt (Bulk Table) cuộn ngang được */
-  .table-responsive { overflow-x: auto; margin-top: 14px; }
-  .bulk-table { width: 100%; min-width: 1000px; white-space: nowrap; }
-  .bulk-table th { border-bottom: 2px solid var(--line); color: var(--muted); font-size: 13px; font-weight: normal; }
+  .table-responsive { overflow-x: auto; margin-top: 14px; border-radius: 8px; border: 1px solid var(--line); }
+  .bulk-table { width: 100%; min-width: 1100px; white-space: nowrap; margin-top: 0; }
+  .bulk-table th { background: #0b1220; border-bottom: 2px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 600; padding: 12px 8px;}
+  .bulk-table tr:hover td { background: rgba(255,255,255,0.03); }
 
-  .badge { display:inline-block; padding: 2px 10px; border-radius: 999px; font-size:12px; font-weight:600; }
+  .badge { display:inline-block; padding: 4px 10px; border-radius: 999px; font-size:12px; font-weight:600; }
   .badge.ok { background: rgba(34,197,94,.15); color: var(--ok); }
   .badge.err { background: rgba(239,68,68,.15); color: var(--err); }
   .msg { margin-top: 12px; font-size: 14px; }
@@ -56,6 +79,13 @@
              border-top-color:#fff; border-radius:50%; animation: spin .7s linear infinite; vertical-align:-2px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  /* Giao diện điện thoại: Chuyển Tabs nằm ngang lại để dễ vuốt */
+  @media (max-width: 768px) {
+    .main-layout { flex-direction: column; }
+    .sidebar-tabs { width: 100%; flex-direction: row; overflow-x: auto; padding-bottom: 5px; }
+    .tab { white-space: nowrap; text-align: center; flex: 1; }
+  }
 </style>
 </head>
 <body>
@@ -72,42 +102,47 @@
     <div class="hint">Mật khẩu được lưu tạm trong trình duyệt (localStorage).</div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" id="tabSingleBtn" onclick="switchTab('single')">🔍 Tra cứu 1 mã</div>
-    <div class="tab" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Nhập nhiều mã</div>
-    <div class="tab" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý Excel</div>
-  </div>
-
-  <div class="card" id="tabSingle">
-    <label>Mã đơn hàng</label>
-    <div class="row">
-      <div><input type="text" id="orderCode" placeholder="VD: DH18700, BIZ02120" 
-                  onkeydown="if(event.key==='Enter') doLookup()" /></div>
-      <button id="lookupBtn" onclick="doLookup()">Tra cứu</button>
+  <div class="main-layout">
+    
+    <div class="sidebar-tabs">
+      <div class="tab active" id="tabSingleBtn" onclick="switchTab('single')">🔍 Tra cứu 1 mã</div>
+      <div class="tab" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Nhập nhiều mã</div>
+      <div class="tab" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý Excel</div>
     </div>
-    <div id="singleResult"></div>
-  </div>
 
-  <div class="card hidden" id="tabBulk">
-    <label>Nhập danh sách mã đơn (ngăn cách bằng dấu phẩy hoặc xuống dòng)</label>
-    <textarea id="bulkCodes" rows="5" placeholder="VD:&#10;DH18700&#10;BIZ02120&#10;DH19999"></textarea>
-    <div style="margin-top: 10px;">
-      <button id="bulkBtn" onclick="doBulkLookup()">Tra cứu hàng loạt</button>
-    </div>
-    <div class="hint">Bảng kết quả sẽ hiển thị ngay bên dưới sau khi tra cứu.</div>
-    <div id="bulkResultArea"></div>
-  </div>
+    <div class="content-area">
+      <div class="card" id="tabSingle">
+        <label>Mã đơn hàng</label>
+        <div class="row">
+          <div><input type="text" id="orderCode" placeholder="VD: DH18700, BIZ02120" 
+                      onkeydown="if(event.key==='Enter') doLookup()" /></div>
+          <button id="lookupBtn" onclick="doLookup()">Tra cứu</button>
+        </div>
+        <div id="singleResult"></div>
+      </div>
 
-  <div class="card hidden" id="tabExcel">
-    <label>Chọn file Excel (.xlsx) — mã đơn nằm ở cột A</label>
-    <div class="row">
-      <div><input type="file" id="excelFile" accept=".xlsx" /></div>
-      <button id="excelBtn" onclick="doExcel()">Xử lý & tải về</button>
+      <div class="card hidden" id="tabBulk">
+        <label>Nhập danh sách mã đơn (ngăn cách bằng dấu phẩy hoặc xuống dòng)</label>
+        <textarea id="bulkCodes" rows="6" placeholder="VD:&#10;DH18700&#10;BIZ02120&#10;DH19999"></textarea>
+        <div style="margin-top: 12px;">
+          <button id="bulkBtn" onclick="doBulkLookup()">Tra cứu hàng loạt</button>
+        </div>
+        <div class="hint">Bảng kết quả sẽ hiển thị ngay bên dưới sau khi tra cứu.</div>
+        <div id="bulkResultArea"></div>
+      </div>
+
+      <div class="card hidden" id="tabExcel">
+        <label>Chọn file Excel (.xlsx) — mã đơn nằm ở cột A</label>
+        <div class="row">
+          <div><input type="file" id="excelFile" accept=".xlsx" /></div>
+          <button id="excelBtn" onclick="doExcel()">Xử lý & tải về</button>
+        </div>
+        <div class="hint">File kết quả sẽ tự tải về sau khi xử lý xong. Có thể mất vài phút với danh sách lớn.</div>
+        <div id="excelResult" class="msg"></div>
+      </div>
     </div>
-    <div class="hint">File kết quả sẽ tự tải về sau khi xử lý xong. Có thể mất vài phút với danh sách lớn.</div>
-    <div id="excelResult" class="msg"></div>
-  </div>
-</div>
+    
+  </div> </div>
 
 <script>
 const FIELDS = [
@@ -135,7 +170,7 @@ function saveToken() {
 document.getElementById("accessToken").placeholder = 
   getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
 
-// Hàm chuyển Tab (cập nhật 3 tabs)
+// Hàm chuyển Tab
 function switchTab(which) {
   document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
   document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
@@ -163,7 +198,6 @@ async function doLookup() {
     const data = await resp.json();
     if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
     
-    // Render result single
     const ok = data.status_msg === "Thành công";
     let rows = FIELDS.map(([k, label]) => 
       `<tr><td class="k">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
@@ -180,7 +214,6 @@ async function doLookup() {
 /* --- TAB 2: TRA CỨU NHIỀU MÃ (TEXTAREA -> TABLE) --- */
 async function doBulkLookup() {
   const rawInput = document.getElementById("bulkCodes").value;
-  // Tách mã bằng dấu phẩy, khoảng trắng, hoặc xuống dòng và loại bỏ mã rỗng
   const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
   const box = document.getElementById("bulkResultArea");
   const btn = document.getElementById("bulkBtn");
@@ -192,7 +225,6 @@ async function doBulkLookup() {
 
   btn.disabled = true;
 
-  // Tạo khung Bảng (Table Headers)
   let theadHTML = `<tr><th>Trạng thái</th>` + FIELDS.map(f => `<th>${f[1]}</th>`).join("") + `</tr>`;
   
   box.innerHTML = `
@@ -209,7 +241,6 @@ async function doBulkLookup() {
   const progress = document.getElementById("bulkProgress");
   let successCount = 0;
 
-  // Xử lý từng mã một cách tuần tự (tránh sập API)
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
     progress.innerHTML = `<span class="spinner"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
@@ -230,9 +261,7 @@ async function doBulkLookup() {
         const badge = ok ? '<span class="badge ok">Thành công</span>' 
                          : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
         
-        // Cột 1: Badge Trạng thái
         let tds = `<td>${badge}</td>`;
-        // Các cột tiếp theo: Data ánh xạ từ FIELDS
         tds += FIELDS.map(f => `<td>${escapeHtml(data[f[0]] || "")}</td>`).join("");
         tr.innerHTML = tds;
       } else {
@@ -299,6 +328,7 @@ function downloadBase64(b64, filename) {
 }
 
 function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 
