@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler
-from _subtitle import search_subtitle
+
 import openpyxl
 
 sys.path.append(os.path.dirname(__file__))
@@ -18,15 +18,20 @@ from _core import (  # noqa: E402
     EXCEL_FIELDS,
 )
 from _missav import get_movie_detail, get_category_list
+from _subtitle import search_subtitle
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
     if not code:
         return 400, {"error": "Thiếu mã phim"}
+    
     detail = get_movie_detail(code)
     if not detail:
         return 404, {"error": "Không tìm thấy phim hoặc mã không hợp lệ"}
+        
+    # Tự động quét và lấy link phụ đề
     detail["subtitle_url"] = search_subtitle(code)
+    
     return 200, detail
 
 def handle_category(body):
@@ -47,7 +52,7 @@ def handle_excel(body):
     if not file_b64:
         return 400, {"error": "Thiếu file Excel"}
     try:
-        if "," in file_b64: 
+        if "," in file_b64:
             file_b64 = file_b64.split(",", 1)[1]
         wb = openpyxl.load_workbook(io.BytesIO(base64.b64decode(file_b64)))
         sheet = wb.active
@@ -113,7 +118,7 @@ class handler(BaseHTTPRequestHandler):
 
         action = body.get("action", "lookup")
         
-        # Đã tích hợp luồng lấy danh sách Category
+        # Đã tích hợp đầy đủ 4 luồng xử lý
         if action == "movie":
             status, payload = handle_movie(body)
         elif action == "category":
