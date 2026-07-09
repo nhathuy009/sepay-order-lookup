@@ -144,7 +144,7 @@ def get_movie_detail(slug_or_code):
         return {
             "title": title,
             "stream_url": f"https://surrit.mrstcdn.store/{uuid}/playlist.m3u8",
-            "code": code_clean.upper()
+            "code": code_clean.upper(),
             "subtitle_url": subtitle_url
         }
     except Exception:
