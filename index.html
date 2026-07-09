@@ -3,21 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Công cụ tra cứu đơn hàng</title>
+<title>Công cụ tra cứu đơn hàng & Sao kê</title>
 <style>
-  /* DESIGN SYSTEM THEO PHONG CÁCH ADMIN DASHBOARD SÁNG MÀU */
+  /* DESIGN SYSTEM ADMIN DASHBOARD */
   :root { 
-    --bg-app: #f3f4f6;          /* Nền tổng thể màu xám nhạt */
-    --header-bg: #1f2937;       /* Header tối màu */
-    --sidebar-bg: #ffffff;      /* Sidebar trắng */
-    --card-bg: #ffffff;         /* Nền card trắng */
-    --border: #e5e7eb;          /* Viền xám nhạt */
-    --text-main: #374151;       /* Chữ xám đậm */
-    --text-muted: #6b7280;      /* Chữ xám nhạt */
-    --accent: #3b82f6;          /* Xanh dương chủ đạo */
+    --bg-app: #f3f4f6;          
+    --header-bg: #1f2937;       
+    --sidebar-bg: #ffffff;      
+    --card-bg: #ffffff;         
+    --border: #e5e7eb;          
+    --text-main: #374151;       
+    --text-muted: #6b7280;      
+    --accent: #3b82f6;          
     --accent-hover: #2563eb; 
     
-    /* Màu Badge giống hệt hình */
     --badge-ok-bg: #def7ec;     
     --badge-ok-text: #03543f;
     --badge-err-bg: #fde8e8;    
@@ -34,19 +33,14 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Chống cuộn toàn trang, chỉ cuộn phần nội dung */
+    overflow: hidden;
   }
 
-  /* 1. HEADER (Thanh trên cùng) */
+  /* HEADER */
   .top-header {
-    background: var(--header-bg);
-    color: white;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    flex-shrink: 0;
+    background: var(--header-bg); color: white; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; flex-shrink: 0;
   }
   .header-brand { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;}
   .header-actions { display: flex; align-items: center; gap: 12px; }
@@ -55,26 +49,15 @@
     padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none;
   }
   .header-actions input::placeholder { color: #9ca3af; }
-  .header-actions button {
-    background: var(--accent); padding: 8px 16px; 
-  }
+  .header-actions button { background: var(--accent); padding: 8px 16px; }
 
-  /* 2. BODY LAYOUT (Sidebar + Main Content) */
-  .app-body {
-    display: flex;
-    flex-grow: 1;
-    overflow: hidden;
-  }
+  /* BODY LAYOUT */
+  .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 
-  /* 3. SIDEBAR (Menu trái) */
+  /* SIDEBAR */
   .sidebar {
-    width: 240px;
-    background: var(--sidebar-bg);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 16px 0;
-    flex-shrink: 0;
+    width: 240px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 16px 0; flex-shrink: 0;
   }
   .sidebar-menu-title {
     font-size: 11px; font-weight: 600; color: var(--text-muted);
@@ -83,27 +66,18 @@
   .menu-item {
     padding: 10px 20px; margin: 2px 12px; border-radius: 6px;
     display: flex; align-items: center; gap: 12px;
-    cursor: pointer; color: var(--text-main); font-weight: 500;
-    transition: all 0.2s;
+    cursor: pointer; color: var(--text-main); font-weight: 500; transition: all 0.2s;
   }
   .menu-item:hover { background: #f3f4f6; }
-  .menu-item.active {
-    background: var(--accent); color: white;
-  }
+  .menu-item.active { background: var(--accent); color: white; }
 
-  /* 4. MAIN CONTENT (Vùng nội dung phải) */
-  .main-content {
-    flex-grow: 1;
-    padding: 24px 32px;
-    overflow-y: auto;
-  }
+  /* MAIN CONTENT */
+  .main-content { flex-grow: 1; padding: 24px 32px; overflow-y: auto; }
 
-  /* Elements chung trong Main */
   h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; color: #111827; }
   .card { 
     background: var(--card-bg); border: 1px solid var(--border); 
-    border-radius: 8px; padding: 20px; margin-bottom: 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border-radius: 8px; padding: 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
   label { display: block; font-size: 13px; font-weight: 500; color: var(--text-main); margin-bottom: 8px; }
   
@@ -129,7 +103,7 @@
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
   .row > div { flex: 1; min-width: 250px; }
 
-  /* 5. KHU VỰC CHỌN CỘT (DRAG & DROP) */
+  /* CHECKBOX DRAG & DROP */
   .checkbox-group { 
     display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; 
     background: #f9fafb; padding: 14px; border-radius: 6px; border: 1px solid var(--border); 
@@ -145,7 +119,7 @@
   .checkbox-item input { cursor: pointer; accent-color: var(--accent); margin:0; }
   .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 2px;}
 
-  /* 6. TABLE SÁNG MÀU */
+  /* TABLE */
   .table-responsive { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; border-bottom: none;}
   table { width: 100%; border-collapse: collapse; text-align: left; background: white;}
   th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
@@ -156,7 +130,6 @@
   td { font-size: 13px; color: var(--text-main); }
   tr:hover td { background: #f9fafb; }
 
-  /* Badges giống hình */
   .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
   .badge.ok { background: var(--badge-ok-bg); color: var(--badge-ok-text); }
   .badge.err { background: var(--badge-err-bg); color: var(--badge-err-text); }
@@ -165,7 +138,6 @@
   .msg.err { color: var(--badge-err-text); }
   .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
 
-  /* Spinner */
   .spinner { 
     display: inline-block; width: 14px; height: 14px; 
     border: 2px solid rgba(0,0,0,0.1); border-top-color: currentColor; 
@@ -173,7 +145,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Responsive */
   @media (max-width: 768px) {
     .app-body { flex-direction: column; overflow: auto; }
     .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 8px; border-right: none; border-bottom: 1px solid var(--border); }
@@ -187,7 +158,7 @@
 
   <header class="top-header">
     <div class="header-brand">
-      📡 Tra cứu Đơn hàng (10X & SOLOBIZ)
+      📡 Công cụ Hệ thống
     </div>
     <div class="header-actions" id="authCard">
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
@@ -199,15 +170,10 @@
     
     <aside class="sidebar">
       <div class="sidebar-menu-title">Chức năng chính</div>
-      <div class="menu-item active" id="tabSingleBtn" onclick="switchTab('single')">
-        🔍 Tra cứu 1 mã
-      </div>
-      <div class="menu-item" id="tabBulkBtn" onclick="switchTab('bulk')">
-        📝 Tra cứu hàng loạt
-      </div>
-      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">
-        📊 Xử lý bằng file Excel
-      </div>
+      <div class="menu-item active" id="tabSingleBtn" onclick="switchTab('single')">🔍 Tra cứu 1 mã</div>
+      <div class="menu-item" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
+      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý bằng file Excel</div>
+      <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
     </aside>
 
     <main class="content main-content">
@@ -217,9 +183,7 @@
         <div class="card">
           <label>Mã đơn hàng (Enter để tìm)</label>
           <div class="row">
-            <div>
-              <input type="text" id="orderCode" placeholder="Nhập mã... VD: DH18700, BIZ02120" onkeydown="if(event.key==='Enter') doLookup()" />
-            </div>
+            <div><input type="text" id="orderCode" placeholder="Nhập mã... VD: DH18700, BIZ02120" onkeydown="if(event.key==='Enter') doLookup()" /></div>
             <button id="lookupBtn" onclick="doLookup()">Tra cứu</button>
           </div>
           <div id="singleResult" style="margin-top: 16px;"></div>
@@ -231,21 +195,17 @@
           <h2 style="margin:0">Tra cứu hàng loạt</h2>
           <button id="copyExcelBtn" class="btn-outline hidden" onclick="copyTableToExcel()" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
         </div>
-        
         <div class="card">
           <label>Danh sách mã đơn (cách nhau bằng phẩy hoặc xuống dòng)</label>
           <textarea id="bulkCodes" rows="5" placeholder="VD:&#10;DH18700&#10;BIZ02120"></textarea>
-          
           <div style="margin-top: 16px;">
             <label style="color: var(--accent); margin-bottom: 4px;">⚙ Tùy chỉnh cột (Kéo thả '☰' để đổi chỗ, Tích để ẩn/hiện)</label>
             <div id="colSelector" class="checkbox-group"></div>
           </div>
-
           <div style="margin-top: 16px;">
             <button id="bulkBtn" onclick="doBulkLookup()">Chạy tiến trình tra cứu</button>
           </div>
         </div>
-
         <div id="bulkResultArea">
           <div class="msg" id="bulkProgress" style="display:none; margin-bottom: 12px;"></div>
           <div class="table-responsive" style="display:none;" id="bulkTableWrap">
@@ -258,7 +218,7 @@
       </div>
 
       <div id="tabExcel" class="hidden">
-        <h2>Xử lý file Excel</h2>
+        <h2>Xử lý file Excel đơn hàng</h2>
         <div class="card">
           <label>Chọn file Excel đầu vào (.xlsx) — Hệ thống sẽ đọc mã ở Cột A</label>
           <div class="row">
@@ -270,23 +230,30 @@
         </div>
       </div>
 
+      <div id="tabBank" class="hidden">
+        <h2>Tổng hợp Sao kê Ngân hàng</h2>
+        <div class="card">
+          <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
+          <div class="row">
+            <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
+            <button id="bankBtn" onclick="doBankStatement()">Tổng hợp GD & tải về</button>
+          </div>
+          <div class="hint" style="margin-top: 10px; color: var(--badge-ok-text); font-weight:500;">
+            Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.
+          </div>
+          <div id="bankResult" class="msg"></div>
+        </div>
+      </div>
+
     </main>
   </div>
 
 <script>
 const FIELDS = [
-  ["order_code", "Mã đơn"],
-  ["system", "Hệ thống"],
-  ["lead_email", "Email KH"],
-  ["lead_phone", "SĐT KH"],
-  ["lead_cccd", "Số CCCD"],
-  ["username", "Username"],
-  ["users_name", "Họ tên"],
-  ["orders_amount", "Số tiền"],
-  ["einvoice_created_at", "Ngày TT"],
-  ["invoice_number", "Số hóa đơn"],
-  ["ref_username", "Ref user"],
-  ["ref_name", "Ref tên"],
+  ["order_code", "Mã đơn"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
+  ["lead_phone", "SĐT KH"], ["lead_cccd", "Số CCCD"], ["username", "Username"],
+  ["users_name", "Họ tên"], ["orders_amount", "Số tiền"], ["einvoice_created_at", "Ngày TT"],
+  ["invoice_number", "Số hóa đơn"], ["ref_username", "Ref user"], ["ref_name", "Ref tên"]
 ];
 
 let currentColumns = [
@@ -296,8 +263,7 @@ let currentColumns = [
 let bulkData = []; 
 
 function getToken() { 
-  try { return localStorage.getItem("sepay_access_token") || ""; } 
-  catch(e) { return ""; } 
+  try { return localStorage.getItem("sepay_access_token") || ""; } catch(e) { return ""; } 
 }
 
 function saveToken() {
@@ -306,7 +272,7 @@ function saveToken() {
     localStorage.setItem("sepay_access_token", token);
     document.getElementById("accessToken").value = "";
     document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu";
-  } catch(e) { alert("Không thể lưu mật khẩu: Trình duyệt đang chặn lưu trữ."); }
+  } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -321,301 +287,185 @@ document.addEventListener("DOMContentLoaded", () => {
       if(authCard) authCard.classList.add("hidden");
     }
   }).catch(() => {});
-
   initColumnSelector();
 });
 
+// CẬP NHẬT HÀM SWITCH TAB THÊM TAB BANK
 function switchTab(which) {
   try {
     document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
     document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
     document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
+    document.getElementById("tabBank").classList.toggle("hidden", which !== "bank"); 
     
     document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
     document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
     document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
+    document.getElementById("tabBankBtn").classList.toggle("active", which === "bank"); 
   } catch(e) {}
 }
 
-/* Kéo thả chọn cột */
+/* Các hàm Kéo Thả & Tra cứu giữ nguyên */
 let dragSrcEl = null;
-
 function initColumnSelector() {
   const container = document.getElementById('colSelector');
   if (!container) return;
   container.innerHTML = '';
-  
   currentColumns.forEach(col => {
     const label = document.createElement('label');
-    label.className = 'checkbox-item';
-    label.draggable = true;
-    label.dataset.key = col.key;
-
-    label.addEventListener('dragstart', function(e) {
-      dragSrcEl = this;
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', this.dataset.key);
-      this.style.opacity = '0.4';
-    });
-    
-    label.addEventListener('dragover', function(e) {
-      if (e.preventDefault) e.preventDefault(); 
-      e.dataTransfer.dropEffect = 'move';
-      return false;
-    });
-    
+    label.className = 'checkbox-item'; label.draggable = true; label.dataset.key = col.key;
+    label.addEventListener('dragstart', function(e) { dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', this.dataset.key); this.style.opacity = '0.4'; });
+    label.addEventListener('dragover', function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; });
     label.addEventListener('dragenter', function(e) { this.classList.add('over'); });
     label.addEventListener('dragleave', function(e) { this.classList.remove('over'); });
-    
     label.addEventListener('drop', function(e) {
       if (e.stopPropagation) e.stopPropagation();
       if (dragSrcEl !== this) {
-        const draggedKey = dragSrcEl.dataset.key;
-        const targetKey = this.dataset.key;
+        const draggedKey = dragSrcEl.dataset.key; const targetKey = this.dataset.key;
         const draggedIdx = currentColumns.findIndex(c => c.key === draggedKey);
         const targetIdx = currentColumns.findIndex(c => c.key === targetKey);
         const [draggedItem] = currentColumns.splice(draggedIdx, 1);
         currentColumns.splice(targetIdx, 0, draggedItem);
-        initColumnSelector();
-        renderBulkTable();
+        initColumnSelector(); renderBulkTable();
       }
       return false;
     });
-
-    label.addEventListener('dragend', function(e) {
-      this.style.opacity = '1';
-      document.querySelectorAll('.checkbox-item').forEach(item => item.classList.remove('over'));
-    });
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.value = col.key;
-    cb.checked = col.visible;
-    cb.addEventListener('change', (e) => {
-      col.visible = e.target.checked;
-      renderBulkTable();
-    });
-
-    label.innerHTML = `<span class="drag-handle">☰</span>`;
-    label.appendChild(cb);
-    label.appendChild(document.createTextNode(' ' + col.label));
-    container.appendChild(label);
+    label.addEventListener('dragend', function(e) { this.style.opacity = '1'; document.querySelectorAll('.checkbox-item').forEach(item => item.classList.remove('over')); });
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = col.key; cb.checked = col.visible;
+    cb.addEventListener('change', (e) => { col.visible = e.target.checked; renderBulkTable(); });
+    label.innerHTML = `<span class="drag-handle">☰</span>`; label.appendChild(cb); label.appendChild(document.createTextNode(' ' + col.label)); container.appendChild(label);
   });
 }
 
 function renderBulkTable() {
-  const thead = document.getElementById("bulkThead");
-  const tbody = document.getElementById("bulkTbody");
+  const thead = document.getElementById("bulkThead"); const tbody = document.getElementById("bulkTbody");
   if (!thead || !tbody) return;
-
-  let theadHTML = '<tr>';
-  currentColumns.forEach(col => {
-    if (col.visible) theadHTML += `<th>${col.label}</th>`;
-  });
-  theadHTML += '</tr>';
-  thead.innerHTML = theadHTML;
-
-  tbody.innerHTML = '';
-  bulkData.forEach(rowObj => { appendRowToDOM(rowObj, tbody); });
+  let theadHTML = '<tr>'; currentColumns.forEach(col => { if (col.visible) theadHTML += `<th>${col.label}</th>`; }); theadHTML += '</tr>';
+  thead.innerHTML = theadHTML; tbody.innerHTML = ''; bulkData.forEach(rowObj => { appendRowToDOM(rowObj, tbody); });
 }
 
 function appendRowToDOM(rowObj, tbody) {
-  let tr = document.createElement("tr");
-  let tds = '';
-  let errorPrinted = false; 
-
+  let tr = document.createElement("tr"); let tds = ''; let errorPrinted = false; 
   currentColumns.forEach(col => {
     if (!col.visible) return;
-    if (col.key === 'status') {
-      tds += `<td>${rowObj.badgeHTML}</td>`;
-    } 
+    if (col.key === 'status') { tds += `<td>${rowObj.badgeHTML}</td>`; } 
     else if (rowObj.isError) {
-      if (!errorPrinted) {
-        tds += `<td><span style="color:var(--badge-err-text); font-weight:500;">${escapeHtml(rowObj.errorMsg)}</span></td>`;
-        errorPrinted = true;
-      } else {
-        tds += `<td></td>`;
-      }
-    } 
-    else {
-      tds += `<td>${escapeHtml(rowObj.raw[col.key] || "")}</td>`;
-    }
+      if (!errorPrinted) { tds += `<td><span style="color:var(--badge-err-text); font-weight:500;">${escapeHtml(rowObj.errorMsg)}</span></td>`; errorPrinted = true; } 
+      else { tds += `<td></td>`; }
+    } else { tds += `<td>${escapeHtml(rowObj.raw[col.key] || "")}</td>`; }
   });
-
-  tr.innerHTML = tds;
-  tbody.appendChild(tr);
+  tr.innerHTML = tds; tbody.appendChild(tr);
 }
 
-/* Chạy lệnh Tab 1 */
 async function doLookup() {
-  const code = document.getElementById("orderCode").value.trim();
-  const box = document.getElementById("singleResult");
-  const btn = document.getElementById("lookupBtn");
+  const code = document.getElementById("orderCode").value.trim(); const box = document.getElementById("singleResult"); const btn = document.getElementById("lookupBtn");
   if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã đơn.</div>'; return; }
-  
-  btn.disabled = true;
-  box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
-  
+  btn.disabled = true; box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
   try {
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
-    });
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, access_token: getToken() }) });
     const data = await resp.json();
     if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
-    
     const ok = data.status_msg === "Thành công";
-    let rows = FIELDS.map(([k, label]) => 
-      `<tr><td style="color:var(--text-muted); font-weight:500; width:150px;">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
+    let rows = FIELDS.map(([k, label]) => `<tr><td style="color:var(--text-muted); font-weight:500; width:150px;">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
     const badge = ok ? '<span class="badge ok">Thành công</span>' : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
-    
-    // Sử dụng class table-responsive và table đã khai báo ở trên để hiển thị đẹp
     box.innerHTML = `<div style="margin-bottom:12px;">${badge}</div><div class="table-responsive"><table>${rows}</table></div>`;
-  } catch (e) {
-    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối: ${e.message}</div>`;
-  } finally {
-    btn.disabled = false;
-  }
+  } catch (e) { box.innerHTML = `<div class="msg err">❌ Lỗi kết nối: ${e.message}</div>`; } finally { btn.disabled = false; }
 }
 
-/* Chạy lệnh Tab 2 */
 async function doBulkLookup() {
   const rawInput = document.getElementById("bulkCodes").value;
   const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
-  const btn = document.getElementById("bulkBtn");
-  const progress = document.getElementById("bulkProgress");
-  const tableWrap = document.getElementById("bulkTableWrap");
-  const copyBtn = document.getElementById("copyExcelBtn");
-
-  if (codes.length === 0) { 
-    progress.style.display = 'block';
-    progress.innerHTML = '<span class="err">Vui lòng nhập ít nhất 1 mã đơn.</span>'; 
-    return; 
-  }
-
-  btn.disabled = true;
-  bulkData = []; 
-  progress.style.display = 'block';
-  tableWrap.style.display = 'block';
-  copyBtn.style.display = 'none';
-
-  renderBulkTable(); 
-  const tbody = document.getElementById("bulkTbody");
-  let successCount = 0;
-
+  const btn = document.getElementById("bulkBtn"); const progress = document.getElementById("bulkProgress");
+  const tableWrap = document.getElementById("bulkTableWrap"); const copyBtn = document.getElementById("copyExcelBtn");
+  if (codes.length === 0) { progress.style.display = 'block'; progress.innerHTML = '<span class="err">Vui lòng nhập ít nhất 1 mã đơn.</span>'; return; }
+  btn.disabled = true; bulkData = []; progress.style.display = 'block'; tableWrap.style.display = 'block'; copyBtn.style.display = 'none';
+  renderBulkTable(); const tbody = document.getElementById("bulkTbody"); let successCount = 0;
   for (let i = 0; i < codes.length; i++) {
-    const code = codes[i];
-    progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
-    
+    const code = codes[i]; progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
     let rowObj = { code: code, raw: {}, isError: false, errorMsg: "" };
-    
     try {
-      const resp = await fetch("/api/index", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "lookup", code, access_token: getToken() }),
-      });
+      const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, access_token: getToken() }) });
       const data = await resp.json();
-
       if (resp.ok) {
-        const ok = data.status_msg === "Thành công";
-        if (ok) successCount++;
+        const ok = data.status_msg === "Thành công"; if (ok) successCount++;
         const badgeText = ok ? 'Thành công' : (data.status_msg || 'Thất bại');
-        rowObj.badgeHTML = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` : `<span class="badge err">${escapeHtml(badgeText)}</span>`;
-        rowObj.raw = data;
-      } else {
-        rowObj.isError = true;
-        rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`;
-        rowObj.errorMsg = `${data.error || "Lỗi server"} (${code})`;
-      }
-    } catch (e) {
-      rowObj.isError = true;
-      rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`;
-      rowObj.errorMsg = `${e.message} (${code})`;
-    }
-    
-    bulkData.push(rowObj);
-    appendRowToDOM(rowObj, tbody);
+        rowObj.badgeHTML = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` : `<span class="badge err">${escapeHtml(badgeText)}</span>`; rowObj.raw = data;
+      } else { rowObj.isError = true; rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`; rowObj.errorMsg = `${data.error || "Lỗi server"} (${code})`; }
+    } catch (e) { rowObj.isError = true; rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`; rowObj.errorMsg = `${e.message} (${code})`; }
+    bulkData.push(rowObj); appendRowToDOM(rowObj, tbody);
   }
-
-  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> đơn.`;
-  copyBtn.style.display = "inline-flex"; 
-  btn.disabled = false;
+  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> đơn.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
 }
 
-/* Copy Excel Tab 2 */
 function copyTableToExcel() {
   try {
-    const table = document.getElementById('bulkTable');
-    if (!table) return;
-
-    let tsv = "";
+    const table = document.getElementById('bulkTable'); if (!table) return; let tsv = "";
     const rows = Array.from(table.querySelectorAll('tr'));
-    rows.forEach(row => {
-      const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim());
-      tsv += cells.join("\t") + "\n";
-    });
-
+    rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
     navigator.clipboard.writeText(tsv).then(() => {
-      const btn = document.getElementById("copyExcelBtn");
-      const originalText = btn.innerText;
-      btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
+      const btn = document.getElementById("copyExcelBtn"); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
-    }).catch(err => {
-      alert("Không thể tự động copy. Vui lòng thử lại.");
-    });
+    }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
-/* Chạy lệnh Tab 3 */
 async function doExcel() {
-  const fileInput = document.getElementById("excelFile");
-  const box = document.getElementById("excelResult");
-  const btn = document.getElementById("excelBtn");
+  const fileInput = document.getElementById("excelFile"); const box = document.getElementById("excelResult"); const btn = document.getElementById("excelBtn");
   if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
+  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }) });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
+    downloadBase64(data.file_base64, "ket_qua_" + file.name); box.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${data.success}/${data.total}</strong> đơn. File đã tự tải về máy.`;
+  } catch (e) { box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
+}
+
+/* HÀM XỬ LÝ CHO SAO KÊ NGÂN HÀNG MỚI THÊM */
+async function doBankStatement() {
+  const fileInput = document.getElementById("bankExcelFile");
+  const box = document.getElementById("bankResult");
+  const btn = document.getElementById("bankBtn");
+  
+  if (!fileInput.files.length) { box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; return; }
   
   const file = fileInput.files[0];
   btn.disabled = true;
-  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
   
   try {
     const b64 = await fileToBase64(file);
     const resp = await fetch("/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }),
+      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }),
     });
     const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
+    if (!resp.ok) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; return; }
     
-    downloadBase64(data.file_base64, "ket_qua_" + file.name);
-    box.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${data.success}/${data.total}</strong> đơn. File đã tự tải về máy.`;
+    downloadBase64(data.file_base64, "TongHop_" + file.name);
+    box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
   } catch (e) {
-    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
+    box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`;
   } finally {
     btn.disabled = false;
   }
 }
 
+/* Utilities */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => resolve(r.result.split(",", 2)[1]);
-    r.onerror = reject;
-    r.readAsDataURL(file);
+    r.onload = () => resolve(r.result.split(",", 2)[1]); r.onerror = reject; r.readAsDataURL(file);
   });
 }
-
 function downloadBase64(b64, filename) {
   const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
   const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
 }
-
 function escapeHtml(s) {
   if (s === null || s === undefined) return "";
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
