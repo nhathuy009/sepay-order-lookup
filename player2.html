@@ -212,7 +212,11 @@
             if (!codeInput) return;
             
             const btn = document.getElementById('playBtn');
-            btn.disabled = true; btn.innerText = "Đang tìm..."; errorDiv.style.display = 'none';
+            const subBox = document.getElementById('subtitle-box'); // Lấy thẻ hộp phụ đề
+            btn.disabled = true; 
+            btn.innerText = "Đang tìm..."; 
+            errorDiv.style.display = 'none';
+            subBox.style.display = 'none'; // Ẩn hộp phụ đề khi bắt đầu tìm mới
 
             try {
                 const res = await fetch('/api/index', {
@@ -222,7 +226,18 @@
                 const data = await res.json();
                 if (!res.ok) showError("❌ " + (data.error || "Lỗi API")); 
                 else if (!data.stream_url) showError("❌ Không tìm thấy luồng m3u8."); 
-                else playStream(data.stream_url); 
+            } else {
+                // -- HIỂN THỊ PHỤ ĐỀ --
+                subBox.style.display = 'block';
+                subBox.classList.remove('error');
+                if (data.subtitle_url && data.subtitle_url !== "chưa có phụ đề") {
+                    subBox.innerHTML = `💬 Đã tìm thấy phụ đề: <a href="${data.subtitle_url}" target="_blank">Tải xuống file</a> <i>(Sau khi tải, kéo thả file vào video để xem)</i>`;
+                } else {
+                    subBox.classList.add('error');
+                    subBox.innerHTML = `⚠️ Phim này hiện chưa có phụ đề trên hệ thống SubtitleCat.`;
+                }
+                // --------------------
+                playStream(data.stream_url); 
             } catch (err) { showError("❌ Lỗi mạng"); } 
             finally { btn.disabled = false; btn.innerText = "Phát Video"; }
         }
