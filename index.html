@@ -32,15 +32,10 @@
   button:hover { filter: brightness(1.1); }
   button:disabled { opacity: .6; cursor: not-allowed; }
   
-  /* Cấu trúc Layout 2 cột */
   .main-layout { display: flex; gap: 24px; align-items: flex-start; }
   
   .sidebar-tabs { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-    width: 160px; 
-    flex-shrink: 0; 
+    display: flex; flex-direction: column; gap: 10px; width: 160px; flex-shrink: 0; 
   }
   .tab { 
     padding: 10px 12px; border-radius: 8px; background: var(--card); 
@@ -53,18 +48,23 @@
   .content-area { flex-grow: 1; min-width: 0; }
   .hidden { display:none; }
   
-  /* CSS Nhóm Checkbox chọn cột */
+  /* CSS Nhóm Checkbox & Kéo thả */
   .checkbox-group { 
-    display: flex; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 16px; 
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; 
     background: #0b1220; padding: 14px; border-radius: 8px; border: 1px solid var(--line); 
   }
   .checkbox-item { 
     display: flex; align-items: center; gap: 6px; font-size: 13px; 
-    cursor: pointer; user-select: none; margin: 0; color: var(--text);
+    cursor: grab; user-select: none; margin: 0; color: var(--text);
+    background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 6px;
+    border: 1px dashed transparent; transition: 0.2s;
   }
+  .checkbox-item:hover { background: rgba(255,255,255,0.1); }
+  .checkbox-item.over { border-color: var(--accent); background: rgba(59,130,246,0.15); transform: scale(1.02);}
   .checkbox-item input { cursor: pointer; accent-color: var(--accent); width: auto; }
+  .drag-handle { color: var(--muted); font-size: 14px; font-weight: bold; margin-right: 2px;}
 
-  /* CSS Table tối ưu */
+  /* CSS Table */
   table { width:100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
   td, th { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
   td.k { color: var(--muted); width: 200px; }
@@ -128,13 +128,15 @@
         <label>Nhập danh sách mã đơn (ngăn cách bằng dấu phẩy hoặc xuống dòng)</label>
         <textarea id="bulkCodes" rows="6" placeholder="VD:&#10;DH18700&#10;BIZ02120&#10;DH19999"></textarea>
         
-        <label style="margin-top: 16px;">Tùy chọn cột hiển thị (các cột bị ẩn sẽ không được Copy sang Excel):</label>
+        <label style="margin-top: 16px; color: var(--accent); font-weight:600;">
+          ⚙ Tùy chỉnh cột hiển thị (Kéo thả nút ☰ để đổi thứ tự, Tích chọn để bật/tắt)
+        </label>
         <div id="colSelector" class="checkbox-group"></div>
 
         <div style="margin-top: 8px;">
           <button id="bulkBtn" onclick="doBulkLookup()">Tra cứu hàng loạt</button>
         </div>
-        <div class="hint">Bảng kết quả sẽ hiển thị ngay bên dưới sau khi tra cứu.</div>
+        <div class="hint">Bảng kết quả sẽ hiển thị ngay bên dưới và tự động cập nhật khi bạn kéo thả cột.</div>
         <div id="bulkResultArea"></div>
       </div>
 
@@ -168,6 +170,13 @@ const FIELDS = [
   ["ref_name", "Ref tên"],
 ];
 
+// Biến lưu trữ trạng thái Cột và Dữ liệu
+let currentColumns = [
+  { key: "status", label: "Trạng thái", visible: true },
+  ...FIELDS.map(f => ({ key: f[0], label: f[1], visible: true }))
+];
+let bulkData = []; // Lưu trữ dữ liệu tải về để vẽ lại bảng khi kéo thả cột
+
 function getToken() { 
   try { return localStorage.getItem("sepay_access_token") || ""; } 
   catch(e) { return ""; } 
@@ -179,17 +188,13 @@ function saveToken() {
     localStorage.setItem("sepay_access_token", token);
     document.getElementById("accessToken").value = "";
     document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu (nhập lại để đổi)";
-  } catch(e) {
-    alert("Không thể lưu mật khẩu: Trình duyệt đang chặn lưu trữ.");
-  }
+  } catch(e) { alert("Không thể lưu mật khẩu: Trình duyệt đang chặn lưu trữ."); }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   try {
     const inputToken = document.getElementById("accessToken");
-    if(inputToken) {
-      inputToken.placeholder = getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
-    }
+    if(inputToken) inputToken.placeholder = getToken() ? "Đã lưu mật khẩu (nhập lại để đổi)" : "Nhập mật khẩu truy cập";
   } catch(e) {}
 
   fetch("/api/index").then(r => r.json()).then(d => {
@@ -199,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }).catch(() => {});
 
-  // Khởi tạo giao diện Checkbox chọn cột
+  // Khởi tạo các ô cột kéo thả
   initColumnSelector();
 });
 
@@ -215,35 +220,132 @@ function switchTab(which) {
   } catch(e) {}
 }
 
-/* --- LOGIC HIỂN THỊ CỘT --- */
+/* =========================================
+   LOGIC KÉO THẢ & CHỌN CỘT
+========================================= */
+let dragSrcEl = null;
+
 function initColumnSelector() {
   const container = document.getElementById('colSelector');
   if (!container) return;
   
-  // Mặc định luôn có cột Trạng thái
-  let html = `<label class="checkbox-item"><input type="checkbox" value="status" checked onchange="toggleCol('status')"> Trạng thái</label>`;
+  container.innerHTML = '';
   
-  FIELDS.forEach(f => {
-    html += `<label class="checkbox-item"><input type="checkbox" value="${f[0]}" checked onchange="toggleCol('${f[0]}')"> ${f[1]}</label>`;
+  currentColumns.forEach(col => {
+    const label = document.createElement('label');
+    label.className = 'checkbox-item';
+    label.draggable = true;
+    label.dataset.key = col.key;
+
+    // Các sự kiện Drag & Drop
+    label.addEventListener('dragstart', function(e) {
+      dragSrcEl = this;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.key);
+      this.style.opacity = '0.4';
+    });
+    
+    label.addEventListener('dragover', function(e) {
+      if (e.preventDefault) e.preventDefault(); // Cần thiết để Drop hoạt động
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    });
+    
+    label.addEventListener('dragenter', function(e) { this.classList.add('over'); });
+    label.addEventListener('dragleave', function(e) { this.classList.remove('over'); });
+    
+    label.addEventListener('drop', function(e) {
+      if (e.stopPropagation) e.stopPropagation();
+      if (dragSrcEl !== this) {
+        const draggedKey = dragSrcEl.dataset.key;
+        const targetKey = this.dataset.key;
+
+        // Đảo vị trí trong mảng
+        const draggedIdx = currentColumns.findIndex(c => c.key === draggedKey);
+        const targetIdx = currentColumns.findIndex(c => c.key === targetKey);
+        const [draggedItem] = currentColumns.splice(draggedIdx, 1);
+        currentColumns.splice(targetIdx, 0, draggedItem);
+
+        // Render lại giao diện và bảng
+        initColumnSelector();
+        renderBulkTable();
+      }
+      return false;
+    });
+
+    label.addEventListener('dragend', function(e) {
+      this.style.opacity = '1';
+      document.querySelectorAll('.checkbox-item').forEach(item => item.classList.remove('over'));
+    });
+
+    // Handle Checkbox
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = col.key;
+    cb.checked = col.visible;
+    cb.addEventListener('change', (e) => {
+      col.visible = e.target.checked;
+      renderBulkTable(); // Vẽ lại bảng khi ẩn/hiện cột
+    });
+
+    label.innerHTML = `<span class="drag-handle">☰</span>`;
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(' ' + col.label));
+    
+    container.appendChild(label);
   });
-  
-  container.innerHTML = html;
 }
 
-// Kiểm tra xem cột có đang được chọn bật không
-function isColVisible(key) {
-  const cb = document.querySelector(`input[value="${key}"]`);
-  return cb ? cb.checked : true;
+/* =========================================
+   RENDER BẢNG HÀNG LOẠT (TỪ BỘ NHỚ TẠM)
+========================================= */
+function renderBulkTable() {
+  const thead = document.getElementById("bulkThead");
+  const tbody = document.getElementById("bulkTbody");
+  if (!thead || !tbody) return;
+
+  // 1. Dựng Header (Chỉ lấy cột đang bật)
+  let theadHTML = '<tr>';
+  currentColumns.forEach(col => {
+    if (col.visible) theadHTML += `<th>${col.label}</th>`;
+  });
+  theadHTML += '</tr>';
+  thead.innerHTML = theadHTML;
+
+  // 2. Dựng Body
+  tbody.innerHTML = '';
+  bulkData.forEach(rowObj => { appendRowToDOM(rowObj, tbody); });
 }
 
-// Ẩn/Hiện cột ngay lập tức (Real-time)
-function toggleCol(key) {
-  const isVisible = isColVisible(key);
-  const cells = document.querySelectorAll(`.col-${key}`);
-  cells.forEach(cell => {
-    cell.style.display = isVisible ? '' : 'none';
+function appendRowToDOM(rowObj, tbody) {
+  let tr = document.createElement("tr");
+  let tds = '';
+  let errorPrinted = false; // Đảm bảo lỗi chỉ in ra ở 1 cột để Excel không bị lệch dóng
+
+  currentColumns.forEach(col => {
+    if (!col.visible) return; // Bỏ qua cột ẩn
+
+    if (col.key === 'status') {
+      tds += `<td>${rowObj.badgeHTML}</td>`;
+    } 
+    else if (rowObj.isError) {
+      // Nếu có lỗi, nhét thông báo lỗi vào cột text đầu tiên, các cột sau để trống
+      if (!errorPrinted) {
+        tds += `<td><span class="err">${escapeHtml(rowObj.errorMsg)}</span></td>`;
+        errorPrinted = true;
+      } else {
+        tds += `<td></td>`;
+      }
+    } 
+    else {
+      tds += `<td>${escapeHtml(rowObj.raw[col.key] || "")}</td>`;
+    }
   });
+
+  tr.innerHTML = tds;
+  tbody.appendChild(tr);
 }
+
 
 /* --- TAB 1: TRA CỨU 1 MÃ --- */
 async function doLookup() {
@@ -290,16 +392,9 @@ async function doBulkLookup() {
   }
 
   btn.disabled = true;
+  bulkData = []; // Reset dữ liệu
 
-  // Tạo Thead với class để điều khiển ẩn/hiện
-  const displayStatus = isColVisible('status') ? '' : 'display:none;';
-  let theadHTML = `<tr><th class="col-status" style="${displayStatus}">Trạng thái</th>`;
-  FIELDS.forEach(f => {
-    const display = isColVisible(f[0]) ? '' : 'display:none;';
-    theadHTML += `<th class="col-${f[0]}" style="${display}">${f[1]}</th>`;
-  });
-  theadHTML += `</tr>`;
-  
+  // Tạo khung table tĩnh
   box.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px;">
       <div class="msg" id="bulkProgress" style="margin-top:0"><span class="spinner"></span> Đang xử lý 0/${codes.length}...</div>
@@ -307,11 +402,13 @@ async function doBulkLookup() {
     </div>
     <div class="table-responsive">
       <table class="bulk-table" id="bulkTable">
-        <thead>${theadHTML}</thead>
+        <thead id="bulkThead"></thead>
         <tbody id="bulkTbody"></tbody>
       </table>
     </div>
   `;
+
+  renderBulkTable(); // Vẽ Header lần đầu
 
   const tbody = document.getElementById("bulkTbody");
   const progress = document.getElementById("bulkProgress");
@@ -322,7 +419,7 @@ async function doBulkLookup() {
     const code = codes[i];
     progress.innerHTML = `<span class="spinner"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
     
-    let tr = document.createElement("tr");
+    let rowObj = { code: code, raw: {}, isError: false, errorMsg: "" };
     
     try {
       const resp = await fetch("/api/index", {
@@ -336,26 +433,21 @@ async function doBulkLookup() {
         const ok = data.status_msg === "Thành công";
         if (ok) successCount++;
         const badgeText = ok ? 'Thành công' : (data.status_msg || 'Thất bại');
-        const badge = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` 
-                         : `<span class="badge err">${escapeHtml(badgeText)}</span>`;
-        
-        const dStatus = isColVisible('status') ? '' : 'display:none;';
-        let tds = `<td class="col-status" style="${dStatus}">${badge}</td>`;
-        
-        FIELDS.forEach(f => {
-          const dCol = isColVisible(f[0]) ? '' : 'display:none;';
-          tds += `<td class="col-${f[0]}" style="${dCol}">${escapeHtml(data[f[0]] || "")}</td>`;
-        });
-        
-        tr.innerHTML = tds;
+        rowObj.badgeHTML = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` : `<span class="badge err">${escapeHtml(badgeText)}</span>`;
+        rowObj.raw = data;
       } else {
-        tr.innerHTML = `<td class="col-status"><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(data.error || "Lỗi server")} (${code})</td>`;
+        rowObj.isError = true;
+        rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`;
+        rowObj.errorMsg = `${data.error || "Lỗi server"} (${code})`;
       }
     } catch (e) {
-      tr.innerHTML = `<td class="col-status"><span class="badge err">Lỗi</span></td><td colspan="${FIELDS.length}">${escapeHtml(e.message)} (${code})</td>`;
+      rowObj.isError = true;
+      rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`;
+      rowObj.errorMsg = `${e.message} (${code})`;
     }
     
-    tbody.appendChild(tr);
+    bulkData.push(rowObj);
+    appendRowToDOM(rowObj, tbody); // Render nối tiếp vào bảng
   }
 
   progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--ok)">${successCount}/${codes.length}</strong> đơn.`;
@@ -363,7 +455,7 @@ async function doBulkLookup() {
   btn.disabled = false;
 }
 
-/* --- HÀM COPY DỮ LIỆU SANG EXCEL (CHỈ LẤY CỘT HIỂN THỊ) --- */
+/* --- HÀM COPY DỮ LIỆU SANG EXCEL --- */
 function copyTableToExcel() {
   try {
     const table = document.getElementById('bulkTable');
@@ -371,14 +463,10 @@ function copyTableToExcel() {
 
     let tsv = "";
     
-    // Quét toàn bộ dòng (cả Thead và Tbody)
+    // Vì bảng được render CHỈ CHỨA các cột hiển thị, nên ta quét lấy toàn bộ text dễ dàng
     const rows = Array.from(table.querySelectorAll('tr'));
     rows.forEach(row => {
-      // Chỉ lọc và lấy nội dung từ các ô (th, td) KHÔNG BỊ ẨN
-      const cells = Array.from(row.querySelectorAll('th, td'))
-                         .filter(cell => cell.style.display !== 'none')
-                         .map(td => td.innerText.trim());
-      
+      const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim());
       tsv += cells.join("\t") + "\n";
     });
 
