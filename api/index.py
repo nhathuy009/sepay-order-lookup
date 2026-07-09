@@ -50,7 +50,50 @@ def handle_lookup(body):
     if not code:
         return 400, {"error": "Thiếu mã đơn hàng"}
     return 200, lookup_order(code)
+    
+def handle_excel(body):
+    file_b64 = body.get("file_base64", "")
+    if not file_b64:
+        return 400, {"error": "Thiếu file Excel"}
+    try:
+        if "," in file_b64:
+            file_b64 = file_b64.split(",", 1)[1]
+        wb = openpyxl.load_workbook(io.BytesIO(base64.b64decode(file_b64)))
+        sheet = wb.active
+    except Exception as e:
+        return 400, {"error": f"Không đọc được file Excel: {e}"}
 
+    for col_idx, header in enumerate(EXCEL_HEADERS, start=1):
+        sheet.cell(row=1, column=col_idx, value=header)
+
+    status_col = len(EXCEL_HEADERS)
+    total = 0
+    success = 0
+    for row in range(2, sheet.max_row + 1):
+        cell_val = sheet.cell(row=row, column=1).value
+        if not cell_val:
+            continue
+        total += 1
+        order_code = str(cell_val).strip()
+        if detect_system(order_code) is None:
+            sheet.cell(row=row, column=status_col, value="Bỏ qua (Mã không hợp lệ)")
+            continue
+        result = lookup_order(order_code)
+        for col_idx, field_name in enumerate(EXCEL_FIELDS, start=1):
+            if field_name is not None:
+                sheet.cell(row=row, column=col_idx, value=result.get(field_name, ""))
+        if result.get("status_msg") == "Thành công":
+            success += 1
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return 200, {
+        "file_base64": base64.b64encode(out.read()).decode("ascii"),
+        "total": total,
+        "success": success,
+    }
+    
 def handle_bank_statement(body):
     file_b64 = body.get("file_base64", "")
     if not file_b64:
