@@ -107,12 +107,16 @@ def handle_bank_statement(body):
     except Exception as e:
         return 400, {"error": f"Không đọc được file Excel: {e}"}
 
-    # BỔ SUNG: Đọc số dư đầu kỳ từ ô D7 (Row 7, Column 4) của file gốc
-    so_du_dau_ky = sheet.cell(row=7, column=4).value
-    try:
-        so_du_dau_ky = float(so_du_dau_ky) if so_du_dau_ky is not None else 0
-    except ValueError:
-        so_du_dau_ky = 0
+    # BỔ SUNG & CẢI TIẾN: Đọc số dư đầu kỳ từ D7, xử lý Text có dấu phẩy thành Number
+    so_du_dau_ky_raw = sheet.cell(row=7, column=4).value
+    so_du_dau_ky = 0
+    if so_du_dau_ky_raw is not None:
+        try:
+            # Chuyển thành string, xóa dấu phẩy và khoảng trắng thừa, sau đó ép về float (số thực)
+            chuoi_so = str(so_du_dau_ky_raw).replace(",", "").replace(" ", "").strip()
+            so_du_dau_ky = float(chuoi_so)
+        except ValueError:
+            so_du_dau_ky = 0
 
     dem_gui_vao = defaultdict(int)
     dem_rut_ra = defaultdict(int)
