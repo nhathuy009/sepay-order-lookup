@@ -107,6 +107,13 @@ def handle_bank_statement(body):
     except Exception as e:
         return 400, {"error": f"Không đọc được file Excel: {e}"}
 
+    # BỔ SUNG: Đọc số dư đầu kỳ từ ô D7 (Row 7, Column 4) của file gốc
+    so_du_dau_ky = sheet.cell(row=7, column=4).value
+    try:
+        so_du_dau_ky = float(so_du_dau_ky) if so_du_dau_ky is not None else 0
+    except ValueError:
+        so_du_dau_ky = 0
+
     dem_gui_vao = defaultdict(int)
     dem_rut_ra = defaultdict(int)
 
@@ -142,7 +149,9 @@ def handle_bank_statement(body):
     ws.title = "Tong_Hop_Sao_Ke"
 
     ws.append(["Nội dung diễn giải", "Gửi vào", "Rút ra", "Số dư lũy kế", "Ghi chú (Để bạn dò số)"])
-    ws.append(["Số dư đầu kỳ STK ...", "", "", 0, "<-- Hãy nhập số dư đầu kỳ của bạn vào ô D2"])
+    
+    # CẬP NHẬT: Điền số dư đầu kỳ vừa lấy được vào thẳng ô D2
+    ws.append(["Số dư đầu kỳ STK ...", "", "", so_du_dau_ky, "Tự động lấy từ ô D7 file gốc"])
 
     current_excel_row = 3
     for gia_tri in tat_ca_gia_tri:
@@ -195,7 +204,7 @@ def handle_bank_statement(body):
     out.seek(0)
     return 200, {
         "file_base64": base64.b64encode(out.read()).decode("ascii")
-    }
+    } 
     
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
