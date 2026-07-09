@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  
 from _missav import search_missav, get_movie_detail, get_category_list  
+from _subtitle import search_subtitle
 
 VERCEL_DOMAIN = "https://nhathuy009.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -114,7 +115,7 @@ def handle_update(update):
     if movie_detail:
         stream_url = movie_detail['stream_url']
         subtitle_url = movie_detail.get('subtitle_url', '')
-        web_app_url = f"{VERCEL_DOMAIN}/player.html?vid={urllib.parse.quote(stream_url)}&sub={urllib.parse.quote(subtitle_url)}"
+        web_app_url = f"{VERCEL_DOMAIN}/player.html?vid={urllib.parse.quote(stream_url)}&sub={srt_link}"
         reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem!"
         keyboard = {"inline_keyboard": [[{"text": "▶️ Xem Phim (Giao diện gốc)", "web_app": {"url": web_app_url}}]]}
         tg_call("sendMessage", {"chat_id": chat_id, "text": reply, "parse_mode": "HTML", "reply_markup": keyboard})
