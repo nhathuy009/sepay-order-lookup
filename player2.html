@@ -11,9 +11,8 @@
     
     <style>
         body { margin: 0; background: #0b0f19; font-family: system-ui, sans-serif; overflow-y: auto; color: white; padding-bottom: 60px; }
-        :root { --plyr-color-main: #fe628e; --plyr-captions-background: rgba(0, 0, 0, 0.5); }
+        :root { --plyr-color-main: #fe628e; --plyr-captions-background: rgba(0, 0, 0, 0.8); --plyr-captions-text-color: #facc15; }
         
-        /* Vùng chiếu phim (Chiếm trọn vẹn màn hình đầu) */
         .player-wrapper { position: relative; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; }
         .plyr { width: 100%; height: 100%; z-index: 10; }
         
@@ -21,14 +20,12 @@
         #welcome-screen { position: absolute; color: #475569; text-align: center; font-size: 18px; font-weight: 500; z-index: 1; user-select: none; }
         #welcome-screen span { font-size: 40px; display: block; margin-bottom: 10px; }
 
-        /* Thanh công cụ nổi */
         #search-box {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20;
             display: flex; gap: 8px; background: rgba(30, 41, 59, 0.9); padding: 10px; border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(4px); transition: opacity 0.3s; flex-wrap: wrap; justify-content: center; opacity: 1; pointer-events: auto;
         }
         
-        /* Hiệu ứng tàng hình thanh công cụ khi đang xem phim */
         body.video-active.hide-ui #search-box { opacity: 0; pointer-events: none; }
         
         #search-box input { padding: 10px 14px; border: none; border-radius: 6px; outline: none; background: #0f172a; color: #e2e8f0; font-size: 14px; }
@@ -38,13 +35,11 @@
         #search-box button:hover { background: #2563eb; }
         #search-box button:disabled { background: #64748b; cursor: not-allowed; }
 
-        /* Hộp chứa phụ đề */
         #subtitle-box { flex-basis: 100%; text-align: center; margin-top: 5px; font-size: 13px; color: #e2e8f0; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 4px; display: none; }
-        #subtitle-box a { color: #34d399; text-decoration: underline; font-weight: bold; }
+        #subtitle-box a { color: #34d399; text-decoration: underline; font-weight: bold; margin-left: 5px; }
         #subtitle-box a:hover { color: #6ee7b7; }
         #subtitle-box.error { color: #fca5a5; }
 
-        /* Vùng giao diện 5 hàng danh sách phim */
         #home-sections { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         .category-row { margin-bottom: 40px; }
         .category-title { font-size: 22px; font-weight: 700; margin-bottom: 15px; padding-left: 12px; border-left: 5px solid #fe628e; }
@@ -85,7 +80,6 @@
     <div id="home-sections"></div>
 
     <script>
-        // --- 1. CẤU HÌNH DANH MỤC PHIM ---
         const categories = [
             { slug: 'vi/today-hot', title: '🔥 Hot Hôm Nay' },
             { slug: 'vi/weekly-hot', title: '📅 Hot Trong Tuần' },
@@ -102,7 +96,6 @@
         const subBox = document.getElementById('subtitle-box');
         let hlsInstance = null; let plyrInstance = null; let uiTimeout;
 
-        // --- 2. LOGIC TỰ ĐỘNG ẨN/HIỆN THANH CÔNG CỤ (TÀNG HÌNH) ---
         function wakeUpUI() {
             document.body.classList.remove('hide-ui');
             clearTimeout(uiTimeout);
@@ -120,12 +113,10 @@
         searchBox.addEventListener('mouseenter', () => clearTimeout(uiTimeout));
         searchBox.addEventListener('mouseleave', wakeUpUI);
 
-        // --- 3. KHỞI TẠO TRANG ---
         document.addEventListener("DOMContentLoaded", () => {
             const savedToken = localStorage.getItem("sepay_access_token") || "";
             document.getElementById("accessToken").value = savedToken;
             
-            // Dựng khung HTML cho 5 hàng
             const container = document.getElementById('home-sections');
             for (const cat of categories) {
                 const section = document.createElement('div');
@@ -139,15 +130,12 @@
                 container.appendChild(section);
             }
 
-            // Tải danh sách phim nếu đã có mật khẩu
             if (savedToken) { loadCategories(savedToken); }
-            
             const urlParams = new URLSearchParams(window.location.search);
             const rawVidUrl = urlParams.get('vid');
-            if (rawVidUrl) { playStream(rawVidUrl); }
+            if (rawVidUrl) { playStream(rawVidUrl, null); }
         });
 
-        // --- 4. HÀM TẢI 5 HÀNG PHIM ---
         async function loadCategories(token) {
             categoriesLoaded = true;
             for (const cat of categories) {
@@ -170,7 +158,7 @@
                             card.onclick = () => {
                                 document.getElementById('movieCode').value = movie.code;
                                 fetchAndPlay();
-                                window.scrollTo({ top: 0, behavior: 'smooth' }); // Tự cuộn lên xem phim
+                                window.scrollTo({ top: 0, behavior: 'smooth' }); 
                             };
                             
                             const thumbUrl = `https://fourhoi.mrstcdn.store/${movie.code.toLowerCase()}/cover-n.jpg`;
@@ -194,13 +182,12 @@
             }
         }
 
-        // --- 5. HÀM TÌM KIẾM PHIM VÀ LẤY PHỤ ĐỀ ---
         async function fetchAndPlay() {
             const codeInput = document.getElementById('movieCode').value.trim();
             const tokenInput = document.getElementById('accessToken').value.trim();
             
             localStorage.setItem("sepay_access_token", tokenInput);
-            if (!categoriesLoaded) { loadCategories(tokenInput); } // Kích hoạt tải danh sách dưới nếu chưa tải
+            if (!categoriesLoaded) { loadCategories(tokenInput); }
             if (!codeInput) return;
             
             const btn = document.getElementById('playBtn');
@@ -220,17 +207,17 @@
                 } else if (!data.stream_url) {
                     showError("❌ Không tìm thấy luồng m3u8."); 
                 } else {
-                    // Xử lý hiển thị hộp phụ đề
                     subBox.style.display = 'block';
                     subBox.classList.remove('error');
                     if (data.subtitle_url && data.subtitle_url !== "chưa có phụ đề") {
-                        subBox.innerHTML = `💬 Đã tìm thấy phụ đề: <a href="${data.subtitle_url}" target="_blank">Tải xuống file</a> <i>(Sau khi tải, kéo thả file vào video để xem)</i>`;
+                        subBox.innerHTML = `✅ Phụ đề tiếng Việt đã được tự động áp dụng! <a href="${data.subtitle_url}" target="_blank">Tải file thủ công</a>`;
                     } else {
                         subBox.classList.add('error');
-                        subBox.innerHTML = `⚠️ Phim này hiện chưa có phụ đề trên hệ thống.`;
+                        subBox.innerHTML = `⚠️ Phim này hiện chưa có phụ đề tiếng Việt trên hệ thống.`;
                     }
 
-                    playStream(data.stream_url); 
+                    // Gửi thêm thông tin phụ đề vào hàm phát video
+                    playStream(data.stream_url, data.subtitle_url); 
                 }
             } catch (err) { 
                 showError("❌ Lỗi mạng"); 
@@ -239,24 +226,57 @@
             }
         }
 
-        // --- 6. HÀM PHÁT VIDEO HLS CHUẨN ---
-        function playStream(streamUrl) {
+        function playStream(streamUrl, subtitleUrl) {
             errorDiv.style.display = 'none'; welcomeScreen.style.display = 'none';
             document.body.classList.add('video-active'); wakeUpUI(); 
-            if (hlsInstance) hlsInstance.destroy(); 
             
-            const playerSettings = { controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'settings', 'fullscreen', 'volume'], speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] }, autoplay: true, i18n: { speed: 'Tốc độ', normal: 'Bình thường', quality: 'Chất lượng', qualityLabel: { 0: 'Tự động' } } };
+            // Xóa rác của phiên cũ để nhúng phụ đề mới
+            if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+            if (plyrInstance) { plyrInstance.destroy(); plyrInstance = null; }
+            
+            // Xóa tất cả các Track phụ đề cũ
+            video.innerHTML = '';
+            
+            // Nếu có phụ đề, tạo đường dẫn gọi lên trạm trung chuyển (Proxy API)
+            if (subtitleUrl && subtitleUrl !== "chưa có phụ đề") {
+                const proxyUrl = '/api/subtitle?url=' + encodeURIComponent(subtitleUrl);
+                const track = document.createElement('track');
+                track.kind = 'captions';
+                track.label = 'Tiếng Việt';
+                track.srclang = 'vi';
+                track.src = proxyUrl;
+                track.default = true;
+                video.appendChild(track);
+            }
+
+            // Bật sẵn cấu hình Captions (Phụ đề) cho Plyr
+            const playerSettings = { 
+                controls: ['play-large', 'rewind', 'play', 'fast-forward', 'progress', 'current-time', 'duration', 'mute', 'captions', 'settings', 'fullscreen', 'volume'], 
+                speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] }, 
+                autoplay: true, 
+                captions: { active: true, update: true, language: 'vi' }, // Tự động hiển thị tiếng Việt
+                i18n: { speed: 'Tốc độ', normal: 'Bình thường', quality: 'Chất lượng', qualityLabel: { 0: 'Tự động' } } 
+            };
 
             if (Hls.isSupported()) {
                 hlsInstance = new Hls({ autoStartLoad: true, maxBufferSize: 1 * 1000 * 1000 });
                 let parsedManifest = false;
                 hlsInstance.on(Hls.Events.ERROR, (event, data) => { if (!parsedManifest && data.networkDetails && data.networkDetails.status === 429) hlsInstance.loadSource(streamUrl); });
                 hlsInstance.loadSource(streamUrl);
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { if (!plyrInstance) plyrInstance = new Plyr(video, playerSettings); video.play(); });
+                
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { 
+                    plyrInstance = new Plyr(video, playerSettings); 
+                    video.play(); 
+                });
                 hlsInstance.attachMedia(video);
+                
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = streamUrl; if (!plyrInstance) plyrInstance = new Plyr(video, playerSettings); video.play();
-            } else { showError("Trình duyệt không hỗ trợ luồng HLS."); }
+                video.src = streamUrl; 
+                plyrInstance = new Plyr(video, playerSettings); 
+                video.play();
+            } else { 
+                showError("Trình duyệt không hỗ trợ luồng HLS."); 
+            }
         }
 
         function showError(msg) { errorDiv.innerHTML = `<b>${msg}</b>`; errorDiv.style.display = 'block'; }
