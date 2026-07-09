@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system  
 from _missav import search_missav, get_movie_detail, get_category_list  
 
-VERCEL_DOMAIN = "https://sepay-order-lookup.vercel.app"
+VERCEL_DOMAIN = "https://nhathuy009.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 ALLOWED_IDS = set(x.strip() for x in os.environ.get("TELEGRAM_ALLOWED_IDS", "").split(",") if x.strip())
 WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
