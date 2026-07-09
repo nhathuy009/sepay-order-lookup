@@ -107,12 +107,11 @@ def handle_bank_statement(body):
     except Exception as e:
         return 400, {"error": f"Không đọc được file Excel: {e}"}
 
-    # BỔ SUNG & CẢI TIẾN: Đọc số dư đầu kỳ từ D7, xử lý Text có dấu phẩy thành Number
+    # BƯỚC 1: Đọc số dư đầu kỳ từ D7, xử lý Text thành Number
     so_du_dau_ky_raw = sheet.cell(row=7, column=4).value
     so_du_dau_ky = 0
     if so_du_dau_ky_raw is not None:
         try:
-            # Chuyển thành string, xóa dấu phẩy và khoảng trắng thừa, sau đó ép về float (số thực)
             chuoi_so = str(so_du_dau_ky_raw).replace(",", "").replace(" ", "").strip()
             so_du_dau_ky = float(chuoi_so)
         except ValueError:
@@ -122,13 +121,19 @@ def handle_bank_statement(body):
     dem_rut_ra = defaultdict(int)
 
     current_row = 9
+    last_valid_row = 8 # Biến lưu lại số thứ tự của dòng cuối cùng có dữ liệu
+
+    # BƯỚC 2: Quét dữ liệu
     while True:
         rut_ra = sheet.cell(row=current_row, column=5).value
         gui_vao = sheet.cell(row=current_row, column=6).value
         ngay_gd = sheet.cell(row=current_row, column=1).value 
 
+        # Nếu dòng hoàn toàn trống -> đã đến cuối file -> ngắt vòng lặp
         if ngay_gd is None and rut_ra is None and gui_vao is None:
             break
+
+        last_valid_row = current_row # Cập nhật liên tục để giữ lại dòng cuối cùng
 
         if rut_ra is not None:
             try:
@@ -144,17 +149,27 @@ def handle_bank_statement(body):
 
         current_row += 1
 
+    # BƯỚC 3: Đọc số dư cuối kỳ ở Cột G (Cột 7) của dòng dữ liệu cuối cùng
+    so_du_cuoi_ky_raw = sheet.cell(row=last_valid_row, column=7).value
+    so_du_cuoi_ky = 0
+    if so_du_cuoi_ky_raw is not None:
+        try:
+            chuoi_so_cuoi = str(so_du_cuoi_ky_raw).replace(",", "").replace(" ", "").strip()
+            so_du_cuoi_ky = float(chuoi_so_cuoi)
+        except ValueError:
+            so_du_cuoi_ky = 0
+
+    # BƯỚC 4: Tổng hợp và tạo file
     tat_ca_gia_tri = set(dem_gui_vao.keys()).union(set(dem_rut_ra.keys()))
     tat_ca_gia_tri = sorted(list(tat_ca_gia_tri), reverse=True) 
 
-    # Tạo file Excel mới trong bộ nhớ
     wb_new = openpyxl.Workbook()
     ws = wb_new.active
     ws.title = "Tong_Hop_Sao_Ke"
 
     ws.append(["Nội dung diễn giải", "Gửi vào", "Rút ra", "Số dư lũy kế", "Ghi chú (Để bạn dò số)"])
     
-    # CẬP NHẬT: Điền số dư đầu kỳ vừa lấy được vào thẳng ô D2
+    # Ghi số dư đầu kỳ
     ws.append(["Số dư đầu kỳ STK ...", "", "", so_du_dau_ky, "Tự động lấy từ ô D7 file gốc"])
 
     current_excel_row = 3
@@ -178,14 +193,18 @@ def handle_bank_statement(body):
         ])
         current_excel_row += 1
 
+    # CẬP NHẬT: Ghi Số dư cuối kỳ thực tế từ file thay vì lấy công thức
     ws.append([
         "Số dư cuối kỳ", 
         f"=SUM(B3:B{current_excel_row-1})", 
         f"=SUM(C3:C{current_excel_row-1})", 
-        f"=D{current_excel_row-1}", 
-        ""
+        so_du_cuoi_ky, 
+        f"Tự động lấy từ cột G, dòng {last_valid_row} file gốc"
     ])
 
+    # ==========================================
+    # LÀM ĐẸP GIAO DIỆN EXCEL
+    # ==========================================
     for row in ws.iter_rows(min_row=2, max_row=current_excel_row, min_col=2, max_col=4):
         for cell in row:
             if isinstance(cell.value, (int, float)):
@@ -200,9 +219,8 @@ def handle_bank_statement(body):
     ws.column_dimensions['B'].width = 18
     ws.column_dimensions['C'].width = 18
     ws.column_dimensions['D'].width = 20
-    ws.column_dimensions['E'].width = 40
+    ws.column_dimensions['E'].width = 45
 
-    # Xuất ra base64
     out = io.BytesIO()
     wb_new.save(out)
     out.seek(0)
