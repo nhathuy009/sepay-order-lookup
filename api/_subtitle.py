@@ -5,9 +5,9 @@ import urllib.parse
 def search_subtitle(code_str):
     """
     Tìm kiếm phụ đề trên SubtitleCat theo mã phim.
-    Chỉ trả về đường dẫn nếu có duy nhất 1 kết quả, các trường hợp khác trả về 'chưa có phụ đề'.
+    Lọc kết quả chứa chính xác mã phim, chọn kết quả có số lượng languages cao nhất,
+    và vào tận trang chi tiết để lấy link tải file .srt tiếng Việt.
     """
-    # Mã hóa chuỗi tìm kiếm (VD: chứa khoảng trắng)
     encoded_code = urllib.parse.quote(code_str)
     url = f"https://www.subtitlecat.com/index.php?search={encoded_code}"
     
@@ -16,44 +16,78 @@ def search_subtitle(code_str):
     }
     
     try:
+        # --- BƯỚC 1: Tìm kiếm danh sách ---
         resp = requests.get(url, headers=headers, timeout=15)
         if resp.status_code != 200:
             return "chưa có phụ đề"
             
         html = resp.text
         
-        # Bước 1: Trích xuất phần thân bảng (<tbody>...</tbody>) chứa danh sách kết quả
         tbody_match = re.search(r'<tbody>(.*?)</tbody>', html, re.DOTALL | re.IGNORECASE)
         if not tbody_match:
             return "chưa có phụ đề"
             
         tbody_html = tbody_match.group(1)
+        rows = re.findall(r'<tr>(.*?)</tr>', tbody_html, re.DOTALL | re.IGNORECASE)
         
-        # Bước 2: Quét toàn bộ các đường link <a href="..."> nằm bên trong <td>
-        # Dựa trên HTML mẫu: <td><a href="subs/1536/PRED-874...">
-        links = re.findall(r'<td[^>]*>\s*<a[^>]+href="([^"]+)"', tbody_html, re.IGNORECASE)
+        valid_results = []
+        target_code = code_str.upper()
         
-        # Bước 3: Kiểm tra điều kiện "chỉ lấy nếu là kết quả duy nhất"
-        if len(links) == 1:
-            sub_link = links[0]
+        for row in rows:
+            link_match = re.search(r'<td[^>]*>\s*<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', row, re.IGNORECASE)
+            if not link_match:
+                continue
+                
+            href = link_match.group(1)
+            link_text = re.sub(r'<[^>]*>', '', link_match.group(2)).strip()
             
-            # Xử lý ghép thành link tuyệt đối nếu SubtitleCat trả về link tương đối
-            if not sub_link.startswith("http"):
-                if sub_link.startswith("/"):
-                    sub_link = "https://www.subtitlecat.com" + sub_link
-                else:
-                    sub_link = "https://www.subtitlecat.com/" + sub_link
-                    
-            return sub_link
-        else:
-            # Nếu có 0 kết quả hoặc nhiều hơn 1 kết quả
+            lang_match = re.search(r'<td[^>]*>(\d+)\s+languages\s*</td>', row, re.IGNORECASE)
+            languages_count = int(lang_match.group(1)) if lang_match else 0
+            
+            # Kiểm tra xem tiêu đề link có chứa CHÍNH XÁC mã phim hay không
+            if target_code in link_text.upper():
+                valid_results.append({
+                    "href": href,
+                    "languages": languages_count
+                })
+        
+        # --- BƯỚC 2: Chọn trang kết quả tốt nhất ---
+        if not valid_results:
             return "chưa có phụ đề"
             
-    except Exception as e:
-        # Bắt mọi lỗi mạng, timeout...
-        return "chưa có phụ đề"
+        best_match = max(valid_results, key=lambda x: x['languages'])
+        
+        detail_url = best_match['href']
+        if not detail_url.startswith("http"):
+            detail_url = "https://www.subtitlecat.com/" + detail_url.lstrip("/")
+            
+        # --- BƯỚC 3: Truy cập trang chi tiết để lấy link tiếng Việt ---
+        detail_resp = requests.get(detail_url, headers=headers, timeout=15)
+        if detail_resp.status_code != 200:
+            return "chưa có phụ đề"
+            
+        detail_html = detail_resp.text
+        
+        # Tìm link tải tiếng Việt (Ưu tiên thẻ a có id="download_vi")
+        vi_link_match = re.search(r'<a[^>]+id="download_vi"[^>]+href="([^"]+)"', detail_html, re.IGNORECASE)
+        
+        # Dự phòng: Quét khối div có chứa chữ "Vietnamese" và trích xuất href
+        if not vi_link_match:
+            vi_div_match = re.search(r'<div class="sub-single">.*?Vietnamese.*?<a[^>]+href="([^"]+)"', detail_html, re.DOTALL | re.IGNORECASE)
+            if vi_div_match:
+                vi_link_match = vi_div_match
 
-# Bạn có thể test nhanh bằng cách chạy trực tiếp file này
-if __name__ == "__main__":
-    # Test case 1 kết quả
-    print(search_subtitle("PRED-874"))
+        # --- BƯỚC 4: Trả về link file .srt ---
+        if vi_link_match:
+            srt_link = vi_link_match.group(1)
+            # Chuẩn hóa link thành đường dẫn tuyệt đối
+            if not srt_link.startswith("http"):
+                srt_link = "https://www.subtitlecat.com/" + srt_link.lstrip("/")
+            return srt_link
+        else:
+            # Phim có trong hệ thống nhưng không có phụ đề tiếng Việt
+            return "chưa có phụ đề"
+            
+    except Exception:
+        # Xử lý an toàn cho mọi lỗi phát sinh (Timeout, lỗi parse...)
+        return "chưa có phụ đề"
