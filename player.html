@@ -73,7 +73,7 @@
             };
 
             if (Hls.isSupported()) {
-                hlsInstance = new Hls({ autoStartLoad: true});
+                hlsInstance = new Hls({ autoStartLoad: true,maxBufferLength: 30, maxMaxBufferLength: 600, maxBufferSize: 60 * 1000 * 1000, enableWorker: true});
                 
                 let parsedManifest = false;
                 hlsInstance.on(Hls.Events.ERROR, (event, data) => {
