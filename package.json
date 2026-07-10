@@ -1,0 +1,8 @@
+{
+  "name": "sepay-order-lookup",
+  "version": "1.0.0",
+  "description": "App tra cứu đơn hàng và hóa đơn",
+  "dependencies": {
+    "@redonvn/matbao-invoice-sdk": "^1.0.0" 
+  }
+}
