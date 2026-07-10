@@ -170,27 +170,15 @@
     
     <aside class="sidebar">
       <div class="sidebar-menu-title">Chức năng chính</div>
-      <div class="menu-item active" id="tabSingleBtn" onclick="switchTab('single')">🔍 Tra cứu 1 mã</div>
       <div class="menu-item" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
+      <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
       <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý bằng file Excel</div>
       <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
     </aside>
 
     <main class="content main-content">
-      
-      <div id="tabSingle">
-        <h2>Tra cứu nhanh 1 mã đơn</h2>
-        <div class="card">
-          <label>Mã đơn hàng (Enter để tìm)</label>
-          <div class="row">
-            <div><input type="text" id="orderCode" placeholder="Nhập mã... VD: DH18700, BIZ02120" onkeydown="if(event.key==='Enter') doLookup()" /></div>
-            <button id="lookupBtn" onclick="doLookup()">Tra cứu</button>
-          </div>
-          <div id="singleResult" style="margin-top: 16px;"></div>
-        </div>
-      </div>
 
-      <div id="tabBulk" class="hidden">
+      <div id="tabBulk">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="margin:0">Tra cứu hàng loạt</h2>
           <button id="copyExcelBtn" class="btn-outline hidden" onclick="copyTableToExcel()" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
@@ -293,12 +281,10 @@ document.addEventListener("DOMContentLoaded", () => {
 // CẬP NHẬT HÀM SWITCH TAB THÊM TAB BANK
 function switchTab(which) {
   try {
-    document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
     document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
     document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
     document.getElementById("tabBank").classList.toggle("hidden", which !== "bank"); 
     
-    document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
     document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
     document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
     document.getElementById("tabBankBtn").classList.toggle("active", which === "bank"); 
@@ -356,22 +342,7 @@ function appendRowToDOM(rowObj, tbody) {
   });
   tr.innerHTML = tds; tbody.appendChild(tr);
 }
-
-async function doLookup() {
-  const code = document.getElementById("orderCode").value.trim(); const box = document.getElementById("singleResult"); const btn = document.getElementById("lookupBtn");
-  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã đơn.</div>'; return; }
-  btn.disabled = true; box.innerHTML = '<div class="msg"><span class="spinner"></span> Đang tra cứu…</div>';
-  try {
-    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, access_token: getToken() }) });
-    const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi"}</div>`; return; }
-    const ok = data.status_msg === "Thành công";
-    let rows = FIELDS.map(([k, label]) => `<tr><td style="color:var(--text-muted); font-weight:500; width:150px;">${label}</td><td>${escapeHtml(data[k] || "")}</td></tr>`).join("");
-    const badge = ok ? '<span class="badge ok">Thành công</span>' : `<span class="badge err">${escapeHtml(data.status_msg || "Thất bại")}</span>`;
-    box.innerHTML = `<div style="margin-bottom:12px;">${badge}</div><div class="table-responsive"><table>${rows}</table></div>`;
-  } catch (e) { box.innerHTML = `<div class="msg err">❌ Lỗi kết nối: ${e.message}</div>`; } finally { btn.disabled = false; }
-}
-
+  
 async function doBulkLookup() {
   const rawInput = document.getElementById("bulkCodes").value;
   const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
