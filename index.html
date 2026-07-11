@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Công cụ tra cứu đơn hàng & Sao kê</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <style>
   /* DESIGN SYSTEM ADMIN DASHBOARD */
   :root { 
@@ -120,16 +121,30 @@
   .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 2px;}
 
   /* TABLE */
-  /* --- GIAO DIỆN BẢNG MỚI (STYLE NHƯ ẢNH) --- */
-  .sepay-table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+  /* --- GIAO DIỆN BẢNG CHUẨN SEPAY --- */
+  .sepay-table { 
+    width: 100%; border-collapse: collapse; background: white; 
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+  
   .sepay-table th { 
-    background: #ffffff; color: #6b7280; font-weight: 500; font-size: 11px; 
-    text-transform: uppercase; padding: 12px 16px; border-bottom: 1px solid var(--border); 
+    background: #ffffff; color: #6c757d; font-weight: 400; font-size: 12px; 
+    text-transform: uppercase; padding: 12px 16px; 
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border); /* THÊM KẺ DỌC */
+    white-space: nowrap;
   }
+  
   .sepay-table td { 
-    padding: 12px 16px; border-bottom: 1px solid var(--border); color: #374151; 
-    vertical-align: middle; 
+    padding: 14px 16px; 
+    border-bottom: 1px solid var(--border); 
+    border-right: 1px solid var(--border); /* THÊM KẺ DỌC */
+    color: #374151; vertical-align: middle; font-size: 13px;
   }
+  
+  /* Xóa kẻ dọc ở cột cuối cùng cho đẹp */
+  .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
+  
   .sepay-table tr:hover td { background: #f9fafb; }
   
   /* Cột số tiền */
@@ -279,11 +294,11 @@
           <div class="row" style="align-items: flex-end; margin-bottom: 16px;">
             <div style="flex: 0.25; min-width: 140px;">
               <label>Từ ngày</label>
-              <input type="date" id="txDateFrom" />
+              <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="background: white; cursor: pointer;" />
             </div>
             <div style="flex: 0.25; min-width: 140px;">
               <label>Đến ngày</label>
-              <input type="date" id="txDateTo" />
+              <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="background: white; cursor: pointer;" />
             </div>
             <div style="flex: 0.25; min-width: 180px;">
               <label>Mã Ngân hàng (Tùy chọn)</label>
@@ -567,7 +582,7 @@ async function doBankStatement() {
 
 // HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
 async function doTxList() {
-  const dateFromVal = document.getElementById("txDateFrom").value;
+  const dateFromVal = document.getElementById("txDateFrom").value; // Sẽ có dạng 11/07/2026
   const dateToVal = document.getElementById("txDateTo").value;
   const bankBrandVal = document.getElementById("txBankBrand").value.trim();
   const bankAccountVal = document.getElementById("txBankAccountId").value.trim();
@@ -579,11 +594,20 @@ async function doTxList() {
     return; 
   }
   
-  const dateFrom = dateFromVal + " 00:00:00";
-  const dateTo = dateToVal + " 23:59:59";
+  // Hàm đảo chuỗi DD/MM/YYYY thành YYYY-MM-DD để gửi lên API
+  const parseDateToAPI = (str) => {
+    const parts = str.split('/');
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    return str;
+  };
+  
+  const dateFrom = parseDateToAPI(dateFromVal) + " 00:00:00";
+  const dateTo = parseDateToAPI(dateToVal) + " 23:59:59";
   
   btn.disabled = true;
   box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang tải danh sách từ SePay...</div>';
+  
+  // ... (Phần gọi fetch API và vẽ bảng giữ nguyên như cũ) ...
   
   try {
     const resp = await fetch("/api/index", { 
@@ -685,13 +709,20 @@ async function doTxList() {
   }
 }
 
-// Tiện ích: Tự động gán ngày hôm nay vào ô Input Date khi load trang
+// Khởi tạo giao diện lịch cực đẹp với Flatpickr
 document.addEventListener("DOMContentLoaded", () => {
-  const today = new Date().toISOString().split('T')[0];
+  const dateConfig = {
+    dateFormat: "d/m/Y", // Hiển thị định dạng dd/mm/yyyy
+    locale: "vn",        // Dịch sang tiếng Việt (T2, T3, Thg 1...)
+    defaultDate: new Date(), // Mặc định chọn ngày hôm nay
+    allowInput: true     // Cho phép người dùng tự gõ nếu muốn
+  };
+  
   const elFrom = document.getElementById('txDateFrom');
   const elTo = document.getElementById('txDateTo');
-  if(elFrom) elFrom.value = today;
-  if(elTo) elTo.value = today;
+  
+  if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
+  if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
 });
   
 // HÀM TRA CỨU GIAO DỊCH SEPAY
@@ -766,5 +797,7 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
 </body>
 </html>
