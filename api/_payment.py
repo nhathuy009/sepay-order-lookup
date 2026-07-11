@@ -50,10 +50,10 @@ def search_sepay_transaction(keyword):
         # Lấy giao dịch mới nhất khớp với mã và trả về toàn bộ (raw data)
         return {"transaction": transactions[0]}
         
-def list_sepay_transactions(date_from, date_to):
+def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id=None):
     """
     Lấy danh sách giao dịch nạp tiền (in) trong khoảng thời gian.
-    Giới hạn tối đa 100 giao dịch mới nhất (theo API v2).
+    Có hỗ trợ lọc tùy chọn theo Ngân hàng hoặc UUID Tài khoản.
     """
     api_token = os.environ.get("SEPAY_API_TOKEN")
     if not api_token:
@@ -65,22 +65,26 @@ def list_sepay_transactions(date_from, date_to):
         "Content-Type": "application/json"
     }
     
-    # Tham số bám sát tài liệu API
     params = {
         "transaction_date_from": date_from,
         "transaction_date_to": date_to,
-        "transfer_type": "in",      # Chỉ lấy tiền vào
+        "transfer_type": "in",
         "page": 1,
-        "per_page": 100,            # Lấy tối đa 100 dòng
-        "transaction_date_sort": "desc" # Mới nhất xếp trên
+        "per_page": 100,
+        "transaction_date_sort": "desc"
     }
     
+    # Thêm điều kiện lọc nếu có truyền vào
+    if bank_brand:
+        params["bank_brand_name"] = bank_brand
+    if bank_account_id:
+        params["bank_account_id"] = bank_account_id
+        
     session = requests.Session()
     
     while True:
         resp = session.get(url, headers=headers, params=params)
         
-        # Xử lý Rate Limit
         if resp.status_code == 429:
             retry_after = resp.headers.get("x-sepay-userapi-retry-after", 1)
             time.sleep(float(retry_after))
@@ -93,5 +97,4 @@ def list_sepay_transactions(date_from, date_to):
         if data.get("status") != "success":
             return {"error": "Dữ liệu trả về từ SePay không hợp lệ."}
             
-        # Trả về danh sách giao dịch
         return {"transactions": data.get("data", [])}
