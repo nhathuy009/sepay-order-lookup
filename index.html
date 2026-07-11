@@ -4,7 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Công cụ tra cứu đơn hàng & Sao kê</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
 <style>
   /* DESIGN SYSTEM ADMIN DASHBOARD */
   :root { 
@@ -120,62 +123,7 @@
   .checkbox-item input { cursor: pointer; accent-color: var(--accent); margin:0; }
   .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 2px;}
 
-  /* TABLE */
-  /* --- GIAO DIỆN BẢNG CHUẨN SEPAY --- */
-  .sepay-table { 
-    width: 100%; border-collapse: collapse; background: white; 
-    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
-  }
-  
-  .sepay-table th { 
-    background: #ffffff; color: #6c757d; font-weight: 400; font-size: 12px; 
-    text-transform: uppercase; padding: 12px 16px; 
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border); /* THÊM KẺ DỌC */
-    white-space: nowrap;
-  }
-  
-  .sepay-table td { 
-    padding: 14px 16px; 
-    border-bottom: 1px solid var(--border); 
-    border-right: 1px solid var(--border); /* THÊM KẺ DỌC */
-    color: #374151; vertical-align: middle; font-size: 13px;
-  }
-
-  /* --- DÒNG TỔNG CỘNG CUỐI BẢNG --- */
-  .sepay-table .total-row td {
-    background-color: #3b82f6 !important; /* Màu xanh giống hệt ảnh bạn gửi */
-    color: #ffffff !important;            /* Chữ màu trắng để nổi bật */
-    border-bottom: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.2); /* Đường kẻ sọc mờ */
-  }
-  .sepay-table .total-row td:last-child {
-    border-right: none;
-  }
-  
-  /* Xóa kẻ dọc ở cột cuối cùng cho đẹp */
-  .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
-  
-  .sepay-table tr:hover td { background: #f9fafb; }
-  
-  /* Cột số tiền */
-  .amount-in { color: #10b981; font-weight: 700; }
-  .amount-out { color: #ef4444; font-weight: 700; }
-  
-  /* Cột nội dung (Tự động thêm dấu ... nếu quá dài) */
-  .tx-content-cell {
-    max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  
-  /* Cột thời gian phụ */
-  .text-muted-small { color: #9ca3af; font-size: 12px; font-style: italic; margin-top: 4px; }
-  
-  /* Cột Tài khoản (Icon Ngân hàng mini) */
-  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #1e3a8a; }
-  .bank-icon {
-    width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: white;
-    display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold;
-  }
+  /* --- BẢNG BULK & CHUNG --- */
   .table-responsive { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; border-bottom: none;}
   table { width: 100%; border-collapse: collapse; text-align: left; background: white;}
   th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
@@ -200,6 +148,58 @@
     border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; 
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
+  .sepay-table { 
+    width: 100%; border-collapse: collapse; background: white; 
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+  
+  .sepay-table th { 
+    background: #ffffff; color: #6c757d; font-weight: 400; font-size: 12px; 
+    text-transform: uppercase; padding: 12px 16px; 
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border); /* Kẻ dọc */
+    white-space: nowrap;
+  }
+  
+  .sepay-table td { 
+    padding: 14px 16px; 
+    border-bottom: 1px solid var(--border); 
+    border-right: 1px solid var(--border); /* Kẻ dọc */
+    color: #374151; vertical-align: middle; font-size: 13px;
+  }
+
+  /* Xóa kẻ dọc ở cột cuối cùng */
+  .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
+  .sepay-table tr:hover td { background: #f9fafb; }
+  
+  /* Cột số tiền */
+  .amount-in { color: #198754; font-weight: 600; font-size: 13px;}
+  .amount-out { color: #dc3545; font-weight: 600; font-size: 13px;}
+  
+  /* Cột nội dung */
+  .tx-content-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  
+  /* Chữ phụ */
+  .text-muted-small { color: #6c757d; font-size: 12px; margin-top: 2px; }
+  .text-id { color: #6c757d; font-size: 12px; }
+
+  /* Tag Ngân hàng */
+  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; color: #1e3a8a; }
+  .bank-icon {
+    width: 20px; height: 20px; border-radius: 50%; background: #0d6efd; color: white;
+    display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: 600;
+  }
+
+  /* Dòng tổng cộng cuối bảng */
+  .sepay-table .total-row td {
+    background-color: #3b82f6 !important; 
+    color: #ffffff !important;            
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.2); 
+  }
+  .sepay-table .total-row td:last-child { border-right: none; }
 
   @media (max-width: 768px) {
     .app-body { flex-direction: column; overflow: auto; }
@@ -288,6 +288,7 @@
           <div id="bankResult" class="msg"></div>
         </div>
       </div>
+
       <div id="tabTransaction" class="hidden">
         <h2>Kiểm tra giao dịch SePay v2</h2>
         
@@ -327,11 +328,13 @@
           </div>
           <div id="txListResult" style="margin-top: 16px;"></div>
         </div>
-          <div id="txListResult" style="margin-top: 16px;"></div>
-        </div>
+        
       </div>
     </main>
   </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
 
 <script>
 const FIELDS = [
@@ -372,11 +375,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if(authCard) authCard.classList.add("hidden");
     }
   }).catch(() => {});
+  
   initColumnSelector();
+
+  // Khởi tạo Flatpickr
+  const dateConfig = {
+    dateFormat: "d/m/Y",
+    locale: "vn",
+    defaultDate: new Date(),
+    allowInput: true
+  };
+  const elFrom = document.getElementById('txDateFrom');
+  const elTo = document.getElementById('txDateTo');
+  if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
+  if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
 });
 
-// Cập nhật lại hàm switchTab
-// CẬP NHẬT LẠI HÀM NÀY
 function switchTab(which) {
   const tabs = ["bulk", "excel", "bank", "transaction"];
   
@@ -389,17 +403,15 @@ function switchTab(which) {
     if (btnEl) btnEl.classList.toggle("active", which === tab);
   });
 
-  // Tự động tải dropdown Ngân hàng nếu người dùng bấm qua tab Transaction
   if (which === "transaction") {
     const selectEl = document.getElementById("txBankAccountId");
-    // Nếu dropdown mới chỉ có 1 dòng "-- Tất cả tài khoản --" thì mới tải, tránh API bị gọi lại nhiều lần
     if (selectEl && selectEl.options.length <= 1) {
       loadBankAccounts();
     }
   }
 }
 
-// Chuyển đổi YYYY-MM-DD HH:MM:SS sang DD/MM/YYYY HH:MM:SS
+// Chuyển đổi Thời gian
 function formatTxDate(dateString) {
   if (!dateString) return "";
   const [date, time] = dateString.split(" ");
@@ -407,10 +419,8 @@ function formatTxDate(dateString) {
   return `${d}/${m}/${y} ${time}`;
 }
 
-// Tính toán thời gian tương đối (VD: 2 giờ trước, 20 phút trước)
 function timeAgo(dateString) {
   if (!dateString) return "";
-  // API SePay dùng múi giờ Việt Nam (+07:00)
   const txDate = new Date(dateString.replace(" ", "T") + "+07:00");
   const now = new Date();
   const diffMs = now - txDate;
@@ -423,7 +433,7 @@ function timeAgo(dateString) {
   return `${Math.floor(diffHours / 24)} ngày trước`;
 }
 
-/* Các hàm Kéo Thả & Tra cứu giữ nguyên */
+/* Các hàm Kéo Thả & Tra cứu Bulk */
 let dragSrcEl = null;
 function initColumnSelector() {
   const container = document.getElementById('colSelector');
@@ -512,39 +522,26 @@ function copyTableToExcel() {
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
-// HÀM TẢI DANH SÁCH TÀI KHOẢN NGÂN HÀNG VÀO DROPDOWN
 async function loadBankAccounts() {
   const selectEl = document.getElementById("txBankAccountId");
   if (!selectEl) return;
-
   try {
     const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "get_bank_accounts", access_token: getToken() })
     });
-    
     const data = await resp.json();
-    
     if (resp.ok && data.bank_accounts) {
-      // Xóa các option cũ (nếu có) và giữ lại option "Tất cả"
       selectEl.innerHTML = '<option value="">-- Tất cả tài khoản --</option>';
-      
-      // Đổ data mới vào dropdown
       data.bank_accounts.forEach(bank => {
         const option = document.createElement("option");
-        option.value = bank.id; // Gắn UUID ngầm vào value
-        
-        // Hiển thị: [Tên NH] - [Số TK] (Số dư lũy kế)
+        option.value = bank.id; 
         const balance = Number(bank.accumulated).toLocaleString('vi-VN');
         option.text = `${bank.bank_short_name} - ${bank.account_number} (Số dư: ${balance}đ)`;
-        
         selectEl.appendChild(option);
       });
     }
-  } catch (e) {
-    console.error("Lỗi khi tải danh sách ngân hàng từ SePay:", e);
-  }
+  } catch (e) { console.error("Lỗi tải danh sách ngân hàng:", e); }
 }
 
 async function doExcel() {
@@ -560,40 +557,41 @@ async function doExcel() {
   } catch (e) { box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
 }
 
-/* HÀM XỬ LÝ CHO SAO KÊ NGÂN HÀNG MỚI THÊM */
 async function doBankStatement() {
-  const fileInput = document.getElementById("bankExcelFile");
-  const box = document.getElementById("bankResult");
-  const btn = document.getElementById("bankBtn");
-  
+  const fileInput = document.getElementById("bankExcelFile"); const box = document.getElementById("bankResult"); const btn = document.getElementById("bankBtn");
   if (!fileInput.files.length) { box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; return; }
-  
-  const file = fileInput.files[0];
-  btn.disabled = true;
-  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
-  
+  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
   try {
     const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }),
-    });
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }) });
     const data = await resp.json();
     if (!resp.ok) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; return; }
-    
-    downloadBase64(data.file_base64, "TongHop_" + file.name);
-    box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
-  } catch (e) {
-    box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`;
-  } finally {
-    btn.disabled = false;
-  }
+    downloadBase64(data.file_base64, "TongHop_" + file.name); box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
+  } catch (e) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
 }
 
-// HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
+async function doTxSearch() {
+  const code = document.getElementById("txSearchCode").value.trim(); const box = document.getElementById("txSearchResult"); const btn = document.getElementById("txSearchBtn");
+  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã cần tìm.</div>'; return; }
+  btn.disabled = true; box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang kết nối SePay v2...</div>';
+  try {
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "search_transaction", code: code, access_token: getToken() }) });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; return; }
+    const tx = data.transaction;
+    let rows = "";
+    for (const [key, value] of Object.entries(tx)) {
+        let displayValue = escapeHtml(value);
+        if (key === "amount_in") displayValue = `<span style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(value).toLocaleString('vi-VN')} VND</span>`;
+        if (value === null) displayValue = '<span style="color:var(--text-muted)">null</span>';
+        rows += `<tr><td style="color:var(--text-muted); font-weight:600; width:200px;">${escapeHtml(key)}</td><td style="word-break: break-all;">${displayValue}</td></tr>`;
+    }
+    box.innerHTML = `<div style="margin-bottom:12px;"><span class="badge ok">🎉 Tìm thấy giao dịch!</span></div><div class="table-responsive"><table style="width:100%; border-collapse: collapse;"><tbody>${rows}</tbody></table></div>`;
+  } catch (e) { box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; } finally { btn.disabled = false; }
+}
+
 async function doTxList() {
-  const dateFromVal = document.getElementById("txDateFrom").value; // Sẽ có dạng 11/07/2026
+  const dateFromVal = document.getElementById("txDateFrom").value; 
   const dateToVal = document.getElementById("txDateTo").value;
   const bankBrandVal = document.getElementById("txBankBrand").value.trim();
   const bankAccountVal = document.getElementById("txBankAccountId").value.trim();
@@ -605,7 +603,6 @@ async function doTxList() {
     return; 
   }
   
-  // Hàm đảo chuỗi DD/MM/YYYY thành YYYY-MM-DD để gửi lên API
   const parseDateToAPI = (str) => {
     const parts = str.split('/');
     if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -626,8 +623,8 @@ async function doTxList() {
           action: "list_transactions", 
           date_from: dateFrom, 
           date_to: dateTo, 
-          bank_brand: bankBrandVal,          // TRUYỀN THÊM TRƯỜNG NÀY
-          bank_account: bankAccountVal,      // TRUYỀN THÊM TRƯỜNG NÀY
+          bank_brand: bankBrandVal,          
+          bank_account: bankAccountVal,      
           access_token: getToken() 
       }) 
     });
@@ -644,13 +641,10 @@ async function doTxList() {
       return;
     }
     
-    // Đoạn code vẽ bảng giữ nguyên như cũ
-    // Vẽ bảng HTML giao diện mới chuẩn kích thước
-    let rows = ""; 
-    let totalAmount = 0; // Thêm biến tính tổng dòng tiền
+    let rows = "";
+    let totalAmount = 0; 
 
     txs.forEach(tx => {
-      // Tính tổng: Tiền vào thì cộng, tiền ra thì trừ
       totalAmount += Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
 
       const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
@@ -685,20 +679,17 @@ async function doTxList() {
         </tr>`;
     });
 
-    // Xử lý hiển thị số tiền tổng cộng (+ hoặc -)
     let totalDisplay = totalAmount >= 0 
       ? `+${totalAmount.toLocaleString('vi-VN')} đ` 
       : `${totalAmount.toLocaleString('vi-VN')} đ`;
 
-    // Chèn dòng Tổng cộng vào cuối bảng
     rows += `
       <tr class="total-row">
         <td colspan="3" style="text-align: right; font-weight: 600; text-transform: uppercase;">Tổng cộng:</td>
         <td style="font-weight: 700; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
         <td colspan="3"></td>
       </tr>`;
-    });
-    
+      
     box.innerHTML = `
       <div style="margin-bottom:12px;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
@@ -727,77 +718,6 @@ async function doTxList() {
   }
 }
 
-// Khởi tạo giao diện lịch cực đẹp với Flatpickr
-document.addEventListener("DOMContentLoaded", () => {
-  const dateConfig = {
-    dateFormat: "d/m/Y", // Hiển thị định dạng dd/mm/yyyy
-    locale: "vn",        // Dịch sang tiếng Việt (T2, T3, Thg 1...)
-    defaultDate: new Date(), // Mặc định chọn ngày hôm nay
-    allowInput: true     // Cho phép người dùng tự gõ nếu muốn
-  };
-  
-  const elFrom = document.getElementById('txDateFrom');
-  const elTo = document.getElementById('txDateTo');
-  
-  if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
-  if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
-});
-  
-// HÀM TRA CỨU GIAO DỊCH SEPAY
-async function doTxSearch() {
-  const code = document.getElementById("txSearchCode").value.trim(); 
-  const box = document.getElementById("txSearchResult"); 
-  const btn = document.getElementById("txSearchBtn");
-  
-  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã cần tìm.</div>'; return; }
-  
-  btn.disabled = true; 
-  box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang kết nối SePay v2...</div>';
-  
-  try {
-    const resp = await fetch("/api/index", { 
-      method: "POST", 
-      headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ action: "search_transaction", code: code, access_token: getToken() }) 
-    });
-    const data = await resp.json();
-    
-    if (!resp.ok) { 
-      box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; 
-      return; 
-    }
-
-    const tx = data.transaction;
-    
-    // Tự động lặp qua TOÀN BỘ các trường JSON và vẽ thành bảng
-    let rows = "";
-    for (const [key, value] of Object.entries(tx)) {
-        // Đổi màu riêng số tiền để dễ nhìn
-        let displayValue = escapeHtml(value);
-        if (key === "amount_in") displayValue = `<span style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(value).toLocaleString('vi-VN')} VND</span>`;
-        if (value === null) displayValue = '<span style="color:var(--text-muted)">null</span>';
-        
-        rows += `<tr><td style="color:var(--text-muted); font-weight:600; width:200px;">${escapeHtml(key)}</td><td style="word-break: break-all;">${displayValue}</td></tr>`;
-    }
-
-    box.innerHTML = `
-      <div style="margin-bottom:12px;">
-        <span class="badge ok">🎉 Tìm thấy giao dịch!</span>
-      </div>
-      <div class="table-responsive">
-        <table style="width:100%; border-collapse: collapse;">
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-      
-  } catch (e) { 
-    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; 
-  } finally { 
-    btn.disabled = false; 
-  }
-}
-  
-/* Utilities */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -815,7 +735,5 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
 </body>
 </html>
