@@ -24,8 +24,7 @@ from _missav import get_movie_detail, get_category_list
 from _subtitle import search_subtitle
 from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
-from _payment import search_sepay_transaction
-from _payment import search_sepay_transaction, list_sepay_transactions
+from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -307,6 +306,9 @@ class handler(BaseHTTPRequestHandler):
             else:
                 res = list_sepay_transactions(date_from, date_to, bank_brand, bank_account)
                 status, payload = (400 if "error" in res else 200), res
+        elif action == "get_bank_accounts":
+            res = get_sepay_bank_accounts()
+            status, payload = (400 if "error" in res else 200), res
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
