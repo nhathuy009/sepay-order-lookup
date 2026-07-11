@@ -474,9 +474,12 @@ async function doBankStatement() {
 }
   
 // HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
+// HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
 async function doTxList() {
   const dateFromVal = document.getElementById("txDateFrom").value;
   const dateToVal = document.getElementById("txDateTo").value;
+  const bankBrandVal = document.getElementById("txBankBrand").value.trim();
+  const bankAccountVal = document.getElementById("txBankAccountId").value.trim();
   const box = document.getElementById("txListResult");
   const btn = document.getElementById("txListBtn");
   
@@ -485,7 +488,6 @@ async function doTxList() {
     return; 
   }
   
-  // Format thành YYYY-MM-DD HH:MM:SS theo yêu cầu của API v2
   const dateFrom = dateFromVal + " 00:00:00";
   const dateTo = dateToVal + " 23:59:59";
   
@@ -496,7 +498,14 @@ async function doTxList() {
     const resp = await fetch("/api/index", { 
       method: "POST", 
       headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ action: "list_transactions", date_from: dateFrom, date_to: dateTo, access_token: getToken() }) 
+      body: JSON.stringify({ 
+          action: "list_transactions", 
+          date_from: dateFrom, 
+          date_to: dateTo, 
+          bank_brand: bankBrandVal,          // TRUYỀN THÊM TRƯỜNG NÀY
+          bank_account: bankAccountVal,      // TRUYỀN THÊM TRƯỜNG NÀY
+          access_token: getToken() 
+      }) 
     });
     const data = await resp.json();
     
@@ -507,11 +516,11 @@ async function doTxList() {
     
     const txs = data.transactions;
     if (!txs || txs.length === 0) {
-      box.innerHTML = '<div class="msg">⚠️ Không có giao dịch chuyển khoản nào trong khoảng thời gian này.</div>';
+      box.innerHTML = '<div class="msg">⚠️ Không có giao dịch chuyển khoản nào khớp với điều kiện lọc.</div>';
       return;
     }
     
-    // Vẽ bảng HTML (Mỗi giao dịch 1 dòng)
+    // Đoạn code vẽ bảng giữ nguyên như cũ
     let rows = "";
     txs.forEach(tx => {
       rows += `
@@ -520,7 +529,7 @@ async function doTxList() {
           <td style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(tx.amount_in).toLocaleString('vi-VN')} đ</td>
           <td style="word-break: break-all;">${escapeHtml(tx.transaction_content)}</td>
           <td style="font-size:12px;">${escapeHtml(tx.reference_number)}</td>
-          <td style="font-size:12px;">${escapeHtml(tx.bank_brand_name)}</td>
+          <td style="font-size:12px;">${escapeHtml(tx.bank_brand_name)} - ${escapeHtml(tx.account_number)}</td>
         </tr>`;
     });
     
