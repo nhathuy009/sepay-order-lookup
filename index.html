@@ -245,18 +245,30 @@
         </div>
 
         <div class="card">
-          <h3 style="margin-top:0; font-size:15px;">Liệt kê giao dịch theo ngày</h3>
-          <div class="row" style="align-items: flex-end;">
-            <div style="flex: 0.5;">
+          <h3 style="margin-top:0; font-size:15px;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
+          <div class="row" style="align-items: flex-end; margin-bottom: 16px;">
+            <div style="flex: 0.25; min-width: 140px;">
               <label>Từ ngày</label>
               <input type="date" id="txDateFrom" />
             </div>
-            <div style="flex: 0.5;">
+            <div style="flex: 0.25; min-width: 140px;">
               <label>Đến ngày</label>
               <input type="date" id="txDateTo" />
             </div>
+            <div style="flex: 0.25; min-width: 180px;">
+              <label>Mã Ngân hàng (Tùy chọn)</label>
+              <input type="text" id="txBankBrand" placeholder="VD: ACB, MB, VCB..." />
+            </div>
+            <div style="flex: 0.25; min-width: 180px;">
+              <label>ID Tài khoản (Tùy chọn)</label>
+              <input type="text" id="txBankAccountId" placeholder="UUID tài khoản..." />
+            </div>
+          </div>
+          <div>
             <button id="txListBtn" onclick="doTxList()">Lấy danh sách</button>
           </div>
+          <div id="txListResult" style="margin-top: 16px;"></div>
+        </div>
           <div id="txListResult" style="margin-top: 16px;"></div>
         </div>
       </div>
