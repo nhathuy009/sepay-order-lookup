@@ -260,8 +260,10 @@
               <input type="text" id="txBankBrand" placeholder="VD: ACB, MB, VCB..." />
             </div>
             <div style="flex: 0.25; min-width: 180px;">
-              <label>ID Tài khoản (Tùy chọn)</label>
-              <input type="text" id="txBankAccountId" placeholder="UUID tài khoản..." />
+              <label>Tài khoản (Tùy chọn)</label>
+              <select id="txBankAccountId" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); background: #f9fafb; color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+                <option value="">-- Tất cả tài khoản --</option>
+              </select>
             </div>
           </div>
           <div>
@@ -320,24 +322,25 @@ document.addEventListener("DOMContentLoaded", () => {
 // Cập nhật lại hàm switchTab
 // CẬP NHẬT LẠI HÀM NÀY
 function switchTab(which) {
-  // Danh sách các tab đang có (đã bỏ 'single')
   const tabs = ["bulk", "excel", "bank", "transaction"];
   
   tabs.forEach(tab => {
-    // Viết hoa chữ cái đầu để khớp với ID (VD: bulk -> Bulk -> tabBulk)
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
-    
     const contentEl = document.getElementById("tab" + idSuffix);
     const btnEl = document.getElementById("tab" + idSuffix + "Btn");
     
-    // Chỉ thực hiện đổi class nếu tìm thấy phần tử trên giao diện HTML
-    if (contentEl) {
-      contentEl.classList.toggle("hidden", which !== tab);
-    }
-    if (btnEl) {
-      btnEl.classList.toggle("active", which === tab);
-    }
+    if (contentEl) contentEl.classList.toggle("hidden", which !== tab);
+    if (btnEl) btnEl.classList.toggle("active", which === tab);
   });
+
+  // Tự động tải dropdown Ngân hàng nếu người dùng bấm qua tab Transaction
+  if (which === "transaction") {
+    const selectEl = document.getElementById("txBankAccountId");
+    // Nếu dropdown mới chỉ có 1 dòng "-- Tất cả tài khoản --" thì mới tải, tránh API bị gọi lại nhiều lần
+    if (selectEl && selectEl.options.length <= 1) {
+      loadBankAccounts();
+    }
+  }
 }
   
 /* Các hàm Kéo Thả & Tra cứu giữ nguyên */
@@ -429,6 +432,41 @@ function copyTableToExcel() {
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
+// HÀM TẢI DANH SÁCH TÀI KHOẢN NGÂN HÀNG VÀO DROPDOWN
+async function loadBankAccounts() {
+  const selectEl = document.getElementById("txBankAccountId");
+  if (!selectEl) return;
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get_bank_accounts", access_token: getToken() })
+    });
+    
+    const data = await resp.json();
+    
+    if (resp.ok && data.bank_accounts) {
+      // Xóa các option cũ (nếu có) và giữ lại option "Tất cả"
+      selectEl.innerHTML = '<option value="">-- Tất cả tài khoản --</option>';
+      
+      // Đổ data mới vào dropdown
+      data.bank_accounts.forEach(bank => {
+        const option = document.createElement("option");
+        option.value = bank.id; // Gắn UUID ngầm vào value
+        
+        // Hiển thị: [Tên NH] - [Số TK] (Số dư lũy kế)
+        const balance = Number(bank.accumulated).toLocaleString('vi-VN');
+        option.text = `${bank.bank_short_name} - ${bank.account_number} (Số dư: ${balance}đ)`;
+        
+        selectEl.appendChild(option);
+      });
+    }
+  } catch (e) {
+    console.error("Lỗi khi tải danh sách ngân hàng từ SePay:", e);
+  }
+}
+
 async function doExcel() {
   const fileInput = document.getElementById("excelFile"); const box = document.getElementById("excelResult"); const btn = document.getElementById("excelBtn");
   if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
@@ -472,8 +510,7 @@ async function doBankStatement() {
     btn.disabled = false;
   }
 }
-  
-// HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
+
 // HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
 async function doTxList() {
   const dateFromVal = document.getElementById("txDateFrom").value;
