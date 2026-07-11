@@ -234,13 +234,30 @@
       </div>
       <div id="tabTransaction" class="hidden">
         <h2>Kiểm tra giao dịch SePay v2</h2>
+        
         <div class="card">
           <label>Mã đơn hàng / Nội dung CK cần tìm (Enter để tìm)</label>
           <div class="row">
             <div><input type="text" id="txSearchCode" placeholder="Nhập mã... VD: DH18700" onkeydown="if(event.key==='Enter') doTxSearch()" /></div>
-            <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu trên SePay</button>
+            <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu 1 mã</button>
           </div>
           <div id="txSearchResult" style="margin-top: 16px;"></div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0; font-size:15px;">Liệt kê giao dịch theo ngày</h3>
+          <div class="row" style="align-items: flex-end;">
+            <div style="flex: 0.5;">
+              <label>Từ ngày</label>
+              <input type="date" id="txDateFrom" />
+            </div>
+            <div style="flex: 0.5;">
+              <label>Đến ngày</label>
+              <input type="date" id="txDateTo" />
+            </div>
+            <button id="txListBtn" onclick="doTxList()">Lấy danh sách</button>
+          </div>
+          <div id="txListResult" style="margin-top: 16px;"></div>
         </div>
       </div>
     </main>
