@@ -120,6 +120,36 @@
   .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 2px;}
 
   /* TABLE */
+  /* --- GIAO DIỆN BẢNG MỚI (STYLE NHƯ ẢNH) --- */
+  .sepay-table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
+  .sepay-table th { 
+    background: #ffffff; color: #6b7280; font-weight: 500; font-size: 11px; 
+    text-transform: uppercase; padding: 12px 16px; border-bottom: 1px solid var(--border); 
+  }
+  .sepay-table td { 
+    padding: 12px 16px; border-bottom: 1px solid var(--border); color: #374151; 
+    vertical-align: middle; 
+  }
+  .sepay-table tr:hover td { background: #f9fafb; }
+  
+  /* Cột số tiền */
+  .amount-in { color: #10b981; font-weight: 700; }
+  .amount-out { color: #ef4444; font-weight: 700; }
+  
+  /* Cột nội dung (Tự động thêm dấu ... nếu quá dài) */
+  .tx-content-cell {
+    max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  
+  /* Cột thời gian phụ */
+  .text-muted-small { color: #9ca3af; font-size: 12px; font-style: italic; margin-top: 4px; }
+  
+  /* Cột Tài khoản (Icon Ngân hàng mini) */
+  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #1e3a8a; }
+  .bank-icon {
+    width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: white;
+    display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold;
+  }
   .table-responsive { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; border-bottom: none;}
   table { width: 100%; border-collapse: collapse; text-align: left; background: white;}
   th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
@@ -342,7 +372,31 @@ function switchTab(which) {
     }
   }
 }
+
+// Chuyển đổi YYYY-MM-DD HH:MM:SS sang DD/MM/YYYY HH:MM:SS
+function formatTxDate(dateString) {
+  if (!dateString) return "";
+  const [date, time] = dateString.split(" ");
+  const [y, m, d] = date.split("-");
+  return `${d}/${m}/${y} ${time}`;
+}
+
+// Tính toán thời gian tương đối (VD: 2 giờ trước, 20 phút trước)
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  // API SePay dùng múi giờ Việt Nam (+07:00)
+  const txDate = new Date(dateString.replace(" ", "T") + "+07:00");
+  const now = new Date();
+  const diffMs = now - txDate;
+  const diffMins = Math.floor(diffMs / 60000);
   
+  if (diffMins < 1) return `Vừa xong`;
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  return `${Math.floor(diffHours / 24)} ngày trước`;
+}
+
 /* Các hàm Kéo Thả & Tra cứu giữ nguyên */
 let dragSrcEl = null;
 function initColumnSelector() {
@@ -558,15 +612,48 @@ async function doTxList() {
     }
     
     // Đoạn code vẽ bảng giữ nguyên như cũ
+    // Vẽ bảng HTML giao diện mới
     let rows = "";
     txs.forEach(tx => {
+      // 1. Cắt ngắn UUID của v2 xuống 8 ký tự cho giống ID số trong ảnh
+      const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
+      
+      // 2. Xử lý Thời gian
+      const formattedDate = formatTxDate(tx.transaction_date);
+      const relativeTime = timeAgo(tx.transaction_date);
+      
+      // 3. Xử lý Số tiền (Xanh cho nạp vào, Đỏ cho rút ra)
+      let amountHtml = "";
+      if (tx.amount_in > 0) {
+        amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
+      } else if (tx.amount_out > 0) {
+        amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
+      } else {
+        amountHtml = `0 đ`;
+      }
+
+      // 4. Lấy chữ cái đầu của tên ngân hàng làm Icon (VD: VCB -> V)
+      const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+
       rows += `
         <tr>
-          <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(tx.transaction_date)}</td>
-          <td style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(tx.amount_in).toLocaleString('vi-VN')} đ</td>
-          <td style="word-break: break-all;">${escapeHtml(tx.transaction_content)}</td>
-          <td style="font-size:12px;">${escapeHtml(tx.reference_number)}</td>
-          <td style="font-size:12px;">${escapeHtml(tx.bank_brand_name)} - ${escapeHtml(tx.account_number)}</td>
+          <td style="color:#6b7280; font-size: 12px;">${shortId}</td>
+          <td>
+            <div>${formattedDate}</div>
+            <div class="text-muted-small">· ${relativeTime}</div>
+          </td>
+          <td>
+            <div class="bank-tag">
+              <span class="bank-icon">${bankLetter}</span>
+              ${escapeHtml(tx.account_number)}
+            </div>
+          </td>
+          <td>${amountHtml}</td>
+          <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
+            ${escapeHtml(tx.transaction_content)}
+          </td>
+          <td>${escapeHtml(tx.code || "—")}</td>
+          <td>${escapeHtml(tx.reference_number || "—")}</td>
         </tr>`;
     });
     
@@ -574,15 +661,17 @@ async function doTxList() {
       <div style="margin-bottom:12px;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
       </div>
-      <div class="table-responsive">
-        <table style="width:100%; border-collapse: collapse;">
+      <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+        <table class="sepay-table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Thời gian</th>
+              <th>Tài khoản</th>
               <th>Số tiền</th>
-              <th>Nội dung chuyển khoản</th>
-              <th>Mã GD Ngân hàng</th>
-              <th>Ngân hàng</th>
+              <th>Nội dung</th>
+              <th>Mã thanh toán</th>
+              <th>Mã tham chiếu</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
