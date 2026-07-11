@@ -23,6 +23,8 @@ from _core import (  # noqa: E402
 from _missav import get_movie_detail, get_category_list
 from _subtitle import search_subtitle
 from collections import defaultdict
+# Thêm dòng này vào cụm import từ file nội bộ
+from _payment import search_sepay_transaction
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -286,7 +288,13 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_bank_statement(body)
         elif action == "lookup":
             status, payload = handle_lookup(body)
+        elif action == "search_transaction": # <--- THÊM NHÁNH NÀY
+            code = (body.get("code") or "").strip()
+            if not code:
+                status, payload = 400, {"error": "Thiếu mã đơn hàng"}
+            else:
+                res = search_sepay_transaction(code)
+                status, payload = (400 if "error" in res else 200), res
         else:
-            status, payload = 400, {"error": f"action không hợp lệ: {action}"}
-            
+            status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
