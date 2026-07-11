@@ -108,7 +108,7 @@ def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id
     params = {
         "transaction_date_from": date_from,
         "transaction_date_to": date_to,
-        "transfer_type": "in",
+        #"transfer_type": "in",
         "page": 1,
         "per_page": 100,
         "transaction_date_sort": "desc"
