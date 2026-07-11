@@ -299,11 +299,13 @@ class handler(BaseHTTPRequestHandler):
         elif action == "list_transactions":
             date_from = body.get("date_from", "").strip()
             date_to = body.get("date_to", "").strip()
+            bank_brand = body.get("bank_brand", "").strip()
+            bank_account = body.get("bank_account", "").strip()
             
             if not date_from or not date_to:
                 status, payload = 400, {"error": "Thiếu thông tin ngày bắt đầu/kết thúc."}
             else:
-                res = list_sepay_transactions(date_from, date_to)
+                res = list_sepay_transactions(date_from, date_to, bank_brand, bank_account)
                 status, payload = (400 if "error" in res else 200), res
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
