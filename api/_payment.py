@@ -49,7 +49,47 @@ def search_sepay_transaction(keyword):
             
         # Lấy giao dịch mới nhất khớp với mã và trả về toàn bộ (raw data)
         return {"transaction": transactions[0]}
+
+def get_sepay_bank_accounts():
+    """
+    Lấy danh sách tài khoản ngân hàng đã liên kết trên SePay.
+    Chỉ lấy các tài khoản đang hoạt động.
+    """
+    api_token = os.environ.get("SEPAY_API_TOKEN")
+    if not api_token:
+        return {"error": "Chưa cấu hình biến môi trường SEPAY_API_TOKEN trên Vercel."}
+    
+    url = "https://userapi.sepay.vn/v2/bank-accounts"
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
+    }
+    
+    # Lấy tài khoản đang active, tối đa 100 tài khoản
+    params = {
+        "active": "1",
+        "per_page": 100
+    }
+    
+    session = requests.Session()
+    
+    while True:
+        resp = session.get(url, headers=headers, params=params)
         
+        if resp.status_code == 429:
+            retry_after = resp.headers.get("x-sepay-userapi-retry-after", 1)
+            time.sleep(float(retry_after))
+            continue
+            
+        if resp.status_code != 200:
+            return {"error": f"Lỗi từ SePay (HTTP {resp.status_code}): {resp.text}"}
+            
+        data = resp.json()
+        if data.get("status") != "success":
+            return {"error": "Dữ liệu trả về từ SePay không hợp lệ."}
+            
+        return {"bank_accounts": data.get("data", [])}
+
 def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id=None):
     """
     Lấy danh sách giao dịch nạp tiền (in) trong khoảng thời gian.
