@@ -173,6 +173,7 @@
       <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
       <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý bằng file Excel</div>
       <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
+      <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">💳 Tra cứu CK (SePay)</div>
     </aside>
 
     <main class="content main-content">
@@ -231,7 +232,17 @@
           <div id="bankResult" class="msg"></div>
         </div>
       </div>
-
+      <div id="tabTransaction" class="hidden">
+        <h2>Kiểm tra giao dịch SePay v2</h2>
+        <div class="card">
+          <label>Mã đơn hàng / Nội dung CK cần tìm (Enter để tìm)</label>
+          <div class="row">
+            <div><input type="text" id="txSearchCode" placeholder="Nhập mã... VD: DH18700" onkeydown="if(event.key==='Enter') doTxSearch()" /></div>
+            <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu trên SePay</button>
+          </div>
+          <div id="txSearchResult" style="margin-top: 16px;"></div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -277,16 +288,20 @@ document.addEventListener("DOMContentLoaded", () => {
   initColumnSelector();
 });
 
-// CẬP NHẬT HÀM SWITCH TAB THÊM TAB BANK
+// Cập nhật lại hàm switchTab
 function switchTab(which) {
   try {
+    document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
     document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
     document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
     document.getElementById("tabBank").classList.toggle("hidden", which !== "bank"); 
+    document.getElementById("tabTransaction").classList.toggle("hidden", which !== "transaction"); // Thêm dòng này
     
+    document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
     document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
     document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
     document.getElementById("tabBankBtn").classList.toggle("active", which === "bank"); 
+    document.getElementById("tabTransactionBtn").classList.toggle("active", which === "transaction"); // Thêm dòng này
   } catch(e) {}
 }
 
@@ -423,6 +438,60 @@ async function doBankStatement() {
   }
 }
 
+// HÀM TRA CỨU GIAO DỊCH SEPAY
+async function doTxSearch() {
+  const code = document.getElementById("txSearchCode").value.trim(); 
+  const box = document.getElementById("txSearchResult"); 
+  const btn = document.getElementById("txSearchBtn");
+  
+  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã cần tìm.</div>'; return; }
+  
+  btn.disabled = true; 
+  box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang kết nối SePay v2...</div>';
+  
+  try {
+    const resp = await fetch("/api/index", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ action: "search_transaction", code: code, access_token: getToken() }) 
+    });
+    const data = await resp.json();
+    
+    if (!resp.ok) { 
+      box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; 
+      return; 
+    }
+
+    const tx = data.transaction;
+    
+    // Tự động lặp qua TOÀN BỘ các trường JSON và vẽ thành bảng
+    let rows = "";
+    for (const [key, value] of Object.entries(tx)) {
+        // Đổi màu riêng số tiền để dễ nhìn
+        let displayValue = escapeHtml(value);
+        if (key === "amount_in") displayValue = `<span style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(value).toLocaleString('vi-VN')} VND</span>`;
+        if (value === null) displayValue = '<span style="color:var(--text-muted)">null</span>';
+        
+        rows += `<tr><td style="color:var(--text-muted); font-weight:600; width:200px;">${escapeHtml(key)}</td><td style="word-break: break-all;">${displayValue}</td></tr>`;
+    }
+
+    box.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <span class="badge ok">🎉 Tìm thấy giao dịch!</span>
+      </div>
+      <div class="table-responsive">
+        <table style="width:100%; border-collapse: collapse;">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+      
+  } catch (e) { 
+    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; 
+  } finally { 
+    btn.disabled = false; 
+  }
+}
+  
 /* Utilities */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
