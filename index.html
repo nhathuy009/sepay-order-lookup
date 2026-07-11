@@ -289,22 +289,28 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // Cập nhật lại hàm switchTab
+// CẬP NHẬT LẠI HÀM NÀY
 function switchTab(which) {
-  try {
-    document.getElementById("tabSingle").classList.toggle("hidden", which !== "single");
-    document.getElementById("tabBulk").classList.toggle("hidden", which !== "bulk");
-    document.getElementById("tabExcel").classList.toggle("hidden", which !== "excel");
-    document.getElementById("tabBank").classList.toggle("hidden", which !== "bank"); 
-    document.getElementById("tabTransaction").classList.toggle("hidden", which !== "transaction"); // Thêm dòng này
+  // Danh sách các tab đang có (đã bỏ 'single')
+  const tabs = ["bulk", "excel", "bank", "transaction"];
+  
+  tabs.forEach(tab => {
+    // Viết hoa chữ cái đầu để khớp với ID (VD: bulk -> Bulk -> tabBulk)
+    const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
     
-    document.getElementById("tabSingleBtn").classList.toggle("active", which === "single");
-    document.getElementById("tabBulkBtn").classList.toggle("active", which === "bulk");
-    document.getElementById("tabExcelBtn").classList.toggle("active", which === "excel");
-    document.getElementById("tabBankBtn").classList.toggle("active", which === "bank"); 
-    document.getElementById("tabTransactionBtn").classList.toggle("active", which === "transaction"); // Thêm dòng này
-  } catch(e) {}
+    const contentEl = document.getElementById("tab" + idSuffix);
+    const btnEl = document.getElementById("tab" + idSuffix + "Btn");
+    
+    // Chỉ thực hiện đổi class nếu tìm thấy phần tử trên giao diện HTML
+    if (contentEl) {
+      contentEl.classList.toggle("hidden", which !== tab);
+    }
+    if (btnEl) {
+      btnEl.classList.toggle("active", which === tab);
+    }
+  });
 }
-
+  
 /* Các hàm Kéo Thả & Tra cứu giữ nguyên */
 let dragSrcEl = null;
 function initColumnSelector() {
