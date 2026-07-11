@@ -141,6 +141,17 @@
     border-right: 1px solid var(--border); /* THÊM KẺ DỌC */
     color: #374151; vertical-align: middle; font-size: 13px;
   }
+
+  /* --- DÒNG TỔNG CỘNG CUỐI BẢNG --- */
+  .sepay-table .total-row td {
+    background-color: #3b82f6 !important; /* Màu xanh giống hệt ảnh bạn gửi */
+    color: #ffffff !important;            /* Chữ màu trắng để nổi bật */
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.2); /* Đường kẻ sọc mờ */
+  }
+  .sepay-table .total-row td:last-child {
+    border-right: none;
+  }
   
   /* Xóa kẻ dọc ở cột cuối cùng cho đẹp */
   .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
@@ -607,8 +618,6 @@ async function doTxList() {
   btn.disabled = true;
   box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang tải danh sách từ SePay...</div>';
   
-  // ... (Phần gọi fetch API và vẽ bảng giữ nguyên như cũ) ...
-  
   try {
     const resp = await fetch("/api/index", { 
       method: "POST", 
@@ -636,35 +645,30 @@ async function doTxList() {
     }
     
     // Đoạn code vẽ bảng giữ nguyên như cũ
-    // Vẽ bảng HTML giao diện mới
+    // Vẽ bảng HTML giao diện mới chuẩn kích thước
     let rows = "";
+    let totalAmount = 0; // Thêm biến tính tổng dòng tiền
+
     txs.forEach(tx => {
-      // 1. Cắt ngắn UUID của v2 xuống 8 ký tự cho giống ID số trong ảnh
+      // Tính tổng: Tiền vào thì cộng, tiền ra thì trừ
+      totalAmount += Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
+
       const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
-      
-      // 2. Xử lý Thời gian
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
-      // 3. Xử lý Số tiền (Xanh cho nạp vào, Đỏ cho rút ra)
-      let amountHtml = "";
-      if (tx.amount_in > 0) {
-        amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
-      } else if (tx.amount_out > 0) {
-        amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
-      } else {
-        amountHtml = `0 đ`;
-      }
+      let amountHtml = "0 đ";
+      if (tx.amount_in > 0) amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
+      else if (tx.amount_out > 0) amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
 
-      // 4. Lấy chữ cái đầu của tên ngân hàng làm Icon (VD: VCB -> V)
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
 
       rows += `
         <tr>
-          <td style="color:#6b7280; font-size: 12px;">${shortId}</td>
+          <td class="text-id">${shortId}</td>
           <td>
             <div>${formattedDate}</div>
-            <div class="text-muted-small">· ${relativeTime}</div>
+            <div class="text-muted-small">${relativeTime}</div>
           </td>
           <td>
             <div class="bank-tag">
@@ -676,9 +680,23 @@ async function doTxList() {
           <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
             ${escapeHtml(tx.transaction_content)}
           </td>
-          <td>${escapeHtml(tx.code || "—")}</td>
-          <td>${escapeHtml(tx.reference_number || "—")}</td>
+          <td class="text-id">${escapeHtml(tx.code || "—")}</td>
+          <td class="text-id">${escapeHtml(tx.reference_number || "—")}</td>
         </tr>`;
+    });
+
+    // Xử lý hiển thị số tiền tổng cộng (+ hoặc -)
+    let totalDisplay = totalAmount >= 0 
+      ? `+${totalAmount.toLocaleString('vi-VN')} đ` 
+      : `${totalAmount.toLocaleString('vi-VN')} đ`;
+
+    // Chèn dòng Tổng cộng vào cuối bảng
+    rows += `
+      <tr class="total-row">
+        <td colspan="3" style="text-align: right; font-weight: 600; text-transform: uppercase;">Tổng cộng:</td>
+        <td style="font-weight: 700; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
+        <td colspan="3"></td>
+      </tr>`;
     });
     
     box.innerHTML = `
