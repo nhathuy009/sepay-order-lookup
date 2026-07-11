@@ -460,7 +460,93 @@ async function doBankStatement() {
     btn.disabled = false;
   }
 }
+  
+// HÀM LIỆT KÊ DANH SÁCH GIAO DỊCH
+async function doTxList() {
+  const dateFromVal = document.getElementById("txDateFrom").value;
+  const dateToVal = document.getElementById("txDateTo").value;
+  const box = document.getElementById("txListResult");
+  const btn = document.getElementById("txListBtn");
+  
+  if (!dateFromVal || !dateToVal) {
+    box.innerHTML = '<div class="msg err">Vui lòng chọn "Từ ngày" và "Đến ngày".</div>'; 
+    return; 
+  }
+  
+  // Format thành YYYY-MM-DD HH:MM:SS theo yêu cầu của API v2
+  const dateFrom = dateFromVal + " 00:00:00";
+  const dateTo = dateToVal + " 23:59:59";
+  
+  btn.disabled = true;
+  box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang tải danh sách từ SePay...</div>';
+  
+  try {
+    const resp = await fetch("/api/index", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ action: "list_transactions", date_from: dateFrom, date_to: dateTo, access_token: getToken() }) 
+    });
+    const data = await resp.json();
+    
+    if (!resp.ok) { 
+      box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; 
+      return; 
+    }
+    
+    const txs = data.transactions;
+    if (!txs || txs.length === 0) {
+      box.innerHTML = '<div class="msg">⚠️ Không có giao dịch chuyển khoản nào trong khoảng thời gian này.</div>';
+      return;
+    }
+    
+    // Vẽ bảng HTML (Mỗi giao dịch 1 dòng)
+    let rows = "";
+    txs.forEach(tx => {
+      rows += `
+        <tr>
+          <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(tx.transaction_date)}</td>
+          <td style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(tx.amount_in).toLocaleString('vi-VN')} đ</td>
+          <td style="word-break: break-all;">${escapeHtml(tx.transaction_content)}</td>
+          <td style="font-size:12px;">${escapeHtml(tx.reference_number)}</td>
+          <td style="font-size:12px;">${escapeHtml(tx.bank_brand_name)}</td>
+        </tr>`;
+    });
+    
+    box.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
+      </div>
+      <div class="table-responsive">
+        <table style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Số tiền</th>
+              <th>Nội dung chuyển khoản</th>
+              <th>Mã GD Ngân hàng</th>
+              <th>Ngân hàng</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+      
+  } catch (e) { 
+    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; 
+  } finally { 
+    btn.disabled = false; 
+  }
+}
 
+// Tiện ích: Tự động gán ngày hôm nay vào ô Input Date khi load trang
+document.addEventListener("DOMContentLoaded", () => {
+  const today = new Date().toISOString().split('T')[0];
+  const elFrom = document.getElementById('txDateFrom');
+  const elTo = document.getElementById('txDateTo');
+  if(elFrom) elFrom.value = today;
+  if(elTo) elTo.value = today;
+});
+  
 // HÀM TRA CỨU GIAO DỊCH SEPAY
 async function doTxSearch() {
   const code = document.getElementById("txSearchCode").value.trim(); 
