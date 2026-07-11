@@ -25,6 +25,7 @@ from _subtitle import search_subtitle
 from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction
+from _payment import search_sepay_transaction, list_sepay_transactions
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -294,6 +295,15 @@ class handler(BaseHTTPRequestHandler):
                 status, payload = 400, {"error": "Thiếu mã đơn hàng"}
             else:
                 res = search_sepay_transaction(code)
+                status, payload = (400 if "error" in res else 200), res
+        elif action == "list_transactions":
+            date_from = body.get("date_from", "").strip()
+            date_to = body.get("date_to", "").strip()
+            
+            if not date_from or not date_to:
+                status, payload = 400, {"error": "Thiếu thông tin ngày bắt đầu/kết thúc."}
+            else:
+                res = list_sepay_transactions(date_from, date_to)
                 status, payload = (400 if "error" in res else 200), res
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
