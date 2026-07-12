@@ -382,7 +382,7 @@
   <header class="top-header">
     <div class="header-brand">
       <button id="toggleSidebarBtn" onclick="toggleSidebar()" title="Thu gọn / Mở rộng Sidebar">☰</button>
-      📡 Hệ Thống 10X
+      📡 NHẬT HUY OPERATION HUB
     </div>
     <div class="header-actions" id="authCard">
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
@@ -516,6 +516,10 @@
               <select id="txBankAccountId" style="cursor: pointer;">
                 <option value="">-- Tất cả tài khoản --</option>
               </select>
+            <div style="flex: 0.25; min-width: 180px;">
+              <label>Số dư đầu kỳ</label>
+              <input type="text" id="txInitialBalance" placeholder="Nhập số (VD: 5000000)" />
+            </div>
             </div>
           </div>
           <div>
@@ -903,26 +907,46 @@ async function doTxList() {
       box.innerHTML = '<div class="msg" style="color:var(--text-muted);">⚠️ Không có giao dịch chuyển khoản nào khớp với điều kiện lọc.</div>';
       return;
     }
+
+    // BẮT ĐẦU PHẦN THAY ĐỔI LOGIC XỬ LÝ
     
+    // 1. Lấy số dư đầu kỳ do user nhập (Loại bỏ các ký tự không phải số)
+    let initialBalanceInput = document.getElementById("txInitialBalance") ? document.getElementById("txInitialBalance").value : "0";
+    let currentBalance = parseFloat(initialBalanceInput.replace(/[^\d.-]/g, '')) || 0;
+
+    // 2. Mặc định SePay trả về GD Mới nhất -> Cũ nhất. 
+    // Để tính lũy kế đúng, ta đảo mảng thành Cũ nhất -> Mới nhất để cộng dồn
+    let sortedTxs = [...txs].reverse();
+    let runningBalance = currentBalance;
+
+    sortedTxs.forEach(tx => {
+      runningBalance = runningBalance + Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
+      tx.luyKe = runningBalance; // Gắn thuộc tính lũy kế vào object
+    });
+
+    // 3. Đảo mảng trở lại để hiển thị Mới nhất nằm trên cùng
+    sortedTxs.reverse();
+
     let rows = "";
-    let totalAmount = 0; 
 
-    txs.forEach(tx => {
-      totalAmount += Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
-
-      const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
+    sortedTxs.forEach(tx => {
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
-      let amountHtml = "0 đ";
-      if (tx.amount_in > 0) amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
-      else if (tx.amount_out > 0) amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
+      // Tách 2 cột: Tiền vào và Tiền ra
+      let htmlIn = "";
+      let htmlOut = "";
+      if (tx.amount_in > 0) htmlIn = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
+      if (tx.amount_out > 0) htmlOut = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
+
+      // Cột lũy kế
+      let htmlLuyKe = `<span style="font-weight:700;">${Number(tx.luyKe).toLocaleString('vi-VN')} đ</span>`;
 
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
 
+      // Đã loại bỏ <td> chứa Mã ID và Mã tham chiếu, thêm cột Lũy kế trước Nội dung
       rows += `
         <tr>
-          <td class="text-id">${shortId}</td>
           <td>
             <div style="font-weight:600;">${formattedDate}</div>
             <div class="text-muted-small">${relativeTime}</div>
@@ -933,26 +957,28 @@ async function doTxList() {
               ${escapeHtml(tx.account_number)}
             </div>
           </td>
-          <td>${amountHtml}</td>
+          <td>${htmlIn}</td>
+          <td>${htmlOut}</td>
+          <td>${htmlLuyKe}</td>
           <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
             ${escapeHtml(tx.transaction_content)}
           </td>
           <td class="text-id">${escapeHtml(tx.code || "—")}</td>
-          <td class="text-id">${escapeHtml(tx.reference_number || "—")}</td>
         </tr>`;
     });
 
-    let totalDisplay = totalAmount >= 0 
-      ? `+${totalAmount.toLocaleString('vi-VN')} đ` 
-      : `${totalAmount.toLocaleString('vi-VN')} đ`;
+    let totalDisplay = runningBalance >= 0 
+      ? `+${runningBalance.toLocaleString('vi-VN')} đ` 
+      : `${runningBalance.toLocaleString('vi-VN')} đ`;
 
     rows += `
       <tr class="total-row">
-        <td colspan="3" style="text-align: right; font-weight: 700; text-transform: uppercase;">Tổng cộng:</td>
+        <td colspan="4" style="text-align: right; font-weight: 700; text-transform: uppercase;">Số dư cuối kỳ:</td>
         <td style="font-weight: 800; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
-        <td colspan="3"></td>
+        <td colspan="2"></td>
       </tr>`;
       
+    // Vẽ lại Thead với cấu trúc cột mới
     box.innerHTML = `
       <div style="margin-bottom:16px;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
@@ -961,13 +987,13 @@ async function doTxList() {
         <table class="sepay-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Thời gian</th>
               <th>Tài khoản</th>
-              <th>Số tiền</th>
+              <th>Tiền vào</th>
+              <th>Tiền ra</th>
+              <th>Lũy kế</th>
               <th>Nội dung</th>
               <th>Mã thanh toán</th>
-              <th>Mã tham chiếu</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
