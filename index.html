@@ -796,7 +796,8 @@ async function doBulkLookup() {
 function copyTableToExcel() {
   try {
     const table = document.getElementById('bulkTable'); if (!table) return; let tsv = "";
-    const rows = Array.from(table.querySelectorAll('tr'));
+    const tbody = table.querySelector('tbody');
+    const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
     rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyExcelBtn"); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
@@ -1033,7 +1034,8 @@ async function doTxList() {
 function copyTableToClipboard(tableId, btnId) {
   try {
     const table = document.getElementById(tableId); if (!table) return; let tsv = "";
-    const rows = Array.from(table.querySelectorAll('tr'));
+    const tbody = table.querySelector('tbody');
+    const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
     rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById(btnId); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
