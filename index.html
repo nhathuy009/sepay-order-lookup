@@ -910,7 +910,20 @@ async function doTxList() {
       if (tx.amount_out > 0) htmlOut = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
 
       let htmlLuyKe = `<span style="font-weight:700;">${Number(tx.luyKe).toLocaleString('vi-VN')} đ</span>`;
-      const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+      
+      // XỬ LÝ LOGO HÌNH ẢNH CHO ACB HOẶC MB
+      let bankLogoHtml = "";
+      const bankBrand = tx.bank_brand_name ? tx.bank_brand_name.toUpperCase() : "";
+      
+      if (bankBrand.includes("ACB")) {
+        bankLogoHtml = `<img src="https://my.sepay.vn/assets/images/banklogo/acb-icon.png" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="ACB" />`;
+      } else if (bankBrand.includes("MBBank")) {
+        bankLogoHtml = `<img src="https://my.sepay.vn/assets/images/banklogo/mbbank-icon.png" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="MB" />`;
+      } else {
+        // Phương án dự phòng cho các ngân hàng khác (hiển thị chữ cái đầu)
+        const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+        bankLogoHtml = `<span class="bank-icon">${bankLetter}</span>`;
+      }
 
       rows += `
         <tr>
@@ -920,7 +933,7 @@ async function doTxList() {
           </td>
           <td>
             <div class="bank-tag">
-              <span class="bank-icon">${bankLetter}</span>
+              ${bankLogoHtml}
               ${escapeHtml(tx.account_number)}
             </div>
           </td>
