@@ -95,23 +95,46 @@ class InvoiceClient:
 
     def __init__(self):
         self.cookies = None
+        self.last_error = ""
         self._lock = threading.Lock()
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": USER_AGENT})
 
     def login(self):
         if not EINVOICE_BASE_URL or not EINVOICE_USERNAME or not EINVOICE_PASSWORD:
+            missing = [
+                name for name, val in (
+                    ("EINVOICE_BASE_URL", EINVOICE_BASE_URL),
+                    ("EINVOICE_USERNAME", EINVOICE_USERNAME),
+                    ("EINVOICE_PASSWORD", EINVOICE_PASSWORD),
+                ) if not val
+            ]
+            self.last_error = f"Thiếu biến môi trường: {', '.join(missing)}"
+            print(f"[einvoice] {self.last_error}")
             return False
+
         login_url = EINVOICE_BASE_URL + "/"
         try:
             resp_get = self.session.get(login_url, timeout=REQUEST_TIMEOUT)
+            print(f"[einvoice] GET {login_url} -> {resp_get.status_code}, final_url={resp_get.url}")
             resp_get.raise_for_status()
             html = resp_get.text
 
+            viewstate = _extract_hidden("__VIEWSTATE", html)
+            viewstate_gen = _extract_hidden("__VIEWSTATEGENERATOR", html)
+            event_validation = _extract_hidden("__EVENTVALIDATION", html)
+            print(f"[einvoice] hidden fields lengths: VIEWSTATE={len(viewstate)}, "
+                  f"GENERATOR={len(viewstate_gen)}, EVENTVALIDATION={len(event_validation)}")
+            if not viewstate or not event_validation:
+                self.last_error = ("Không đọc được __VIEWSTATE/__EVENTVALIDATION từ trang đăng nhập "
+                                    "(có thể trang bị chặn bot/Cloudflare, hoặc EINVOICE_BASE_URL sai)")
+                print(f"[einvoice] {self.last_error}. HTML preview: {html[:300]!r}")
+                return False
+
             payload = {
-                "__VIEWSTATE": _extract_hidden("__VIEWSTATE", html),
-                "__VIEWSTATEGENERATOR": _extract_hidden("__VIEWSTATEGENERATOR", html),
-                "__EVENTVALIDATION": _extract_hidden("__EVENTVALIDATION", html),
+                "__VIEWSTATE": viewstate,
+                "__VIEWSTATEGENERATOR": viewstate_gen,
+                "__EVENTVALIDATION": event_validation,
                 "txtUserName": EINVOICE_USERNAME,
                 "txtPassword": EINVOICE_PASSWORD,
                 "btnLogin": "Đăng nhập",
@@ -126,14 +149,21 @@ class InvoiceClient:
                 login_url, data=payload, headers=headers,
                 timeout=REQUEST_TIMEOUT, allow_redirects=True,
             )
+            print(f"[einvoice] POST {login_url} -> {resp_post.status_code}, final_url={resp_post.url}")
             resp_post.raise_for_status()
 
             cookies_dict = self.session.cookies.get_dict()
+            print(f"[einvoice] cookies after login: {list(cookies_dict.keys())}")
             if ".ASPXAUTH" not in cookies_dict:
+                self.last_error = ("Đăng nhập thất bại: không có cookie .ASPXAUTH sau khi POST "
+                                    "(sai EINVOICE_USERNAME/EINVOICE_PASSWORD, hoặc trang chặn IP server)")
                 return False
             self.cookies = cookies_dict
+            self.last_error = ""
             return True
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            self.last_error = f"Lỗi mạng khi đăng nhập: {type(e).__name__}: {e}"
+            print(f"[einvoice] {self.last_error}")
             return False
 
     def _fetch(self, invoice_no):
@@ -221,7 +251,7 @@ class InvoiceClient:
         with self._lock:
             if not self.cookies and not self.login():
                 d = empty_details()
-                d["status_msg"] = "Không đăng nhập được (thiếu EINVOICE_USERNAME/EINVOICE_PASSWORD?)"
+                d["status_msg"] = self.last_error or "Không đăng nhập được"
                 return d
 
         result = self._build_details(invoice_no)
@@ -232,7 +262,7 @@ class InvoiceClient:
                 result = self._build_details(invoice_no)
             else:
                 d = empty_details()
-                d["status_msg"] = "Không thể đăng nhập lại (session hết hạn)"
+                d["status_msg"] = self.last_error or "Không thể đăng nhập lại (session hết hạn)"
                 return d
         if result == UNAUTHORIZED:
             d = empty_details()
