@@ -70,11 +70,32 @@
   .header-brand { 
     font-size: 20px; 
     font-weight: 800; 
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; 
     font-family: Georgia, serif;
     color: #F0A124;
     letter-spacing: 0.5px;
   }
+  
+  /* NÚT THU GỌN SIDEBAR */
+  #toggleSidebarBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px 10px;
+    margin-right: 8px;
+    border-radius: 8px;
+    transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #toggleSidebarBtn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+  }
+
   .header-actions { display: flex; align-items: center; gap: 12px; }
   .header-actions input {
     background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
@@ -94,15 +115,17 @@
   /* BODY LAYOUT */
   .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 
-  /* SIDEBAR */
+  /* SIDEBAR CÓ HIỆU ỨNG TRANSITION CHUYỂN ĐỘNG */
   .sidebar {
     width: 250px; background: var(--sidebar-bg); border-right: 1px solid rgba(255,255,255,0.08);
     display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0;
     z-index: 5;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar-menu-title {
     font-size: 11px; font-weight: 700; color: var(--text-muted);
     text-transform: uppercase; padding: 0 20px; margin-bottom: 12px; letter-spacing: 0.8px;
+    transition: opacity 0.2s ease, visibility 0.2s;
   }
   .menu-item {
     padding: 12px 20px; margin: 4px 14px; border-radius: 11px;
@@ -115,6 +138,34 @@
     color: var(--btn-orange-text); 
     box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
     font-weight: 800;
+  }
+  .menu-icon { font-size: 14px; flex-shrink: 0; }
+  .menu-text { transition: opacity 0.2s ease; }
+
+  /* TRẠNG THÁI SIDEBAR KHI THU GỌN */
+  .sidebar.collapsed {
+    width: 78px;
+  }
+  .sidebar.collapsed .sidebar-menu-title {
+    opacity: 0;
+    visibility: hidden;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .sidebar.collapsed .menu-item {
+    margin: 4px 12px;
+    padding: 12px 0;
+    justify-content: center;
+    border-radius: 10px;
+  }
+  .sidebar.collapsed .menu-text {
+    display: none;
+  }
+  .sidebar.collapsed .menu-icon {
+    font-size: 16px;
+    margin: 0;
   }
 
   /* MAIN CONTENT */
@@ -252,10 +303,12 @@
 
   @media (max-width: 768px) {
     .app-body { flex-direction: column; overflow: auto; }
-    .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
-    .sidebar-menu-title { display: none; }
-    .menu-item { white-space: nowrap; padding: 10px 14px; margin: 0 4px; }
+    .sidebar { width: 100% !important; flex-direction: row; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-menu-title { display: none !important; }
+    .menu-item { white-space: nowrap; padding: 10px 14px; margin: 0 4px; justify-content: flex-start !important; }
+    .menu-text { display: inline !important; }
     .main-content { padding: 16px; overflow: visible; }
+    #toggleSidebarBtn { display: none !important; }
   }
 </style>
 </head>
@@ -263,6 +316,7 @@
 
   <header class="top-header">
     <div class="header-brand">
+      <button id="toggleSidebarBtn" onclick="toggleSidebar()" title="Thu gọn / Mở rộng Sidebar">☰</button>
       📡 Hệ Thống 10X
     </div>
     <div class="header-actions" id="authCard">
@@ -273,12 +327,20 @@
 
   <div class="app-body">
     
-    <aside class="sidebar">
+    <aside class="sidebar" id="appSidebar">
       <div class="sidebar-menu-title">Chức năng chính</div>
-      <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
-      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý bằng file Excel</div>
-      <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
-      <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">💳 Tra cứu CK (SePay)</div>
+      <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
+        <span class="menu-icon">📝</span><span class="menu-text">Tra cứu hàng loạt</span>
+      </div>
+      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">
+        <span class="menu-icon">📊</span><span class="menu-text">Xử lý bằng file Excel</span>
+      </div>
+      <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">
+        <span class="menu-icon">🏦</span><span class="menu-text">Tổng hợp sao kê</span>
+      </div>
+      <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
+        <span class="menu-icon">💳</span><span class="menu-text">Tra cứu CK (SePay)</span>
+      </div>
     </aside>
 
     <main class="content main-content">
@@ -412,10 +474,26 @@ function saveToken() {
   } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
+/* LOGIC THU GỌN / MỞ RỘNG SIDEBAR */
+function toggleSidebar() {
+  const sidebar = document.getElementById("appSidebar");
+  sidebar.classList.toggle("collapsed");
+  const isCollapsed = sidebar.classList.contains("collapsed");
+  localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   try {
     const inputToken = document.getElementById("accessToken");
     if(inputToken) inputToken.placeholder = getToken() ? "Đã lưu mật khẩu" : "Mật khẩu hệ thống";
+  } catch(e) {}
+
+  // Đọc cấu hình đóng mở sidebar đã lưu từ trước
+  try {
+    const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
+    if (isCollapsed) {
+      document.getElementById("appSidebar").classList.add("collapsed");
+    }
   } catch(e) {}
 
   fetch("/api/index").then(r => r.json()).then(d => {
