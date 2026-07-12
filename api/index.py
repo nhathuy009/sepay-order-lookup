@@ -25,6 +25,7 @@ from _subtitle import search_subtitle
 from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
+from _invoice import lookup_invoice
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -46,6 +47,12 @@ def handle_category(body):
         return 400, {"error": "Thiếu slug danh mục"}
     movies = get_category_list(slug)
     return 200, {"movies": movies}
+
+def handle_invoice(body):
+    code = (body.get("code") or "").strip()
+    if not code:
+        return 400, {"error": "Thiếu số hóa đơn"}
+    return 200, lookup_invoice(code)
 
 def handle_lookup(body):
     code = (body.get("code") or "").strip()
@@ -288,6 +295,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_bank_statement(body)
         elif action == "lookup":
             status, payload = handle_lookup(body)
+        elif action == "invoice":
+            status, payload = handle_invoice(body)
         elif action == "search_transaction": # <--- THÊM NHÁNH NÀY
             code = (body.get("code") or "").strip()
             if not code:

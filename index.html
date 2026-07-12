@@ -407,6 +407,9 @@
         <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
           <span class="menu-icon">💳</span><span class="menu-text">Tra cứu CK (SePay)</span>
         </div>
+        <div class="menu-item" id="tabInvoiceBtn" onclick="switchTab('invoice')">
+          <span class="menu-icon">🧾</span><span class="menu-text">Tra cứu hóa đơn</span>
+        </div>
       </div>
 
       <div class="sidebar-bottom">
@@ -524,6 +527,44 @@
         </div>
         
       </div>
+
+      <div id="tabInvoice" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin:0">Tra cứu hóa đơn</h2>
+          <button id="copyInvoiceBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceTable', 'copyInvoiceBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
+        </div>
+        <div class="card">
+          <label>Danh sách số hóa đơn (cách nhau bằng phẩy hoặc xuống dòng)</label>
+          <textarea id="invoiceCodes" rows="5" placeholder="VD:&#10;1277&#10;1280"></textarea>
+          <div style="margin-top: 20px;">
+            <button id="invoiceBtn" onclick="doInvoiceLookup()">Chạy tiến trình tra cứu</button>
+          </div>
+        </div>
+        <div id="invoiceResultArea">
+          <div class="msg" id="invoiceProgress" style="display:none; margin-bottom: 12px;"></div>
+          <div class="table-responsive" style="display:none;" id="invoiceTableWrap">
+            <table class="bulk-table" id="invoiceTable">
+              <thead>
+                <tr>
+                  <th>Trạng thái</th>
+                  <th>Số hóa đơn</th>
+                  <th>Mẫu số &amp; Ký hiệu</th>
+                  <th>Ngày lập</th>
+                  <th>Khách hàng</th>
+                  <th>Số CCCD</th>
+                  <th>Địa chỉ</th>
+                  <th>Tiền hàng</th>
+                  <th>Tiền thuế</th>
+                  <th>Tổng tiền</th>
+                  <th>Hình thức TT</th>
+                  <th>Loại hóa đơn</th>
+                </tr>
+              </thead>
+              <tbody id="invoiceTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -626,7 +667,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "excel", "bank", "transaction"];
+  const tabs = ["bulk", "excel", "bank", "transaction", "invoice"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -979,6 +1020,61 @@ async function doTxList() {
   } finally { 
     btn.disabled = false; 
   }
+}
+
+function copyTableToClipboard(tableId, btnId) {
+  try {
+    const table = document.getElementById(tableId); if (!table) return; let tsv = "";
+    const rows = Array.from(table.querySelectorAll('tr'));
+    rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById(btnId); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
+      setTimeout(() => { btn.innerText = originalText; }, 2000);
+    }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+}
+
+async function doInvoiceLookup() {
+  const rawInput = document.getElementById("invoiceCodes").value;
+  const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
+  const btn = document.getElementById("invoiceBtn"); const progress = document.getElementById("invoiceProgress");
+  const tableWrap = document.getElementById("invoiceTableWrap"); const copyBtn = document.getElementById("copyInvoiceBtn");
+  const tbody = document.getElementById("invoiceTbody");
+  if (codes.length === 0) { progress.style.display = 'block'; progress.innerHTML = '<span class="err">Vui lòng nhập ít nhất 1 số hóa đơn.</span>'; return; }
+  btn.disabled = true; progress.style.display = 'block'; tableWrap.style.display = 'block'; copyBtn.style.display = 'none';
+  tbody.innerHTML = ''; let successCount = 0;
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i]; progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
+    let tr = document.createElement("tr");
+    try {
+      const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invoice", code, access_token: getToken() }) });
+      const data = await resp.json();
+      if (resp.ok) {
+        const ok = data.status_msg === "Thành công"; if (ok) successCount++;
+        const badgeHTML = ok ? `<span class="badge ok">${escapeHtml(data.status_msg)}</span>` : `<span class="badge err">${escapeHtml(data.status_msg || 'Thất bại')}</span>`;
+        const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+        tr.innerHTML = `
+          <td>${badgeHTML}</td>
+          <td>${escapeHtml(data.invoice_no)}</td>
+          <td>${escapeHtml(data.pattern_serial)}</td>
+          <td>${escapeHtml(data.arising_date)}</td>
+          <td>${escapeHtml(data.customer_name)}</td>
+          <td>${escapeHtml(data.customer_id)}</td>
+          <td>${escapeHtml(data.customer_address)}</td>
+          <td>${amountFmt(data.amount_before_tax)}</td>
+          <td>${amountFmt(data.vat_amount)}</td>
+          <td>${amountFmt(data.total_amount)}</td>
+          <td>${escapeHtml(data.payment_method)}</td>
+          <td>${escapeHtml(data.invoice_type)}</td>`;
+      } else {
+        tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td>${escapeHtml(code)}</td><td colspan="10">${escapeHtml(data.error || "Lỗi server")}</td>`;
+      }
+    } catch (e) {
+      tr.innerHTML = `<td><span class="badge err">Lỗi</span></td><td>${escapeHtml(code)}</td><td colspan="10">${escapeHtml(e.message)}</td>`;
+    }
+    tbody.appendChild(tr);
+  }
+  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> hóa đơn.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
 }
 
 function fileToBase64(file) {

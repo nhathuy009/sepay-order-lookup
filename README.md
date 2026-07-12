@@ -7,8 +7,9 @@ Backend là serverless function Python trên Vercel.
 
 ```
 api/_core.py     Logic tra cứu dùng chung (đăng nhập, gọi API, cache token in-memory)
-api/index.py     Serverless function duy nhất; phân nhánh theo body.action ("lookup"/"excel")
-index.html       Giao diện web (2 tab: tra cứu / Excel), gọi POST /api/index
+api/_invoice.py  Logic tra cứu hóa đơn điện tử (đăng nhập ASP.NET WebForms, cache cookie in-memory)
+api/index.py     Serverless function duy nhất; phân nhánh theo body.action ("lookup"/"excel"/"invoice"/...)
+index.html       Giao diện web (các tab: tra cứu / Excel / sao kê / SePay / hóa đơn), gọi POST /api/index
 vercel.json      Legacy builds: build api/index.py (@vercel/python) + index.html (static),
                  route /api/* -> api/index.py, còn lại -> index.html
 requirements.txt requests, openpyxl
@@ -27,6 +28,9 @@ requirements.txt requests, openpyxl
    - `LOGIN_EMAIL` — email đăng nhập hệ thống (10X/SOLOBIZ)
    - `LOGIN_PASSWORD` — mật khẩu đăng nhập hệ thống (10X/SOLOBIZ)
    - `APP_ACCESS_TOKEN` — mật khẩu bảo vệ truy cập web app (khuyến nghị)
+   - `EINVOICE_BASE_URL`, `EINVOICE_USERNAME`, `EINVOICE_PASSWORD` — dùng cho tab
+     "Tra cứu hóa đơn" (đăng nhập vào hệ thống hóa đơn điện tử ASP.NET WebForms).
+     Tùy chọn thêm `EINVOICE_SERIAL` nếu ký hiệu mẫu hóa đơn khác `C26MSL`.
 5. **Deploy**. Xong sẽ có URL dạng `https://<project>.vercel.app`.
 
 > Sau khi thêm/đổi Environment Variables phải **Redeploy** để có hiệu lực.
@@ -56,6 +60,9 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   đơn hàng/khách hàng. Nếu để trống, ai có link cũng tra cứu được.
 - Không hardcode email/mật khẩu trong code — luôn dùng Environment Variables.
 - Khuyến nghị đổi mật khẩu hệ thống vì mật khẩu cũ đã từng lộ trong chat/script.
+- Mật khẩu tài khoản hóa đơn điện tử (`EINVOICE_PASSWORD`) từng bị dán thẳng dạng
+  plaintext trong 1 đoạn script cũ khi trao đổi — coi như đã lộ và **đổi lại ngay**
+  trên hệ thống hóa đơn điện tử trước khi đưa app này lên production.
 
 ## Chạy thử local
 
