@@ -14,6 +14,7 @@ import openpyxl
 sys.path.append(os.path.dirname(__file__))
 from _core import (  # noqa: E402
     lookup_order,
+    lookup_customer,
     check_access,
     detect_system,
     APP_ACCESS_TOKEN,
@@ -57,8 +58,9 @@ def handle_invoice(body):
 def handle_lookup(body):
     code = (body.get("code") or "").strip()
     if not code:
-        return 400, {"error": "Thiếu mã đơn hàng"}
-    return 200, lookup_order(code)
+        return 400, {"error": "Thiếu mã đơn hàng / mã KH"}
+    sa_system = (body.get("sa_system") or "").strip() or None
+    return 200, lookup_customer(code, sa_system=sa_system)
     
 def handle_excel(body):
     file_b64 = body.get("file_base64", "")

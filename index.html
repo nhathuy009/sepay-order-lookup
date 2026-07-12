@@ -436,8 +436,16 @@
           <button id="copyExcelBtn" class="btn-outline hidden" onclick="copyTableToExcel()" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
         </div>
         <div class="card">
-          <label>Danh sách mã đơn (cách nhau bằng phẩy hoặc xuống dòng)</label>
-          <textarea id="bulkCodes" rows="5" placeholder="VD:&#10;DH18700&#10;BIZ02120"></textarea>
+          <label>Danh sách mã đơn / mã KH (DH..., BIZ..., SA...) — cách nhau bằng phẩy hoặc xuống dòng</label>
+          <textarea id="bulkCodes" rows="5" placeholder="VD:&#10;DH18700&#10;BIZ02120&#10;SA00123"></textarea>
+          <div style="margin-top: 14px;">
+            <label>Hệ thống tra cứu cho mã KH (SA...) — bắt buộc chọn nếu danh sách có mã SA</label>
+            <select id="bulkSaSystem" style="width: 100%; max-width: 320px; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+              <option value="">-- Chọn hệ thống (chỉ cần khi có mã SA...) --</option>
+              <option value="10X">10X (10xtrading)</option>
+              <option value="SOLOBIZ">SOLOBIZ</option>
+            </select>
+          </div>
           <div style="margin-top: 16px;">
             <label style="color: var(--accent); margin-bottom: 4px;">⚙ Tùy chỉnh cột (Kéo thả '☰' để đổi chỗ, Tích để ẩn/hiện)</label>
             <div id="colSelector" class="checkbox-group"></div>
@@ -570,7 +578,7 @@
 
 <script>
 const FIELDS = [
-  ["order_code", "Mã đơn"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
+  ["order_code", "Mã đơn/KH"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
   ["lead_phone", "SĐT KH"], ["lead_cccd", "Số CCCD"], ["username", "Username"],
   ["users_name", "Họ tên"], ["orders_amount", "Số tiền"], ["einvoice_created_at", "Ngày TT"],
   ["invoice_number", "Số hóa đơn"], ["ref_username", "Ref user"], ["ref_name", "Ref tên"]
@@ -760,16 +768,19 @@ function appendRowToDOM(rowObj, tbody) {
 async function doBulkLookup() {
   const rawInput = document.getElementById("bulkCodes").value;
   const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
+  const saSystem = document.getElementById("bulkSaSystem").value;
   const btn = document.getElementById("bulkBtn"); const progress = document.getElementById("bulkProgress");
   const tableWrap = document.getElementById("bulkTableWrap"); const copyBtn = document.getElementById("copyExcelBtn");
   if (codes.length === 0) { progress.style.display = 'block'; progress.innerHTML = '<span class="err">Vui lòng nhập ít nhất 1 mã đơn.</span>'; return; }
+  const hasSaCode = codes.some(c => c.toUpperCase().startsWith("SA"));
+  if (hasSaCode && !saSystem) { progress.style.display = 'block'; progress.innerHTML = '<span class="err">Danh sách có mã SA... — vui lòng chọn hệ thống tra cứu (10X hoặc SOLOBIZ) ở trên trước khi chạy.</span>'; return; }
   btn.disabled = true; bulkData = []; progress.style.display = 'block'; tableWrap.style.display = 'block'; copyBtn.style.display = 'none';
   renderBulkTable(); const tbody = document.getElementById("bulkTbody"); let successCount = 0;
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i]; progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
     let rowObj = { code: code, raw: {}, isError: false, errorMsg: "" };
     try {
-      const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, access_token: getToken() }) });
+      const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, sa_system: saSystem, access_token: getToken() }) });
       const data = await resp.json();
       if (resp.ok) {
         const ok = data.status_msg === "Thành công"; if (ok) successCount++;
@@ -779,7 +790,7 @@ async function doBulkLookup() {
     } catch (e) { rowObj.isError = true; rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`; rowObj.errorMsg = `${e.message} (${code})`; }
     bulkData.push(rowObj); appendRowToDOM(rowObj, tbody);
   }
-  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> đơn.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
+  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> mã.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
 }
 
 function copyTableToExcel() {

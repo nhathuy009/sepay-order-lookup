@@ -230,20 +230,20 @@ class SepayClient:
         details["status_msg"] = "Thành công"
         return details
 
-    def lookup(self, order_code):
-        """Tra cứu 1 đơn, tự đăng nhập và refresh token khi cần (thread-safe)."""
+    def _run_with_relogin(self, builder, code):
+        """Chạy 1 hàm builder(code) -> dict, tự đăng nhập/re-login khi cần (thread-safe)."""
         with self._lock:
             if not self.token and not self.login():
                 d = empty_details()
                 d["status_msg"] = "Không đăng nhập được (thiếu LOGIN_EMAIL/LOGIN_PASSWORD?)"
                 return d
 
-        result = self._build_details(order_code)
+        result = builder(code)
         if result == UNAUTHORIZED:
             with self._lock:
                 relogged = self.login()
             if relogged:
-                result = self._build_details(order_code)
+                result = builder(code)
             else:
                 d = empty_details()
                 d["status_msg"] = "Không thể làm mới token"
@@ -253,6 +253,47 @@ class SepayClient:
             d["status_msg"] = "Token hết hạn (401/403)"
             return d
         return result
+
+    def lookup(self, order_code):
+        """Tra cứu 1 đơn, tự đăng nhập và refresh token khi cần (thread-safe)."""
+        return self._run_with_relogin(self._build_details, order_code)
+
+    def _build_user_details(self, code):
+        """Tra cứu trực tiếp theo mã KH (SA...) qua API Users, không qua Orders."""
+        details = empty_details()
+
+        users_response = self._fetch_users(code)
+        if users_response is None:
+            details["status_msg"] = "Lỗi kết nối API Users"
+            return details
+        if users_response.status_code in (401, 403):
+            return UNAUTHORIZED
+        if users_response.status_code != 200:
+            details["status_msg"] = f"Lỗi API Users: {users_response.status_code}"
+            return details
+
+        users_data = users_response.json().get("data", [])
+        if not users_data:
+            details["status_msg"] = "Không tìm thấy mã KH"
+            return details
+
+        user = users_data[0]
+        details["lead_email"] = user.get("email", "")
+        details["lead_phone"] = user.get("phone", "")
+        details["lead_cccd"] = user.get("cccd", "")
+        details["username"] = user.get("code", "")
+        details["users_name"] = user.get("name", "")
+        details["ref_username"] = user.get("ref_username", "")
+
+        if details["ref_username"] and details["ref_username"].startswith("SA"):
+            details["ref_name"] = self._lookup_ref_name(details["ref_username"])
+
+        details["status_msg"] = "Thành công"
+        return details
+
+    def lookup_user_by_code(self, code):
+        """Tra cứu 1 mã KH (SA...) trực tiếp theo Username, tự đăng nhập khi cần (thread-safe)."""
+        return self._run_with_relogin(self._build_user_details, code)
 
 
 # Cache client giữa các lần gọi warm invocation.
@@ -282,3 +323,46 @@ def lookup_order(order_code):
     result["order_code"] = order_code
     result["system"] = system_name
     return result
+
+
+def lookup_customer(code, sa_system=None):
+    """Điểm vào cho "Tra cứu hàng loạt" mở rộng: nhận mã đơn (DH/BIZ) HOẶC mã KH (SA...).
+
+    - DH...  -> tra cứu đơn hàng bên 10X (giống lookup_order).
+    - BIZ... -> tra cứu đơn hàng bên SOLOBIZ (giống lookup_order).
+    - SA...  -> tra cứu trực tiếp mã KH (Username) qua API Users. Vì cả 2 hệ thống
+      đều dùng chung định dạng mã SA..., bắt buộc truyền sa_system ("10X" hoặc
+      "SOLOBIZ") để biết tra cứu ở hệ thống nào.
+    """
+    code = (code or "").strip()
+    up = code.upper()
+
+    if up.startswith("DH"):
+        result = get_client("10X").lookup(code)
+        result["order_code"] = code
+        result["system"] = "10X"
+        return result
+
+    if up.startswith("BIZ"):
+        result = get_client("SOLOBIZ").lookup(code)
+        result["order_code"] = code
+        result["system"] = "SOLOBIZ"
+        return result
+
+    if up.startswith("SA"):
+        if sa_system not in ("10X", "SOLOBIZ"):
+            d = empty_details()
+            d["order_code"] = code
+            d["system"] = ""
+            d["status_msg"] = "Mã SA... cần chọn hệ thống (10X hoặc SOLOBIZ) trước khi tra cứu"
+            return d
+        result = get_client(sa_system).lookup_user_by_code(code)
+        result["order_code"] = code
+        result["system"] = sa_system
+        return result
+
+    d = empty_details()
+    d["order_code"] = code
+    d["system"] = ""
+    d["status_msg"] = "Mã không hợp lệ (phải bắt đầu bằng DH, BIZ hoặc SA)"
+    return d
