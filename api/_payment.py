@@ -93,7 +93,7 @@ def get_sepay_bank_accounts():
 def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id=None):
     """
     Lấy danh sách giao dịch nạp tiền (in) trong khoảng thời gian.
-    Có hỗ trợ lọc tùy chọn theo Ngân hàng hoặc UUID Tài khoản.
+    Tự động lặp qua tất cả các trang để lấy toàn bộ dữ liệu.
     """
     api_token = os.environ.get("SEPAY_API_TOKEN")
     if not api_token:
@@ -108,8 +108,6 @@ def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id
     params = {
         "transaction_date_from": date_from,
         "transaction_date_to": date_to,
-        #"transfer_type": "in",
-        "page": 1,
         "per_page": 100,
         "transaction_date_sort": "desc"
     }
@@ -122,9 +120,14 @@ def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id
         
     session = requests.Session()
     
+    all_transactions = []
+    current_page = 1
+    
     while True:
+        params["page"] = current_page
         resp = session.get(url, headers=headers, params=params)
         
+        # Xử lý khi bị giới hạn lượt gọi (Rate Limit)
         if resp.status_code == 429:
             retry_after = resp.headers.get("x-sepay-userapi-retry-after", 1)
             time.sleep(float(retry_after))
@@ -137,4 +140,16 @@ def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id
         if data.get("status") != "success":
             return {"error": "Dữ liệu trả về từ SePay không hợp lệ."}
             
-        return {"transactions": data.get("data", [])}
+        page_data = data.get("data", [])
+        
+        # Nếu trang hiện tại không có dữ liệu (mảng rỗng) -> Đã lấy hết toàn bộ
+        if not page_data:
+            break
+            
+        # Nối dữ liệu của trang này vào mảng tổng
+        all_transactions.extend(page_data)
+        
+        # Tăng số trang lên để chuẩn bị gọi trang tiếp theo
+        current_page += 1
+        
+    return {"transactions": all_transactions}
