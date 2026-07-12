@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Công cụ tra cứu đơn hàng & Sao kê | 10X</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+
+<style>
+  /* 10X DESIGN SYSTEM - DARK MODE / GLASSMORPHISM */
+  :root { 
+    --bg-app: #0C1640; 
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(46,151,224,.18), transparent 70%), 
+                   radial-gradient(800px 500px at 50% 120%, rgba(240,161,36,.12), transparent 70%), 
+                   linear-gradient(180deg,#0C1640,#070D26);
+    
+    --header-bg: rgba(12,22,64,0.4);       
+    --sidebar-bg: transparent;      
+    --card-bg: linear-gradient(180deg, rgba(20,32,78,.9), rgba(15,25,64,.8));         
+    --border: rgba(120,150,220,.22);          
+    
+    --text-main: #FFFFFF;       
+    --text-muted: rgba(255,255,255,.6);      
+    
+    --accent: #2E97E0;          
+    --accent-gradient: linear-gradient(90deg,#2E97E0,#63B8F0);
+    --accent-hover: #63B8F0; 
+    
+    --btn-orange: linear-gradient(180deg,#F4AE36,#E08B10);
+    --btn-orange-text: #241400;
+
+    --badge-ok-bg: rgba(46,151,224,.16);     
+    --badge-ok-text: rgba(159,212,248,.95);
+    --badge-err-bg: rgba(240,161,36,.16);    
+    --badge-err-text: #FFD98A;
+
+    --input-bg: rgba(15,25,64,.5);
+    --input-border: rgba(255,255,255,.14);
+  }
+  
+  * { box-sizing: border-box; }
+  body { 
+    margin: 0; 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+    background: var(--bg-app); 
+    background-image: var(--bg-gradient);
+    background-attachment: fixed;
+    color: var(--text-main); 
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  .top-header {
+    background: var(--header-bg); 
+    color: white; 
+    height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  .header-brand { 
+    font-size: 20px; 
+    font-weight: 800; 
+    display: flex; align-items: center; gap: 10px;
+    font-family: Georgia, serif;
+    color: #F0A124;
+    letter-spacing: 0.5px;
+  }
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+  .header-actions input {
+    background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none; transition: 0.2s;
+  }
+  .header-actions input:focus { border-color: var(--accent); background: rgba(20,32,78,.8); }
+  .header-actions input::placeholder { color: var(--text-muted); }
+  .header-actions button { 
+    background: var(--btn-orange); 
+    color: var(--btn-orange-text); 
+    padding: 8px 16px; 
+    font-weight: 700;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px -2px rgba(240,161,36,.4);
+  }
+
+  /* BODY LAYOUT */
+  .app-body { display: flex; flex-grow: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 250px; background: var(--sidebar-bg); border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0;
+    z-index: 5;
+  }
+  .sidebar-menu-title {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; padding: 0 20px; margin-bottom: 12px; letter-spacing: 0.8px;
+  }
+  .menu-item {
+    padding: 12px 20px; margin: 4px 14px; border-radius: 11px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; color: var(--text-muted); font-weight: 600; transition: all 0.2s;
+  }
+  .menu-item:hover { background: rgba(255,255,255,0.06); color: white; }
+  .menu-item.active { 
+    background: var(--btn-orange); 
+    color: var(--btn-orange-text); 
+    box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
+    font-weight: 800;
+  }
+
+  /* MAIN CONTENT */
+  .main-content { flex-grow: 1; padding: 28px 36px; overflow-y: auto; }
+
+  h2 { margin: 0 0 20px; font-size: 20px; font-weight: 800; color: #FFFFFF; font-family: 'Poppins', sans-serif;}
+  h3 { color: #FFFFFF; font-family: 'Poppins', sans-serif;}
+  .card { 
+    background: var(--card-bg); border: 1px solid var(--border); 
+    border-radius: 16px; padding: 24px; margin-bottom: 24px; 
+    box-shadow: 0 12px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+  }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+  
+  input[type=text], input[type=file], textarea, select {
+    width: 100%; padding: 12px 14px; border-radius: 11px; 
+    border: 1px solid var(--input-border); background: var(--input-bg); 
+    color: var(--text-main); font-size: 14px; font-family: inherit; outline: none; transition: 0.2s;
+  }
+  input[type=text]:focus, textarea:focus, select:focus { 
+    border-color: var(--accent); 
+    background: rgba(20,32,78,.8); 
+    box-shadow: 0 0 0 3px rgba(46,151,224,0.15); 
+  }
+  select option { background: #0C1640; color: #fff; }
+  textarea { resize: vertical; }
+
+  button { 
+    background: var(--accent-gradient); color: #0C1640; border: none; 
+    padding: 12px 20px; border-radius: 11px; font-size: 14px; 
+    cursor: pointer; font-weight: 700; transition: all 0.2s ease; 
+    box-shadow: 0 4px 12px rgba(46,151,224,0.2);
+  }
+  button:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(46,151,224,0.35); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  
+  .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--input-border); box-shadow: none; }
+  .btn-outline:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,.2); color: white; box-shadow: none;}
+
+  .hidden { display: none !important; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1; min-width: 250px; }
+
+  /* CHECKBOX DRAG & DROP */
+  .checkbox-group { 
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; 
+    background: rgba(255,255,255,0.012); padding: 14px; border-radius: 11px; border: 1px dashed rgba(255,255,255,.14); 
+  }
+  .checkbox-item { 
+    display: flex; align-items: center; gap: 6px; font-size: 13px; 
+    cursor: grab; user-select: none; margin: 0; color: var(--text-main);
+    background: rgba(255,255,255,.05); padding: 6px 12px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,.08); transition: 0.2s;
+  }
+  .checkbox-item:hover { border-color: rgba(255,255,255,.2); }
+  .checkbox-item.over { border-color: var(--accent); background: rgba(46,151,224,.15); }
+  .checkbox-item input { cursor: pointer; accent-color: var(--accent); margin:0; }
+  .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 4px;}
+
+  /* --- BẢNG BULK & CHUNG --- */
+  .table-responsive { overflow-x: auto; border: 1px solid var(--border); border-radius: 11px; border-bottom: none;}
+  table { width: 100%; border-collapse: collapse; text-align: left; background: transparent;}
+  th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+  th { 
+    background: rgba(0,0,0,0.2); font-size: 12px; font-weight: 600; 
+    color: #AEC0E6; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  td { font-size: 13px; color: var(--text-main); }
+  tr:hover td { background: rgba(255,255,255,0.04); }
+
+  .badge { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  .badge.ok { background: var(--badge-ok-bg); color: var(--badge-ok-text); }
+  .badge.err { background: var(--badge-err-bg); color: var(--badge-err-text); }
+  
+  .msg { margin-top: 12px; font-size: 14px; }
+  .msg.err { color: var(--badge-err-text); }
+  .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+  .spinner { 
+    display: inline-block; width: 14px; height: 14px; 
+    border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); 
+    border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; 
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
+  .sepay-table { 
+    width: 100%; border-collapse: collapse; background: transparent; 
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+  
+  .sepay-table th { 
+    background: rgba(0,0,0,0.2); color: #AEC0E6; font-weight: 500; font-size: 12px; 
+    text-transform: uppercase; padding: 14px 16px; 
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border); 
+    white-space: nowrap;
+  }
+  
+  .sepay-table td { 
+    padding: 14px 16px; 
+    border-bottom: 1px solid var(--border); 
+    border-right: 1px solid var(--border); 
+    color: #FFFFFF; vertical-align: middle; font-size: 13px;
+  }
+
+  .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
+  
+  /* Cột số tiền */
+  .amount-in { color: rgba(159,212,248,.95); font-weight: 600; font-size: 13px;}
+  .amount-out { color: #FFD98A; font-weight: 600; font-size: 13px;}
+  
+  /* Cột nội dung */
+  .tx-content-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  
+  /* Chữ phụ */
+  .text-muted-small { color: rgba(255,255,255,.5); font-size: 12px; margin-top: 4px; }
+  .text-id { color: rgba(255,255,255,.5); font-size: 12px; font-family: monospace;}
+
+  /* Tag Ngân hàng */
+  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #AEC0E6; }
+  .bank-icon {
+    width: 22px; height: 22px; border-radius: 50%; background: var(--btn-orange); color: var(--btn-orange-text);
+    display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: 800;
+  }
+
+  /* Dòng tổng cộng cuối bảng */
+  .sepay-table .total-row td {
+    background-color: rgba(46,151,224,.16) !important; 
+    color: #ffffff !important;            
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1); 
+  }
+  .sepay-table .total-row td:last-child { border-right: none; }
+
+  @media (max-width: 768px) {
+    .app-body { flex-direction: column; overflow: auto; }
+    .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-menu-title { display: none; }
+    .menu-item { white-space: nowrap; padding: 10px 14px; margin: 0 4px; }
+    .main-content { padding: 16px; overflow: visible; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="top-header">
+    <div class="header-brand">
+      📡 Hệ Thống 10X
+    </div>
+    <div class="header-actions" id="authCard">
+      <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
+      <button onclick="saveToken()">Lưu khóa</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+    
+    <aside class="sidebar">
+      <div class="sidebar-menu-title">Chức năng chính</div>
+      <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">📝 Tra cứu hàng loạt</div>
+      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">📊 Xử lý bằng file Excel</div>
+      <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">🏦 Tổng hợp sao kê</div>
+      <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">💳 Tra cứu CK (SePay)</div>
+    </aside>
+
+    <main class="content main-content">
+
+      <div id="tabBulk">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 style="margin:0">Tra cứu hàng loạt</h2>
+          <button id="copyExcelBtn" class="btn-outline hidden" onclick="copyTableToExcel()" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
+        </div>
+        <div class="card">
+          <label>Danh sách mã đơn (cách nhau bằng phẩy hoặc xuống dòng)</label>
+          <textarea id="bulkCodes" rows="5" placeholder="VD:&#10;DH18700&#10;BIZ02120"></textarea>
+          <div style="margin-top: 16px;">
+            <label style="color: var(--accent); margin-bottom: 4px;">⚙ Tùy chỉnh cột (Kéo thả '☰' để đổi chỗ, Tích để ẩn/hiện)</label>
+            <div id="colSelector" class="checkbox-group"></div>
+          </div>
+          <div style="margin-top: 20px;">
+            <button id="bulkBtn" onclick="doBulkLookup()">Chạy tiến trình tra cứu</button>
+          </div>
+        </div>
+        <div id="bulkResultArea">
+          <div class="msg" id="bulkProgress" style="display:none; margin-bottom: 12px;"></div>
+          <div class="table-responsive" style="display:none;" id="bulkTableWrap">
+            <table class="bulk-table" id="bulkTable">
+              <thead id="bulkThead"></thead>
+              <tbody id="bulkTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabExcel" class="hidden">
+        <h2>Xử lý file Excel đơn hàng</h2>
+        <div class="card">
+          <label>Chọn file Excel đầu vào (.xlsx) — Hệ thống sẽ đọc mã ở Cột A</label>
+          <div class="row">
+            <div><input type="file" id="excelFile" accept=".xlsx" /></div>
+            <button id="excelBtn" onclick="doExcel()">Xử lý & Tải về ngay</button>
+          </div>
+          <div class="hint">Tệp chứa kết quả sẽ tự động tải xuống sau khi hoàn tất.</div>
+          <div id="excelResult" class="msg"></div>
+        </div>
+      </div>
+
+      <div id="tabBank" class="hidden">
+        <h2>Tổng hợp Sao kê Ngân hàng</h2>
+        <div class="card">
+          <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
+          <div class="row">
+            <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
+            <button id="bankBtn" onclick="doBankStatement()">Tổng hợp GD & tải về</button>
+          </div>
+          <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
+            Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.
+          </div>
+          <div id="bankResult" class="msg"></div>
+        </div>
+      </div>
+
+      <div id="tabTransaction" class="hidden">
+        <h2>Kiểm tra giao dịch SePay v2</h2>
+        
+        <div class="card">
+          <label>Mã đơn hàng / Nội dung CK cần tìm (Enter để tìm)</label>
+          <div class="row">
+            <div><input type="text" id="txSearchCode" placeholder="Nhập mã... VD: DH18700" onkeydown="if(event.key==='Enter') doTxSearch()" /></div>
+            <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu 1 mã</button>
+          </div>
+          <div id="txSearchResult" style="margin-top: 20px;"></div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0; font-size:16px; font-weight:700;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
+          <div class="row" style="align-items: flex-end; margin-bottom: 20px;">
+            <div style="flex: 0.25; min-width: 140px;">
+              <label>Từ ngày</label>
+              <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            </div>
+            <div style="flex: 0.25; min-width: 140px;">
+              <label>Đến ngày</label>
+              <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            </div>
+            <div style="flex: 0.25; min-width: 180px;">
+              <label>Mã Ngân hàng (Tùy chọn)</label>
+              <input type="text" id="txBankBrand" placeholder="VD: ACB, MB, VCB..." />
+            </div>
+            <div style="flex: 0.25; min-width: 180px;">
+              <label>Tài khoản (Tùy chọn)</label>
+              <select id="txBankAccountId" style="cursor: pointer;">
+                <option value="">-- Tất cả tài khoản --</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <button id="txListBtn" onclick="doTxList()">Lấy danh sách</button>
+          </div>
+          <div id="txListResult" style="margin-top: 20px;"></div>
+        </div>
+        
+      </div>
+    </main>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+
+<script>
+const FIELDS = [
+  ["order_code", "Mã đơn"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
+  ["lead_phone", "SĐT KH"], ["lead_cccd", "Số CCCD"], ["username", "Username"],
+  ["users_name", "Họ tên"], ["orders_amount", "Số tiền"], ["einvoice_created_at", "Ngày TT"],
+  ["invoice_number", "Số hóa đơn"], ["ref_username", "Ref user"], ["ref_name", "Ref tên"]
+];
+
+let currentColumns = [
+  { key: "status", label: "Trạng thái", visible: true },
+  ...FIELDS.map(f => ({ key: f[0], label: f[1], visible: true }))
+];
+let bulkData = []; 
+
+function getToken() { 
+  try { return localStorage.getItem("sepay_access_token") || ""; } catch(e) { return ""; } 
+}
+
+function saveToken() {
+  const token = document.getElementById("accessToken").value.trim();
+  try {
+    localStorage.setItem("sepay_access_token", token);
+    document.getElementById("accessToken").value = "";
+    document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu";
+  } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    const inputToken = document.getElementById("accessToken");
+    if(inputToken) inputToken.placeholder = getToken() ? "Đã lưu mật khẩu" : "Mật khẩu hệ thống";
+  } catch(e) {}
+
+  fetch("/api/index").then(r => r.json()).then(d => {
+    if (d && d.auth_required === false) {
+      const authCard = document.getElementById("authCard");
+      if(authCard) authCard.classList.add("hidden");
+    }
+  }).catch(() => {});
+  
+  initColumnSelector();
+
+  // Khởi tạo Flatpickr
+  const dateConfig = {
+    dateFormat: "d/m/Y",
+    locale: "vn",
+    defaultDate: new Date(),
+    allowInput: true
+  };
+  const elFrom = document.getElementById('txDateFrom');
+  const elTo = document.getElementById('txDateTo');
+  if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
+  if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
+});
+
+function switchTab(which) {
+  const tabs = ["bulk", "excel", "bank", "transaction"];
+  
+  tabs.forEach(tab => {
+    const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
+    const contentEl = document.getElementById("tab" + idSuffix);
+    const btnEl = document.getElementById("tab" + idSuffix + "Btn");
+    
+    if (contentEl) contentEl.classList.toggle("hidden", which !== tab);
+    if (btnEl) btnEl.classList.toggle("active", which === tab);
+  });
+
+  if (which === "transaction") {
+    const selectEl = document.getElementById("txBankAccountId");
+    if (selectEl && selectEl.options.length <= 1) {
+      loadBankAccounts();
+    }
+  }
+}
+
+// Chuyển đổi Thời gian
+function formatTxDate(dateString) {
+  if (!dateString) return "";
+  const [date, time] = dateString.split(" ");
+  const [y, m, d] = date.split("-");
+  return `${d}/${m}/${y} ${time}`;
+}
+
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  const txDate = new Date(dateString.replace(" ", "T") + "+07:00");
+  const now = new Date();
+  const diffMs = now - txDate;
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return `Vừa xong`;
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  return `${Math.floor(diffHours / 24)} ngày trước`;
+}
+
+/* Các hàm Kéo Thả & Tra cứu Bulk */
+let dragSrcEl = null;
+function initColumnSelector() {
+  const container = document.getElementById('colSelector');
+  if (!container) return;
+  container.innerHTML = '';
+  currentColumns.forEach(col => {
+    const label = document.createElement('label');
+    label.className = 'checkbox-item'; label.draggable = true; label.dataset.key = col.key;
+    label.addEventListener('dragstart', function(e) { dragSrcEl = this; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', this.dataset.key); this.style.opacity = '0.4'; });
+    label.addEventListener('dragover', function(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; });
+    label.addEventListener('dragenter', function(e) { this.classList.add('over'); });
+    label.addEventListener('dragleave', function(e) { this.classList.remove('over'); });
+    label.addEventListener('drop', function(e) {
+      if (e.stopPropagation) e.stopPropagation();
+      if (dragSrcEl !== this) {
+        const draggedKey = dragSrcEl.dataset.key; const targetKey = this.dataset.key;
+        const draggedIdx = currentColumns.findIndex(c => c.key === draggedKey);
+        const targetIdx = currentColumns.findIndex(c => c.key === targetKey);
+        const [draggedItem] = currentColumns.splice(draggedIdx, 1);
+        currentColumns.splice(targetIdx, 0, draggedItem);
+        initColumnSelector(); renderBulkTable();
+      }
+      return false;
+    });
+    label.addEventListener('dragend', function(e) { this.style.opacity = '1'; document.querySelectorAll('.checkbox-item').forEach(item => item.classList.remove('over')); });
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = col.key; cb.checked = col.visible;
+    cb.addEventListener('change', (e) => { col.visible = e.target.checked; renderBulkTable(); });
+    label.innerHTML = `<span class="drag-handle">☰</span>`; label.appendChild(cb); label.appendChild(document.createTextNode(' ' + col.label)); container.appendChild(label);
+  });
+}
+
+function renderBulkTable() {
+  const thead = document.getElementById("bulkThead"); const tbody = document.getElementById("bulkTbody");
+  if (!thead || !tbody) return;
+  let theadHTML = '<tr>'; currentColumns.forEach(col => { if (col.visible) theadHTML += `<th>${col.label}</th>`; }); theadHTML += '</tr>';
+  thead.innerHTML = theadHTML; tbody.innerHTML = ''; bulkData.forEach(rowObj => { appendRowToDOM(rowObj, tbody); });
+}
+
+function appendRowToDOM(rowObj, tbody) {
+  let tr = document.createElement("tr"); let tds = ''; let errorPrinted = false; 
+  currentColumns.forEach(col => {
+    if (!col.visible) return;
+    if (col.key === 'status') { tds += `<td>${rowObj.badgeHTML}</td>`; } 
+    else if (rowObj.isError) {
+      if (!errorPrinted) { tds += `<td><span style="color:var(--badge-err-text); font-weight:600;">${escapeHtml(rowObj.errorMsg)}</span></td>`; errorPrinted = true; } 
+      else { tds += `<td></td>`; }
+    } else { tds += `<td>${escapeHtml(rowObj.raw[col.key] || "")}</td>`; }
+  });
+  tr.innerHTML = tds; tbody.appendChild(tr);
+}
+  
+async function doBulkLookup() {
+  const rawInput = document.getElementById("bulkCodes").value;
+  const codes = rawInput.split(/[\n,; \t]+/).map(c => c.trim()).filter(c => c !== "");
+  const btn = document.getElementById("bulkBtn"); const progress = document.getElementById("bulkProgress");
+  const tableWrap = document.getElementById("bulkTableWrap"); const copyBtn = document.getElementById("copyExcelBtn");
+  if (codes.length === 0) { progress.style.display = 'block'; progress.innerHTML = '<span class="err">Vui lòng nhập ít nhất 1 mã đơn.</span>'; return; }
+  btn.disabled = true; bulkData = []; progress.style.display = 'block'; tableWrap.style.display = 'block'; copyBtn.style.display = 'none';
+  renderBulkTable(); const tbody = document.getElementById("bulkTbody"); let successCount = 0;
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i]; progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang xử lý ${i + 1}/${codes.length}... (${code})`;
+    let rowObj = { code: code, raw: {}, isError: false, errorMsg: "" };
+    try {
+      const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lookup", code, access_token: getToken() }) });
+      const data = await resp.json();
+      if (resp.ok) {
+        const ok = data.status_msg === "Thành công"; if (ok) successCount++;
+        const badgeText = ok ? 'Thành công' : (data.status_msg || 'Thất bại');
+        rowObj.badgeHTML = ok ? `<span class="badge ok">${escapeHtml(badgeText)}</span>` : `<span class="badge err">${escapeHtml(badgeText)}</span>`; rowObj.raw = data;
+      } else { rowObj.isError = true; rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`; rowObj.errorMsg = `${data.error || "Lỗi server"} (${code})`; }
+    } catch (e) { rowObj.isError = true; rowObj.badgeHTML = `<span class="badge err">Lỗi</span>`; rowObj.errorMsg = `${e.message} (${code})`; }
+    bulkData.push(rowObj); appendRowToDOM(rowObj, tbody);
+  }
+  progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> đơn.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
+}
+
+function copyTableToExcel() {
+  try {
+    const table = document.getElementById('bulkTable'); if (!table) return; let tsv = "";
+    const rows = Array.from(table.querySelectorAll('tr'));
+    rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyExcelBtn"); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
+      setTimeout(() => { btn.innerText = originalText; }, 2000);
+    }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+}
+
+async function loadBankAccounts() {
+  const selectEl = document.getElementById("txBankAccountId");
+  if (!selectEl) return;
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get_bank_accounts", access_token: getToken() })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.bank_accounts) {
+      selectEl.innerHTML = '<option value="">-- Tất cả tài khoản --</option>';
+      data.bank_accounts.forEach(bank => {
+        const option = document.createElement("option");
+        option.value = bank.id; 
+        const balance = Number(bank.accumulated).toLocaleString('vi-VN');
+        option.text = `${bank.bank_short_name} - ${bank.account_number} (Số dư: ${balance}đ)`;
+        selectEl.appendChild(option);
+      });
+    }
+  } catch (e) { console.error("Lỗi tải danh sách ngân hàng:", e); }
+}
+
+async function doExcel() {
+  const fileInput = document.getElementById("excelFile"); const box = document.getElementById("excelResult"); const btn = document.getElementById("excelBtn");
+  if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
+  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }) });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
+    downloadBase64(data.file_base64, "ket_qua_" + file.name); box.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${data.success}/${data.total}</strong> đơn. File đã tự tải về máy.`;
+  } catch (e) { box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
+}
+
+async function doBankStatement() {
+  const fileInput = document.getElementById("bankExcelFile"); const box = document.getElementById("bankResult"); const btn = document.getElementById("bankBtn");
+  if (!fileInput.files.length) { box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; return; }
+  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }) });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; return; }
+    downloadBase64(data.file_base64, "TongHop_" + file.name); box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
+  } catch (e) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
+}
+
+async function doTxSearch() {
+  const code = document.getElementById("txSearchCode").value.trim(); const box = document.getElementById("txSearchResult"); const btn = document.getElementById("txSearchBtn");
+  if (!code) { box.innerHTML = '<div class="msg err">Vui lòng nhập mã cần tìm.</div>'; return; }
+  btn.disabled = true; box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang kết nối SePay v2...</div>';
+  try {
+    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "search_transaction", code: code, access_token: getToken() }) });
+    const data = await resp.json();
+    if (!resp.ok) { box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; return; }
+    const tx = data.transaction;
+    let rows = "";
+    for (const [key, value] of Object.entries(tx)) {
+        let displayValue = escapeHtml(value);
+        if (key === "amount_in") displayValue = `<span style="color:var(--badge-ok-text); font-weight:bold;">+ ${Number(value).toLocaleString('vi-VN')} VND</span>`;
+        if (value === null) displayValue = '<span style="color:var(--text-muted)">null</span>';
+        rows += `<tr><td style="color:var(--text-muted); font-weight:600; width:200px;">${escapeHtml(key)}</td><td style="word-break: break-all;">${displayValue}</td></tr>`;
+    }
+    box.innerHTML = `<div style="margin-bottom:12px;"><span class="badge ok">🎉 Tìm thấy giao dịch!</span></div><div class="table-responsive"><table style="width:100%; border-collapse: collapse;"><tbody>${rows}</tbody></table></div>`;
+  } catch (e) { box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; } finally { btn.disabled = false; }
+}
+
+async function doTxList() {
+  const dateFromVal = document.getElementById("txDateFrom").value; 
+  const dateToVal = document.getElementById("txDateTo").value;
+  const bankBrandVal = document.getElementById("txBankBrand").value.trim();
+  const bankAccountVal = document.getElementById("txBankAccountId").value.trim();
+  const box = document.getElementById("txListResult");
+  const btn = document.getElementById("txListBtn");
+  
+  if (!dateFromVal || !dateToVal) {
+    box.innerHTML = '<div class="msg err">Vui lòng chọn "Từ ngày" và "Đến ngày".</div>'; 
+    return; 
+  }
+  
+  const parseDateToAPI = (str) => {
+    const parts = str.split('/');
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    return str;
+  };
+  
+  const dateFrom = parseDateToAPI(dateFromVal) + " 00:00:00";
+  const dateTo = parseDateToAPI(dateToVal) + " 23:59:59";
+  
+  btn.disabled = true;
+  box.innerHTML = '<div class="msg"><span class="spinner" style="color:var(--accent)"></span> Đang tải danh sách từ SePay...</div>';
+  
+  try {
+    const resp = await fetch("/api/index", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ 
+          action: "list_transactions", 
+          date_from: dateFrom, 
+          date_to: dateTo, 
+          bank_brand: bankBrandVal,          
+          bank_account: bankAccountVal,      
+          access_token: getToken() 
+      }) 
+    });
+    const data = await resp.json();
+    
+    if (!resp.ok) { 
+      box.innerHTML = `<div class="msg err">❌ ${data.error || "Lỗi server"}</div>`; 
+      return; 
+    }
+    
+    const txs = data.transactions;
+    if (!txs || txs.length === 0) {
+      box.innerHTML = '<div class="msg" style="color:var(--text-muted);">⚠️ Không có giao dịch chuyển khoản nào khớp với điều kiện lọc.</div>';
+      return;
+    }
+    
+    let rows = "";
+    let totalAmount = 0; 
+
+    txs.forEach(tx => {
+      totalAmount += Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
+
+      const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
+      const formattedDate = formatTxDate(tx.transaction_date);
+      const relativeTime = timeAgo(tx.transaction_date);
+      
+      let amountHtml = "0 đ";
+      if (tx.amount_in > 0) amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
+      else if (tx.amount_out > 0) amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
+
+      const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+
+      rows += `
+        <tr>
+          <td class="text-id">${shortId}</td>
+          <td>
+            <div style="font-weight:600;">${formattedDate}</div>
+            <div class="text-muted-small">${relativeTime}</div>
+          </td>
+          <td>
+            <div class="bank-tag">
+              <span class="bank-icon">${bankLetter}</span>
+              ${escapeHtml(tx.account_number)}
+            </div>
+          </td>
+          <td>${amountHtml}</td>
+          <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
+            ${escapeHtml(tx.transaction_content)}
+          </td>
+          <td class="text-id">${escapeHtml(tx.code || "—")}</td>
+          <td class="text-id">${escapeHtml(tx.reference_number || "—")}</td>
+        </tr>`;
+    });
+
+    let totalDisplay = totalAmount >= 0 
+      ? `+${totalAmount.toLocaleString('vi-VN')} đ` 
+      : `${totalAmount.toLocaleString('vi-VN')} đ`;
+
+    rows += `
+      <tr class="total-row">
+        <td colspan="3" style="text-align: right; font-weight: 700; text-transform: uppercase;">Tổng cộng:</td>
+        <td style="font-weight: 800; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
+        <td colspan="3"></td>
+      </tr>`;
+      
+    box.innerHTML = `
+      <div style="margin-bottom:16px;">
+        <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
+      </div>
+      <div class="table-responsive">
+        <table class="sepay-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Thời gian</th>
+              <th>Tài khoản</th>
+              <th>Số tiền</th>
+              <th>Nội dung</th>
+              <th>Mã thanh toán</th>
+              <th>Mã tham chiếu</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+      
+  } catch (e) { 
+    box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; 
+  } finally { 
+    btn.disabled = false; 
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(",", 2)[1]); r.onerror = reject; r.readAsDataURL(file);
+  });
+}
+function downloadBase64(b64, filename) {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+}
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+</script>
+</body>
+</html>
