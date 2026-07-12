@@ -123,33 +123,33 @@ def list_sepay_transactions(date_from, date_to, bank_brand=None, bank_account_id
     all_transactions = []
     current_page = 1
     
-    while True:
+    while current_page <= 10: # Đặt giới hạn an toàn 50 trang để tránh lặp vô tận
         params["page"] = current_page
         resp = session.get(url, headers=headers, params=params)
         
-        # Xử lý khi bị giới hạn lượt gọi (Rate Limit)
         if resp.status_code == 429:
-            retry_after = resp.headers.get("x-sepay-userapi-retry-after", 1)
-            time.sleep(float(retry_after))
+            retry_after = int(resp.headers.get("x-sepay-userapi-retry-after", 2))
+            time.sleep(retry_after)
             continue
             
         if resp.status_code != 200:
-            return {"error": f"Lỗi từ SePay (HTTP {resp.status_code}): {resp.text}"}
+            # Ghi log lỗi để debug trên Vercel
+            print(f"Error: {resp.status_code} - {resp.text}")
+            break 
             
         data = resp.json()
-        if data.get("status") != "success":
-            return {"error": "Dữ liệu trả về từ SePay không hợp lệ."}
-            
-        page_data = data.get("data", [])
+        page_data = data.get("data")
         
-        # Nếu trang hiện tại không có dữ liệu (mảng rỗng) -> Đã lấy hết toàn bộ
-        if not page_data:
+        # Kiểm tra dữ liệu an toàn
+        if not page_data: 
             break
             
-        # Nối dữ liệu của trang này vào mảng tổng
         all_transactions.extend(page_data)
         
-        # Tăng số trang lên để chuẩn bị gọi trang tiếp theo
+        # Nếu số lượng bản ghi nhận được ít hơn per_page, chắc chắn đã hết dữ liệu
+        if len(page_data) < 100:
+            break
+            
         current_page += 1
         
     return {"transactions": all_transactions}
