@@ -497,29 +497,25 @@
         <div class="card">
           <h3 style="margin-top:0; font-size:16px; font-weight:700;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
           <div class="row" style="align-items: flex-end; margin-bottom: 20px;">
-            <div style="flex: 0.25; min-width: 140px;">
+            <div style="flex: 1; min-width: 120px;">
               <label>Từ ngày</label>
               <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
             </div>
-            <div style="flex: 0.25; min-width: 140px;">
+            <div style="flex: 1; min-width: 120px;">
               <label>Đến ngày</label>
               <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
             </div>
-            <div style="flex: 0.25; min-width: 180px;">
-              <label>Mã Ngân hàng (Tùy chọn)</label>
-              <select id="txBankBrand" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border); background: #f9fafb; color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
-                <option value="">-- Tất cả ngân hàng --</option>
-              </select>
-            </div>
-            <div style="flex: 0.25; min-width: 180px;">
-              <label>Tài khoản (Tùy chọn)</label>
-              <select id="txBankAccountId" style="cursor: pointer;">
-                <option value="">-- Tất cả tài khoản --</option>
-              </select>
-            <div style="flex: 0.25; min-width: 180px;">
+            <div style="flex: 1.2; min-width: 140px;">
               <label>Số dư đầu kỳ</label>
               <input type="text" id="txInitialBalance" placeholder="Nhập số (VD: 5000000)" />
             </div>
+            <div style="flex: 1.5; min-width: 180px;">
+              <label>Tài khoản (Tùy chọn)</label>
+              <select id="txBankAccountId" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+                <option value="">-- Tất cả tài khoản --</option>
+              </select>
+            </div>
+          </div>
             </div>
           </div>
           <div>
@@ -764,9 +760,7 @@ function copyTableToExcel() {
 // HÀM TẢI DANH SÁCH TÀI KHOẢN VÀ MÃ NGÂN HÀNG VÀO DROPDOWN
 async function loadBankAccounts() {
   const selectAccEl = document.getElementById("txBankAccountId");
-  const selectBrandEl = document.getElementById("txBankBrand"); // Lấy thêm thẻ select BankBrand
-  
-  if (!selectAccEl || !selectBrandEl) return;
+  if (!selectAccEl) return;
 
   try {
     const resp = await fetch("/api/index", {
@@ -777,33 +771,14 @@ async function loadBankAccounts() {
     const data = await resp.json();
     
     if (resp.ok && data.bank_accounts) {
-      // Reset cả 2 dropdown về mặc định
       selectAccEl.innerHTML = '<option value="">-- Tất cả tài khoản --</option>';
-      selectBrandEl.innerHTML = '<option value="">-- Tất cả ngân hàng --</option>';
       
-      // Dùng Set để lưu các mã ngân hàng (tự động loại bỏ giá trị trùng lặp nếu có 2 tài khoản cùng chung 1 ngân hàng)
-      const uniqueBrands = new Set();
-
       data.bank_accounts.forEach(bank => {
-        // 1. Đổ dữ liệu vào dropdown Tài Khoản
         const optionAcc = document.createElement("option");
         optionAcc.value = bank.id; 
         const balance = Number(bank.accumulated).toLocaleString('vi-VN');
         optionAcc.text = `${bank.bank_short_name} - ${bank.account_number} (Số dư: ${balance}đ)`;
         selectAccEl.appendChild(optionAcc);
-
-        // Lấy tên ngân hàng cho vào Set
-        if (bank.bank_short_name) {
-          uniqueBrands.add(bank.bank_short_name);
-        }
-      });
-
-      // 2. Đổ dữ liệu vào dropdown Mã Ngân Hàng từ tập Set đã lọc
-      uniqueBrands.forEach(brand => {
-        const optionBrand = document.createElement("option");
-        optionBrand.value = brand;
-        optionBrand.text = brand; // Hiển thị mã ngân hàng (VD: ACB, MBBank,...)
-        selectBrandEl.appendChild(optionBrand);
       });
     }
   } catch (e) { 
@@ -860,7 +835,8 @@ async function doTxSearch() {
 async function doTxList() {
   const dateFromVal = document.getElementById("txDateFrom").value; 
   const dateToVal = document.getElementById("txDateTo").value;
-  const bankBrandVal = document.getElementById("txBankBrand").value.trim();
+  // Ô chọn ngân hàng đã loại bỏ, mặc định gửi chuỗi rỗng lên API (tương đương với chọn "Tất cả")
+  const bankBrandVal = "";          
   const bankAccountVal = document.getElementById("txBankAccountId").value.trim();
   const box = document.getElementById("txListResult");
   const btn = document.getElementById("txListBtn");
@@ -907,25 +883,20 @@ async function doTxList() {
       box.innerHTML = '<div class="msg" style="color:var(--text-muted);">⚠️ Không có giao dịch chuyển khoản nào khớp với điều kiện lọc.</div>';
       return;
     }
-
-    // BẮT ĐẦU PHẦN THAY ĐỔI LOGIC XỬ LÝ
     
-    // 1. Lấy số dư đầu kỳ do user nhập (Loại bỏ các ký tự không phải số)
     let initialBalanceInput = document.getElementById("txInitialBalance") ? document.getElementById("txInitialBalance").value : "0";
     let currentBalance = parseFloat(initialBalanceInput.replace(/[^\d.-]/g, '')) || 0;
 
-    // 2. Mặc định SePay trả về GD Mới nhất -> Cũ nhất. 
-    // Để tính lũy kế đúng, ta đảo mảng thành Cũ nhất -> Mới nhất để cộng dồn
+    // Đảo ngược mảng từ gốc (Mới -> Cũ) thành (Cũ -> Mới) để tính lũy kế tăng tiến theo thời gian
     let sortedTxs = [...txs].reverse();
     let runningBalance = currentBalance;
 
     sortedTxs.forEach(tx => {
       runningBalance = runningBalance + Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
-      tx.luyKe = runningBalance; // Gắn thuộc tính lũy kế vào object
+      tx.luyKe = runningBalance; 
     });
 
-    // 3. Đảo mảng trở lại để hiển thị Mới nhất nằm trên cùng
-    sortedTxs.reverse();
+    // GIỮ NGUYÊN sortedTxs (Không lật ngược lại) để hiển thị giao dịch Cũ trước Mới sau
 
     let rows = "";
 
@@ -933,18 +904,14 @@ async function doTxList() {
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
-      // Tách 2 cột: Tiền vào và Tiền ra
       let htmlIn = "";
       let htmlOut = "";
       if (tx.amount_in > 0) htmlIn = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
       if (tx.amount_out > 0) htmlOut = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
 
-      // Cột lũy kế
       let htmlLuyKe = `<span style="font-weight:700;">${Number(tx.luyKe).toLocaleString('vi-VN')} đ</span>`;
-
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
 
-      // Đã loại bỏ <td> chứa Mã ID và Mã tham chiếu, thêm cột Lũy kế trước Nội dung
       rows += `
         <tr>
           <td>
@@ -967,21 +934,16 @@ async function doTxList() {
         </tr>`;
     });
 
-    let totalDisplay = runningBalance >= 0 
-      ? `+${runningBalance.toLocaleString('vi-VN')} đ` 
-      : `${runningBalance.toLocaleString('vi-VN')} đ`;
-
     rows += `
       <tr class="total-row">
-        <td colspan="4" style="text-align: right; font-weight: 700; text-transform: uppercase;">Số dư cuối kỳ:</td>
-        <td style="font-weight: 800; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
+        <td colspan="4" style="text-align: right; font-weight: 700; text-transform: uppercase;">Số dư cuối kỳ hiện tại:</td>
+        <td style="font-weight: 800; font-size: 14px; white-space: nowrap;">${runningBalance.toLocaleString('vi-VN')} đ</td>
         <td colspan="2"></td>
       </tr>`;
       
-    // Vẽ lại Thead với cấu trúc cột mới
     box.innerHTML = `
       <div style="margin-bottom:16px;">
-        <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
+        <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch (Thứ tự thời gian tăng dần)</span>
       </div>
       <div class="table-responsive">
         <table class="sepay-table">
