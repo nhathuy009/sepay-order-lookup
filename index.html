@@ -6,10 +6,10 @@
 <title>Công cụ tra cứu đơn hàng & Sao kê | 10X</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
 
 <style>
-  /* 10X DESIGN SYSTEM - DARK MODE / GLASSMORPHISM */
+  /* 10X DESIGN SYSTEM - CÁC BIẾN MẶC ĐỊNH LÀ DARK MODE */
   :root { 
     --bg-app: #0C1640; 
     --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(46,151,224,.18), transparent 70%), 
@@ -23,13 +23,16 @@
     
     --text-main: #FFFFFF;       
     --text-muted: rgba(255,255,255,.6);      
-    
+    --heading-color: #FFFFFF;
+    --brand-color: #F0A124;
+
     --accent: #2E97E0;          
     --accent-gradient: linear-gradient(90deg,#2E97E0,#63B8F0);
     --accent-hover: #63B8F0; 
     
     --btn-orange: linear-gradient(180deg,#F4AE36,#E08B10);
     --btn-orange-text: #241400;
+    --btn-text: #0C1640;
 
     --badge-ok-bg: rgba(46,151,224,.16);     
     --badge-ok-text: rgba(159,212,248,.95);
@@ -38,6 +41,57 @@
 
     --input-bg: rgba(15,25,64,.5);
     --input-border: rgba(255,255,255,.14);
+
+    --card-shadow: 0 12px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+    --table-th-bg: rgba(0,0,0,0.2);
+    --table-th-text: #AEC0E6;
+    --table-row-hover: rgba(255,255,255,0.04);
+    
+    --amount-in: rgba(159,212,248,.95);
+    --amount-out: #FFD98A;
+    --total-row-bg: rgba(46,151,224,.16);
+    --checkbox-bg: rgba(255,255,255,0.012);
+    --settings-panel-bg: rgba(0,0,0,0.2);
+  }
+
+  /* GIAO DIỆN LIGHT MODE SẼ GHI ĐÈ CÁC BIẾN NÀY */
+  body.light-mode {
+    --bg-app: #F4F7F9; 
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(46,151,224,.06), transparent 70%),
+                   linear-gradient(180deg, #F4F7F9, #E9EEF2);
+    --header-bg: rgba(255,255,255,0.85);       
+    --card-bg: #FFFFFF;         
+    --border: rgba(0,0,0,0.08);          
+    --text-main: #1E293B;       
+    --text-muted: #64748B;      
+    --heading-color: #0F172A;
+    --brand-color: #E08B10;
+
+    --accent: #2563EB;          
+    --accent-gradient: linear-gradient(90deg, #2563EB, #3B82F6);
+    
+    --btn-orange: linear-gradient(180deg, #F4AE36, #E08B10);
+    --btn-orange-text: #FFFFFF;
+    --btn-text: #FFFFFF;
+
+    --badge-ok-bg: #DCFCE7;     
+    --badge-ok-text: #166534;
+    --badge-err-bg: #FEE2E2;    
+    --badge-err-text: #991B1B;
+
+    --input-bg: #F8FAFC;
+    --input-border: #CBD5E1;
+
+    --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    --table-th-bg: #F1F5F9;
+    --table-th-text: #475569;
+    --table-row-hover: #F8FAFC;
+    
+    --amount-in: #16A34A;
+    --amount-out: #DC2626;
+    --total-row-bg: #EFF6FF;
+    --checkbox-bg: #F8FAFC;
+    --settings-panel-bg: rgba(0,0,0,0.04);
   }
   
   * { box-sizing: border-box; }
@@ -53,26 +107,28 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: background 0.3s ease, color 0.3s ease;
   }
 
   /* HEADER */
   .top-header {
     background: var(--header-bg); 
-    color: white; 
+    color: var(--text-main); 
     height: 64px;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid var(--border);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     z-index: 10;
+    transition: 0.3s ease;
   }
   .header-brand { 
     font-size: 20px; 
     font-weight: 800; 
     display: flex; align-items: center; 
     font-family: Georgia, serif;
-    color: #F0A124;
+    color: var(--brand-color);
     letter-spacing: 0.5px;
   }
   
@@ -90,18 +146,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: none;
   }
   #toggleSidebarBtn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #FFFFFF;
+    background: var(--border);
+    color: var(--text-main);
   }
 
   .header-actions { display: flex; align-items: center; gap: 12px; }
   .header-actions input {
-    background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.1);
+    background: var(--input-bg); color: var(--text-main); border: 1px solid var(--input-border);
     padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none; transition: 0.2s;
   }
-  .header-actions input:focus { border-color: var(--accent); background: rgba(20,32,78,.8); }
+  .header-actions input:focus { border-color: var(--accent); }
   .header-actions input::placeholder { color: var(--text-muted); }
   .header-actions button { 
     background: var(--btn-orange); 
@@ -115,13 +172,15 @@
   /* BODY LAYOUT */
   .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 
-  /* SIDEBAR CÓ HIỆU ỨNG TRANSITION CHUYỂN ĐỘNG */
+  /* SIDEBAR */
   .sidebar {
-    width: 250px; background: var(--sidebar-bg); border-right: 1px solid rgba(255,255,255,0.08);
-    display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0;
+    width: 250px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; justify-content: space-between; padding: 24px 0; flex-shrink: 0;
     z-index: 5;
-    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
   }
+  .sidebar-top, .sidebar-bottom { display: flex; flex-direction: column; }
+  
   .sidebar-menu-title {
     font-size: 11px; font-weight: 700; color: var(--text-muted);
     text-transform: uppercase; padding: 0 20px; margin-bottom: 12px; letter-spacing: 0.8px;
@@ -132,51 +191,69 @@
     display: flex; align-items: center; gap: 12px;
     cursor: pointer; color: var(--text-muted); font-weight: 600; transition: all 0.2s;
   }
-  .menu-item:hover { background: rgba(255,255,255,0.06); color: white; }
+  .menu-item:hover { background: var(--border); color: var(--text-main); }
   .menu-item.active { 
     background: var(--btn-orange); 
     color: var(--btn-orange-text); 
     box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
     font-weight: 800;
   }
-  .menu-icon { font-size: 14px; flex-shrink: 0; }
+  .menu-icon { font-size: 15px; flex-shrink: 0; }
   .menu-text { transition: opacity 0.2s ease; }
 
-  /* TRẠNG THÁI SIDEBAR KHI THU GỌN */
-  .sidebar.collapsed {
-    width: 78px;
-  }
-  .sidebar.collapsed .sidebar-menu-title {
-    opacity: 0;
-    visibility: hidden;
-    height: 0;
-    margin: 0;
-    padding: 0;
+  /* SWITCH TOGGLE GIAO DIỆN */
+  .settings-panel {
+    padding: 12px 18px; margin: 4px 14px 0;
+    background: var(--settings-panel-bg);
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    transition: all 0.3s ease;
     overflow: hidden;
   }
-  .sidebar.collapsed .menu-item {
-    margin: 4px 12px;
-    padding: 12px 0;
-    justify-content: center;
-    border-radius: 10px;
-  }
-  .sidebar.collapsed .menu-text {
+  .settings-panel.hidden {
     display: none;
   }
-  .sidebar.collapsed .menu-icon {
-    font-size: 16px;
-    margin: 0;
+  .theme-switch-wrapper {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
   }
+  .theme-switch-wrapper span { font-size: 13px; font-weight: 600; color: var(--text-main); }
+  
+  .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1; transition: .4s; border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  input:checked + .slider { background-color: var(--accent); }
+  input:checked + .slider:before { transform: translateX(18px); }
+
+  body.light-mode .slider { background-color: #94a3b8; }
+
+  /* TRẠNG THÁI SIDEBAR KHI THU GỌN */
+  .sidebar.collapsed { width: 78px; }
+  .sidebar.collapsed .sidebar-menu-title {
+    opacity: 0; visibility: hidden; height: 0; margin: 0; padding: 0; overflow: hidden;
+  }
+  .sidebar.collapsed .menu-item {
+    margin: 4px 12px; padding: 12px 0; justify-content: center; border-radius: 10px;
+  }
+  .sidebar.collapsed .menu-text { display: none; }
+  .sidebar.collapsed .menu-icon { font-size: 18px; margin: 0; }
+  .sidebar.collapsed .settings-panel { display: none !important; }
 
   /* MAIN CONTENT */
   .main-content { flex-grow: 1; padding: 28px 36px; overflow-y: auto; }
 
-  h2 { margin: 0 0 20px; font-size: 20px; font-weight: 800; color: #FFFFFF; font-family: 'Poppins', sans-serif;}
-  h3 { color: #FFFFFF; font-family: 'Poppins', sans-serif;}
+  h2 { margin: 0 0 20px; font-size: 20px; font-weight: 800; color: var(--heading-color); font-family: 'Poppins', sans-serif;}
+  h3 { color: var(--heading-color); font-family: 'Poppins', sans-serif;}
   .card { 
     background: var(--card-bg); border: 1px solid var(--border); 
     border-radius: 16px; padding: 24px; margin-bottom: 24px; 
-    box-shadow: 0 12px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
+    box-shadow: var(--card-shadow); transition: 0.3s;
   }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
   
@@ -187,14 +264,13 @@
   }
   input[type=text]:focus, textarea:focus, select:focus { 
     border-color: var(--accent); 
-    background: rgba(20,32,78,.8); 
     box-shadow: 0 0 0 3px rgba(46,151,224,0.15); 
   }
-  select option { background: #0C1640; color: #fff; }
+  select option { background: var(--bg-app); color: var(--text-main); }
   textarea { resize: vertical; }
 
   button { 
-    background: var(--accent-gradient); color: #0C1640; border: none; 
+    background: var(--accent-gradient); color: var(--btn-text); border: none; 
     padding: 12px 20px; border-radius: 11px; font-size: 14px; 
     cursor: pointer; font-weight: 700; transition: all 0.2s ease; 
     box-shadow: 0 4px 12px rgba(46,151,224,0.2);
@@ -203,7 +279,7 @@
   button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
   
   .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--input-border); box-shadow: none; }
-  .btn-outline:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,.2); color: white; box-shadow: none;}
+  .btn-outline:hover { background: var(--border); color: var(--text-main); box-shadow: none;}
 
   .hidden { display: none !important; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
@@ -212,16 +288,16 @@
   /* CHECKBOX DRAG & DROP */
   .checkbox-group { 
     display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; 
-    background: rgba(255,255,255,0.012); padding: 14px; border-radius: 11px; border: 1px dashed rgba(255,255,255,.14); 
+    background: var(--checkbox-bg); padding: 14px; border-radius: 11px; border: 1px dashed var(--border); 
   }
   .checkbox-item { 
     display: flex; align-items: center; gap: 6px; font-size: 13px; 
     cursor: grab; user-select: none; margin: 0; color: var(--text-main);
-    background: rgba(255,255,255,.05); padding: 6px 12px; border-radius: 6px;
-    border: 1px solid rgba(255,255,255,.08); transition: 0.2s;
+    background: var(--card-bg); padding: 6px 12px; border-radius: 6px;
+    border: 1px solid var(--border); transition: 0.2s;
   }
-  .checkbox-item:hover { border-color: rgba(255,255,255,.2); }
-  .checkbox-item.over { border-color: var(--accent); background: rgba(46,151,224,.15); }
+  .checkbox-item:hover { border-color: var(--accent); }
+  .checkbox-item.over { border-color: var(--accent); background: var(--total-row-bg); }
   .checkbox-item input { cursor: pointer; accent-color: var(--accent); margin:0; }
   .drag-handle { color: var(--text-muted); cursor: grab; padding-right: 4px;}
 
@@ -230,11 +306,11 @@
   table { width: 100%; border-collapse: collapse; text-align: left; background: transparent;}
   th, td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
   th { 
-    background: rgba(0,0,0,0.2); font-size: 12px; font-weight: 600; 
-    color: #AEC0E6; text-transform: uppercase; letter-spacing: 0.5px;
+    background: var(--table-th-bg); font-size: 12px; font-weight: 600; 
+    color: var(--table-th-text); text-transform: uppercase; letter-spacing: 0.5px;
   }
   td { font-size: 13px; color: var(--text-main); }
-  tr:hover td { background: rgba(255,255,255,0.04); }
+  tr:hover td { background: var(--table-row-hover); }
 
   .badge { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
   .badge.ok { background: var(--badge-ok-bg); color: var(--badge-ok-text); }
@@ -246,7 +322,7 @@
 
   .spinner { 
     display: inline-block; width: 14px; height: 14px; 
-    border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--accent); 
+    border: 2px solid var(--border); border-top-color: var(--accent); 
     border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; 
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -258,52 +334,41 @@
   }
   
   .sepay-table th { 
-    background: rgba(0,0,0,0.2); color: #AEC0E6; font-weight: 500; font-size: 12px; 
+    background: var(--table-th-bg); color: var(--table-th-text); font-weight: 600; font-size: 12px; 
     text-transform: uppercase; padding: 14px 16px; 
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border); 
-    white-space: nowrap;
+    border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
   }
-  
   .sepay-table td { 
-    padding: 14px 16px; 
-    border-bottom: 1px solid var(--border); 
-    border-right: 1px solid var(--border); 
-    color: #FFFFFF; vertical-align: middle; font-size: 13px;
+    padding: 14px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
+    color: var(--text-main); vertical-align: middle; font-size: 13px;
   }
-
   .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
   
-  /* Cột số tiền */
-  .amount-in { color: rgba(159,212,248,.95); font-weight: 600; font-size: 13px;}
-  .amount-out { color: #FFD98A; font-weight: 600; font-size: 13px;}
+  .amount-in { color: var(--amount-in); font-weight: 600; font-size: 13px;}
+  .amount-out { color: var(--amount-out); font-weight: 600; font-size: 13px;}
   
-  /* Cột nội dung */
   .tx-content-cell { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  
-  /* Chữ phụ */
-  .text-muted-small { color: rgba(255,255,255,.5); font-size: 12px; margin-top: 4px; }
-  .text-id { color: rgba(255,255,255,.5); font-size: 12px; font-family: monospace;}
+  .text-muted-small { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .text-id { color: var(--text-muted); font-size: 12px; font-family: monospace;}
 
-  /* Tag Ngân hàng */
-  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #AEC0E6; }
+  .bank-tag { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-main); }
   .bank-icon {
-    width: 22px; height: 22px; border-radius: 50%; background: var(--btn-orange); color: var(--btn-orange-text);
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff;
     display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: 800;
   }
 
-  /* Dòng tổng cộng cuối bảng */
   .sepay-table .total-row td {
-    background-color: rgba(46,151,224,.16) !important; 
-    color: #ffffff !important;            
-    border-bottom: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.1); 
+    background-color: var(--total-row-bg) !important; 
+    color: var(--text-main) !important;            
+    border-bottom: none; border-right: 1px solid var(--border); 
   }
   .sepay-table .total-row td:last-child { border-right: none; }
 
   @media (max-width: 768px) {
     .app-body { flex-direction: column; overflow: auto; }
-    .sidebar { width: 100% !important; flex-direction: row; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar { width: 100% !important; flex-direction: row; justify-content: flex-start; overflow-x: auto; padding: 12px; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar-top { flex-direction: row; }
+    .sidebar-bottom { display: none; /* Ẩn cụm Setting ở Mobile hoặc phải thiết kế lại dạng Popup */ }
     .sidebar-menu-title { display: none !important; }
     .menu-item { white-space: nowrap; padding: 10px 14px; margin: 0 4px; justify-content: flex-start !important; }
     .menu-text { display: inline !important; }
@@ -328,18 +393,35 @@
   <div class="app-body">
     
     <aside class="sidebar" id="appSidebar">
-      <div class="sidebar-menu-title">Chức năng chính</div>
-      <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
-        <span class="menu-icon">📝</span><span class="menu-text">Tra cứu hàng loạt</span>
+      <div class="sidebar-top">
+        <div class="sidebar-menu-title">Chức năng chính</div>
+        <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
+          <span class="menu-icon">📝</span><span class="menu-text">Tra cứu hàng loạt</span>
+        </div>
+        <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">
+          <span class="menu-icon">📊</span><span class="menu-text">Xử lý bằng file Excel</span>
+        </div>
+        <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">
+          <span class="menu-icon">🏦</span><span class="menu-text">Tổng hợp sao kê</span>
+        </div>
+        <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
+          <span class="menu-icon">💳</span><span class="menu-text">Tra cứu CK (SePay)</span>
+        </div>
       </div>
-      <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">
-        <span class="menu-icon">📊</span><span class="menu-text">Xử lý bằng file Excel</span>
-      </div>
-      <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">
-        <span class="menu-icon">🏦</span><span class="menu-text">Tổng hợp sao kê</span>
-      </div>
-      <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
-        <span class="menu-icon">💳</span><span class="menu-text">Tra cứu CK (SePay)</span>
+
+      <div class="sidebar-bottom">
+        <div class="menu-item" onclick="toggleSettingsMenu()">
+          <span class="menu-icon">⚙️</span><span class="menu-text">Cài đặt</span>
+        </div>
+        <div id="settingsPanel" class="settings-panel hidden">
+          <div class="theme-switch-wrapper">
+            <span>Giao diện Sáng</span>
+            <label class="switch">
+              <input type="checkbox" id="themeToggle" onchange="changeTheme(this.checked)">
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -474,7 +556,7 @@ function saveToken() {
   } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
-/* LOGIC THU GỌN / MỞ RỘNG SIDEBAR */
+/* ---------------- LOGIC GIAO DIỆN & SIDEBAR ---------------- */
 function toggleSidebar() {
   const sidebar = document.getElementById("appSidebar");
   sidebar.classList.toggle("collapsed");
@@ -482,17 +564,46 @@ function toggleSidebar() {
   localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
 }
 
+function toggleSettingsMenu() {
+  const panel = document.getElementById("settingsPanel");
+  panel.classList.toggle("hidden");
+  
+  // Nếu sidebar đang thu gọn mà bấm vào nút cài đặt, tạm thời mở rộng ra để hiển thị nút gạt.
+  const sidebar = document.getElementById("appSidebar");
+  if(sidebar.classList.contains("collapsed")) {
+    toggleSidebar(); 
+  }
+}
+
+function changeTheme(isLight) {
+  const flatpickrTheme = document.getElementById("flatpickr-theme");
+  if(isLight) {
+    document.body.classList.add("light-mode");
+    localStorage.setItem("app_theme", "light");
+    flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css";
+  } else {
+    document.body.classList.remove("light-mode");
+    localStorage.setItem("app_theme", "dark");
+    flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";
+  }
+}
+/* ----------------------------------------------------------- */
+
 document.addEventListener("DOMContentLoaded", () => {
   try {
     const inputToken = document.getElementById("accessToken");
     if(inputToken) inputToken.placeholder = getToken() ? "Đã lưu mật khẩu" : "Mật khẩu hệ thống";
   } catch(e) {}
 
-  // Đọc cấu hình đóng mở sidebar đã lưu từ trước
+  // Đọc cấu hình giao diện từ bộ nhớ
   try {
     const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
-    if (isCollapsed) {
-      document.getElementById("appSidebar").classList.add("collapsed");
+    if (isCollapsed) document.getElementById("appSidebar").classList.add("collapsed");
+
+    const savedTheme = localStorage.getItem("app_theme");
+    if(savedTheme === "light") {
+      document.getElementById("themeToggle").checked = true;
+      changeTheme(true);
     }
   } catch(e) {}
 
@@ -506,12 +617,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initColumnSelector();
 
   // Khởi tạo Flatpickr
-  const dateConfig = {
-    dateFormat: "d/m/Y",
-    locale: "vn",
-    defaultDate: new Date(),
-    allowInput: true
-  };
+  const dateConfig = { dateFormat: "d/m/Y", locale: "vn", defaultDate: new Date(), allowInput: true };
   const elFrom = document.getElementById('txDateFrom');
   const elTo = document.getElementById('txDateTo');
   if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
