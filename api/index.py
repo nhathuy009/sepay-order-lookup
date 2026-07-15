@@ -42,6 +42,47 @@ def handle_movie(body):
     
     return 200, detail
 
+def handle_fetch_employees_excel(body):
+    file_b64 = body.get("file_base64", "")
+    if not file_b64:
+        return 400, {"error": "Thiếu file Excel"}
+    try:
+        # Tách phần header của base64 nếu có
+        if "," in file_b64:
+            file_b64 = file_b64.split(",", 1)[1]
+        
+        # Đọc dữ liệu excel trong RAM bằng openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(base64.b64decode(file_b64)), data_only=True)
+        
+        # Biểu thức chính quy (Regex) bắt các sheet có tên như T012026, T122026...
+        pattern = re.compile(r"^T\d{2}20\d{2}$")
+        sheets_data = {}
+        
+        for sheet_name in wb.sheetnames:
+            clean_name = sheet_name.strip()
+            if pattern.match(clean_name):
+                ws = wb[sheet_name]
+                data = []
+                # Lấy dữ liệu từ dòng 7 trở đi
+                for row in range(7, ws.max_row + 1):
+                    ma_nv = ws.cell(row=row, column=2).value  # Cột B
+                    ten_nv = ws.cell(row=row, column=3).value # Cột C
+                    
+                    # Nếu dòng có chứa mã NV hoặc Tên NV thì mới đưa vào danh sách
+                    if ma_nv is not None or ten_nv is not None:
+                        data.append({
+                            "ma_nv": str(ma_nv).strip() if ma_nv is not None else "",
+                            "ten_nv": str(ten_nv).strip() if ten_nv is not None else ""
+                        })
+                
+                # Lưu mảng data theo key là tên sheet
+                sheets_data[clean_name] = data
+                
+        return 200, {"sheets": sheets_data}
+        
+    except Exception as e:
+        return 400, {"error": f"Lỗi đọc file Excel: {str(e)}"}
+        
 def handle_category(body):
     slug = (body.get("slug") or "").strip()
     if not slug:
@@ -299,7 +340,9 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_lookup(body)
         elif action == "invoice":
             status, payload = handle_invoice(body)
-        elif action == "search_transaction": # <--- THÊM NHÁNH NÀY
+        elif action == "fetch_employees_excel":
+            status, payload = handle_fetch_employees_excel(body)
+        elif action == "search_transaction":
             code = (body.get("code") or "").strip()
             if not code:
                 status, payload = 400, {"error": "Thiếu mã đơn hàng"}
