@@ -562,12 +562,19 @@
             <table class="sepay-table" id="employeeTable">
               <thead>
                 <tr>
-                  <th>Mã NV (B)</th>
-                  <th>Tên NV (C)</th>
-                  <th style="text-align: right;">Lương cơ bản (H)</th>
-                  <th style="text-align: center;">Ngày công TT (J)</th>
-                  <th style="text-align: center;">Ngày công HL (K)</th>
-                  <th style="text-align: right;">Lương tính toán</th>
+                  <th rowspan="2" style="vertical-align: middle;">Mã NV (B)</th>
+                  <th rowspan="2" style="vertical-align: middle;">Tên NV (C)</th>
+                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương cơ bản (H)</th>
+                  <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công TT (J)</th>
+                  <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công HL (K)</th>
+                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương tính toán</th>
+                  <th colspan="4" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Các khoản chế độ và phúc lợi</th>
+                </tr>
+                <tr>
+                  <th style="text-align: right;">Trang Phục (L)</th>
+                  <th style="text-align: right;">Cơm Trưa (M)</th>
+                  <th style="text-align: right;">Trách nhiệm (N)</th>
+                  <th style="text-align: right;">Chi phí HT- BHXH (O)</th>
                 </tr>
               </thead>
               <tbody id="employeeTbody"></tbody>
@@ -843,25 +850,34 @@ async function doFetchEmployeesExcel() {
         
         let sheetData = [];
         jsonData.forEach(row => {
-          // B=1, C=2, H=7, J=9, K=10
+          // Chỉ mục (Index) của các cột: B=1, C=2, H=7, J=9, K=10, L=11, M=12, N=13, O=14
           const ma_nv = row[1]; 
           const ten_nv = row[2];
           const luong_cb_raw = row[7];
           const ngay_cong_tt_raw = row[9];
           const ngay_cong_hl_raw = row[10];
+          const trang_phuc_raw = row[11];
+          const com_trua_raw = row[12];
+          const trach_nhiem_raw = row[13];
+          const bhxh_raw = row[14];
           
           const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
           
           // Chỉ lấy khi có cả Mã NV và Tên NV
           if (ma_nv_str !== "" && ten_nv_str !== "") {
-            // Ép kiểu số, nếu ô trống hoặc lỗi thì mặc định là 0
             const luong_cb = parseFloat(luong_cb_raw) || 0;
             const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
             
-            // Tính toán: Cột H / 26 * Cột J (Làm tròn số nguyên)
-            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_hl);
+            // Ép kiểu 4 cột chế độ phúc lợi
+            const trang_phuc = parseFloat(trang_phuc_raw) || 0;
+            const com_trua = parseFloat(com_trua_raw) || 0;
+            const trach_nhiem = parseFloat(trach_nhiem_raw) || 0;
+            const bhxh = parseFloat(bhxh_raw) || 0;
+            
+            // Tính toán: Cột H / 26 * Cột J
+            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_tt);
 
             sheetData.push({
               ma_nv: ma_nv_str,
@@ -869,7 +885,11 @@ async function doFetchEmployeesExcel() {
               luong_cb: luong_cb,
               ngay_cong_tt: ngay_cong_tt,
               ngay_cong_hl: ngay_cong_hl,
-              luong_tinh_toan: luong_tinh_toan
+              luong_tinh_toan: luong_tinh_toan,
+              trang_phuc: trang_phuc,
+              com_trua: com_trua,
+              trach_nhiem: trach_nhiem,
+              bhxh: bhxh
             });
           }
         });
@@ -920,9 +940,9 @@ function displaySheetData() {
   tbody.innerHTML = "";
   
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+    // Đã nâng colspan lên 10 để bao phủ toàn bộ cột
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
   } else {
-    // Hàm định dạng số tiền (Có dấu phẩy phân cách)
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
 
     rows.forEach(r => {
@@ -934,6 +954,10 @@ function displaySheetData() {
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
+        <td style="text-align: right;">${formatMoney(r.trang_phuc)}</td>
+        <td style="text-align: right;">${formatMoney(r.com_trua)}</td>
+        <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
+        <td style="text-align: right;">${formatMoney(r.bhxh)}</td>
       `;
       tbody.appendChild(tr);
     });
