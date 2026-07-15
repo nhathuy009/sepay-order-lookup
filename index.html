@@ -861,7 +861,7 @@ async function doFetchEmployeesExcel() {
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
             
             // Tính toán: Cột H / 26 * Cột J (Làm tròn số nguyên)
-            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_tt);
+            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_hl);
 
             sheetData.push({
               ma_nv: ma_nv_str,
