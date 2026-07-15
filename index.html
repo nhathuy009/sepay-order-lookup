@@ -410,6 +410,9 @@
         <div class="menu-item" id="tabInvoiceBtn" onclick="switchTab('invoice')">
           <span class="menu-icon">🧾</span><span class="menu-text">Tra cứu hóa đơn</span>
         </div>
+        <div class="menu-item" id="tabEmployeeBtn" onclick="switchTab('employee')">
+          <span class="menu-icon">👥</span><span class="menu-text">Danh sách Nhân sự</span>
+        </div>
       </div>
 
       <div class="sidebar-bottom">
@@ -532,7 +535,38 @@
         </div>
 
       </div>
+      <div id="tabEmployee" class="hidden">
+        <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
+        <div class="card">
+          <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
+          <div class="row">
+            <div><input type="file" id="employeeExcelFile" accept=".xlsx" /></div>
+            <button id="fetchSheetsBtn" onclick="doFetchEmployeesExcel()">Xử lý file</button>
+          </div>
+          <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
+          
+          <div id="sheetSelectWrapper" style="display:none; margin-top: 20px;">
+            <label>Chọn Sheet (Tháng)</label>
+            <select id="sheetSelect" onchange="displaySheetData()" style="width: 100%; max-width: 320px; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+              </select>
+          </div>
+        </div>
 
+        <div class="card" id="employeeTableWrapper" style="display:none;">
+          <h3 style="margin-top:0; font-size:16px;">Danh sách nhân viên từ Cột B & C (Từ dòng 7)</h3>
+          <div class="table-responsive">
+            <table class="sepay-table" id="employeeTable">
+              <thead>
+                <tr>
+                  <th>Mã Nhân Viên (B)</th>
+                  <th>Tên Nhân Viên (C)</th>
+                </tr>
+              </thead>
+              <tbody id="employeeTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
       <div id="tabInvoice" class="hidden">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="margin:0">Tra cứu hóa đơn</h2>
@@ -750,6 +784,95 @@ function renderBulkTable() {
   if (!thead || !tbody) return;
   let theadHTML = '<tr>'; currentColumns.forEach(col => { if (col.visible) theadHTML += `<th>${col.label}</th>`; }); theadHTML += '</tr>';
   thead.innerHTML = theadHTML; tbody.innerHTML = ''; bulkData.forEach(rowObj => { appendRowToDOM(rowObj, tbody); });
+}
+
+let globalSheetsData = {};
+
+async function doFetchEmployeesExcel() {
+  const fileInput = document.getElementById("employeeExcelFile");
+  const box = document.getElementById("sheetsResult");
+  const btn = document.getElementById("fetchSheetsBtn");
+  
+  if (!fileInput.files.length) { 
+    box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>'; 
+    return; 
+  }
+  
+  const file = fileInput.files[0];
+  btn.disabled = true;
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
+  
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ action: "fetch_employees_excel", file_base64: b64, access_token: getToken() }) 
+    });
+    
+    const data = await resp.json();
+    if (!resp.ok) {
+      box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi xử lý file"}</span>`;
+      return;
+    }
+    
+    globalSheetsData = data.sheets;
+    const sheetNames = Object.keys(globalSheetsData);
+    
+    if (sheetNames.length === 0) {
+      box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026... trong file này.</span>';
+      document.getElementById("sheetSelectWrapper").style.display = "none";
+      document.getElementById("employeeTableWrapper").style.display = "none";
+      return;
+    }
+    
+    // Đổ dữ liệu vào Dropdown
+    const select = document.getElementById("sheetSelect");
+    select.innerHTML = '<option value="">-- Chọn Tháng / Sheet --</option>';
+    sheetNames.forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+    
+    document.getElementById("sheetSelectWrapper").style.display = "block";
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ.</span>`;
+    
+  } catch (e) {
+    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function displaySheetData() {
+  const selectedSheet = document.getElementById("sheetSelect").value;
+  const wrapper = document.getElementById("employeeTableWrapper");
+  const tbody = document.getElementById("employeeTbody");
+  
+  if (!selectedSheet) {
+    wrapper.style.display = "none";
+    return;
+  }
+  
+  const rows = globalSheetsData[selectedSheet] || [];
+  tbody.innerHTML = "";
+  
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+  } else {
+    rows.forEach(r => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>
+        <td>${escapeHtml(r.ten_nv)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  
+  wrapper.style.display = "block";
 }
 
 function appendRowToDOM(rowObj, tbody) {
