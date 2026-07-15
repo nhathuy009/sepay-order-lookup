@@ -981,8 +981,9 @@ function displaySheetData() {
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
-    let totalLuongTinhToan = 0;
-    let detailRowsHTML = ''; // Biến chứa các dòng chi tiết xổ xuống
+    // Đổi tên biến cho chuẩn xác
+    let total6422 = 0; 
+    let detailRowsHTML = ''; 
 
     rows.forEach(r => {
       // 1. In dữ liệu ra bảng lương chính
@@ -1001,17 +1002,21 @@ function displaySheetData() {
       `;
       tbody.appendChild(tr);
 
-      // 2. Tính tổng và chuẩn bị các dòng ẩn (Chi tiết từng người cho TK 6422)
-      totalLuongTinhToan += r.luong_tinh_toan;
+      // 2. Tính tổng 6422 = Lương tính toán + L + M + N + O
+      const employeeTotal6422 = r.luong_tinh_toan + r.trang_phuc + r.com_trua + r.trach_nhiem + r.bhxh;
       
+      // Cộng dồn vào dòng tổng
+      total6422 += employeeTotal6422;
+      
+      // Tạo dòng chi tiết cho từng người
       detailRowsHTML += `
         <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
-          <td style="font-weight: 600;">3341</td>
+          <td style="font-weight: 600;">334/338</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
-            └─ Phải trả: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+            └─ Phải trả & Trích theo lương: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(r.luong_tinh_toan)}</td>
+          <td style="text-align: right;">${formatMoney(employeeTotal6422)}</td>
           <td></td>
         </tr>
       `;
@@ -1022,12 +1027,12 @@ function displaySheetData() {
       <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6422')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
         <td></td>
-        <td style="font-weight: 700;">Chi phí lương tháng (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(totalLuongTinhToan)}</td>
+        <td style="font-weight: 700;">Chi phí lương và các khoản trích theo lương (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(total6422)}</td>
         <td style="text-align: center;"><span id="icon-6422" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
-    accHTML += detailRowsHTML; // Gắn các dòng ẩn vào ngay bên dưới dòng tổng
+    accHTML += detailRowsHTML; 
 
     accTbody.innerHTML = accHTML;
     accWrapper.style.display = "block";
