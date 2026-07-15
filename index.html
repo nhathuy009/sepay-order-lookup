@@ -1280,7 +1280,7 @@ async function doExportAirPacking() {
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý và định dạng Style (Màu, Viền)...';
   
   try {
-    // 1. ĐỌC DỮ LIỆU BẰNG SHEETJS (Tốc độ cao)
+    // 1. ĐỌC DỮ LIỆU BẰNG SHEETJS
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type: 'array' });
     
@@ -1353,18 +1353,13 @@ async function doExportAirPacking() {
     const today = new Date();
     const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
     
+    const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
     worksheet.mergeCells('A1:E1');
     const titleCell = worksheet.getCell('A1');
-    titleCell.value = `HÀNG XUẤT AIR - ${dateStr}`;
     titleCell.font = { name: 'Arial', size: 14, bold: true };
-    // Màu F7C7AC -> Hệ ARGB (Alpha + RGB) là FFF7C7AC
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
-    // Set chiều cao dòng Header (Row 2) giống Python (49.5)
-    worksheet.getRow(2).height = 49.5;
-
-    // Khai báo Border cam BE5014
     const customBorder = {
       top: { style: 'thin', color: { argb: 'FFBE5014' } },
       left: { style: 'thin', color: { argb: 'FFBE5014' } },
@@ -1372,20 +1367,31 @@ async function doExportAirPacking() {
       right: { style: 'thin', color: { argb: 'FFBE5014' } }
     };
 
-    // Tạo dòng Header
+    // Tạo dòng Header (Row 2)
     const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
+    headerRow.height = 49.5; // Chiều cao 49.5
     headerRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
       cell.font = { bold: true };
+      // SỬA: vertical phải là 'middle'
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = customBorder;
     });
 
-    // Thêm dữ liệu
+    // Thêm dữ liệu (Từ Row 3 trở đi)
     let totalSets = 0;
     let totalWeight = 0;
     allBagsData.forEach((bag, idx) => {
       totalSets += bag.QTITY;
       totalWeight += (bag.KGS || 0);
-      worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
+      const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
+      
+      // Áp dụng Alignment và Border ngay trên dòng được thêm
+      row.eachCell((cell) => {
+        // SỬA: vertical phải là 'middle'
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = customBorder;
+      });
     });
 
     // Dòng Tổng cộng
@@ -1393,17 +1399,10 @@ async function doExportAirPacking() {
     totalRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
       cell.font = { bold: true };
+      // SỬA: vertical phải là 'middle'
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = customBorder;
     });
-
-    // 3. APPLY ALIGNMENT VÀ BORDER CHO TOÀN BỘ BẢNG (Từ Row 2 trở đi)
-    for (let r = 2; r <= worksheet.rowCount; r++) {
-      let row = worksheet.getRow(r);
-      for (let c = 1; c <= 5; c++) {
-        let cell = row.getCell(c);
-        cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true }; // Wrap Text (Alt+Enter)
-        cell.border = customBorder;
-      }
-    }
 
     // 4. CHỈNH ĐỘ RỘNG CỘT
     worksheet.getColumn(1).width = 8.38; // A
@@ -1417,8 +1416,7 @@ async function doExportAirPacking() {
     const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
     saveAs(new Blob([buffer], { type: "application/octet-stream" }), exportFileName);
     
-    box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File <b>${exportFileName}</b> với đầy đủ Style đã được tạo ra.</span>`;
-    
+    box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File  <b>${exportFileName}</b>  với đầy đủ Style đã được tạo ra.</span>`;    
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
   } finally {
