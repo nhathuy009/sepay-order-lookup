@@ -4,6 +4,7 @@
     { "src": "api/telegram.py", "use": "@vercel/python@4.8.0" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "player.html", "use": "@vercel/static" },
+    { "src": "ebook.html", "use": "@vercel/static" },
     { "src": "player2.html", "use": "@vercel/static" }
   ],
   "routes": [
@@ -11,6 +12,7 @@
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/player.html", "dest": "/player.html" },
     { "src": "/jav", "dest": "/player2.html" },
+    { "src": "/ebook", "dest": "/ebook.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
