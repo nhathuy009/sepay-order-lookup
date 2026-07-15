@@ -609,6 +609,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
 <script>
 const FIELDS = [
@@ -800,23 +801,45 @@ async function doFetchEmployeesExcel() {
   
   const file = fileInput.files[0];
   btn.disabled = true;
-  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file cực tốc trên trình duyệt...';
   
   try {
-    const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", { 
-      method: "POST", 
-      headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ action: "fetch_employees_excel", file_base64: b64, access_token: getToken() }) 
+    // Đọc file thành mảng byte (ArrayBuffer)
+    const data = await file.arrayBuffer();
+    
+    // Dùng SheetJS để phân tích file Excel
+    const workbook = XLSX.read(data, { type: 'array' });
+    
+    // Regex tìm sheet có tên như T012026, T122026
+    const pattern = /^T\d{2}20\d{2}$/;
+    globalSheetsData = {};
+    
+    workbook.SheetNames.forEach(sheetName => {
+      const cleanName = sheetName.trim();
+      if (pattern.test(cleanName)) {
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Chuyển sheet thành mảng 2 chiều (bắt đầu từ dòng 7 -> index là 6)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 6 });
+        
+        let sheetData = [];
+        jsonData.forEach(row => {
+          // Cột B có index là 1, Cột C có index là 2
+          const ma_nv = row[1]; 
+          const ten_nv = row[2];
+          
+          if (ma_nv !== undefined || ten_nv !== undefined) {
+            sheetData.push({
+              ma_nv: ma_nv !== undefined ? String(ma_nv).trim() : "",
+              ten_nv: ten_nv !== undefined ? String(ten_nv).trim() : ""
+            });
+          }
+        });
+        
+        globalSheetsData[cleanName] = sheetData;
+      }
     });
     
-    const data = await resp.json();
-    if (!resp.ok) {
-      box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi xử lý file"}</span>`;
-      return;
-    }
-    
-    globalSheetsData = data.sheets;
     const sheetNames = Object.keys(globalSheetsData);
     
     if (sheetNames.length === 0) {
@@ -837,7 +860,7 @@ async function doFetchEmployeesExcel() {
     });
     
     document.getElementById("sheetSelectWrapper").style.display = "block";
-    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ.</span>`;
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ (Không giới hạn dung lượng).</span>`;
     
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
@@ -845,7 +868,6 @@ async function doFetchEmployeesExcel() {
     btn.disabled = false;
   }
 }
-
 function displaySheetData() {
   const selectedSheet = document.getElementById("sheetSelect").value;
   const wrapper = document.getElementById("employeeTableWrapper");
