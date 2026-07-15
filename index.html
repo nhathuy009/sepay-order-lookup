@@ -557,13 +557,17 @@
         </div>
 
         <div class="card" id="employeeTableWrapper" style="display:none;">
-          <h3 style="margin-top:0; font-size:16px;">Danh sách nhân viên từ Cột B & C (Từ dòng 7)</h3>
+          <h3 style="margin-top:0; font-size:16px;">Bảng lương chi tiết (Từ dòng 7)</h3>
           <div class="table-responsive">
             <table class="sepay-table" id="employeeTable">
               <thead>
                 <tr>
-                  <th>Mã Nhân Viên (B)</th>
-                  <th>Tên Nhân Viên (C)</th>
+                  <th>Mã NV (B)</th>
+                  <th>Tên NV (C)</th>
+                  <th style="text-align: right;">Lương cơ bản (H)</th>
+                  <th style="text-align: center;">Ngày công TT (J)</th>
+                  <th style="text-align: center;">Ngày công HL (K)</th>
+                  <th style="text-align: right;">Lương tính toán</th>
                 </tr>
               </thead>
               <tbody id="employeeTbody"></tbody>
@@ -834,21 +838,38 @@ async function doFetchEmployeesExcel() {
       const cleanName = sheetName.trim();
       if (pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
+        // Đọc dữ liệu từ dòng 7 (index 6)
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 6 });
         
         let sheetData = [];
         jsonData.forEach(row => {
+          // B=1, C=2, H=7, J=9, K=10
           const ma_nv = row[1]; 
           const ten_nv = row[2];
+          const luong_cb_raw = row[7];
+          const ngay_cong_tt_raw = row[9];
+          const ngay_cong_hl_raw = row[10];
           
           const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
           
-          // ĐIỀU KIỆN MỚI: Cả mã nhân viên VÀ tên nhân viên đều phải khác rỗng
+          // Chỉ lấy khi có cả Mã NV và Tên NV
           if (ma_nv_str !== "" && ten_nv_str !== "") {
+            // Ép kiểu số, nếu ô trống hoặc lỗi thì mặc định là 0
+            const luong_cb = parseFloat(luong_cb_raw) || 0;
+            const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
+            const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
+            
+            // Tính toán: Cột H / 26 * Cột J (Làm tròn số nguyên)
+            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_tt);
+
             sheetData.push({
               ma_nv: ma_nv_str,
-              ten_nv: ten_nv_str
+              ten_nv: ten_nv_str,
+              luong_cb: luong_cb,
+              ngay_cong_tt: ngay_cong_tt,
+              ngay_cong_hl: ngay_cong_hl,
+              luong_tinh_toan: luong_tinh_toan
             });
           }
         });
@@ -860,7 +881,7 @@ async function doFetchEmployeesExcel() {
     const sheetNames = Object.keys(globalSheetsData);
     
     if (sheetNames.length === 0) {
-      box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026... trong file này.</span>';
+      box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026...</span>';
       document.getElementById("sheetSelectWrapper").style.display = "none";
       document.getElementById("employeeTableWrapper").style.display = "none";
       return;
@@ -876,7 +897,7 @@ async function doFetchEmployeesExcel() {
     });
     
     document.getElementById("sheetSelectWrapper").style.display = "block";
-    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ (Không giới hạn dung lượng).</span>`;
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ.</span>`;
     
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
@@ -899,13 +920,20 @@ function displaySheetData() {
   tbody.innerHTML = "";
   
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
   } else {
+    // Hàm định dạng số tiền (Có dấu phẩy phân cách)
+    const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
+
     rows.forEach(r => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>
         <td>${escapeHtml(r.ten_nv)}</td>
+        <td style="text-align: right;">${formatMoney(r.luong_cb)}</td>
+        <td style="text-align: center;">${r.ngay_cong_tt}</td>
+        <td style="text-align: center;">${r.ngay_cong_hl}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -913,7 +941,7 @@ function displaySheetData() {
   
   wrapper.style.display = "block";
 }
-
+  
 function appendRowToDOM(rowObj, tbody) {
   let tr = document.createElement("tr"); let tds = ''; let errorPrinted = false; 
   currentColumns.forEach(col => {
