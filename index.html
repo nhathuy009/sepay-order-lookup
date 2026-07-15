@@ -627,6 +627,8 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script>
 const FIELDS = [
@@ -1275,11 +1277,11 @@ async function doExportAirPacking() {
   
   const file = fileInput.files[0];
   btn.disabled = true;
-  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file Air Packing List...';
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý và định dạng Style (Màu, Viền)...';
   
   try {
+    // 1. ĐỌC DỮ LIỆU BẰNG SHEETJS (Tốc độ cao)
     const data = await file.arrayBuffer();
-    // Đọc file Excel
     const wb = XLSX.read(data, { type: 'array' });
     
     let allBagsData = [];
@@ -1292,26 +1294,14 @@ async function doExportAirPacking() {
 
       const ws = wb.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
       if (jsonData.length === 0) continue;
 
-      // Lấy Tên Khách Hàng ở Sheet đầu tiên (Tương đương df.iloc[3, 1] -> dòng 4, cột B)
       if (!firstSheetProcessed && jsonData.length > 3) {
-        if (jsonData[3][1]) {
-          customerName = String(jsonData[3][1]).trim();
-        }
+        if (jsonData[3][1]) customerName = String(jsonData[3][1]).trim();
         firstSheetProcessed = true;
       }
 
-      // Tìm dòng header chứa 'BAG NO'
-      let headerIdx = -1;
-      for (let r = 0; r < jsonData.length; r++) {
-        if (jsonData[r] && jsonData[r].some(cell => String(cell).toUpperCase().includes('BAG NO'))) {
-          headerIdx = r;
-          break;
-        }
-      }
-
+      let headerIdx = jsonData.findIndex(row => row && row.some(cell => String(cell).toUpperCase().includes('BAG NO')));
       if (headerIdx === -1) continue;
 
       const headers = jsonData[headerIdx];
@@ -1322,39 +1312,23 @@ async function doExportAirPacking() {
 
       let currentBagNo = null;
       let currentKgs = null;
-      let sheetBagsMap = new Map(); // Dùng map để giữ thứ tự
+      let sheetBagsMap = new Map(); 
 
-      // Bắt đầu đọc dữ liệu từ sau dòng Header
       for (let r = headerIdx + 1; r < jsonData.length; r++) {
         const row = jsonData[r];
         if (!row || row.length === 0) continue;
+        if (colItems !== -1 && (row[colItems] === undefined || row[colItems] === null || String(row[colItems]).trim() === "")) continue;
 
-        // Dropna subset 'ITEMS'
-        if (colItems !== -1 && (row[colItems] === undefined || row[colItems] === null || String(row[colItems]).trim() === "")) {
-          continue;
-        }
-
-        // ffill (Forward fill) BAG NO
         let bagNo = row[colBagNo];
-        if (bagNo !== undefined && bagNo !== null && String(bagNo).trim() !== "") {
-          currentBagNo = String(bagNo).trim();
-        } else {
-          bagNo = currentBagNo;
-        }
+        currentBagNo = (bagNo !== undefined && bagNo !== null && String(bagNo).trim() !== "") ? String(bagNo).trim() : currentBagNo;
 
-        // ffill (Forward fill) KGS và chuyển đổi dấu phẩy thành dấu chấm
         let kgsRaw = row[colKgs];
-        let kgs = null;
         if (kgsRaw !== undefined && kgsRaw !== null && String(kgsRaw).trim() !== "") {
-          kgs = parseFloat(String(kgsRaw).replace(',', '.'));
+          let kgs = parseFloat(String(kgsRaw).replace(',', '.'));
           if (!isNaN(kgs)) currentKgs = kgs;
-        } else {
-          kgs = currentKgs;
         }
 
-        // QTITY
-        let qtity = parseFloat(row[colQtity]);
-        if (isNaN(qtity)) qtity = 0;
+        let qtity = parseFloat(row[colQtity]) || 0;
 
         if (currentBagNo) {
           if (!sheetBagsMap.has(currentBagNo)) {
@@ -1363,73 +1337,87 @@ async function doExportAirPacking() {
           sheetBagsMap.get(currentBagNo).QTITY += qtity;
         }
       }
-
-      // Đưa data của sheet này vào mảng tổng
       sheetBagsMap.forEach(val => allBagsData.push(val));
     }
 
     if (allBagsData.length === 0) {
-      box.innerHTML = `<span class="err">❌ Không tìm thấy dữ liệu hợp lệ (BAG NO, ITEMS...) trong file này!</span>`;
+      box.innerHTML = `<span class="err">❌ Không tìm thấy dữ liệu hợp lệ trong file!</span>`;
       return;
     }
 
-    // Lắp ráp mảng dữ liệu cuối cùng theo Template
-    let finalData = [];
-    let totalBags = allBagsData.length;
+    // 2. TẠO FILE MỚI & ĐỊNH DẠNG BẰNG EXCELJS
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Sheet1');
+
+    // Tạo dòng Tiêu đề (Row 1)
+    const today = new Date();
+    const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    
+    worksheet.mergeCells('A1:E1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `HÀNG XUẤT AIR - ${dateStr}`;
+    titleCell.font = { name: 'Arial', size: 14, bold: true };
+    // Màu F7C7AC -> Hệ ARGB (Alpha + RGB) là FFF7C7AC
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Set chiều cao dòng Header (Row 2) giống Python (49.5)
+    worksheet.getRow(2).height = 49.5;
+
+    // Khai báo Border cam BE5014
+    const customBorder = {
+      top: { style: 'thin', color: { argb: 'FFBE5014' } },
+      left: { style: 'thin', color: { argb: 'FFBE5014' } },
+      bottom: { style: 'thin', color: { argb: 'FFBE5014' } },
+      right: { style: 'thin', color: { argb: 'FFBE5014' } }
+    };
+
+    // Tạo dòng Header
+    const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
+      cell.font = { bold: true };
+    });
+
+    // Thêm dữ liệu
     let totalSets = 0;
     let totalWeight = 0;
-
     allBagsData.forEach((bag, idx) => {
       totalSets += bag.QTITY;
       totalWeight += (bag.KGS || 0);
-      finalData.push({
-        "STT": idx + 1,
-        "Bag\nMARK": bag.BAG_NO,
-        "Customer Name": customerName,
-        "SET": bag.QTITY,
-        "Weight": bag.KGS || 0
-      });
+      worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
     });
 
-    // Thêm dòng TOTAL
-    finalData.push({
-      "STT": "",
-      "Bag\nMARK": totalBags,
-      "Customer Name": "",
-      "SET": totalSets,
-      "Weight": totalWeight
+    // Dòng Tổng cộng
+    const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
+    totalRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
+      cell.font = { bold: true };
     });
 
-    // Bắt đầu ghi file Excel mới
-    const newWb = XLSX.utils.book_new();
-    const newWs = XLSX.utils.json_to_sheet(finalData, { origin: "A2" });
+    // 3. APPLY ALIGNMENT VÀ BORDER CHO TOÀN BỘ BẢNG (Từ Row 2 trở đi)
+    for (let r = 2; r <= worksheet.rowCount; r++) {
+      let row = worksheet.getRow(r);
+      for (let c = 1; c <= 5; c++) {
+        let cell = row.getCell(c);
+        cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true }; // Wrap Text (Alt+Enter)
+        cell.border = customBorder;
+      }
+    }
 
-    // 1. Thêm Title ở dòng A1
-    const today = new Date();
-    const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-    XLSX.utils.sheet_add_aoa(newWs, [[`HÀNG XUẤT AIR - ${dateStr}`]], { origin: "A1" });
+    // 4. CHỈNH ĐỘ RỘNG CỘT
+    worksheet.getColumn(1).width = 8.38; // A
+    worksheet.getColumn(2).width = 8.38; // B
+    worksheet.getColumn(3).width = 24.38; // C
+    worksheet.getColumn(4).width = 8.38; // D
+    worksheet.getColumn(5).width = 8.38; // E
 
-    // 2. Merge ô Title (A1:E1)
-    if (!newWs['!merges']) newWs['!merges'] = [];
-    newWs['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
-
-    // 3. Cấu hình độ rộng của cột
-    newWs['!cols'] = [
-      { wch: 8.38 },   // A: STT
-      { wch: 8.38 },   // B: Bag MARK
-      { wch: 24.38 },  // C: Customer Name
-      { wch: 8.38 },   // D: SET
-      { wch: 8.38 }    // E: Weight
-    ];
-
-    XLSX.utils.book_append_sheet(newWb, newWs, "Sheet1");
-
-    // Tạo tên file xuất ra theo định dạng bạn yêu cầu
+    // 5. XUẤT FILE TỰ ĐỘNG
+    const buffer = await workbook.xlsx.writeBuffer();
     const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
+    saveAs(new Blob([buffer], { type: "application/octet-stream" }), exportFileName);
     
-    XLSX.writeFile(newWb, exportFileName);
-    
-    box.innerHTML = `<span class="badge ok">🎉 Hoàn tất! File <b>${exportFileName}</b> đã được xử lý và tự động tải về.</span>`;
+    box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File <b>${exportFileName}</b> với đầy đủ Style đã được tạo ra.</span>`;
     
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
