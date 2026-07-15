@@ -910,8 +910,15 @@ async function doFetchEmployeesExcel() {
             const trach_nhiem = parseFloat(trach_nhiem_raw) || 0;
             const bhxh = parseFloat(bhxh_raw) || 0;
             
-            // CÔNG THỨC MỚI: (H / T5 * K) + (L + M + N + O)
-            const luong_tinh_toan = Math.round((luong_cb / soNgayCongChuan) * ngay_cong_hl) + trang_phuc + com_trua + trach_nhiem + bhxh;
+            // XỬ LÝ ĐIỀU KIỆN MẪU SỐ CHIA (Theo ô T5 hoặc theo Cột K)
+            let mauSoChia = soNgayCongChuan;
+            // Nếu cột K có số ngày lớn hơn 0 VÀ khác với T5 -> Dùng giá trị cột K làm mẫu số
+            if (ngay_cong_hl > 0 && ngay_cong_hl !== soNgayCongChuan) {
+                mauSoChia = ngay_cong_hl;
+            }
+
+            // CÔNG THỨC MỚI: (H / mẫu số * K) + (L + M + N + O)
+            const luong_tinh_toan = Math.round((luong_cb / mauSoChia) * ngay_cong_hl) + trang_phuc + com_trua + trach_nhiem + bhxh;
 
             sheetData.push({
               ma_nv: ma_nv_str,
@@ -959,7 +966,6 @@ async function doFetchEmployeesExcel() {
     btn.disabled = false;
   }
 }
-
 function displaySheetData() {
   const selectedSheet = document.getElementById("sheetSelect").value;
   const wrapper = document.getElementById("employeeTableWrapper");
