@@ -804,13 +804,9 @@ async function doFetchEmployeesExcel() {
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file cực tốc trên trình duyệt...';
   
   try {
-    // Đọc file thành mảng byte (ArrayBuffer)
     const data = await file.arrayBuffer();
-    
-    // Dùng SheetJS để phân tích file Excel
     const workbook = XLSX.read(data, { type: 'array' });
     
-    // Regex tìm sheet có tên như T012026, T122026
     const pattern = /^T\d{2}20\d{2}$/;
     globalSheetsData = {};
     
@@ -818,20 +814,21 @@ async function doFetchEmployeesExcel() {
       const cleanName = sheetName.trim();
       if (pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
-        
-        // Chuyển sheet thành mảng 2 chiều (bắt đầu từ dòng 7 -> index là 6)
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 6 });
         
         let sheetData = [];
         jsonData.forEach(row => {
-          // Cột B có index là 1, Cột C có index là 2
           const ma_nv = row[1]; 
           const ten_nv = row[2];
           
-          if (ma_nv !== undefined || ten_nv !== undefined) {
+          const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
+          const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
+          
+          // ĐIỀU KIỆN MỚI: Cả mã nhân viên VÀ tên nhân viên đều phải khác rỗng
+          if (ma_nv_str !== "" && ten_nv_str !== "") {
             sheetData.push({
-              ma_nv: ma_nv !== undefined ? String(ma_nv).trim() : "",
-              ten_nv: ten_nv !== undefined ? String(ten_nv).trim() : ""
+              ma_nv: ma_nv_str,
+              ten_nv: ten_nv_str
             });
           }
         });
@@ -849,7 +846,6 @@ async function doFetchEmployeesExcel() {
       return;
     }
     
-    // Đổ dữ liệu vào Dropdown
     const select = document.getElementById("sheetSelect");
     select.innerHTML = '<option value="">-- Chọn Tháng / Sheet --</option>';
     sheetNames.forEach(name => {
@@ -868,6 +864,7 @@ async function doFetchEmployeesExcel() {
     btn.disabled = false;
   }
 }
+
 function displaySheetData() {
   const selectedSheet = document.getElementById("sheetSelect").value;
   const wrapper = document.getElementById("employeeTableWrapper");
