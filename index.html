@@ -580,8 +580,8 @@
                   <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương cơ bản (H)</th>
                   <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công TT (J)</th>
                   <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công HL (K)</th>
-                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương tính toán</th>
                   <th colspan="4" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Các khoản chế độ và phúc lợi</th>
+                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương tính toán</th>
                 </tr>
                 <tr>
                   <th style="text-align: right;">Trang Phục (L)</th>
@@ -875,12 +875,19 @@ async function doFetchEmployeesExcel() {
       const cleanName = sheetName.trim();
       if (pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
+        
+        // Đọc ô T5 để làm số ngày công chuẩn (nếu trống hoặc lỗi thì mặc định là 26)
+        let soNgayCongChuan = 26;
+        if (worksheet['T5'] && worksheet['T5'].v) {
+            const t5Val = parseFloat(worksheet['T5'].v);
+            if (!isNaN(t5Val) && t5Val > 0) soNgayCongChuan = t5Val;
+        }
+
         // Đọc dữ liệu từ dòng 7 (index 6)
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 6 });
         
         let sheetData = [];
         jsonData.forEach(row => {
-          // Chỉ mục (Index) của các cột: B=1, C=2, H=7, J=9, K=10, L=11, M=12, N=13, O=14
           const ma_nv = row[1]; 
           const ten_nv = row[2];
           const luong_cb_raw = row[7];
@@ -894,20 +901,17 @@ async function doFetchEmployeesExcel() {
           const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
           
-          // Chỉ lấy khi có cả Mã NV và Tên NV
           if (ma_nv_str !== "" && ten_nv_str !== "") {
             const luong_cb = parseFloat(luong_cb_raw) || 0;
             const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
-            
-            // Ép kiểu 4 cột chế độ phúc lợi
             const trang_phuc = parseFloat(trang_phuc_raw) || 0;
             const com_trua = parseFloat(com_trua_raw) || 0;
             const trach_nhiem = parseFloat(trach_nhiem_raw) || 0;
             const bhxh = parseFloat(bhxh_raw) || 0;
             
-            // Tính toán: Cột H / 26 * Cột J
-            const luong_tinh_toan = Math.round((luong_cb / 26) * ngay_cong_tt);
+            // CÔNG THỨC MỚI: (H / T5 * K) + (L + M + N + O)
+            const luong_tinh_toan = Math.round((luong_cb / soNgayCongChuan) * ngay_cong_hl) + trang_phuc + com_trua + trach_nhiem + bhxh;
 
             sheetData.push({
               ma_nv: ma_nv_str,
@@ -915,11 +919,11 @@ async function doFetchEmployeesExcel() {
               luong_cb: luong_cb,
               ngay_cong_tt: ngay_cong_tt,
               ngay_cong_hl: ngay_cong_hl,
-              luong_tinh_toan: luong_tinh_toan,
               trang_phuc: trang_phuc,
               com_trua: com_trua,
               trach_nhiem: trach_nhiem,
-              bhxh: bhxh
+              bhxh: bhxh,
+              luong_tinh_toan: luong_tinh_toan
             });
           }
         });
@@ -961,7 +965,6 @@ function displaySheetData() {
   const wrapper = document.getElementById("employeeTableWrapper");
   const tbody = document.getElementById("employeeTbody");
   
-  // Khai báo cho bảng Hạch toán
   const accWrapper = document.getElementById("accountingWrapper");
   const accTbody = document.getElementById("accountingTbody");
   
@@ -981,12 +984,12 @@ function displaySheetData() {
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
-    // Đổi tên biến cho chuẩn xác
-    let total6422 = 0; 
+    // Các biến cộng dồn cho dòng Tổng
+    let sumLuongCb = 0, sumTrangPhuc = 0, sumComTrua = 0, sumTrachNhiem = 0, sumBhxh = 0, sumLuongTinhToan = 0;
     let detailRowsHTML = ''; 
 
     rows.forEach(r => {
-      // 1. In dữ liệu ra bảng lương chính
+      // Đổ dữ liệu ra bảng chính (Lương tính toán ở cuối cùng)
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>
@@ -994,21 +997,23 @@ function displaySheetData() {
         <td style="text-align: right;">${formatMoney(r.luong_cb)}</td>
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
-        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
         <td style="text-align: right;">${formatMoney(r.trang_phuc)}</td>
         <td style="text-align: right;">${formatMoney(r.com_trua)}</td>
         <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: right;">${formatMoney(r.bhxh)}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
       `;
       tbody.appendChild(tr);
 
-      // 2. Tính tổng 6422 = Lương tính toán + L + M + N + O
-      const employeeTotal6422 = r.luong_tinh_toan + r.trang_phuc + r.com_trua + r.trach_nhiem + r.bhxh;
+      // Cộng dồn các cột
+      sumLuongCb += r.luong_cb;
+      sumTrangPhuc += r.trang_phuc;
+      sumComTrua += r.com_trua;
+      sumTrachNhiem += r.trach_nhiem;
+      sumBhxh += r.bhxh;
+      sumLuongTinhToan += r.luong_tinh_toan;
       
-      // Cộng dồn vào dòng tổng
-      total6422 += employeeTotal6422;
-      
-      // Tạo dòng chi tiết cho từng người
+      // Tạo dòng chi tiết Hạch toán (Chỉ dùng Lương tính toán vì nó đã bao trọn)
       detailRowsHTML += `
         <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
@@ -1016,19 +1021,34 @@ function displaySheetData() {
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
             └─ Phải trả & Trích theo lương: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(employeeTotal6422)}</td>
+          <td style="text-align: right;">${formatMoney(r.luong_tinh_toan)}</td>
           <td></td>
         </tr>
       `;
     });
 
-    // 3. Đổ dữ liệu vào bảng Hạch toán
+    // Thêm dòng TỔNG CỘNG vào cuối bảng lương
+    const totalTr = document.createElement("tr");
+    totalTr.style.background = "var(--total-row-bg)";
+    totalTr.innerHTML = `
+      <td colspan="2" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng cộng:</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongCb)}</td>
+      <td colspan="2"></td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrangPhuc)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumComTrua)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumBhxh)}</td>
+      <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
+    `;
+    tbody.appendChild(totalTr);
+
+    // Đổ dữ liệu vào bảng Hạch toán 6422
     let accHTML = `
       <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6422')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
         <td></td>
         <td style="font-weight: 700;">Chi phí lương và các khoản trích theo lương (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(total6422)}</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
         <td style="text-align: center;"><span id="icon-6422" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
