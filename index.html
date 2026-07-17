@@ -631,12 +631,28 @@
                   <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công HL (K)</th>
                   <th colspan="4" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Các khoản chế độ và phúc lợi</th>
                   <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương tính toán</th>
+                  <th colspan="5" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thu nhập bổ sung</th>
+                  <th colspan="5" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">Các khoản khấu trừ</th>
+                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Thực nhận (AD)</th>
+                  <th colspan="2" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thông tin nhận lương</th>
                 </tr>
                 <tr>
                   <th style="text-align: right;">Trang Phục (L)</th>
                   <th style="text-align: right;">Cơm Trưa (M)</th>
                   <th style="text-align: right;">Trách nhiệm (N)</th>
                   <th style="text-align: right;">Chi phí HT- BHXH (O)</th>
+                  <th style="text-align: right;">Hoa hồng bán hàng (P)</th>
+                  <th style="text-align: right;">Thưởng ghi nhận đóng góp (Q)</th>
+                  <th style="text-align: right;">Lương phép năm (R)</th>
+                  <th style="text-align: right;">Khác (S)</th>
+                  <th style="text-align: right;">Tổng thu nhập trong tháng (T)</th>
+                  <th style="text-align: right;">BHXH (U)</th>
+                  <th style="text-align: right;">BHYT (V)</th>
+                  <th style="text-align: right;">BHTN (W)</th>
+                  <th style="text-align: right;">CĐ (X)</th>
+                  <th style="text-align: right;">Tiền thuế TNCN (AB)</th>
+                  <th style="text-align: center;">STK (AE)</th>
+                  <th style="text-align: center;">Ngân hàng (AF)</th>
                 </tr>
               </thead>
               <tbody id="employeeTbody"></tbody>
@@ -948,6 +964,19 @@ async function doFetchEmployeesExcel() {
           const com_trua_raw = row[12];
           const trach_nhiem_raw = row[13];
           const bhxh_raw = row[14];
+          const hoa_hong_raw = row[15];         // P: Hoa hồng bán hàng
+          const thuong_dong_gop_raw = row[16];  // Q: Thưởng ghi nhận đóng góp
+          const luong_phep_raw = row[17];       // R: Lương phép năm
+          const khac_raw = row[18];             // S: Khác
+          const tong_thu_nhap_raw = row[19];    // T: Tổng thu nhập trong tháng
+          const bhxh_tru_raw = row[20];         // U: BHXH
+          const bhyt_tru_raw = row[21];         // V: BHYT
+          const bhtn_tru_raw = row[22];         // W: BHTN
+          const cd_tru_raw = row[23];           // X: CĐ
+          const thue_tncn_raw = row[27];        // AB: Tiền thuế TNCN
+          const thuc_nhan_raw = row[29];        // AD: Thực nhận
+          const stk_raw = row[30];              // AE: STK
+          const ngan_hang_raw = row[31];        // AF: Ngân hàng
           
           const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
@@ -960,6 +989,19 @@ async function doFetchEmployeesExcel() {
             const com_trua = parseFloat(com_trua_raw) || 0;
             const trach_nhiem = parseFloat(trach_nhiem_raw) || 0;
             const bhxh = parseFloat(bhxh_raw) || 0;
+            const hoa_hong = parseFloat(hoa_hong_raw) || 0;
+            const thuong_dong_gop = parseFloat(thuong_dong_gop_raw) || 0;
+            const luong_phep = parseFloat(luong_phep_raw) || 0;
+            const khac = parseFloat(khac_raw) || 0;
+            const tong_thu_nhap = parseFloat(tong_thu_nhap_raw) || 0;
+            const bhxh_tru = parseFloat(bhxh_tru_raw) || 0;
+            const bhyt_tru = parseFloat(bhyt_tru_raw) || 0;
+            const bhtn_tru = parseFloat(bhtn_tru_raw) || 0;
+            const cd_tru = parseFloat(cd_tru_raw) || 0;
+            const thue_tncn = parseFloat(thue_tncn_raw) || 0;
+            const thuc_nhan = parseFloat(thuc_nhan_raw) || 0;
+            const stk = stk_raw !== undefined ? String(stk_raw).trim() : "";
+            const ngan_hang = ngan_hang_raw !== undefined ? String(ngan_hang_raw).trim() : "";
             
             // XỬ LÝ ĐIỀU KIỆN MẪU SỐ CHIA (Theo ô T5 hoặc theo Cột K)
             let mauSoChia = soNgayCongChuan;
@@ -981,7 +1023,20 @@ async function doFetchEmployeesExcel() {
               com_trua: com_trua,
               trach_nhiem: trach_nhiem,
               bhxh: bhxh,
-              luong_tinh_toan: luong_tinh_toan
+              luong_tinh_toan: luong_tinh_toan,
+              hoa_hong: hoa_hong,
+              thuong_dong_gop: thuong_dong_gop,
+              luong_phep: luong_phep,
+              khac: khac,
+              tong_thu_nhap: tong_thu_nhap,
+              bhxh_tru: bhxh_tru,
+              bhyt_tru: bhyt_tru,
+              bhtn_tru: bhtn_tru,
+              cd_tru: cd_tru,
+              thue_tncn: thue_tncn,
+              thuc_nhan: thuc_nhan,
+              stk: stk,
+              ngan_hang: ngan_hang
             });
           }
         });
@@ -1036,13 +1091,15 @@ function displaySheetData() {
   accTbody.innerHTML = "";
   
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="23" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
     accWrapper.style.display = "none";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
     // Các biến cộng dồn cho dòng Tổng
     let sumLuongCb = 0, sumTrangPhuc = 0, sumComTrua = 0, sumTrachNhiem = 0, sumBhxh = 0, sumLuongTinhToan = 0;
+    let sumHoaHong = 0, sumThuongDongGop = 0, sumLuongPhep = 0, sumKhac = 0, sumTongThuNhap = 0;
+    let sumBhxhTru = 0, sumBhytTru = 0, sumBhtnTru = 0, sumCdTru = 0, sumThueTncn = 0, sumThucNhan = 0;
     let detailRowsHTML = ''; 
 
     rows.forEach(r => {
@@ -1059,6 +1116,19 @@ function displaySheetData() {
         <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: right;">${formatMoney(r.bhxh)}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
+        <td style="text-align: right;">${formatMoney(r.hoa_hong)}</td>
+        <td style="text-align: right;">${formatMoney(r.thuong_dong_gop)}</td>
+        <td style="text-align: right;">${formatMoney(r.luong_phep)}</td>
+        <td style="text-align: right;">${formatMoney(r.khac)}</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(r.tong_thu_nhap)}</td>
+        <td style="text-align: right;">${formatMoney(r.bhxh_tru)}</td>
+        <td style="text-align: right;">${formatMoney(r.bhyt_tru)}</td>
+        <td style="text-align: right;">${formatMoney(r.bhtn_tru)}</td>
+        <td style="text-align: right;">${formatMoney(r.cd_tru)}</td>
+        <td style="text-align: right;">${formatMoney(r.thue_tncn)}</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in);">${formatMoney(r.thuc_nhan)}</td>
+        <td style="text-align: center;">${escapeHtml(r.stk)}</td>
+        <td style="text-align: center;">${escapeHtml(r.ngan_hang)}</td>
       `;
       tbody.appendChild(tr);
 
@@ -1069,6 +1139,17 @@ function displaySheetData() {
       sumTrachNhiem += r.trach_nhiem;
       sumBhxh += r.bhxh;
       sumLuongTinhToan += r.luong_tinh_toan;
+      sumHoaHong += r.hoa_hong;
+      sumThuongDongGop += r.thuong_dong_gop;
+      sumLuongPhep += r.luong_phep;
+      sumKhac += r.khac;
+      sumTongThuNhap += r.tong_thu_nhap;
+      sumBhxhTru += r.bhxh_tru;
+      sumBhytTru += r.bhyt_tru;
+      sumBhtnTru += r.bhtn_tru;
+      sumCdTru += r.cd_tru;
+      sumThueTncn += r.thue_tncn;
+      sumThucNhan += r.thuc_nhan;
       
       // Tạo dòng chi tiết Hạch toán (Chỉ dùng Lương tính toán vì nó đã bao trọn)
       detailRowsHTML += `
@@ -1096,6 +1177,18 @@ function displaySheetData() {
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumBhxh)}</td>
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumHoaHong)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumThuongDongGop)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongPhep)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumKhac)}</td>
+      <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTongThuNhap)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhxhTru)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhytTru)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhtnTru)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumCdTru)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumThueTncn)}</td>
+      <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumThucNhan)}</td>
+      <td colspan="2"></td>
     `;
     tbody.appendChild(totalTr);
 
