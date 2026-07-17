@@ -248,23 +248,33 @@
 
   /* --- DROPDOWN CHECKBOX (MULTI-SELECT) --- */
   .multi-select-container { position: relative; width: 100%; user-select: none; }
+  
   .multi-select-label { 
-    background: white; cursor: pointer; padding: 10px 12px; border-radius: 6px; 
-    border: 1px solid var(--border); font-size: 14px; color: var(--text-main);
+    background: var(--input-bg); /* Sửa từ white thành biến hệ thống */
+    cursor: pointer; padding: 12px 14px; border-radius: 11px; /* Bo góc và padding đồng bộ với input */
+    border: 1px solid var(--input-border); font-size: 14px; color: var(--text-main);
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis; 
   }
+  
   .multi-select-dropdown { 
     display: none; position: absolute; top: 100%; left: 0; right: 0; 
-    background: white; border: 1px solid var(--border); z-index: 100; 
-    max-height: 250px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-    border-radius: 6px; margin-top: 4px; padding: 8px; 
+    background: var(--card-bg); /* Sửa từ white thành màu nền thẻ */
+    border: 1px solid var(--border); z-index: 100; 
+    max-height: 250px; overflow-y: auto; box-shadow: var(--card-shadow); 
+    border-radius: 11px; margin-top: 4px; padding: 8px; 
   }
+  
   .multi-select-dropdown.show { display: block; }
+  
   .ms-checkbox-item { 
-    display: flex; align-items: center; gap: 8px; padding: 6px 8px; 
-    cursor: pointer; font-size: 13px; border-radius: 4px; color: var(--text-main);
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; 
+    cursor: pointer; font-size: 13px; border-radius: 6px; color: var(--text-main);
   }
-  .ms-checkbox-item:hover { background: #f3f4f6; }
+  
+  .ms-checkbox-item:hover { 
+    background: var(--table-row-hover); /* Đổi màu nền hover đồng bộ với bảng */ 
+  }
+  
   .ms-checkbox-item input { cursor: pointer; margin: 0; accent-color: var(--accent); }
   
   /* MAIN CONTENT */
