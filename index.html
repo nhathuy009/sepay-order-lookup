@@ -581,6 +581,7 @@
                   </div>
               </div>
           </div>
+          </div> <!-- THÊM THẺ NÀY: Để đóng hoàn toàn <div class="row"> -->
           <div><button id="txListBtn" onclick="doTxList()">Lấy danh sách</button></div>
           <div id="txListResult" style="margin-top: 20px;"></div>
         </div>
@@ -1271,6 +1272,7 @@ async function doTxSearch() {
 async function doTxList() {
   const dateFromVal = document.getElementById("txDateFrom").value; 
   const dateToVal = document.getElementById("txDateTo").value;
+  const selectBrandEl = document.getElementById("txBankBrand");
   const bankBrandVal = selectBrandEl ? selectBrandEl.value.trim() : "";
   
   // Lấy danh sách các tài khoản đang được Tích Chọn
