@@ -1824,41 +1824,56 @@ function copyForMisaAmis() {
     }
 
     const rows = globalSheetsData[selectedSheet];
-    let tsv = "";
+    let tsvLines = [];
     
-    // Giả định lấy ngày cuối tháng của kỳ lương hiện tại
-    const dateStr = "30/06/2026"; // Bạn có thể bắt logic động từ tên sheet (VD: T062026)
+    // Bạn có thể tùy biến ngày hạch toán theo nhu cầu
+    const dateStr = "30/06/2026"; 
     const loaiNV = "Khác";
 
+    // GOM NHÓM 1: HOA HỒNG BÁN HÀNG (Nợ 6421 / Có 3341)
     rows.forEach(r => {
-      // Chỉ lấy mã nhân viên trong ngoặc nếu cần, r.ma_nv đã có sẵn
-      const maDoiTuong = r.ma_nv; 
-      
-      // 1. Dòng Hoa hồng bán hàng (Nợ 6421 / Có 3341)
       if (r.hoa_hong > 0) {
         let dienGiai = "Hoa hồng bán hàng " + selectedSheet;
-        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6421", "3341", Math.round(r.hoa_hong), "", maDoiTuong].join("\t") + "\n";
+        // Đảm bảo mảng đủ 11 phần tử để không bị lệch cột trên MISA AMIS
+        // Vị trí index 3 (Diễn giải) và index 5 (Diễn giải Hạch toán) dùng chung biến dienGiai
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
+          "6421", "3341", Math.round(r.hoa_hong), "", r.ma_nv
+        ].join("\t"));
       }
-
-      // 2. Dòng Thưởng ghi nhận đóng góp (Nợ 6421 / Có 3341)
-      if (r.thuong_dong_gop > 0) {
-        let dienGiai = "Chi phí thưởng ghi nhận đóng góp " + selectedSheet;
-        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6421", "3341", Math.round(r.thuong_dong_gop), "", maDoiTuong].join("\t") + "\n";
-      }
-
-      // 3. Dòng Lương tính toán (Nợ 6422 / Có 3341)
-      if (r.luong_tinh_toan > 0) {
-        let dienGiai = "Chi phí lương tháng " + selectedSheet;
-        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6422", "3341", Math.round(r.luong_tinh_toan), "", maDoiTuong].join("\t") + "\n";
-      }
-      
-      // Bạn có thể tiếp tục bổ sung cho Lương phép (r.luong_phep), Khác (r.khac), hoặc các khoản trích theo lương (3383, 3384...) tùy nhu cầu.
     });
 
-    if (!tsv) {
+    // GOM NHÓM 2: THƯỞNG GHI NHẬN ĐÓNG GÓP (Nợ 6421 / Có 3341)
+    rows.forEach(r => {
+      if (r.thuong_dong_gop > 0) {
+        let dienGiai = "Chi phí thưởng ghi nhận đóng góp " + selectedSheet;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
+          "6421", "3341", Math.round(r.thuong_dong_gop), "", r.ma_nv
+        ].join("\t"));
+      }
+    });
+
+    // GOM NHÓM 3: CHI PHÍ LƯƠNG THÁNG (Nợ 6422 / Có 3341)
+    rows.forEach(r => {
+      if (r.luong_tinh_toan > 0) {
+        let dienGiai = "Chi phí lương tháng " + selectedSheet;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
+          "6422", "3341", Math.round(r.luong_tinh_toan), "", r.ma_nv
+        ].join("\t"));
+      }
+    });
+
+    // Bạn có thể nhân bản thêm vòng lặp ở đây cho Lương phép năm, Trích BHXH...
+
+    if (tsvLines.length === 0) {
       alert("Không có phát sinh hạch toán nào.");
       return;
     }
+
+    // Nối các dòng bằng ký tự xuống dòng (\n)
+    const tsv = tsvLines.join("\n") + "\n";
 
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBtn"); 
