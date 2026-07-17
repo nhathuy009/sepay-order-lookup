@@ -1163,7 +1163,7 @@ function displaySheetData() {
     let sumHoaHong = 0, sumThuongDongGop = 0, sumLuongPhep = 0, sumKhac = 0, sumTongThuNhap = 0;
     let sumBhxhTru = 0, sumBhytTru = 0, sumBhtnTru = 0, sumCdTru = 0, sumThueTncn = 0, sumThucNhan = 0;
     let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhNld = 0, sumTongBhxhMoi = 0;
-    let detailRowsHTML = ''; 
+    let detailRows6421HTML = '', detailRows6422HTML = '', detailRows3341HTML = '';
 
     rows.forEach(r => {
       // Đổ dữ liệu ra bảng chính (Lương tính toán ở cuối cùng)
@@ -1230,15 +1230,70 @@ function displaySheetData() {
       sumTongBhxhNld += r.tong_bhxh_nld;
       sumTongBhxhMoi += r.tong_bhxh_moi;
       
-      // Tạo dòng chi tiết Hạch toán (Chỉ dùng Lương tính toán vì nó đã bao trọn)
-      detailRowsHTML += `
+      // Tạo dòng chi tiết Hạch toán theo nhân viên
+      // Nợ 6421 (Chi phí bán hàng): Hoa hồng bán hàng (P) + Thưởng ghi nhận đóng góp (Q)
+      detailRows6421HTML += `
+        <tr class="detail-row-6421" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3341</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ Hoa hồng bán hàng: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.hoa_hong)}</td>
+          <td></td>
+        </tr>
+        <tr class="detail-row-6421" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3341</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ Thưởng ghi nhận đóng góp: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.thuong_dong_gop)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Nợ 6422 (Chi phí quản lý): Lương tính toán + Lương phép năm (R) + Khác (S)
+      detailRows6422HTML += `
         <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
-          <td style="font-weight: 600;">334/338</td>
+          <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
-            └─ Phải trả & Trích theo lương: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+            └─ Lương tính toán: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
           <td style="text-align: right;">${formatMoney(r.luong_tinh_toan)}</td>
+          <td></td>
+        </tr>
+        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3341</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ Lương phép năm: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.luong_phep)}</td>
+          <td></td>
+        </tr>
+        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3341</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ Khác: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.khac)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3341: tổng các khoản Nợ ở trên (per nhân viên)
+      const tong_phai_tra_nv = r.hoa_hong + r.thuong_dong_gop + r.luong_tinh_toan + r.luong_phep + r.khac;
+      detailRows3341HTML += `
+        <tr class="detail-row-3341" style="display: none; background: rgba(0,0,0,0.02);">
+          <td style="font-weight: 600;">6421/6422</td>
+          <td></td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ Phải trả người lao động: ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(tong_phai_tra_nv)}</td>
           <td></td>
         </tr>
       `;
@@ -1279,17 +1334,43 @@ function displaySheetData() {
     `;
     tbody.appendChild(totalTr);
 
-    // Đổ dữ liệu vào bảng Hạch toán 6422
+    // Đổ dữ liệu vào bảng Hạch toán: Nợ 6421, Nợ 6422, Có 3341 (tổng của 6421+6422)
+    const sum6421 = sumHoaHong + sumThuongDongGop;
+    const sum6422 = sumLuongTinhToan + sumLuongPhep + sumKhac;
+    const sum3341 = sum6421 + sum6422;
+
     let accHTML = `
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6421')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6421</td>
+        <td></td>
+        <td style="font-weight: 700;">Chi phí bán hàng: Hoa hồng bán hàng & Thưởng ghi nhận đóng góp (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum6421)}</td>
+        <td style="text-align: center;"><span id="icon-6421" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+    `;
+    accHTML += detailRows6421HTML;
+
+    accHTML += `
       <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6422')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
         <td></td>
-        <td style="font-weight: 700;">Chi phí lương và các khoản trích theo lương (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
+        <td style="font-weight: 700;">Chi phí quản lý DN: Lương tính toán, Lương phép năm & Khác (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum6422)}</td>
         <td style="text-align: center;"><span id="icon-6422" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
-    accHTML += detailRowsHTML; 
+    accHTML += detailRows6422HTML;
+
+    accHTML += `
+      <tr style="cursor: pointer; background: var(--badge-err-bg); transition: 0.2s;" onclick="toggleAccDetail('3341')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3341</td>
+        <td style="font-weight: 700;">Phải trả người lao động (= Tổng Nợ 6421 + 6422) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum3341)}</td>
+        <td style="text-align: center;"><span id="icon-3341" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+    `;
+    accHTML += detailRows3341HTML;
 
     accTbody.innerHTML = accHTML;
     accWrapper.style.display = "block";
