@@ -791,7 +791,13 @@
             </div>
           </div>
           <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 1 1 340px; min-width: 340px;">
-            <h3 style="margin:0 0 16px; font-size:16px;">Danh sách chuyển khoản lương</h3>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
+              <h3 style="margin:0; font-size:16px;">Danh sách chuyển khoản lương</h3>
+              <button id="copyBankTransferBtn" class="btn-outline" onclick="copyBankTransferForBank()" style="font-size: 13px;">📋 Copy dán vào file NH</button>
+            </div>
+            <div class="hint" style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-muted);">
+              Dán bắt đầu tại đúng ô "STT" của dòng dữ liệu đầu tiên trong file mẫu ngân hàng (thường là ô A3). Đã copy sẵn 5 cột: STT, Tên NV, Số tài khoản, Số tiền (số thật, không phải chữ), Nội dung giao dịch.
+            </div>
             <div class="table-responsive">
               <table class="sepay-table" id="bankTransferTable">
                 <thead>
@@ -1047,6 +1053,8 @@ function renderBulkTable() {
 }
 
 let globalSheetsData = {};
+let currentBankTransferRows = [];
+let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
 
 function removeVietnameseDiacritics(str) {
@@ -1252,6 +1260,8 @@ function displaySheetData() {
     wrapper.style.display = "none";
     accWrapper.style.display = "none";
     bankWrapper.style.display = "none";
+    currentBankTransferRows = [];
+    currentBankTransferContent = "";
     return;
   }
   
@@ -1266,6 +1276,8 @@ function displaySheetData() {
     tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
     accWrapper.style.display = "none";
     bankWrapper.style.display = "none";
+    currentBankTransferRows = [];
+    currentBankTransferContent = "";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
@@ -1778,6 +1790,11 @@ function displaySheetData() {
     const otherRows = rows.filter(r => removeVietnameseDiacritics(r.ngan_hang).trim().toUpperCase() !== "ACB");
     const bankSortedRows = [...acbRows, ...otherRows];
 
+    // Ghi nhớ dữ liệu gốc (số thật) + nội dung giao dịch theo tháng để dùng cho nút Copy
+    currentBankTransferRows = bankSortedRows;
+    const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+    currentBankTransferContent = monthMatch ? `CHI LUONG T${monthMatch[1]}/${monthMatch[2]}` : `CHI LUONG ${selectedSheet}`;
+
     let bankHTML = "";
     bankSortedRows.forEach((r, idx) => {
       const tenNvKhongDau = removeVietnameseDiacritics(r.ten_nv).toUpperCase();
@@ -2145,6 +2162,31 @@ async function doTxList() {
   }
 }
   
+function copyBankTransferForBank() {
+  try {
+    if (!currentBankTransferRows || currentBankTransferRows.length === 0) {
+      alert("Chưa có dữ liệu để copy. Vui lòng chọn Sheet (Tháng) trước.");
+      return;
+    }
+    let tsv = "";
+    currentBankTransferRows.forEach((r, idx) => {
+      const tenNvKhongDau = removeVietnameseDiacritics(r.ten_nv).toUpperCase();
+      // Số tiền copy dưới dạng số nguyên thật (không có dấu chấm/phẩy ngăn cách)
+      // để khi dán vào file Excel của ngân hàng, ô nhận đúng kiểu Number chứ không phải Text.
+      const soTien = Math.round(Number(r.thuc_nhan) || 0);
+      tsv += [idx + 1, tenNvKhongDau, r.stk, soTien, currentBankTransferContent].join("\t") + "\n";
+    });
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyBankTransferBtn");
+      const originalText = btn.innerText;
+      btn.innerText = "✅ Đã Copy! Dán vào ô A3 file NH";
+      setTimeout(() => { btn.innerText = originalText; }, 2500);
+    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch (e) {
+    alert("Đã xảy ra lỗi khi copy: " + e.message);
+  }
+}
+
 function copyTableToClipboard(tableId, btnId) {
   try {
     const table = document.getElementById(tableId); if (!table) return; let tsv = "";
