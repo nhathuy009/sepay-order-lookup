@@ -1911,24 +1911,31 @@ function copyForMisaAmisBhxh() {
     const rows = globalSheetsData[selectedSheet];
     let tsvLines = [];
 
+    // Định dạng tháng dạng T06/2026 từ tên sheet (VD: T062026)
+    const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+    const thangStr = monthMatch ? `T${monthMatch[1]}/${monthMatch[2]}` : selectedSheet;
+
     // Bạn có thể tùy biến ngày theo sheet (VD: "30/06/2026")
     const dateStr = "30/06/2026";
     const loaiNV = ""; // Cột E bỏ trống theo yêu cầu
 
+    // Diễn giải (cột D) LUÔN CỐ ĐỊNH cho mọi dòng
+    const dienGiaiCoDinh = "Trích BHXH, BHYT, BHTN, KPCĐ cty đóng " + thangStr;
+
     // GOM NHÓM 1: BHXH CTY ĐÓNG (Nợ 6422 / Có 3383)
     rows.forEach(r => {
       if (r.tong_ajakal > 0) {
-        // Nếu NV không có HT-TT (AJ) và ÔĐ-TS (AK), chỉ có TNLĐ-BNN (AL) -> đổi diễn giải riêng
+        // Nếu NV không có HT-TT (AJ) và ÔĐ-TS (AK), chỉ có TNLĐ-BNN (AL) -> đổi diễn giải hạch toán riêng
         const chiCoTnlDBnn = (r.ht_tt === 0 && r.od_ts === 0 && r.tnld_bnn > 0);
-        let dienGiai = (chiCoTnlDBnn ? "Trích BHXH-TNBNN cty đóng " : "Trích BHXH cty đóng ") + selectedSheet;
+        let dienGiaiHT = (chiCoTnlDBnn ? "Trích BHXH-TNBNN cty đóng " : "Trích BHXH cty đóng ") + thangStr;
         tsvLines.push([
           dateStr,                    // Cột A: Ngày CT
           dateStr,                    // Cột B: Ngày HT
           "",                         // Cột C: Số CT
-          dienGiai,                   // Cột D: Diễn giải
+          dienGiaiCoDinh,             // Cột D: Diễn giải (cố định)
           loaiNV,                     // Cột E: Loại nghiệp vụ
           "",                         // Cột F: BỊ ẨN TRONG EXCEL
-          dienGiai,                   // Cột G: Diễn giải hạch toán
+          dienGiaiHT,                 // Cột G: Diễn giải hạch toán
           "6422",                     // Cột H: TK Nợ
           "3383",                     // Cột I: TK Có
           Math.round(r.tong_ajakal),  // Cột J: Số tiền
@@ -1941,9 +1948,9 @@ function copyForMisaAmisBhxh() {
     // GOM NHÓM 2: BHYT CTY ĐÓNG (Nợ 6422 / Có 3384)
     rows.forEach(r => {
       if (r.bhyt_cty > 0) {
-        let dienGiai = "Trích BHYT cty đóng " + selectedSheet;
+        let dienGiaiHT = "Trích BHYT cty đóng " + thangStr;
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai,
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
           "6422", "3384", Math.round(r.bhyt_cty), r.ma_nv, r.ma_nv
         ].join("\t"));
       }
@@ -1952,9 +1959,9 @@ function copyForMisaAmisBhxh() {
     // GOM NHÓM 3: BHTN CTY ĐÓNG (Nợ 6422 / Có 3385)
     rows.forEach(r => {
       if (r.bhtn_cty > 0) {
-        let dienGiai = "Trích BHTN cty đóng " + selectedSheet;
+        let dienGiaiHT = "Trích BHTN cty đóng " + thangStr;
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai,
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
           "6422", "3385", Math.round(r.bhtn_cty), r.ma_nv, r.ma_nv
         ].join("\t"));
       }
@@ -1963,9 +1970,9 @@ function copyForMisaAmisBhxh() {
     // GOM NHÓM 4: KPCĐ CTY ĐÓNG (Nợ 6422 / Có 3382)
     rows.forEach(r => {
       if (r.cd_cty > 0) {
-        let dienGiai = "Trích KPCĐ cty đóng " + selectedSheet;
+        let dienGiaiHT = "Trích KPCĐ cty đóng " + thangStr;
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai,
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
           "6422", "3382", Math.round(r.cd_cty), r.ma_nv, r.ma_nv
         ].join("\t"));
       }
