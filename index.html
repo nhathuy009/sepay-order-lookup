@@ -740,6 +740,7 @@
             </div>
             <div id="accPanelLuongThuong">
               <div class="text-muted-small" style="margin-bottom: 8px;">Click vào dòng để xem chi tiết</div>
+              <button id="copyAmisBtn" class="btn-outline" onclick="copyForMisaAmis()" style="font-size: 13px;">📋 Copy cho MISA AMIS</button>
               <div class="table-responsive">
                 <table class="sepay-table" id="accountingTable">
                   <thead>
@@ -1814,6 +1815,63 @@ function displaySheetData() {
   wrapper.style.display = "block";
 }
 
+function copyForMisaAmis() {
+  try {
+    const selectedSheet = document.getElementById("sheetSelect").value;
+    if (!selectedSheet || !globalSheetsData[selectedSheet]) {
+      alert("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
+      return;
+    }
+
+    const rows = globalSheetsData[selectedSheet];
+    let tsv = "";
+    
+    // Giả định lấy ngày cuối tháng của kỳ lương hiện tại
+    const dateStr = "30/06/2026"; // Bạn có thể bắt logic động từ tên sheet (VD: T062026)
+    const loaiNV = "Khác";
+
+    rows.forEach(r => {
+      // Chỉ lấy mã nhân viên trong ngoặc nếu cần, r.ma_nv đã có sẵn
+      const maDoiTuong = r.ma_nv; 
+      
+      // 1. Dòng Hoa hồng bán hàng (Nợ 6421 / Có 3341)
+      if (r.hoa_hong > 0) {
+        let dienGiai = "Hoa hồng bán hàng " + selectedSheet;
+        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6421", "3341", Math.round(r.hoa_hong), "", maDoiTuong].join("\t") + "\n";
+      }
+
+      // 2. Dòng Thưởng ghi nhận đóng góp (Nợ 6421 / Có 3341)
+      if (r.thuong_dong_gop > 0) {
+        let dienGiai = "Chi phí thưởng ghi nhận đóng góp " + selectedSheet;
+        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6421", "3341", Math.round(r.thuong_dong_gop), "", maDoiTuong].join("\t") + "\n";
+      }
+
+      // 3. Dòng Lương tính toán (Nợ 6422 / Có 3341)
+      if (r.luong_tinh_toan > 0) {
+        let dienGiai = "Chi phí lương tháng " + selectedSheet;
+        tsv += [dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, "6422", "3341", Math.round(r.luong_tinh_toan), "", maDoiTuong].join("\t") + "\n";
+      }
+      
+      // Bạn có thể tiếp tục bổ sung cho Lương phép (r.luong_phep), Khác (r.khac), hoặc các khoản trích theo lương (3383, 3384...) tùy nhu cầu.
+    });
+
+    if (!tsv) {
+      alert("Không có phát sinh hạch toán nào.");
+      return;
+    }
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyAmisBtn"); 
+      const originalText = btn.innerText; 
+      btn.innerText = "✅ Đã Copy! Dán vào Excel MISA";
+      setTimeout(() => { btn.innerText = originalText; }, 2500);
+    }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
+
+  } catch (e) {
+    alert("Đã xảy ra lỗi: " + e.message);
+  }
+}
+  
 function switchAccTab(tab) {
   accActiveTab = tab;
   applyAccTabView();
