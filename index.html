@@ -442,7 +442,7 @@
   }
 
   /* --- Nút switch dạng pill cho card Định khoản Hạch toán --- */
-  .acc-seg-wrap { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--input-border); }
+  .acc-seg-wrap { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--input-border); }
   .acc-seg-btn {
     padding: 7px 15px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
     border: none; font-family: var(--font-body, inherit); transition: 0.15s;
@@ -721,6 +721,7 @@
               <div class="acc-seg-wrap">
                 <button type="button" class="acc-seg-btn active" id="accTabBtn-luongthuong" onclick="switchAccTab('luongthuong')">Lương thưởng</button>
                 <button type="button" class="acc-seg-btn" id="accTabBtn-bhxh" onclick="switchAccTab('bhxh')">Trích BHXH và KPCĐ cty đóng</button>
+                <button type="button" class="acc-seg-btn" id="accTabBtn-bhxhnld" onclick="switchAccTab('bhxhnld')">Trích BHXH và TNCN từ lương NLĐ</button>
               </div>
             </div>
             <div id="accPanelLuongThuong">
@@ -754,6 +755,23 @@
                     </tr>
                   </thead>
                   <tbody id="accountingTbody2"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="accPanelBhxhNld" style="display:none;">
+              <div class="text-muted-small" style="margin-bottom: 8px;">Click vào dòng để xem chi tiết</div>
+              <div class="table-responsive">
+                <table class="sepay-table" id="accountingTable3">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px;">TK Nợ</th>
+                      <th style="width: 80px;">TK Có</th>
+                      <th>Diễn giải</th>
+                      <th style="text-align: right;">Số tiền (VNĐ)</th>
+                      <th style="text-align: center; width: 60px;">Mở rộng</th>
+                    </tr>
+                  </thead>
+                  <tbody id="accountingTbody3"></tbody>
                 </table>
               </div>
             </div>
@@ -1188,6 +1206,7 @@ function displaySheetData() {
   const accWrapper = document.getElementById("accountingWrapper");
   const accTbody = document.getElementById("accountingTbody");
   const accTbody2 = document.getElementById("accountingTbody2");
+  const accTbody3 = document.getElementById("accountingTbody3");
   
   if (!selectedSheet) {
     wrapper.style.display = "none";
@@ -1199,6 +1218,7 @@ function displaySheetData() {
   tbody.innerHTML = "";
   accTbody.innerHTML = "";
   accTbody2.innerHTML = "";
+  accTbody3.innerHTML = "";
   
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
@@ -1213,6 +1233,7 @@ function displaySheetData() {
     let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumTongAjakal = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhNld = 0, sumTongBhxhMoi = 0;
     let detailRowsHoaHongHTML = '', detailRowsThuongDgHTML = '', detailRowsLuongTtHTML = '', detailRowsLuongPhepHTML = '', detailRowsKhacHTML = '', detailRows3341HTML = '';
     let detailRows3383HTML = '', detailRows3384HTML = '', detailRows3385HTML = '', detailRows3382HTML = '', detailRows6422HTML = '';
+    let detailRowsNld3383HTML = '', detailRowsNld3384HTML = '', detailRowsNld3385HTML = '', detailRowsNld3335HTML = '', detailRowsNld3341HTML = '';
 
     rows.forEach(r => {
       // Đổ dữ liệu ra bảng chính (Lương tính toán ở cuối cùng)
@@ -1427,6 +1448,73 @@ function displaySheetData() {
           <td></td>
         </tr>
       `;
+
+      // ---- Chi tiết theo từng nhân viên cho bảng "Trích BHXH và TNCN từ lương NLĐ" ----
+      // Có 3383: BHXH (cột U)
+      detailRowsNld3383HTML += `
+        <tr class="detail-row-nld3383" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3383</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.bhxh_tru)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3384: BHYT (cột V)
+      detailRowsNld3384HTML += `
+        <tr class="detail-row-nld3384" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3384</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.bhyt_tru)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3385: BHTN (cột W)
+      detailRowsNld3385HTML += `
+        <tr class="detail-row-nld3385" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3385</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.bhtn_tru)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3335: Thuế TNCN (cột AB)
+      detailRowsNld3335HTML += `
+        <tr class="detail-row-nld3335" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3335</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.thue_tncn)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Nợ 3341 (tổng): BHXH + BHYT + BHTN + Thuế TNCN theo từng nhân viên
+      const tong_nld_3341 = r.bhxh_tru + r.bhyt_tru + r.bhtn_tru + r.thue_tncn;
+      detailRowsNld3341HTML += `
+        <tr class="detail-row-nld3341" style="display: none; background: rgba(0,0,0,0.02);">
+          <td style="font-weight: 600;">3341</td>
+          <td></td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(tong_nld_3341)}</td>
+          <td></td>
+        </tr>
+      `;
     });
 
     // Thêm dòng TỔNG CỘNG vào cuối bảng lương
@@ -1588,6 +1676,56 @@ function displaySheetData() {
       ${detailRows3382HTML}
     `;
 
+    // Bảng con: Trích BHXH và TNCN từ lương NLĐ
+    // Nợ 3341 = tổng 4 khoản Có bên dưới (3383 BHXH + 3384 BHYT + 3385 BHTN + 3335 Thuế TNCN)
+    const sumBHXH_U = Math.round(sumBhxhTru);     // Cột BHXH (U)
+    const sumBHYT_V = Math.round(sumBhytTru);     // Cột BHYT (V)
+    const sumBHTN_W = Math.round(sumBhtnTru);     // Cột BHTN (W)
+    const sumTNCN_AB = Math.round(sumThueTncn);   // Cột Tiền thuế TNCN (AB)
+    const sumTong3341Nld = sumBHXH_U + sumBHYT_V + sumBHTN_W + sumTNCN_AB;
+
+    accTbody3.innerHTML = `
+      <tr style="cursor: pointer; background: var(--badge-err-bg); transition: 0.2s;" onclick="toggleAccDetail('nld3341')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3341</td>
+        <td></td>
+        <td style="font-weight: 700;">Trích BHXH, BHYT, BHTN và thuế TNCN từ lương NLĐ</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTong3341Nld)}</td>
+        <td style="text-align: center;"><span id="icon-nld3341" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+      ${detailRowsNld3341HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('nld3383')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3383</td>
+        <td style="font-weight: 700;">BHXH</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHXH_U)}</td>
+        <td style="text-align: center;"><span id="icon-nld3383" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+      ${detailRowsNld3383HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('nld3384')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3384</td>
+        <td style="font-weight: 700;">BHYT</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHYT_V)}</td>
+        <td style="text-align: center;"><span id="icon-nld3384" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+      ${detailRowsNld3384HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('nld3385')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3385</td>
+        <td style="font-weight: 700;">BHTN</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHTN_W)}</td>
+        <td style="text-align: center;"><span id="icon-nld3385" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+      ${detailRowsNld3385HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('nld3335')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3335</td>
+        <td style="font-weight: 700;">Thuế TNCN</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumTNCN_AB)}</td>
+        <td style="text-align: center;"><span id="icon-nld3335" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+      ${detailRowsNld3335HTML}
+    `;
 
     // Giữ đúng panel đang được chọn (mặc định 'luongthuong') khi đổi sheet
     applyAccTabView();
@@ -1602,15 +1740,21 @@ function switchAccTab(tab) {
 }
 
 function applyAccTabView() {
-  const panelLuongThuong = document.getElementById("accPanelLuongThuong");
-  const panelBhxh = document.getElementById("accPanelBhxh");
-  const btnLuongThuong = document.getElementById("accTabBtn-luongthuong");
-  const btnBhxh = document.getElementById("accTabBtn-bhxh");
-  if (!panelLuongThuong || !panelBhxh) return;
-  panelLuongThuong.style.display = accActiveTab === "luongthuong" ? "block" : "none";
-  panelBhxh.style.display = accActiveTab === "bhxh" ? "block" : "none";
-  btnLuongThuong.classList.toggle("active", accActiveTab === "luongthuong");
-  btnBhxh.classList.toggle("active", accActiveTab === "bhxh");
+  const panels = {
+    luongthuong: document.getElementById("accPanelLuongThuong"),
+    bhxh: document.getElementById("accPanelBhxh"),
+    bhxhnld: document.getElementById("accPanelBhxhNld")
+  };
+  const btns = {
+    luongthuong: document.getElementById("accTabBtn-luongthuong"),
+    bhxh: document.getElementById("accTabBtn-bhxh"),
+    bhxhnld: document.getElementById("accTabBtn-bhxhnld")
+  };
+  if (!panels.luongthuong || !panels.bhxh || !panels.bhxhnld) return;
+  Object.keys(panels).forEach(key => {
+    panels[key].style.display = accActiveTab === key ? "block" : "none";
+    btns[key].classList.toggle("active", accActiveTab === key);
+  });
 }
   
 function appendRowToDOM(rowObj, tbody) {
