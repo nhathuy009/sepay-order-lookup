@@ -664,7 +664,7 @@
         </div>
 
         <div class="card" id="employeeTableWrapper" style="display:none;">
-          <h3 style="margin-top:0; font-size:16px;">Bảng lương chi tiết (Từ dòng 7)</h3>
+          <h3 style="margin-top:0; font-size:16px;">Bảng lương chi tiết (Từ dòng 8)</h3>
           <div class="table-responsive">
             <table class="sepay-table" id="employeeTable">
               <thead>
@@ -1052,8 +1052,8 @@ async function doFetchEmployeesExcel() {
             if (!isNaN(t5Val) && t5Val > 0) soNgayCongChuan = t5Val;
         }
 
-        // Đọc dữ liệu từ dòng 7 (index 6)
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 6 });
+        // Đọc dữ liệu từ dòng 8 (index 7)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 7 });
         
         let sheetData = [];
         jsonData.forEach(row => {
