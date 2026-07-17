@@ -375,6 +375,13 @@
     color: var(--text-main); vertical-align: middle; font-size: 13px;
   }
   .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
+
+  /* --- BẢNG DANH SÁCH CHUYỂN KHOẢN LƯƠNG: thu gọn vừa nội dung --- */
+  #bankTransferTable { table-layout: auto; }
+  #bankTransferTable th, #bankTransferTable td { padding: 8px 10px; font-size: 12.5px; white-space: nowrap; }
+  #bankTransferTable th:nth-child(1), #bankTransferTable td:nth-child(1) { width: 34px; text-align: center; }
+  #bankTransferTable th:nth-child(3), #bankTransferTable td:nth-child(3) { width: 1%; }
+  #bankTransferTable th:nth-child(4), #bankTransferTable td:nth-child(4) { width: 1%; }
   
   .amount-in { color: var(--amount-in); font-weight: 600; font-size: 13px;}
   .amount-out { color: var(--amount-out); font-weight: 600; font-size: 13px;}
@@ -776,7 +783,7 @@
               </div>
             </div>
           </div>
-          <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 0 1 480px; max-width: 480px; min-width: 380px;">
+          <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 0 1 400px; max-width: 400px; min-width: 340px;">
             <h3 style="margin:0 0 16px; font-size:16px;">Danh sách chuyển khoản lương</h3>
             <div class="table-responsive">
               <table class="sepay-table" id="bankTransferTable">
