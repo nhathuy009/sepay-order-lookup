@@ -437,6 +437,8 @@
     .menu-text { display: inline !important; }
     .main-content { padding: 16px; overflow: visible; }
     #toggleSidebarBtn { display: none !important; }
+    #accountingRow { flex-direction: column; }
+    #accountingRow #accountingWrapper, #accountingRow #accountingRowRight { max-width: 100%; }
   }
 
   /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
@@ -699,22 +701,26 @@
             </table>
           </div>
         </div>
-        <div class="card" id="accountingWrapper" style="display:none; margin-top: 20px;">
-          <h3 style="margin-top:0; font-size:16px;">Định khoản Hạch toán (Click vào dòng để xem chi tiết)</h3>
-          <div class="table-responsive">
-            <table class="sepay-table" id="accountingTable">
-              <thead>
-                <tr>
-                  <th style="width: 80px;">TK Nợ</th>
-                  <th style="width: 80px;">TK Có</th>
-                  <th>Diễn giải</th>
-                  <th style="text-align: right;">Số tiền (VNĐ)</th>
-                  <th style="text-align: center; width: 60px;">Mở rộng</th>
-                </tr>
-              </thead>
-              <tbody id="accountingTbody"></tbody>
-            </table>
+        <div id="accountingRow" style="display: flex; gap: 20px; align-items: flex-start; margin-top: 20px;">
+          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 1 1 50%; max-width: 50%; min-width: 0;">
+            <h3 style="margin-top:0; font-size:16px;">Định khoản Hạch toán (Click vào dòng để xem chi tiết)</h3>
+            <div class="table-responsive">
+              <table class="sepay-table" id="accountingTable">
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">TK Nợ</th>
+                    <th style="width: 80px;">TK Có</th>
+                    <th>Diễn giải</th>
+                    <th style="text-align: right;">Số tiền (VNĐ)</th>
+                    <th style="text-align: center; width: 60px;">Mở rộng</th>
+                  </tr>
+                </thead>
+                <tbody id="accountingTbody"></tbody>
+              </table>
+            </div>
           </div>
+          <!-- Chỗ trống dành cho bảng mới hiển thị song song bên phải -->
+          <div id="accountingRowRight" style="flex: 1 1 50%; max-width: 50%; min-width: 0;"></div>
         </div>
       </div>
       <div id="tabInvoice" class="hidden">
