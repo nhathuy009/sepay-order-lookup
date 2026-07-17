@@ -803,9 +803,11 @@ function switchTab(which) {
     if (btnEl) btnEl.classList.toggle("active", which === tab);
   });
 
+  // Bắt sự kiện tải tài khoản ngân hàng khi vào tab transaction
   if (which === "transaction") {
-    const selectEl = document.getElementById("txBankAccountId");
-    if (selectEl && selectEl.options.length <= 1) {
+    const dropdownEl = document.getElementById("txBankAccountIdDropdown");
+    // Nếu dropdown trống (chưa có checkbox nào) thì mới tải dữ liệu
+    if (dropdownEl && dropdownEl.children.length === 0) {
       loadBankAccounts();
     }
   }
@@ -1145,12 +1147,12 @@ function copyTableToExcel() {
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
-// HÀM TẢI DANH SÁCH TÀI KHOẢN NGÂN HÀNG VÀO CHECKBOX DROPDOWN
 async function loadBankAccounts() {
   const dropdownEl = document.getElementById("txBankAccountIdDropdown");
   const selectBrandEl = document.getElementById("txBankBrand");
   
-  if (!dropdownEl || !selectBrandEl) return;
+  // Chỉ dừng nếu không tìm thấy khung dropdown của multi-select
+  if (!dropdownEl) return; 
 
   try {
     const resp = await fetch("/api/index", {
@@ -1161,13 +1163,14 @@ async function loadBankAccounts() {
     
     if (resp.ok && data.bank_accounts) {
       dropdownEl.innerHTML = '';
-      selectBrandEl.innerHTML = '<option value="">-- Tất cả ngân hàng --</option>';
+      if (selectBrandEl) selectBrandEl.innerHTML = '<option value="">-- Tất cả ngân hàng --</option>';
+      
       const uniqueBrands = new Set();
 
       data.bank_accounts.forEach(bank => {
         const balance = Number(bank.accumulated).toLocaleString('vi-VN');
         
-        // Tạo Checkbox cho từng tài khoản
+        // Tạo Checkbox cho từng tài khoản và chèn vào dropdown
         const label = document.createElement('label');
         label.className = 'ms-checkbox-item';
         label.innerHTML = `<input type="checkbox" value="${bank.id}" onchange="updateMultiSelectLabel()" /> <span>${bank.bank_short_name} - ${bank.account_number} (SD: ${balance}đ)</span>`;
@@ -1176,11 +1179,14 @@ async function loadBankAccounts() {
         if (bank.bank_short_name) uniqueBrands.add(bank.bank_short_name);
       });
 
-      uniqueBrands.forEach(brand => {
-        const optionBrand = document.createElement("option");
-        optionBrand.value = brand; optionBrand.text = brand;
-        selectBrandEl.appendChild(optionBrand);
-      });
+      // Nếu có dùng bộ lọc txBankBrand ở giao diện thì mới đổ dữ liệu vào
+      if (selectBrandEl) {
+        uniqueBrands.forEach(brand => {
+          const optionBrand = document.createElement("option");
+          optionBrand.value = brand; optionBrand.text = brand;
+          selectBrandEl.appendChild(optionBrand);
+        });
+      }
     }
   } catch (e) { console.error("Lỗi tải danh sách ngân hàng:", e); }
 }
@@ -1255,9 +1261,9 @@ async function doTxSearch() {
 async function doTxList() {
   const dateFromVal = document.getElementById("txDateFrom").value; 
   const dateToVal = document.getElementById("txDateTo").value;
-  const bankBrandVal = document.getElementById("txBankBrand").value.trim();
+  const bankBrandVal = selectBrandEl ? selectBrandEl.value.trim() : "";
   
-  // Lấy 1 mảng (Array) các UUID tài khoản đang được Tích Chọn từ thẻ Dropdown tự tạo
+  // Lấy danh sách các tài khoản đang được Tích Chọn
   const selectedAccounts = Array.from(document.querySelectorAll('#txBankAccountIdDropdown input:checked')).map(cb => cb.value);
   
   const box = document.getElementById("txListResult");
