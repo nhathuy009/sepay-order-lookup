@@ -779,7 +779,10 @@
               </div>
             </div>
             <div id="accPanelBhxhNld" style="display:none;">
-              <div class="text-muted-small" style="margin-bottom: 8px;">Click vào dòng để xem chi tiết</div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: nowrap;">
+                <div class="text-muted-small" style="margin:0; white-space:nowrap;">Click vào dòng để xem chi tiết</div>
+                <button id="copyAmisBhxhNldBtn" class="btn-outline" onclick="copyForMisaAmisBhxhNld()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho MISA AMIS</button>
+              </div>
               <div class="table-responsive">
                 <table class="sepay-table" id="accountingTable3">
                   <thead>
@@ -1977,6 +1980,82 @@ function copyForMisaAmisBhxh() {
 
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBhxhBtn");
+      const originalText = btn.innerText;
+      btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
+      setTimeout(() => { btn.innerText = originalText; }, 3000);
+    }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
+
+  } catch (e) {
+    alert("Đã xảy ra lỗi: " + e.message);
+  }
+}
+
+function copyForMisaAmisBhxhNld() {
+  try {
+    const selectedSheet = document.getElementById("sheetSelect").value;
+    if (!selectedSheet || !globalSheetsData[selectedSheet]) {
+      alert("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
+      return;
+    }
+
+    const rows = globalSheetsData[selectedSheet];
+    let tsvLines = [];
+
+    // Định dạng tháng dạng T06/2026 từ tên sheet (VD: T062026)
+    const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+    const thangStr = monthMatch ? `T${monthMatch[1]}/${monthMatch[2]}` : selectedSheet;
+
+    const dateStr = "30/06/2026";
+    const loaiNV = ""; // Cột E bỏ trống theo yêu cầu
+
+    // Diễn giải (cột D) LUÔN CỐ ĐỊNH cho mọi dòng
+    const dienGiaiCoDinh = "Trích BHXH và TNCN từ lương NLĐ " + thangStr;
+
+    // BƯỚC 1: Lần lượt từng nhân viên -> 3383 (BHXH) -> 3384 (BHYT) -> 3385 (BHTN)
+    rows.forEach(r => {
+      if (r.bhxh_tru > 0) {
+        let dienGiaiHT = "Trích BHXH từ lương NLĐ " + thangStr;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
+          "3341", "3383", Math.round(r.bhxh_tru), r.ma_nv, r.ma_nv
+        ].join("\t"));
+      }
+      if (r.bhyt_tru > 0) {
+        let dienGiaiHT = "Trích BHYT từ lương NLĐ " + thangStr;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
+          "3341", "3384", Math.round(r.bhyt_tru), r.ma_nv, r.ma_nv
+        ].join("\t"));
+      }
+      if (r.bhtn_tru > 0) {
+        let dienGiaiHT = "Trích BHTN từ lương NLĐ " + thangStr;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
+          "3341", "3385", Math.round(r.bhtn_tru), r.ma_nv, r.ma_nv
+        ].join("\t"));
+      }
+    });
+
+    // BƯỚC 2: Sau khi hết danh sách NV ở bước 1, duyệt lại toàn bộ để xuất Thuế TNCN (33351)
+    rows.forEach(r => {
+      if (r.thue_tncn > 0) {
+        let dienGiaiHT = "Trích thuế TNCN từ lương NLĐ " + thangStr;
+        tsvLines.push([
+          dateStr, dateStr, "", dienGiaiCoDinh, loaiNV, "", dienGiaiHT,
+          "3341", "33351", Math.round(r.thue_tncn), r.ma_nv, r.ma_nv
+        ].join("\t"));
+      }
+    });
+
+    if (tsvLines.length === 0) {
+      alert("Không có phát sinh hạch toán nào.");
+      return;
+    }
+
+    const tsv = tsvLines.join("\n") + "\n";
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyAmisBhxhNldBtn");
       const originalText = btn.innerText;
       btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
       setTimeout(() => { btn.innerText = originalText; }, 3000);
