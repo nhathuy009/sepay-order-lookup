@@ -375,7 +375,7 @@
     color: var(--text-main); vertical-align: middle; font-size: 13px;
   }
   .sepay-table th:last-child, .sepay-table td:last-child { border-right: none; }
- 
+  
   .amount-in { color: var(--amount-in); font-weight: 600; font-size: 13px;}
   .amount-out { color: var(--amount-out); font-weight: 600; font-size: 13px;}
   
@@ -438,7 +438,7 @@
     .main-content { padding: 16px; overflow: visible; }
     #toggleSidebarBtn { display: none !important; }
     #accountingRow { flex-direction: column; }
-    #accountingRow #accountingWrapper, #accountingRow #accountingRowRight { max-width: 100%; }
+    #accountingRow #accountingWrapper, #accountingRow #accountingWrapper2 { max-width: 100%; }
   }
 
   /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
@@ -704,7 +704,7 @@
         </div>
         <div id="accountingRow" style="display: flex; gap: 20px; align-items: flex-start; margin-top: 20px;">
           <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 1 1 50%; max-width: 50%; min-width: 0;">
-            <h3 style="margin-top:0; font-size:16px;">Định khoản Hạch toán (Click vào dòng để xem chi tiết)</h3>
+            <h3 style="margin-top:0; font-size:16px;">Lương thưởng <span style="font-weight:400; font-size:12px; color:var(--text-muted);">(Click vào dòng để xem chi tiết)</span></h3>
             <div class="table-responsive">
               <table class="sepay-table" id="accountingTable">
                 <thead>
@@ -720,8 +720,22 @@
               </table>
             </div>
           </div>
-          <!-- Chỗ trống dành cho bảng mới hiển thị song song bên phải -->
-          <div id="accountingRowRight" style="flex: 1 1 50%; max-width: 50%; min-width: 0;"></div>
+          <div class="card" id="accountingWrapper2" style="display:none; margin-top: 0; flex: 1 1 50%; max-width: 50%; min-width: 0;">
+            <h3 style="margin-top:0; font-size:16px;">Trích BHXH và KPCĐ cty đóng</h3>
+            <div class="table-responsive">
+              <table class="sepay-table" id="accountingTable2">
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">TK Nợ</th>
+                    <th style="width: 80px;">TK Có</th>
+                    <th>Diễn giải</th>
+                    <th style="text-align: right;">Số tiền (VNĐ)</th>
+                  </tr>
+                </thead>
+                <tbody id="accountingTbody2"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
       <div id="tabInvoice" class="hidden">
@@ -1150,20 +1164,25 @@ function displaySheetData() {
   
   const accWrapper = document.getElementById("accountingWrapper");
   const accTbody = document.getElementById("accountingTbody");
+  const accWrapper2 = document.getElementById("accountingWrapper2");
+  const accTbody2 = document.getElementById("accountingTbody2");
   
   if (!selectedSheet) {
     wrapper.style.display = "none";
     accWrapper.style.display = "none";
+    accWrapper2.style.display = "none";
     return;
   }
   
   const rows = globalSheetsData[selectedSheet] || [];
   tbody.innerHTML = "";
   accTbody.innerHTML = "";
+  accTbody2.innerHTML = "";
   
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
     accWrapper.style.display = "none";
+    accWrapper2.style.display = "none";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
@@ -1429,6 +1448,48 @@ function displaySheetData() {
 
     accTbody.innerHTML = accHTML;
     accWrapper.style.display = "block";
+
+    // Bảng con: Trích BHXH và KPCĐ cty đóng
+    // Nợ 6422 = tổng 4 khoản Có bên dưới (3383 BHXH + 3384 BHYT + 3385 BHTN + 3382 KPCĐ)
+    const sumBHXH_3383 = Math.round(sumTongAjakal);   // Cột "Tổng BHXH" (AJ+AK+AL)
+    const sumBHYT_3384 = Math.round(sumBhytCty);      // Cột AM
+    const sumBHTN_3385 = Math.round(sumBhtnCty);      // Cột AN
+    const sumKPCD_3382 = Math.round(sumCdCty);        // Cột AO
+    const sumTong6422 = sumBHXH_3383 + sumBHYT_3384 + sumBHTN_3385 + sumKPCD_3382;
+
+    accTbody2.innerHTML = `
+      <tr style="background: var(--badge-err-bg);">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
+        <td></td>
+        <td style="font-weight: 700;">Trích BHXH, BHYT, BHTN, KPCĐ tính vào chi phí</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTong6422)}</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3383</td>
+        <td style="font-weight: 700;">BHXH</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHXH_3383)}</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3384</td>
+        <td style="font-weight: 700;">BHYT</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHYT_3384)}</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3385</td>
+        <td style="font-weight: 700;">BHTN</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHTN_3385)}</td>
+      </tr>
+      <tr>
+        <td></td>
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3382</td>
+        <td style="font-weight: 700;">KPCĐ</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(sumKPCD_3382)}</td>
+      </tr>
+    `;
+    accWrapper2.style.display = "block";
   }
   
   wrapper.style.display = "block";
