@@ -1915,7 +1915,9 @@ function copyForMisaAmisBhxh() {
     // GOM NHÓM 1: BHXH CTY ĐÓNG (Nợ 6422 / Có 3383)
     rows.forEach(r => {
       if (r.tong_ajakal > 0) {
-        let dienGiai = "Trích BHXH cty đóng " + selectedSheet;
+        // Nếu NV không có HT-TT (AJ) và ÔĐ-TS (AK), chỉ có TNLĐ-BNN (AL) -> đổi diễn giải riêng
+        const chiCoTnlDBnn = (r.ht_tt === 0 && r.od_ts === 0 && r.tnld_bnn > 0);
+        let dienGiai = (chiCoTnlDBnn ? "Trích BHXH-TNBNN cty đóng " : "Trích BHXH cty đóng ") + selectedSheet;
         tsvLines.push([
           dateStr,                    // Cột A: Ngày CT
           dateStr,                    // Cột B: Ngày HT
