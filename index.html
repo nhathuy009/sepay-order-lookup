@@ -1826,7 +1826,7 @@ function copyForMisaAmis() {
     const rows = globalSheetsData[selectedSheet];
     let tsvLines = [];
     
-    // Bạn có thể tùy biến ngày hạch toán theo nhu cầu
+    // Bạn có thể tùy biến ngày theo sheet (VD: "30/06/2026")
     const dateStr = "30/06/2026"; 
     const loaiNV = "Khác";
 
@@ -1834,11 +1834,19 @@ function copyForMisaAmis() {
     rows.forEach(r => {
       if (r.hoa_hong > 0) {
         let dienGiai = "Hoa hồng bán hàng " + selectedSheet;
-        // Đảm bảo mảng đủ 11 phần tử để không bị lệch cột trên MISA AMIS
-        // Vị trí index 3 (Diễn giải) và index 5 (Diễn giải Hạch toán) dùng chung biến dienGiai
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
-          "6421", "3341", Math.round(r.hoa_hong), "", r.ma_nv
+          dateStr,                // Cột A: Ngày CT
+          dateStr,                // Cột B: Ngày HT
+          "",                     // Cột C: Số CT
+          dienGiai,               // Cột D: Diễn giải
+          loaiNV,                 // Cột E: Loại nghiệp vụ
+          "",                     // Cột F: BỊ ẨN TRONG EXCEL (để rỗng để không lấn cột)
+          dienGiai,               // Cột G: Diễn giải hạch toán
+          "6421",                 // Cột H: TK Nợ
+          "3341",                 // Cột I: TK Có
+          Math.round(r.hoa_hong), // Cột J: Số tiền
+          "",                     // Cột K: Mã ĐT Nợ
+          r.ma_nv                 // Cột L: Mã ĐT Có
         ].join("\t"));
       }
     });
@@ -1848,7 +1856,7 @@ function copyForMisaAmis() {
       if (r.thuong_dong_gop > 0) {
         let dienGiai = "Chi phí thưởng ghi nhận đóng góp " + selectedSheet;
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
+          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai, 
           "6421", "3341", Math.round(r.thuong_dong_gop), "", r.ma_nv
         ].join("\t"));
       }
@@ -1859,27 +1867,24 @@ function copyForMisaAmis() {
       if (r.luong_tinh_toan > 0) {
         let dienGiai = "Chi phí lương tháng " + selectedSheet;
         tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, dienGiai, 
+          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai, 
           "6422", "3341", Math.round(r.luong_tinh_toan), "", r.ma_nv
         ].join("\t"));
       }
     });
-
-    // Bạn có thể nhân bản thêm vòng lặp ở đây cho Lương phép năm, Trích BHXH...
 
     if (tsvLines.length === 0) {
       alert("Không có phát sinh hạch toán nào.");
       return;
     }
 
-    // Nối các dòng bằng ký tự xuống dòng (\n)
     const tsv = tsvLines.join("\n") + "\n";
 
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBtn"); 
       const originalText = btn.innerText; 
-      btn.innerText = "✅ Đã Copy! Dán vào Excel MISA";
-      setTimeout(() => { btn.innerText = originalText; }, 2500);
+      btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
+      setTimeout(() => { btn.innerText = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
