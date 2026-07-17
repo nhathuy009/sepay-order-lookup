@@ -666,6 +666,7 @@
                   <th rowspan="2" style="text-align: right; vertical-align: middle;">Thực<br>nhận (AD)</th>
                   <th colspan="2" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thông tin nhận lương</th>
                   <th colspan="7" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">BHXH Công ty đóng</th>
+                  <th rowspan="2" style="text-align: right; vertical-align: middle;">CĐ<br>(AO)</th>
                 </tr>
                 <tr>
                   <th style="text-align: right;">Trang<br>Phục (L)</th>
@@ -689,8 +690,8 @@
                   <th style="text-align: right;">TNLĐ-BNN<br>(AL)</th>
                   <th style="text-align: right;">BHYT<br>(AM)</th>
                   <th style="text-align: right;">BHTN<br>(AN)</th>
-                  <th style="text-align: right;">CĐ<br>(AO)</th>
-                  <th style="text-align: right;">Tổng<br>BHXH</th>
+                  <th style="text-align: right;">Tổng BHXH<br>NLĐ Đóng</th>
+                  <th style="text-align: right;">Tổng BHXH<br>CTY Đóng</th>
                 </tr>
               </thead>
               <tbody id="employeeTbody"></tbody>
@@ -1052,7 +1053,8 @@ async function doFetchEmployeesExcel() {
             const bhyt_cty = parseFloat(bhyt_cty_raw) || 0;
             const bhtn_cty = parseFloat(bhtn_cty_raw) || 0;
             const cd_cty = parseFloat(cd_cty_raw) || 0;
-            const tong_bhxh_moi = ht_tt + od_ts + tnld_bnn + bhyt_cty + bhtn_cty + cd_cty;
+            const tong_bhxh_nld = bhxh_tru + bhyt_tru + bhtn_tru; // U + V + W (BHXH người lao động đóng)
+            const tong_bhxh_moi = ht_tt + od_ts + tnld_bnn + bhyt_cty + bhtn_cty; // Tổng BHXH CTY Đóng (không gồm CĐ)
             
             // XỬ LÝ ĐIỀU KIỆN MẪU SỐ CHIA (Theo ô T5 hoặc theo Cột K)
             let mauSoChia = soNgayCongChuan;
@@ -1094,6 +1096,7 @@ async function doFetchEmployeesExcel() {
               bhyt_cty: bhyt_cty,
               bhtn_cty: bhtn_cty,
               cd_cty: cd_cty,
+              tong_bhxh_nld: tong_bhxh_nld,
               tong_bhxh_moi: tong_bhxh_moi
             });
           }
@@ -1149,7 +1152,7 @@ function displaySheetData() {
   accTbody.innerHTML = "";
   
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="30" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
     accWrapper.style.display = "none";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
@@ -1158,7 +1161,7 @@ function displaySheetData() {
     let sumLuongCb = 0, sumTrangPhuc = 0, sumComTrua = 0, sumTrachNhiem = 0, sumBhxh = 0, sumLuongTinhToan = 0;
     let sumHoaHong = 0, sumThuongDongGop = 0, sumLuongPhep = 0, sumKhac = 0, sumTongThuNhap = 0;
     let sumBhxhTru = 0, sumBhytTru = 0, sumBhtnTru = 0, sumCdTru = 0, sumThueTncn = 0, sumThucNhan = 0;
-    let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhMoi = 0;
+    let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhNld = 0, sumTongBhxhMoi = 0;
     let detailRowsHTML = ''; 
 
     rows.forEach(r => {
@@ -1193,8 +1196,9 @@ function displaySheetData() {
         <td style="text-align: right;">${formatMoney(r.tnld_bnn)}</td>
         <td style="text-align: right;">${formatMoney(r.bhyt_cty)}</td>
         <td style="text-align: right;">${formatMoney(r.bhtn_cty)}</td>
-        <td style="text-align: right;">${formatMoney(r.cd_cty)}</td>
+        <td style="text-align: right; font-weight: 700;">${formatMoney(r.tong_bhxh_nld)}</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(r.tong_bhxh_moi)}</td>
+        <td style="text-align: right;">${formatMoney(r.cd_cty)}</td>
       `;
       tbody.appendChild(tr);
 
@@ -1222,6 +1226,7 @@ function displaySheetData() {
       sumBhytCty += r.bhyt_cty;
       sumBhtnCty += r.bhtn_cty;
       sumCdCty += r.cd_cty;
+      sumTongBhxhNld += r.tong_bhxh_nld;
       sumTongBhxhMoi += r.tong_bhxh_moi;
       
       // Tạo dòng chi tiết Hạch toán (Chỉ dùng Lương tính toán vì nó đã bao trọn)
@@ -1267,8 +1272,9 @@ function displaySheetData() {
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumTnldBnn)}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhytCty)}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhtnCty)}</td>
-      <td style="text-align: right; font-weight: 700;">${formatMoney(sumCdCty)}</td>
+      <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTongBhxhNld)}</td>
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTongBhxhMoi)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(sumCdCty)}</td>
     `;
     tbody.appendChild(totalTr);
 
