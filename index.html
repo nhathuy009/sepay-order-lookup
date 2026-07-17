@@ -407,6 +407,20 @@
     .main-content { padding: 16px; overflow: visible; }
     #toggleSidebarBtn { display: none !important; }
   }
+
+  /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
+  #txListTable th, 
+  #txListTable td {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  #txListTable th {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
+  
   /* --- GIAO DIỆN BẢNG LƯƠNG NHỎ GỌN NHƯ EXCEL --- */
   #employeeTable th, 
   #employeeTable td {
@@ -1286,7 +1300,6 @@ async function doTxList() {
     return; 
   }
   
-  // Hàm đảo chuỗi DD/MM/YYYY thành YYYY-MM-DD để gửi lên API
   const parseDateToAPI = (str) => {
     const parts = str.split('/');
     if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -1308,7 +1321,7 @@ async function doTxList() {
           date_from: dateFrom, 
           date_to: dateTo, 
           bank_brand: bankBrandVal,          
-          bank_account: "",   // Để rỗng để Backend lấy tất cả theo khoảng ngày
+          bank_account: "", 
           access_token: getToken() 
       }) 
     });
@@ -1321,8 +1334,7 @@ async function doTxList() {
     
     let txs = data.transactions;
     
-    // BỘ LỌC ĐA TÀI KHOẢN (FRONTEND)
-    // Nếu có chọn checkbox, loại bỏ các giao dịch không thuộc UUID đã chọn
+    // BỘ LỌC ĐA TÀI KHOẢN
     if (selectedAccounts.length > 0) {
       txs = txs.filter(tx => selectedAccounts.includes(tx.bank_account_id));
     }
@@ -1332,22 +1344,39 @@ async function doTxList() {
       return;
     }
     
-    // Vẽ bảng HTML giao diện mới chuẩn kích thước
-    let rows = "";
-    let totalAmount = 0; // Biến tính tổng dòng tiền
+    // TÍNH TOÁN SỐ DƯ LŨY KẾ
+    // 1. Lấy số dư đầu kỳ từ ô input (Chỉ lấy số)
+    let initialBalanceStr = document.getElementById("txInitialBalance").value || "0";
+    let runningBalance = parseInt(initialBalanceStr.replace(/\D/g, '')) || 0;
+    let totalAmountIn = 0;
+    let totalAmountOut = 0;
+
+    // 2. Sắp xếp giao dịch từ cũ đến mới để tính lũy kế đúng dòng thời gian
+    txs.sort((a, b) => new Date(a.transaction_date.replace(" ", "T")) - new Date(b.transaction_date.replace(" ", "T")));
 
     txs.forEach(tx => {
-      // Tính tổng: Tiền vào thì cộng, tiền ra thì trừ
-      totalAmount += Number(tx.amount_in || 0) - Number(tx.amount_out || 0);
+      let inAmt = Number(tx.amount_in || 0);
+      let outAmt = Number(tx.amount_out || 0);
+      totalAmountIn += inAmt;
+      totalAmountOut += outAmt;
+      
+      runningBalance = runningBalance + inAmt - outAmt;
+      tx.currentBalance = runningBalance; // Gắn số dư tương ứng vào object
+    });
 
+    // 3. Đảo ngược mảng để hiển thị Giao dịch mới nhất lên đầu bảng (Tùy chọn UX)
+    txs.reverse();
+    
+    // VẼ BẢNG HTML
+    let rows = "";
+    txs.forEach(tx => {
       const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
-      let amountHtml = "0 đ";
-      if (tx.amount_in > 0) amountHtml = `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')} đ</span>`;
-      else if (tx.amount_out > 0) amountHtml = `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')} đ</span>`;
-
+      let amountInHtml = Number(tx.amount_in) > 0 ? `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')}</span>` : "";
+      let amountOutHtml = Number(tx.amount_out) > 0 ? `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')}</span>` : "";
+      let balanceHtml = `<strong style="color:var(--accent);">${tx.currentBalance.toLocaleString('vi-VN')}</strong>`;
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
 
       rows += `
@@ -1363,43 +1392,42 @@ async function doTxList() {
               ${escapeHtml(tx.account_number)}
             </div>
           </td>
-          <td>${amountHtml}</td>
           <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
             ${escapeHtml(tx.transaction_content)}
           </td>
+          <td style="text-align: right;">${amountInHtml}</td>
+          <td style="text-align: right;">${amountOutHtml}</td>
+          <td style="text-align: right;">${balanceHtml}</td>
           <td class="text-id">${escapeHtml(tx.code || "—")}</td>
           <td class="text-id">${escapeHtml(tx.reference_number || "—")}</td>
         </tr>`;
     });
 
-    // Xử lý hiển thị số tiền tổng cộng (+ hoặc -)
-    let totalDisplay = totalAmount >= 0 
-      ? `+${totalAmount.toLocaleString('vi-VN')} đ` 
-      : `${totalAmount.toLocaleString('vi-VN')} đ`;
-
-    // Chèn dòng Tổng cộng vào cuối bảng
+    // Chèn dòng Tổng phát sinh vào cuối bảng
     rows += `
       <tr class="total-row">
-        <td colspan="3" style="text-align: right; font-weight: 600; text-transform: uppercase;">Tổng cộng:</td>
-        <td style="font-weight: 700; font-size: 14px; white-space: nowrap;">${totalDisplay}</td>
-        <td colspan="3"></td>
+        <td colspan="4" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-out);">${totalAmountOut.toLocaleString('vi-VN')}</td>
+        <td style="text-align: right; font-weight: 800; color: var(--accent);">${runningBalance.toLocaleString('vi-VN')}</td>
+        <td colspan="2"></td>
       </tr>`;
-      
-    // ĐÃ XÓA DẤU "});" BỊ DƯ Ở ĐÂY
       
     box.innerHTML = `
       <div style="margin-bottom:12px;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
       </div>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
-        <table class="sepay-table">
+        <table class="sepay-table" id="txListTable">
           <thead>
             <tr>
               <th>ID</th>
               <th>Thời gian</th>
               <th>Tài khoản</th>
-              <th>Số tiền</th>
               <th>Nội dung</th>
+              <th style="text-align: right;">Tiền vào (+)</th>
+              <th style="text-align: right;">Tiền ra (-)</th>
+              <th style="text-align: right;">Số dư cuối</th>
               <th>Mã thanh toán</th>
               <th>Mã tham chiếu</th>
             </tr>
