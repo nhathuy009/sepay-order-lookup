@@ -438,7 +438,19 @@
     .main-content { padding: 16px; overflow: visible; }
     #toggleSidebarBtn { display: none !important; }
     #accountingRow { flex-direction: column; }
-    #accountingRow #accountingWrapper, #accountingRow #accountingWrapper2 { max-width: 100%; }
+    #accountingRow #accountingWrapper { max-width: 100%; }
+  }
+
+  /* --- Nút switch dạng pill cho card Định khoản Hạch toán --- */
+  .acc-seg-wrap { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--input-border); }
+  .acc-seg-btn {
+    padding: 7px 15px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+    border: none; font-family: var(--font-body, inherit); transition: 0.15s;
+    background: transparent; color: var(--text-muted);
+  }
+  .acc-seg-btn.active {
+    background: var(--btn-orange); color: var(--btn-orange-text);
+    box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
   }
 
   /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
@@ -702,38 +714,46 @@
             </table>
           </div>
         </div>
-        <div id="accountingRow" style="display: flex; gap: 20px; align-items: flex-start; margin-top: 20px;">
-          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 1 1 50%; max-width: 50%; min-width: 0;">
-            <h3 style="margin-top:0; font-size:16px;">Lương thưởng <span style="font-weight:400; font-size:12px; color:var(--text-muted);">(Click vào dòng để xem chi tiết)</span></h3>
-            <div class="table-responsive">
-              <table class="sepay-table" id="accountingTable">
-                <thead>
-                  <tr>
-                    <th style="width: 80px;">TK Nợ</th>
-                    <th style="width: 80px;">TK Có</th>
-                    <th>Diễn giải</th>
-                    <th style="text-align: right;">Số tiền (VNĐ)</th>
-                    <th style="text-align: center; width: 60px;">Mở rộng</th>
-                  </tr>
-                </thead>
-                <tbody id="accountingTbody"></tbody>
-              </table>
+        <div id="accountingRow" style="margin-top: 20px;">
+          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
+              <h3 style="margin:0; font-size:16px;">Định khoản Hạch toán</h3>
+              <div class="acc-seg-wrap">
+                <button type="button" class="acc-seg-btn active" id="accTabBtn-luongthuong" onclick="switchAccTab('luongthuong')">Lương thưởng</button>
+                <button type="button" class="acc-seg-btn" id="accTabBtn-bhxh" onclick="switchAccTab('bhxh')">Trích BHXH và KPCĐ cty đóng</button>
+              </div>
             </div>
-          </div>
-          <div class="card" id="accountingWrapper2" style="display:none; margin-top: 0; flex: 1 1 50%; max-width: 50%; min-width: 0;">
-            <h3 style="margin-top:0; font-size:16px;">Trích BHXH và KPCĐ cty đóng</h3>
-            <div class="table-responsive">
-              <table class="sepay-table" id="accountingTable2">
-                <thead>
-                  <tr>
-                    <th style="width: 80px;">TK Nợ</th>
-                    <th style="width: 80px;">TK Có</th>
-                    <th>Diễn giải</th>
-                    <th style="text-align: right;">Số tiền (VNĐ)</th>
-                  </tr>
-                </thead>
-                <tbody id="accountingTbody2"></tbody>
-              </table>
+            <div id="accPanelLuongThuong">
+              <div class="text-muted-small" style="margin-bottom: 8px;">Click vào dòng để xem chi tiết</div>
+              <div class="table-responsive">
+                <table class="sepay-table" id="accountingTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px;">TK Nợ</th>
+                      <th style="width: 80px;">TK Có</th>
+                      <th>Diễn giải</th>
+                      <th style="text-align: right;">Số tiền (VNĐ)</th>
+                      <th style="text-align: center; width: 60px;">Mở rộng</th>
+                    </tr>
+                  </thead>
+                  <tbody id="accountingTbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="accPanelBhxh" style="display:none;">
+              <div class="table-responsive">
+                <table class="sepay-table" id="accountingTable2">
+                  <thead>
+                    <tr>
+                      <th style="width: 80px;">TK Nợ</th>
+                      <th style="width: 80px;">TK Có</th>
+                      <th>Diễn giải</th>
+                      <th style="text-align: right;">Số tiền (VNĐ)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="accountingTbody2"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -977,6 +997,7 @@ function renderBulkTable() {
 }
 
 let globalSheetsData = {};
+let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
 
 async function doFetchEmployeesExcel() {
   const fileInput = document.getElementById("employeeExcelFile");
@@ -1164,13 +1185,11 @@ function displaySheetData() {
   
   const accWrapper = document.getElementById("accountingWrapper");
   const accTbody = document.getElementById("accountingTbody");
-  const accWrapper2 = document.getElementById("accountingWrapper2");
   const accTbody2 = document.getElementById("accountingTbody2");
   
   if (!selectedSheet) {
     wrapper.style.display = "none";
     accWrapper.style.display = "none";
-    accWrapper2.style.display = "none";
     return;
   }
   
@@ -1182,7 +1201,6 @@ function displaySheetData() {
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
     accWrapper.style.display = "none";
-    accWrapper2.style.display = "none";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
@@ -1489,10 +1507,29 @@ function displaySheetData() {
         <td style="text-align: right; font-weight: 700;">${formatMoney(sumKPCD_3382)}</td>
       </tr>
     `;
-    accWrapper2.style.display = "block";
+
+    // Giữ đúng panel đang được chọn (mặc định 'luongthuong') khi đổi sheet
+    applyAccTabView();
   }
   
   wrapper.style.display = "block";
+}
+
+function switchAccTab(tab) {
+  accActiveTab = tab;
+  applyAccTabView();
+}
+
+function applyAccTabView() {
+  const panelLuongThuong = document.getElementById("accPanelLuongThuong");
+  const panelBhxh = document.getElementById("accPanelBhxh");
+  const btnLuongThuong = document.getElementById("accTabBtn-luongthuong");
+  const btnBhxh = document.getElementById("accTabBtn-bhxh");
+  if (!panelLuongThuong || !panelBhxh) return;
+  panelLuongThuong.style.display = accActiveTab === "luongthuong" ? "block" : "none";
+  panelBhxh.style.display = accActiveTab === "bhxh" ? "block" : "none";
+  btnLuongThuong.classList.toggle("active", accActiveTab === "luongthuong");
+  btnBhxh.classList.toggle("active", accActiveTab === "bhxh");
 }
   
 function appendRowToDOM(rowObj, tbody) {
