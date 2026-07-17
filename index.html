@@ -383,10 +383,11 @@
   #bankTransferTable th:nth-child(3), #bankTransferTable td:nth-child(3) { width: 1%; }
   #bankTransferTable th:nth-child(4), #bankTransferTable td:nth-child(4) { width: 1%; }
 
-  /* --- 3 BẢNG TRONG CARD "ĐỊNH KHOẢN HẠCH TOÁN": thu gọn giống bảng chuyển khoản lương --- */
+  /* --- 3 BẢNG TRONG CARD "ĐỊNH KHOẢN HẠCH TOÁN": co vừa độ dài chữ, không kéo giãn hết chỗ --- */
+  #accountingTable, #accountingTable2, #accountingTable3 { width: auto; }
   #accountingTable th, #accountingTable td,
   #accountingTable2 th, #accountingTable2 td,
-  #accountingTable3 th, #accountingTable3 td { padding: 8px 12px; font-size: 12.5px; }
+  #accountingTable3 th, #accountingTable3 td { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; }
   
   .amount-in { color: var(--amount-in); font-weight: 600; font-size: 13px;}
   .amount-out { color: var(--amount-out); font-weight: 600; font-size: 13px;}
@@ -450,7 +451,8 @@
     .main-content { padding: 16px; overflow: visible; }
     #toggleSidebarBtn { display: none !important; }
     #accountingRow { flex-direction: column; }
-    #accountingRow #accountingWrapper, #accountingRow #bankTransferWrapper { max-width: 100%; }
+    #accountingRow #accountingWrapper, #accountingRow #bankTransferWrapper { max-width: 100%; width: 100%; flex: 1 1 auto; }
+    #accountingTable, #accountingTable2, #accountingTable3 { width: 100%; }
   }
 
   /* --- Nút switch dạng pill cho card Định khoản Hạch toán --- */
@@ -727,7 +729,7 @@
           </div>
         </div>
         <div id="accountingRow" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;">
-          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 1 1 480px; min-width: 0;">
+          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 0 0 auto; min-width: 0;">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
               <h3 style="margin:0; font-size:16px;">Định khoản Hạch toán</h3>
               <div class="acc-seg-wrap">
@@ -788,7 +790,7 @@
               </div>
             </div>
           </div>
-          <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 0 1 400px; max-width: 400px; min-width: 340px;">
+          <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 1 1 340px; min-width: 340px;">
             <h3 style="margin:0 0 16px; font-size:16px;">Danh sách chuyển khoản lương</h3>
             <div class="table-responsive">
               <table class="sepay-table" id="bankTransferTable">
