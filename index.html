@@ -1163,7 +1163,7 @@ function displaySheetData() {
     let sumHoaHong = 0, sumThuongDongGop = 0, sumLuongPhep = 0, sumKhac = 0, sumTongThuNhap = 0;
     let sumBhxhTru = 0, sumBhytTru = 0, sumBhtnTru = 0, sumCdTru = 0, sumThueTncn = 0, sumThucNhan = 0;
     let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhNld = 0, sumTongBhxhMoi = 0;
-    let detailRows6421HTML = '', detailRows6422HTML = '', detailRows3341HTML = '';
+    let detailRowsHoaHongHTML = '', detailRowsThuongDgHTML = '', detailRowsLuongTtHTML = '', detailRowsLuongPhepHTML = '', detailRowsKhacHTML = '', detailRows3341HTML = '';
 
     rows.forEach(r => {
       // Đổ dữ liệu ra bảng chính (Lương tính toán ở cuối cùng)
@@ -1230,10 +1230,10 @@ function displaySheetData() {
       sumTongBhxhNld += r.tong_bhxh_nld;
       sumTongBhxhMoi += r.tong_bhxh_moi;
       
-      // Tạo dòng chi tiết Hạch toán theo nhân viên
-      // Nợ 6421 (Chi phí bán hàng): Hoa hồng bán hàng (P) + Thưởng ghi nhận đóng góp (Q)
-      detailRows6421HTML += `
-        <tr class="detail-row-6421" style="display: none; background: rgba(0,0,0,0.02);">
+      // Tạo dòng chi tiết Hạch toán theo nhân viên — tách riêng từng cột nguồn
+      // Nợ 6421: Hoa hồng bán hàng (P)
+      detailRowsHoaHongHTML += `
+        <tr class="detail-row-hoahong" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
           <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
@@ -1242,7 +1242,11 @@ function displaySheetData() {
           <td style="text-align: right;">${formatMoney(r.hoa_hong)}</td>
           <td></td>
         </tr>
-        <tr class="detail-row-6421" style="display: none; background: rgba(0,0,0,0.02);">
+      `;
+
+      // Nợ 6421: Thưởng ghi nhận đóng góp (Q)
+      detailRowsThuongDgHTML += `
+        <tr class="detail-row-thuongdg" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
           <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
@@ -1253,9 +1257,9 @@ function displaySheetData() {
         </tr>
       `;
 
-      // Nợ 6422 (Chi phí quản lý): Lương tính toán + Lương phép năm (R) + Khác (S)
-      detailRows6422HTML += `
-        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+      // Nợ 6422: Lương tính toán
+      detailRowsLuongTtHTML += `
+        <tr class="detail-row-luongtt" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
           <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
@@ -1264,7 +1268,11 @@ function displaySheetData() {
           <td style="text-align: right;">${formatMoney(r.luong_tinh_toan)}</td>
           <td></td>
         </tr>
-        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+      `;
+
+      // Nợ 6422: Lương phép năm (R)
+      detailRowsLuongPhepHTML += `
+        <tr class="detail-row-luongphep" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
           <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
@@ -1273,7 +1281,11 @@ function displaySheetData() {
           <td style="text-align: right;">${formatMoney(r.luong_phep)}</td>
           <td></td>
         </tr>
-        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+      `;
+
+      // Nợ 6422: Khác (S)
+      detailRowsKhacHTML += `
+        <tr class="detail-row-khac" style="display: none; background: rgba(0,0,0,0.02);">
           <td></td>
           <td style="font-weight: 600;">3341</td>
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
@@ -1334,39 +1346,70 @@ function displaySheetData() {
     `;
     tbody.appendChild(totalTr);
 
-    // Đổ dữ liệu vào bảng Hạch toán: Nợ 6421, Nợ 6422, Có 3341 (tổng của 6421+6422)
-    const sum6421 = sumHoaHong + sumThuongDongGop;
-    const sum6422 = sumLuongTinhToan + sumLuongPhep + sumKhac;
-    const sum3341 = sum6421 + sum6422;
+    // Đổ dữ liệu vào bảng Hạch toán: 5 dòng Nợ riêng biệt, Có 3341 là tổng
+    const sumTong3341 = sumHoaHong + sumThuongDongGop + sumLuongTinhToan + sumLuongPhep + sumKhac;
 
     let accHTML = `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6421')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('hoahong')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6421</td>
         <td></td>
-        <td style="font-weight: 700;">Chi phí bán hàng: Hoa hồng bán hàng & Thưởng ghi nhận đóng góp (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum6421)}</td>
-        <td style="text-align: center;"><span id="icon-6421" style="font-size: 12px; color: var(--accent);">▼</span></td>
+        <td style="font-weight: 700;">Hoa hồng bán hàng (P) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumHoaHong)}</td>
+        <td style="text-align: center;"><span id="icon-hoahong" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
-    accHTML += detailRows6421HTML;
+    accHTML += detailRowsHoaHongHTML;
 
     accHTML += `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('6422')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('thuongdg')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6421</td>
         <td></td>
-        <td style="font-weight: 700;">Chi phí quản lý DN: Lương tính toán, Lương phép năm & Khác (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum6422)}</td>
-        <td style="text-align: center;"><span id="icon-6422" style="font-size: 12px; color: var(--accent);">▼</span></td>
+        <td style="font-weight: 700;">Thưởng ghi nhận đóng góp (Q) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumThuongDongGop)}</td>
+        <td style="text-align: center;"><span id="icon-thuongdg" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
-    accHTML += detailRows6422HTML;
+    accHTML += detailRowsThuongDgHTML;
+
+    accHTML += `
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('luongtt')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
+        <td></td>
+        <td style="font-weight: 700;">Lương tính toán (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
+        <td style="text-align: center;"><span id="icon-luongtt" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+    `;
+    accHTML += detailRowsLuongTtHTML;
+
+    accHTML += `
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('luongphep')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
+        <td></td>
+        <td style="font-weight: 700;">Lương phép năm (R) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongPhep)}</td>
+        <td style="text-align: center;"><span id="icon-luongphep" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+    `;
+    accHTML += detailRowsLuongPhepHTML;
+
+    accHTML += `
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('khac')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
+        <td></td>
+        <td style="font-weight: 700;">Khác (S) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumKhac)}</td>
+        <td style="text-align: center;"><span id="icon-khac" style="font-size: 12px; color: var(--accent);">▼</span></td>
+      </tr>
+    `;
+    accHTML += detailRowsKhacHTML;
 
     accHTML += `
       <tr style="cursor: pointer; background: var(--badge-err-bg); transition: 0.2s;" onclick="toggleAccDetail('3341')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td></td>
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3341</td>
-        <td style="font-weight: 700;">Phải trả người lao động (= Tổng Nợ 6421 + 6422) (Click xem chi tiết)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sum3341)}</td>
+        <td style="font-weight: 700;">Phải trả người lao động (= Tổng các khoản Nợ trên) (Click xem chi tiết)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTong3341)}</td>
         <td style="text-align: center;"><span id="icon-3341" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
