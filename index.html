@@ -714,8 +714,8 @@
             </table>
           </div>
         </div>
-        <div id="accountingRow" style="margin-top: 20px;">
-          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0;">
+        <div id="accountingRow" style="margin-top: 20px; display: flex;">
+          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 0 1 33.333%; max-width: 33.333%; min-width: 0;">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
               <h3 style="margin:0; font-size:16px;">Định khoản Hạch toán</h3>
               <div class="acc-seg-wrap">
@@ -741,6 +741,7 @@
               </div>
             </div>
             <div id="accPanelBhxh" style="display:none;">
+              <div class="text-muted-small" style="margin-bottom: 8px;">Click vào dòng để xem chi tiết</div>
               <div class="table-responsive">
                 <table class="sepay-table" id="accountingTable2">
                   <thead>
@@ -749,6 +750,7 @@
                       <th style="width: 80px;">TK Có</th>
                       <th>Diễn giải</th>
                       <th style="text-align: right;">Số tiền (VNĐ)</th>
+                      <th style="text-align: center; width: 60px;">Mở rộng</th>
                     </tr>
                   </thead>
                   <tbody id="accountingTbody2"></tbody>
@@ -1210,6 +1212,7 @@ function displaySheetData() {
     let sumBhxhTru = 0, sumBhytTru = 0, sumBhtnTru = 0, sumCdTru = 0, sumThueTncn = 0, sumThucNhan = 0;
     let sumHtTt = 0, sumOdTs = 0, sumTnldBnn = 0, sumTongAjakal = 0, sumBhytCty = 0, sumBhtnCty = 0, sumCdCty = 0, sumTongBhxhNld = 0, sumTongBhxhMoi = 0;
     let detailRowsHoaHongHTML = '', detailRowsThuongDgHTML = '', detailRowsLuongTtHTML = '', detailRowsLuongPhepHTML = '', detailRowsKhacHTML = '', detailRows3341HTML = '';
+    let detailRows3383HTML = '', detailRows3384HTML = '', detailRows3385HTML = '', detailRows3382HTML = '', detailRows6422HTML = '';
 
     rows.forEach(r => {
       // Đổ dữ liệu ra bảng chính (Lương tính toán ở cuối cùng)
@@ -1357,6 +1360,73 @@ function displaySheetData() {
           <td></td>
         </tr>
       `;
+
+      // ---- Chi tiết theo từng nhân viên cho bảng "Trích BHXH và KPCĐ cty đóng" ----
+      // Có 3383: BHXH (r.tong_ajakal = AJ + AK + AL)
+      detailRows3383HTML += `
+        <tr class="detail-row-3383" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3383</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.tong_ajakal)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3384: BHYT (cột AM)
+      detailRows3384HTML += `
+        <tr class="detail-row-3384" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3384</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.bhyt_cty)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3385: BHTN (cột AN)
+      detailRows3385HTML += `
+        <tr class="detail-row-3385" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3385</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.bhtn_cty)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Có 3382: KPCĐ (cột AO)
+      detailRows3382HTML += `
+        <tr class="detail-row-3382" style="display: none; background: rgba(0,0,0,0.02);">
+          <td></td>
+          <td style="font-weight: 600;">3382</td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(r.cd_cty)}</td>
+          <td></td>
+        </tr>
+      `;
+
+      // Nợ 6422 (tổng): BHXH + BHYT + BHTN + KPCĐ theo từng nhân viên
+      const tong_6422_nv = r.tong_ajakal + r.bhyt_cty + r.bhtn_cty + r.cd_cty;
+      detailRows6422HTML += `
+        <tr class="detail-row-6422" style="display: none; background: rgba(0,0,0,0.02);">
+          <td style="font-weight: 600;">6422</td>
+          <td></td>
+          <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
+            └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
+          </td>
+          <td style="text-align: right;">${formatMoney(tong_6422_nv)}</td>
+          <td></td>
+        </tr>
+      `;
     });
 
     // Thêm dòng TỔNG CỘNG vào cuối bảng lương
@@ -1476,37 +1546,48 @@ function displaySheetData() {
     const sumTong6422 = sumBHXH_3383 + sumBHYT_3384 + sumBHTN_3385 + sumKPCD_3382;
 
     accTbody2.innerHTML = `
-      <tr style="background: var(--badge-err-bg);">
+      <tr style="cursor: pointer; background: var(--badge-err-bg); transition: 0.2s;" onclick="toggleAccDetail('6422')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
         <td></td>
         <td style="font-weight: 700;">Trích BHXH, BHYT, BHTN, KPCĐ tính vào chi phí</td>
         <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumTong6422)}</td>
+        <td style="text-align: center;"><span id="icon-6422" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
-      <tr>
+      ${detailRows6422HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('3383')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td></td>
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3383</td>
         <td style="font-weight: 700;">BHXH</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHXH_3383)}</td>
+        <td style="text-align: center;"><span id="icon-3383" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
-      <tr>
+      ${detailRows3383HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('3384')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td></td>
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3384</td>
         <td style="font-weight: 700;">BHYT</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHYT_3384)}</td>
+        <td style="text-align: center;"><span id="icon-3384" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
-      <tr>
+      ${detailRows3384HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('3385')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td></td>
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3385</td>
         <td style="font-weight: 700;">BHTN</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(sumBHTN_3385)}</td>
+        <td style="text-align: center;"><span id="icon-3385" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
-      <tr>
+      ${detailRows3385HTML}
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('3382')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
         <td></td>
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">3382</td>
         <td style="font-weight: 700;">KPCĐ</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(sumKPCD_3382)}</td>
+        <td style="text-align: center;"><span id="icon-3382" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
+      ${detailRows3382HTML}
     `;
+
 
     // Giữ đúng panel đang được chọn (mặc định 'luongthuong') khi đổi sheet
     applyAccTabView();
