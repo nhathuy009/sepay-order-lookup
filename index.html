@@ -915,6 +915,14 @@
                 </tfoot>
               </table>
             </div>
+            <div style="margin-top: 16px;">
+              <label style="display:block; margin-bottom:8px;">Ghi chú thêm (sẽ được ghi vào cột B của file Excel, cách dòng tổng 2 dòng)</label>
+              <div style="display:flex; flex-direction: column; gap: 10px;">
+                <input type="text" class="air-extra-input" id="airNote1" placeholder="Dòng ghi chú 1" />
+                <input type="text" class="air-extra-input" id="airNote2" placeholder="Dòng ghi chú 2" />
+                <input type="text" class="air-extra-input" id="airNote3" placeholder="Dòng ghi chú 3" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2746,6 +2754,19 @@ async function doDownloadAirPacking() {
     worksheet.getColumn(3).width = 24.38;
     worksheet.getColumn(4).width = 8.38;
     worksheet.getColumn(5).width = 8.38;
+
+    // Ghi 3 dòng ghi chú thêm vào cột B, cách dòng tổng 2 dòng, bỏ qua ô trống (không tạo dòng cho ô trống)
+    const noteValues = [
+      document.getElementById("airNote1").value.trim(),
+      document.getElementById("airNote2").value.trim(),
+      document.getElementById("airNote3").value.trim()
+    ].filter(v => v !== "");
+
+    let noteRowNum = totalRow.number + 2;
+    noteValues.forEach((val) => {
+      worksheet.getCell(`B${noteRowNum}`).value = val;
+      noteRowNum++;
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
