@@ -1344,14 +1344,14 @@ function displaySheetData() {
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
         <td style="text-align: right;">${formatMoney(r.hoa_hong)}</td>
         <td style="text-align: right;">${formatMoney(r.thuong_dong_gop)}</td>
-        <td style="text-align: right;">${formatMoney(r.luong_phep)}</td>
+        <td style="text-align: right;">${formatMoney(Math.round(r.luong_phep))}</td>
         <td style="text-align: right;">${formatMoney(r.khac)}</td>
         <td style="text-align: right; font-weight: 700;">${formatMoney(r.tong_thu_nhap)}</td>
         <td style="text-align: right;">${formatMoney(r.bhxh_tru)}</td>
         <td style="text-align: right;">${formatMoney(r.bhyt_tru)}</td>
         <td style="text-align: right;">${formatMoney(r.bhtn_tru)}</td>
         <td style="text-align: right;">${formatMoney(r.cd_tru)}</td>
-        <td style="text-align: right;">${formatMoney(r.thue_tncn)}</td>
+        <td style="text-align: right;">${formatMoney(Math.round(r.thue_tncn))}</td>
         <td style="text-align: right; font-weight: 800; color: var(--amount-in);">${formatMoney(r.thuc_nhan)}</td>
         <td style="text-align: center;">${escapeHtml(r.stk)}</td>
         <td style="text-align: center;">${escapeHtml(r.ngan_hang)}</td>
