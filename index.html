@@ -791,10 +791,11 @@
             </div>
           </div>
           <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 1 1 340px; min-width: 340px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 12px;">
               <h3 style="margin:0; font-size:16px;">Danh sách chuyển khoản lương</h3>
               <button id="copyBankTransferBtn" class="btn-outline" onclick="copyBankTransferForBank()" style="font-size: 13px;">📋 Copy dán vào file NH</button>
             </div>
+            <div class="acc-seg-wrap" id="bankTabsWrap" style="margin-bottom: 12px;"></div>
             <div class="hint" style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-muted);">
               Dán bắt đầu tại đúng ô "STT" của dòng dữ liệu đầu tiên trong file mẫu ngân hàng (thường là ô A3). Đã copy sẵn 5 cột: STT, Tên NV, Số tài khoản, Số tiền (số thật, không phải chữ), Nội dung giao dịch.
             </div>
@@ -1095,6 +1096,8 @@ let globalSheetsData = {};
 let currentBankTransferRows = [];
 let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
+let bankGroupsData = {};
+let bankActiveTab = '';
 
 function removeVietnameseDiacritics(str) {
   if (!str) return "";
@@ -1300,6 +1303,10 @@ function displaySheetData() {
     bankWrapper.style.display = "none";
     currentBankTransferRows = [];
     currentBankTransferContent = "";
+    bankGroupsData = {};
+    bankActiveTab = '';
+    const bankTabsWrapEmpty = document.getElementById("bankTabsWrap");
+    if (bankTabsWrapEmpty) bankTabsWrapEmpty.innerHTML = "";
     return;
   }
   
@@ -1316,6 +1323,10 @@ function displaySheetData() {
     bankWrapper.style.display = "none";
     currentBankTransferRows = [];
     currentBankTransferContent = "";
+    bankGroupsData = {};
+    bankActiveTab = '';
+    const bankTabsWrapEmpty2 = document.getElementById("bankTabsWrap");
+    if (bankTabsWrapEmpty2) bankTabsWrapEmpty2.innerHTML = "";
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
@@ -1823,33 +1834,90 @@ function displaySheetData() {
     // Giữ đúng panel đang được chọn (mặc định 'luongthuong') khi đổi sheet
     applyAccTabView();
 
-    // Bảng: Danh sách chuyển khoản lương (STT, Tên NV không dấu, STK ưu tiên ACB, Thực nhận)
-    const acbRows = rows.filter(r => removeVietnameseDiacritics(r.ngan_hang).trim().toUpperCase() === "ACB");
-    const otherRows = rows.filter(r => removeVietnameseDiacritics(r.ngan_hang).trim().toUpperCase() !== "ACB");
-    const bankSortedRows = [...acbRows, ...otherRows];
+    // Bảng: Danh sách chuyển khoản lương - nhóm theo Ngân hàng (AF), mỗi ngân hàng 1 bảng riêng qua pill switch
+    bankGroupsData = {};
+    rows.forEach(r => {
+      const bankKeyRaw = removeVietnameseDiacritics(r.ngan_hang || "").trim().toUpperCase();
+      const bankKey = bankKeyRaw || "KHÁC";
+      if (!bankGroupsData[bankKey]) bankGroupsData[bankKey] = [];
+      bankGroupsData[bankKey].push(r);
+    });
+    const bankKeys = getSortedBankKeys();
 
-    // Ghi nhớ dữ liệu gốc (số thật) + nội dung giao dịch theo tháng để dùng cho nút Copy
-    currentBankTransferRows = bankSortedRows;
+    // Nội dung giao dịch theo tháng dùng cho nút Copy (không đổi theo ngân hàng)
     const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
     currentBankTransferContent = monthMatch ? `CHI LUONG T${monthMatch[1]}/${monthMatch[2]}` : `CHI LUONG ${selectedSheet}`;
 
-    let bankHTML = "";
-    bankSortedRows.forEach((r, idx) => {
-      const tenNvKhongDau = removeVietnameseDiacritics(r.ten_nv).toUpperCase();
-      bankHTML += `
-        <tr>
-          <td style="text-align: center;">${idx + 1}</td>
-          <td style="font-weight: 600;">${escapeHtml(tenNvKhongDau)}</td>
-          <td>${escapeHtml(r.stk)}</td>
-          <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(Math.round(r.thuc_nhan))}</td>
-        </tr>
-      `;
-    });
-    bankTbody.innerHTML = bankHTML;
-    bankWrapper.style.display = "block";
+    if (bankKeys.length === 0) {
+      bankWrapper.style.display = "none";
+      currentBankTransferRows = [];
+      const bankTabsWrapEmpty3 = document.getElementById("bankTabsWrap");
+      if (bankTabsWrapEmpty3) bankTabsWrapEmpty3.innerHTML = "";
+    } else {
+      if (!bankActiveTab || !bankKeys.includes(bankActiveTab)) {
+        bankActiveTab = bankKeys[0];
+      }
+      renderBankTabs(bankKeys);
+      renderBankTransferTable();
+      bankWrapper.style.display = "block";
+    }
   }
   
   wrapper.style.display = "block";
+}
+
+// Trả về danh sách mã ngân hàng đã sắp xếp: ACB lên đầu, còn lại theo bảng chữ cái
+function getSortedBankKeys() {
+  return Object.keys(bankGroupsData).sort((a, b) => {
+    if (a === "ACB") return -1;
+    if (b === "ACB") return 1;
+    return a.localeCompare(b, 'vi');
+  });
+}
+
+// Vẽ các nút pill switch giữa các ngân hàng
+function renderBankTabs(bankKeys) {
+  const tabsWrap = document.getElementById("bankTabsWrap");
+  if (!tabsWrap) return;
+  let html = "";
+  bankKeys.forEach(key => {
+    const count = (bankGroupsData[key] || []).length;
+    const active = key === bankActiveTab ? " active" : "";
+    const keyEscaped = escapeHtml(key);
+    html += `<button type="button" class="acc-seg-btn${active}" onclick="switchBankTab('${key.replace(/'/g, "\\'")}')">${keyEscaped} (${count})</button>`;
+  });
+  tabsWrap.innerHTML = html;
+}
+
+// Chuyển tab ngân hàng đang xem
+function switchBankTab(bankKey) {
+  bankActiveTab = bankKey;
+  renderBankTabs(getSortedBankKeys());
+  renderBankTransferTable();
+}
+
+// Vẽ bảng chuyển khoản cho ngân hàng đang được chọn (tab hiện tại)
+function renderBankTransferTable() {
+  const bankTbody = document.getElementById("bankTransferTbody");
+  if (!bankTbody) return;
+  const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
+  const activeRows = bankGroupsData[bankActiveTab] || [];
+  // Ghi nhớ dữ liệu gốc (số thật) của bảng đang hiển thị để dùng cho nút Copy
+  currentBankTransferRows = activeRows;
+
+  let bankHTML = "";
+  activeRows.forEach((r, idx) => {
+    const tenNvKhongDau = removeVietnameseDiacritics(r.ten_nv).toUpperCase();
+    bankHTML += `
+      <tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td style="font-weight: 600;">${escapeHtml(tenNvKhongDau)}</td>
+        <td>${escapeHtml(r.stk)}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(Math.round(r.thuc_nhan))}</td>
+      </tr>
+    `;
+  });
+  bankTbody.innerHTML = bankHTML || `<tr><td colspan="4" style="text-align:center;">Không có dữ liệu.</td></tr>`;
 }
 
 function copyForMisaAmis() {
