@@ -664,17 +664,21 @@
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
-          <div class="row">
-            <div><input type="file" id="employeeExcelFile" accept=".xlsx" /></div>
-            <button id="fetchSheetsBtn" onclick="doFetchEmployeesExcel()">Xử lý file</button>
+          <div class="row" style="align-items: flex-end;">
+            <div style="flex: 1 1 220px; max-width: 260px; min-width: 180px;">
+              <input type="file" id="employeeExcelFile" accept=".xlsx" style="width:100%;" />
+            </div>
+            <div style="flex: 1 1 200px; max-width: 240px; min-width: 160px;">
+              <label style="margin-bottom: 8px;">Chọn Sheet (Tháng)</label>
+              <select id="sheetSelect" onchange="displaySheetData()" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+                <option value="">-- Chưa có dữ liệu --</option>
+              </select>
+            </div>
+            <div style="flex: 0 0 auto;">
+              <button id="fetchSheetsBtn" onclick="doFetchEmployeesExcel()">Xử lý file</button>
+            </div>
           </div>
           <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
-          
-          <div id="sheetSelectWrapper" style="display:none; margin-top: 20px;">
-            <label>Chọn Sheet (Tháng)</label>
-            <select id="sheetSelect" onchange="displaySheetData()" style="width: 100%; max-width: 320px; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
-              </select>
-          </div>
         </div>
 
         <div class="card" id="employeeTableWrapper" style="display:none;">
@@ -1230,7 +1234,7 @@ async function doFetchEmployeesExcel() {
     
     if (sheetNames.length === 0) {
       box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026...</span>';
-      document.getElementById("sheetSelectWrapper").style.display = "none";
+      document.getElementById("sheetSelect").innerHTML = '<option value="">-- Chưa có dữ liệu --</option>';
       document.getElementById("employeeTableWrapper").style.display = "none";
       return;
     }
@@ -1244,7 +1248,6 @@ async function doFetchEmployeesExcel() {
       select.appendChild(opt);
     });
     
-    document.getElementById("sheetSelectWrapper").style.display = "block";
     box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ.</span>`;
     
   } catch (e) {
