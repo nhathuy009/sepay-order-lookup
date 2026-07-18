@@ -665,16 +665,16 @@
         <div class="card">
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
           <div class="row" style="align-items: flex-end;">
-            <div style="flex: 1 1 auto; min-width: 160px;">
+            <div style="flex: 1 1 0%; min-width: 160px;">
               <input type="file" id="employeeExcelFile" accept=".xlsx" style="width:100%;" />
             </div>
-            <div style="flex: 0 0 140px; min-width: 140px;">
+            <div style="flex: 0 0 175px; min-width: 175px;">
               <label style="margin-bottom: 8px;">Chọn Sheet (Tháng)</label>
               <select id="sheetSelect" onchange="displaySheetData()" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
                 <option value="">-- Chưa có dữ liệu --</option>
               </select>
             </div>
-            <div style="flex: 0 0 auto;">
+            <div style="flex: 0 0 auto; min-width: 0;">
               <button id="fetchSheetsBtn" onclick="doFetchEmployeesExcel()">Xử lý file</button>
             </div>
           </div>
