@@ -917,7 +917,10 @@
                 <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
                 <div class="hint" style="margin:0;">Kiểm tra kỹ số liệu bên dưới. Nếu đúng, bấm "Tải về Excel" để xuất file.</div>
               </div>
-              <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
+                <button id="shareAirBtn" onclick="doShareAirPacking()" style="display:none; background: var(--accent-gradient);">📤 Chia sẻ ngay (Zalo/WhatsApp...)</button>
+              </div>
             </div>
             <div class="table-responsive" style="margin-top: 14px;">
               <table class="bulk-table" id="airTable">
@@ -2799,6 +2802,91 @@ function renderAirPreviewTable(processed) {
   document.getElementById("airTotalBags").innerText = allBagsData.length;
   document.getElementById("airTotalSets").innerText = totalSets;
   document.getElementById("airTotalWeight").innerText = totalWeight.toFixed ? (Math.round(totalWeight * 100) / 100) : totalWeight;
+
+  // Chỉ hiện nút "Chia sẻ ngay" trên thiết bị/trình duyệt hỗ trợ Web Share API (đa số điện thoại)
+  const shareBtn = document.getElementById("shareAirBtn");
+  if (shareBtn) {
+    shareBtn.style.display = (typeof navigator.share === "function") ? "inline-block" : "none";
+  }
+}
+
+// Tạo file Excel Air Packing List (dùng chung cho cả Tải về và Chia sẻ)
+async function buildAirExcelFile() {
+  if (!airProcessedData) {
+    throw new Error("Vui lòng xử lý file trước.");
+  }
+  const { allBagsData, customerName, dateStr } = airProcessedData;
+
+  // TẠO FILE MỚI & ĐỊNH DẠNG BẰNG EXCELJS
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Sheet1');
+
+  const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
+  worksheet.mergeCells('A1:E1');
+  const titleCell = worksheet.getCell('A1');
+  titleCell.font = { name: 'Arial', size: 14, bold: true };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  const customBorder = {
+    top: { style: 'thin', color: { argb: 'FFBE5014' } },
+    left: { style: 'thin', color: { argb: 'FFBE5014' } },
+    bottom: { style: 'thin', color: { argb: 'FFBE5014' } },
+    right: { style: 'thin', color: { argb: 'FFBE5014' } }
+  };
+
+  const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
+  headerRow.height = 49.5;
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = customBorder;
+  });
+
+  let totalSets = 0;
+  let totalWeight = 0;
+  allBagsData.forEach((bag, idx) => {
+    totalSets += bag.QTITY;
+    totalWeight += (bag.KGS || 0);
+    const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
+    row.eachCell((cell) => {
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = customBorder;
+    });
+  });
+
+  const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
+  totalRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = customBorder;
+  });
+
+  worksheet.getColumn(1).width = 8.38;
+  worksheet.getColumn(2).width = 8.38;
+  worksheet.getColumn(3).width = 24.38;
+  worksheet.getColumn(4).width = 8.38;
+  worksheet.getColumn(5).width = 8.38;
+
+  // Ghi 3 dòng ghi chú thêm vào cột B, cách dòng tổng 2 dòng, bỏ qua ô trống (không tạo dòng cho ô trống)
+  const noteValues = [
+    document.getElementById("airNote1").value.trim(),
+    document.getElementById("airNote2").value.trim(),
+    document.getElementById("airNote3").value.trim()
+  ].filter(v => v !== "");
+
+  let noteRowNum = totalRow.number + 2;
+  noteValues.forEach((val) => {
+    worksheet.getCell(`B${noteRowNum}`).value = val;
+    noteRowNum++;
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
+  const blob = new Blob([buffer], { type: "application/octet-stream" });
+  return { blob, exportFileName };
 }
 
 async function doDownloadAirPacking() {
@@ -2810,81 +2898,12 @@ async function doDownloadAirPacking() {
     return;
   }
 
-  const { allBagsData, customerName, dateStr } = airProcessedData;
   dlBtn.disabled = true;
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tạo file Excel và định dạng Style (Màu, Viền)...';
 
   try {
-    // TẠO FILE MỚI & ĐỊNH DẠNG BẰNG EXCELJS
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Sheet1');
-
-    const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
-    worksheet.mergeCells('A1:E1');
-    const titleCell = worksheet.getCell('A1');
-    titleCell.font = { name: 'Arial', size: 14, bold: true };
-    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-    const customBorder = {
-      top: { style: 'thin', color: { argb: 'FFBE5014' } },
-      left: { style: 'thin', color: { argb: 'FFBE5014' } },
-      bottom: { style: 'thin', color: { argb: 'FFBE5014' } },
-      right: { style: 'thin', color: { argb: 'FFBE5014' } }
-    };
-
-    const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
-    headerRow.height = 49.5;
-    headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
-      cell.font = { bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = customBorder;
-    });
-
-    let totalSets = 0;
-    let totalWeight = 0;
-    allBagsData.forEach((bag, idx) => {
-      totalSets += bag.QTITY;
-      totalWeight += (bag.KGS || 0);
-      const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
-      row.eachCell((cell) => {
-        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-        cell.border = customBorder;
-      });
-    });
-
-    const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
-    totalRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
-      cell.font = { bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = customBorder;
-    });
-
-    worksheet.getColumn(1).width = 8.38;
-    worksheet.getColumn(2).width = 8.38;
-    worksheet.getColumn(3).width = 24.38;
-    worksheet.getColumn(4).width = 8.38;
-    worksheet.getColumn(5).width = 8.38;
-
-    // Ghi 3 dòng ghi chú thêm vào cột B, cách dòng tổng 2 dòng, bỏ qua ô trống (không tạo dòng cho ô trống)
-    const noteValues = [
-      document.getElementById("airNote1").value.trim(),
-      document.getElementById("airNote2").value.trim(),
-      document.getElementById("airNote3").value.trim()
-    ].filter(v => v !== "");
-
-    let noteRowNum = totalRow.number + 2;
-    noteValues.forEach((val) => {
-      worksheet.getCell(`B${noteRowNum}`).value = val;
-      noteRowNum++;
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
-    saveAs(new Blob([buffer], { type: "application/octet-stream" }), exportFileName);
-
+    const { blob, exportFileName } = await buildAirExcelFile();
+    saveAs(blob, exportFileName);
     box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File  <b>${exportFileName}</b>  với đầy đủ Style đã được tạo ra.</span>`;
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
@@ -2893,6 +2912,54 @@ async function doDownloadAirPacking() {
   }
 }
   
+async function doShareAirPacking() {
+  const box = document.getElementById("airResult");
+  const shareBtn = document.getElementById("shareAirBtn");
+
+  if (!airProcessedData) {
+    box.innerHTML = '<span class="err">Vui lòng xử lý file trước khi chia sẻ.</span>';
+    return;
+  }
+
+  if (typeof navigator.share !== "function") {
+    box.innerHTML = '<span class="err">Trình duyệt này không hỗ trợ chia sẻ trực tiếp. Vui lòng dùng nút "Tải về Excel" rồi gửi thủ công.</span>';
+    return;
+  }
+
+  shareBtn.disabled = true;
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tạo file để chia sẻ...';
+
+  try {
+    const { blob, exportFileName } = await buildAirExcelFile();
+    const file = new File([blob], exportFileName, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+
+    // Kiểm tra thiết bị có hỗ trợ chia sẻ FILE (không chỉ text/link) hay không
+    if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      box.innerHTML = '<span class="err">Thiết bị này không hỗ trợ chia sẻ file Excel trực tiếp. Vui lòng dùng nút "Tải về Excel" rồi gửi thủ công qua Zalo/WhatsApp.</span>';
+      return;
+    }
+
+    await navigator.share({
+      files: [file],
+      title: exportFileName,
+      text: `File Air Packing List - ${exportFileName}`
+    });
+
+    box.innerHTML = `<span class="badge ok">🎉 Đã mở bảng chia sẻ cho file <b>${exportFileName}</b>. Chọn Zalo/WhatsApp để gửi tiếp.</span>`;
+  } catch (e) {
+    // Người dùng bấm huỷ bảng chia sẻ cũng sẽ rơi vào đây (AbortError) -> không coi là lỗi thật sự
+    if (e && e.name === "AbortError") {
+      box.innerHTML = '<span class="hint">Đã huỷ chia sẻ.</span>';
+    } else {
+      box.innerHTML = `<span class="err">❌ Lỗi khi chia sẻ: ${e.message}</span>`;
+    }
+  } finally {
+    shareBtn.disabled = false;
+  }
+}
+
 function toggleAccDetail(accountId) {
   const rows = document.querySelectorAll('.detail-row-' + accountId);
   const icon = document.getElementById('icon-' + accountId);
