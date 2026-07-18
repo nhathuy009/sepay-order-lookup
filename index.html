@@ -1443,7 +1443,7 @@ function displaySheetData() {
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
             └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(r.luong_phep)}</td>
+          <td style="text-align: right;">${formatMoney(Math.round(r.luong_phep))}</td>
           <td></td>
         </tr>
       `;
@@ -1470,7 +1470,7 @@ function displaySheetData() {
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
             └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(tong_phai_tra_nv)}</td>
+          <td style="text-align: right;">${formatMoney(Math.round(tong_phai_tra_nv))}</td>
           <td></td>
         </tr>
       `;
@@ -1590,7 +1590,7 @@ function displaySheetData() {
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
             └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(r.thue_tncn)}</td>
+          <td style="text-align: right;">${formatMoney(Math.round(r.thue_tncn))}</td>
           <td></td>
         </tr>
       `;
@@ -1604,7 +1604,7 @@ function displaySheetData() {
           <td style="padding-left: 20px; font-size: 12px; color: var(--text-muted);">
             └─ ${escapeHtml(r.ten_nv)} (${escapeHtml(r.ma_nv)})
           </td>
-          <td style="text-align: right;">${formatMoney(tong_nld_3341)}</td>
+          <td style="text-align: right;">${formatMoney(Math.round(tong_nld_3341))}</td>
           <td></td>
         </tr>
       `;
@@ -1624,14 +1624,14 @@ function displaySheetData() {
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumHoaHong)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumThuongDongGop)}</td>
-      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongPhep)}</td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(Math.round(sumLuongPhep))}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumKhac)}</td>
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(Math.round(sumTongThuNhap))}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhxhTru)}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhytTru)}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumBhtnTru)}</td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumCdTru)}</td>
-      <td style="text-align: right; font-weight: 700;">${formatMoney(sumThueTncn)}</td>
+      <td style="text-align: right; font-weight: 700;">${formatMoney(Math.round(sumThueTncn))}</td>
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(Math.round(sumThucNhan))}</td>
       <td colspan="2"></td>
       <td style="text-align: right; font-weight: 700;">${formatMoney(sumHtTt)}</td>
@@ -1687,7 +1687,7 @@ function displaySheetData() {
         <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
         <td></td>
         <td style="font-weight: 700;">Lương phép năm (R)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongPhep)}</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(Math.round(sumLuongPhep))}</td>
         <td style="text-align: center;"><span id="icon-luongphep" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
