@@ -433,7 +433,7 @@
     left: 0; width: auto; min-width: 60px; padding-left: 10px; padding-right: 10px;
   }
   #employeeTable .freeze-col-2 {
-    left: var(--freeze-col1-width, 72px); width: 150px; min-width: 150px; max-width: 150px;
+    left: 72px; width: 150px; min-width: 150px; max-width: 150px;
     box-shadow: 3px 0 6px -2px rgba(0,0,0,0.15);
   }
   #employeeTable td.freeze-col-1 {
@@ -1876,13 +1876,15 @@ function displaySheetData() {
 function updateFreezeCol1Width() {
   const table = document.getElementById("employeeTable");
   if (!table) return;
-  requestAnimationFrame(() => {
-    const cells = table.querySelectorAll("td.freeze-col-1, th.freeze-col-1");
-    let maxWidth = 60;
-    cells.forEach(cell => {
-      if (cell.offsetWidth > maxWidth) maxWidth = cell.offsetWidth;
-    });
-    table.style.setProperty("--freeze-col1-width", maxWidth + "px");
+  const col1Cells = table.querySelectorAll("td.freeze-col-1, th.freeze-col-1");
+  let maxWidth = 60;
+  col1Cells.forEach(cell => {
+    const w = cell.getBoundingClientRect().width;
+    if (w > maxWidth) maxWidth = w;
+  });
+  const leftPx = Math.ceil(maxWidth) + "px";
+  table.querySelectorAll("td.freeze-col-2, th.freeze-col-2").forEach(cell => {
+    cell.style.left = leftPx;
   });
 }
 
