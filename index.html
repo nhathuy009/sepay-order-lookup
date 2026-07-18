@@ -6,7 +6,7 @@
 <title>Công cụ tra cứu đơn hàng & Sao kê | 10X</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css">
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
@@ -507,7 +507,7 @@
   }
 </style>
 </head>
-<body>
+<body class="light-mode">
 
   <header class="top-header">
     <div class="header-brand">
@@ -1001,10 +1001,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (isCollapsed) document.getElementById("appSidebar").classList.add("collapsed");
 
     const savedTheme = localStorage.getItem("app_theme");
-    if(savedTheme === "light") {
-      changeTheme(true);
-    } else {
+    if(savedTheme === "dark") {
       changeTheme(false);
+    } else {
+      changeTheme(true);
     }
   } catch(e) {}
 
