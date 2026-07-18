@@ -508,6 +508,10 @@
       📡 PERSONAL OPERATION HUB
     </div>
     <div class="header-actions" id="authCard">
+      <div class="acc-seg-wrap" id="themeSegWrap">
+        <button type="button" class="acc-seg-btn" id="themeBtnDark" onclick="changeTheme(false)">🌙 Đêm</button>
+        <button type="button" class="acc-seg-btn" id="themeBtnLight" onclick="changeTheme(true)">☀️ Sáng</button>
+      </div>
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
       <button onclick="saveToken()">Lưu khóa</button>
     </div>
@@ -542,18 +546,6 @@
       </div>
 
       <div class="sidebar-bottom">
-        <div class="menu-item" onclick="toggleSettingsMenu()">
-          <span class="menu-icon">⚙️</span><span class="menu-text">Cài đặt</span>
-        </div>
-        <div id="settingsPanel" class="settings-panel hidden">
-          <div class="theme-switch-wrapper">
-            <span>Giao diện Sáng</span>
-            <label class="switch">
-              <input type="checkbox" id="themeToggle" onchange="changeTheme(this.checked)">
-              <span class="slider round"></span>
-            </label>
-          </div>
-        </div>
       </div>
     </aside>
 
@@ -970,27 +962,22 @@ function toggleSidebar() {
   localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
 }
 
-function toggleSettingsMenu() {
-  const panel = document.getElementById("settingsPanel");
-  panel.classList.toggle("hidden");
-  
-  // Nếu sidebar đang thu gọn mà bấm vào nút cài đặt, tạm thời mở rộng ra để hiển thị nút gạt.
-  const sidebar = document.getElementById("appSidebar");
-  if(sidebar.classList.contains("collapsed")) {
-    toggleSidebar(); 
-  }
-}
-
 function changeTheme(isLight) {
   const flatpickrTheme = document.getElementById("flatpickr-theme");
+  const btnDark = document.getElementById("themeBtnDark");
+  const btnLight = document.getElementById("themeBtnLight");
   if(isLight) {
     document.body.classList.add("light-mode");
     localStorage.setItem("app_theme", "light");
     flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css";
+    if(btnLight) btnLight.classList.add("active");
+    if(btnDark) btnDark.classList.remove("active");
   } else {
     document.body.classList.remove("light-mode");
     localStorage.setItem("app_theme", "dark");
     flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";
+    if(btnDark) btnDark.classList.add("active");
+    if(btnLight) btnLight.classList.remove("active");
   }
 }
 /* ----------------------------------------------------------- */
@@ -1008,8 +995,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const savedTheme = localStorage.getItem("app_theme");
     if(savedTheme === "light") {
-      document.getElementById("themeToggle").checked = true;
       changeTheme(true);
+    } else {
+      changeTheme(false);
     }
   } catch(e) {}
 
