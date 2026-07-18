@@ -99,6 +99,7 @@
   }
   
   * { box-sizing: border-box; }
+  html { height: 100%; height: 100dvh; }
   body { 
     margin: 0; 
     font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -108,6 +109,7 @@
     color: var(--text-main); 
     font-size: 14px;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -281,7 +283,7 @@
   .ms-checkbox-item input { cursor: pointer; margin: 0; accent-color: var(--accent); }
   
   /* MAIN CONTENT */
-  .main-content { flex-grow: 1; padding: 28px 36px; overflow-y: auto; }
+  .main-content { flex-grow: 1; padding: 28px 36px; padding-bottom: 80px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
   h2 { margin: 0 0 20px; font-size: 20px; font-weight: 800; color: var(--heading-color); font-family: 'Be Vietnam Pro', sans-serif;}
   h3 { color: var(--heading-color); font-family: 'Be Vietnam Pro', sans-serif;}
@@ -459,7 +461,7 @@
     .sidebar-menu-title { display: none !important; }
     .menu-item { white-space: nowrap; padding: 10px 14px; margin: 0 4px; justify-content: flex-start !important; }
     .menu-text { display: inline !important; }
-    .main-content { padding: 16px; overflow: visible; }
+    .main-content { padding: 16px; padding-bottom: 80px; overflow: visible; -webkit-overflow-scrolling: touch; }
     #toggleSidebarBtn { display: none !important; }
     #accountingRow { flex-direction: column; }
     #accountingRow #accountingWrapper, #accountingRow #bankTransferWrapper { max-width: 100%; width: 100%; flex: 1 1 auto; }
