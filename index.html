@@ -531,9 +531,6 @@
         <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
           <span class="menu-icon">📝</span><span class="menu-text">Tra cứu hàng loạt</span>
         </div>
-        <div class="menu-item" id="tabExcelBtn" onclick="switchTab('excel')">
-          <span class="menu-icon">📊</span><span class="menu-text">Xử lý bằng file Excel</span>
-        </div>
         <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">
           <span class="menu-icon">🏦</span><span class="menu-text">Tổng hợp sao kê</span>
         </div>
@@ -589,19 +586,6 @@
               <tbody id="bulkTbody"></tbody>
             </table>
           </div>
-        </div>
-      </div>
-
-      <div id="tabExcel" class="hidden">
-        <h2>Xử lý file Excel đơn hàng</h2>
-        <div class="card">
-          <label>Chọn file Excel đầu vào (.xlsx) — Hệ thống sẽ đọc mã ở Cột A</label>
-          <div class="row">
-            <div><input type="file" id="excelFile" accept=".xlsx" /></div>
-            <button id="excelBtn" onclick="doExcel()">Xử lý & Tải về ngay</button>
-          </div>
-          <div class="hint">Tệp chứa kết quả sẽ tự động tải xuống sau khi hoàn tất.</div>
-          <div id="excelResult" class="msg"></div>
         </div>
       </div>
 
@@ -1025,7 +1009,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "excel", "bank", "transaction", "invoice", "employee", "air"];
+  const tabs = ["bulk", "bank", "transaction", "invoice", "employee", "air"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -2250,19 +2234,6 @@ document.addEventListener('click', function(e) {
     if(dropdown) dropdown.classList.remove('show');
   }
 });
-
-async function doExcel() {
-  const fileInput = document.getElementById("excelFile"); const box = document.getElementById("excelResult"); const btn = document.getElementById("excelBtn");
-  if (!fileInput.files.length) { box.innerHTML = '<span class="err">Vui lòng chọn file.</span>'; return; }
-  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file, vui lòng đợi…';
-  try {
-    const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "excel", file_base64: b64, access_token: getToken() }) });
-    const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<span class="err">❌ ${data.error || "Lỗi"}</span>`; return; }
-    downloadBase64(data.file_base64, "ket_qua_" + file.name); box.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${data.success}/${data.total}</strong> đơn. File đã tự tải về máy.`;
-  } catch (e) { box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
-}
 
 async function doBankStatement() {
   const fileInput = document.getElementById("bankExcelFile"); const box = document.getElementById("bankResult"); const btn = document.getElementById("bankBtn");
