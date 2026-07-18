@@ -791,13 +791,13 @@
             </div>
           </div>
           <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 1 1 340px; min-width: 340px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
               <h3 style="margin:0; font-size:16px;">Danh sách chuyển khoản lương</h3>
-              <button id="copyBankTransferBtn" class="btn-outline" onclick="copyBankTransferForBank()" style="font-size: 13px;">📋 Copy dán vào file NH</button>
+              <div class="acc-seg-wrap" id="bankTabsWrap"></div>
             </div>
-            <div class="acc-seg-wrap" id="bankTabsWrap" style="margin-bottom: 12px;"></div>
-            <div class="hint" style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-muted);">
-              Dán bắt đầu tại đúng ô "STT" của dòng dữ liệu đầu tiên trong file mẫu ngân hàng (thường là ô A3). Đã copy sẵn 5 cột: STT, Tên NV, Số tài khoản, Số tiền (số thật, không phải chữ), Nội dung giao dịch.
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: wrap;">
+              <div class="text-muted-small" style="margin:0;">Danh sách chi tiết từng người theo từng ngân hàng, ACB đi theo lô, NH khác đi tay từng GD</div>
+              <button id="copyBankTransferBtn" class="btn-outline" onclick="copyBankTransferForBank()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy dán vào file NH</button>
             </div>
             <div class="table-responsive">
               <table class="sepay-table" id="bankTransferTable">
