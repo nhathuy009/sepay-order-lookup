@@ -1906,17 +1906,28 @@ function renderBankTransferTable() {
   currentBankTransferRows = activeRows;
 
   let bankHTML = "";
+  let totalAmount = 0;
   activeRows.forEach((r, idx) => {
     const tenNvKhongDau = removeVietnameseDiacritics(r.ten_nv).toUpperCase();
+    const soTienRounded = Math.round(r.thuc_nhan);
+    totalAmount += soTienRounded;
     bankHTML += `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
         <td style="font-weight: 600;">${escapeHtml(tenNvKhongDau)}</td>
         <td>${escapeHtml(r.stk)}</td>
-        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(Math.round(r.thuc_nhan))}</td>
+        <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(soTienRounded)}</td>
       </tr>
     `;
   });
+  if (activeRows.length > 0) {
+    bankHTML += `
+      <tr style="background: var(--badge-ok-bg);">
+        <td colspan="3" style="text-align: right; font-weight: 800;">Tổng cộng (${activeRows.length} người)</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(totalAmount)}</td>
+      </tr>
+    `;
+  }
   bankTbody.innerHTML = bankHTML || `<tr><td colspan="4" style="text-align:center;">Không có dữ liệu.</td></tr>`;
 }
 
