@@ -466,6 +466,45 @@
     #accountingRow { flex-direction: column; }
     #accountingRow #accountingWrapper, #accountingRow #bankTransferWrapper { max-width: 100%; width: 100%; flex: 1 1 auto; }
     #accountingTable, #accountingTable2, #accountingTable3 { width: 100%; }
+
+    /* --- HEADER GỌN LẠI TRÊN ĐIỆN THOẠI --- */
+    .top-header {
+      height: auto;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 10px 14px;
+      row-gap: 8px;
+      gap: 8px;
+    }
+    .header-brand {
+      font-size: 15px;
+      letter-spacing: 0.2px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .header-actions {
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .header-actions #themeSegWrap {
+      order: 1;
+    }
+    .header-actions #accessToken {
+      order: 2;
+      flex: 1 1 140px;
+      min-width: 0;
+    }
+    .header-actions button:not(.acc-seg-btn) {
+      order: 3;
+      padding: 8px 14px;
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .header-actions #themeSegWrap .acc-seg-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
   }
 
   /* --- Nút switch dạng pill cho card Định khoản Hạch toán --- */
