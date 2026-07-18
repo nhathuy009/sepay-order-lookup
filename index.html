@@ -1922,7 +1922,7 @@ function copyForMisaAmisBhxh() {
     // Diễn giải (cột D) LUÔN CỐ ĐỊNH cho mọi dòng
     const dienGiaiCoDinh = "Trích BHXH, BHYT, BHTN, KPCĐ cty đóng " + thangStr;
 
-    // GOM NHÓM 1: BHXH CTY ĐÓNG (Nợ 6422 / Có 3383)
+    // BƯỚC 1: Lần lượt từng nhân viên -> 3383 (BHXH) -> 3384 (BHYT) -> 3385 (BHTN)
     rows.forEach(r => {
       if (r.tong_ajakal > 0) {
         // Nếu NV không có HT-TT (AJ) và ÔĐ-TS (AK), chỉ có TNLĐ-BNN (AL) -> đổi diễn giải hạch toán riêng
@@ -1943,10 +1943,6 @@ function copyForMisaAmisBhxh() {
           r.ma_nv                     // Cột L: Mã ĐT Có
         ].join("\t"));
       }
-    });
-
-    // GOM NHÓM 2: BHYT CTY ĐÓNG (Nợ 6422 / Có 3384)
-    rows.forEach(r => {
       if (r.bhyt_cty > 0) {
         let dienGiaiHT = "Trích BHYT cty đóng " + thangStr;
         tsvLines.push([
@@ -1954,10 +1950,6 @@ function copyForMisaAmisBhxh() {
           "6422", "3384", Math.round(r.bhyt_cty), r.ma_nv, r.ma_nv
         ].join("\t"));
       }
-    });
-
-    // GOM NHÓM 3: BHTN CTY ĐÓNG (Nợ 6422 / Có 3385)
-    rows.forEach(r => {
       if (r.bhtn_cty > 0) {
         let dienGiaiHT = "Trích BHTN cty đóng " + thangStr;
         tsvLines.push([
@@ -1967,7 +1959,7 @@ function copyForMisaAmisBhxh() {
       }
     });
 
-    // GOM NHÓM 4: KPCĐ CTY ĐÓNG (Nợ 6422 / Có 3382)
+    // BƯỚC 2: Sau khi hết danh sách NV ở bước 1, duyệt lại toàn bộ để xuất KPCĐ (3382) dồn cuối
     rows.forEach(r => {
       if (r.cd_cty > 0) {
         let dienGiaiHT = "Trích KPCĐ cty đóng " + thangStr;
