@@ -1349,7 +1349,7 @@ function displaySheetData() {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>
-        <td class="freeze-col-2" title="${escapeHtml(r.ten_nv)}">${escapeHtml(r.ten_nv)}</td>
+        <td class="freeze-col-2" title="${escapeHtml(r.ten_nv)}">${escapeHtml(toTitleCaseVN(r.ten_nv))}</td>
         <td style="text-align: right;">${formatMoney(r.luong_cb)}</td>
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
@@ -2554,6 +2554,12 @@ function downloadBase64(b64, filename) {
 function escapeHtml(s) {
   if (s === null || s === undefined) return "";
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+
+// Chuyển tên viết hoa toàn bộ (VD: "HỒ ANH ĐỨC") thành dạng viết hoa đầu mỗi từ ("Hồ Anh Đức"), chỉ dùng để hiển thị
+function toTitleCaseVN(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).toLowerCase().split(" ").map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
 }
 
 // Lưu dữ liệu đã xử lý để dùng lại khi bấm "Tải về Excel", không cần đọc lại file
