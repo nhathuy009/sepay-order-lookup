@@ -20,6 +20,7 @@
     --header-bg: rgba(12,22,64,0.4);       
     --sidebar-bg: transparent;      
     --card-bg: linear-gradient(180deg, rgba(20,32,78,.9), rgba(15,25,64,.8));         
+    --card-bg-solid: #141F4E;
     --border: rgba(120,150,220,.22);          
     
     --text-main: #FFFFFF;       
@@ -51,6 +52,7 @@
     --amount-in: rgba(159,212,248,.95);
     --amount-out: #FFD98A;
     --total-row-bg: rgba(46,151,224,.16);
+    --total-row-bg-solid: #183265;
     --checkbox-bg: rgba(255,255,255,0.012);
     --settings-panel-bg: rgba(0,0,0,0.2);
   }
@@ -62,6 +64,7 @@
                    linear-gradient(180deg, #F4F7F9, #E9EEF2);
     --header-bg: rgba(255,255,255,0.85);       
     --card-bg: #FFFFFF;         
+    --card-bg-solid: #FFFFFF;
     --border: rgba(0,0,0,0.08);          
     --text-main: #1E293B;       
     --text-muted: #64748B;      
@@ -91,6 +94,7 @@
     --amount-in: #16A34A;
     --amount-out: #DC2626;
     --total-row-bg: #EFF6FF;
+    --total-row-bg-solid: #EFF6FF;
     --checkbox-bg: #F8FAFC;
     --settings-panel-bg: rgba(0,0,0,0.04);
   }
@@ -423,7 +427,7 @@
   }
   #employeeTable td { padding: 8px 10px; white-space: nowrap; }
   #employeeTable .freeze-col-1, #employeeTable .freeze-col-2 {
-    position: sticky; z-index: 2; background: var(--card-bg);
+    position: sticky; z-index: 2; background: var(--card-bg-solid);
   }
   #employeeTable thead .freeze-col-1, #employeeTable thead .freeze-col-2 { z-index: 4; }
   #employeeTable .freeze-col-1 {
@@ -437,12 +441,12 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sepay-table .total-row td.freeze-col-1, .sepay-table .total-row td.freeze-col-2 {
-    background-color: var(--total-row-bg) !important;
+    background-color: var(--total-row-bg-solid) !important;
   }
   #employeeTable .freeze-col-total {
     position: sticky; left: 0; z-index: 2;
     box-shadow: 3px 0 6px -2px rgba(0,0,0,0.15);
-    background-color: var(--total-row-bg) !important;
+    background-color: var(--total-row-bg-solid) !important;
   }
 
   @media (max-width: 768px) {
