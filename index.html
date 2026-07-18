@@ -870,12 +870,47 @@
           <label>Chọn file Excel gốc (.xlsx, .xls) để xử lý</label>
           <div class="row">
             <div><input type="file" id="airExcelFile" accept=".xlsx, .xls" /></div>
-            <button id="exportAirBtn" onclick="doExportAirPacking()">Xử lý & Tải về ngay</button>
+            <button id="exportAirBtn" onclick="doProcessAirPacking()">Xử lý & Xem trước</button>
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
-            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên, và xuất ra form mẫu chuẩn trực tiếp trên trình duyệt.
+            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên. Kết quả sẽ hiển thị bên dưới để bạn kiểm tra trước khi tải file Excel.
           </div>
           <div id="airResult" class="msg" style="margin-top: 12px;"></div>
+        </div>
+
+        <div id="airResultArea" style="display:none;">
+          <div class="card" style="margin-top: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
+                <div class="hint" style="margin:0;">Kiểm tra kỹ số liệu bên dưới. Nếu đúng, bấm "Tải về Excel" để xuất file.</div>
+              </div>
+              <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
+            </div>
+            <div class="table-responsive" style="margin-top: 14px;">
+              <table class="bulk-table" id="airTable">
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Bag Mark</th>
+                    <th>Customer Name</th>
+                    <th style="text-align:right;">SET</th>
+                    <th style="text-align:right;">Weight (KGS)</th>
+                  </tr>
+                </thead>
+                <tbody id="airTbody"></tbody>
+                <tfoot>
+                  <tr id="airTotalRow" style="font-weight:700;">
+                    <td></td>
+                    <td id="airTotalBags"></td>
+                    <td></td>
+                    <td id="airTotalSets" style="text-align:right;"></td>
+                    <td id="airTotalWeight" style="text-align:right;"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -2514,25 +2549,30 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 
-async function doExportAirPacking() {
+// Lưu dữ liệu đã xử lý để dùng lại khi bấm "Tải về Excel", không cần đọc lại file
+let airProcessedData = null;
+
+async function doProcessAirPacking() {
   const fileInput = document.getElementById("airExcelFile");
   const box = document.getElementById("airResult");
   const btn = document.getElementById("exportAirBtn");
-  
-  if (!fileInput.files.length) { 
-    box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>'; 
-    return; 
+  const resultArea = document.getElementById("airResultArea");
+
+  if (!fileInput.files.length) {
+    box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>';
+    return;
   }
-  
+
   const file = fileInput.files[0];
   btn.disabled = true;
-  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý và định dạng Style (Màu, Viền)...';
-  
+  resultArea.style.display = "none";
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đọc và xử lý dữ liệu...';
+
   try {
     // 1. ĐỌC DỮ LIỆU BẰNG SHEETJS
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type: 'array' });
-    
+
     let allBagsData = [];
     let customerName = "Khách hàng";
     let firstSheetProcessed = false;
@@ -2561,7 +2601,7 @@ async function doExportAirPacking() {
 
       let currentBagNo = null;
       let currentKgs = null;
-      let sheetBagsMap = new Map(); 
+      let sheetBagsMap = new Map();
 
       for (let r = headerIdx + 1; r < jsonData.length; r++) {
         const row = jsonData[r];
@@ -2594,14 +2634,65 @@ async function doExportAirPacking() {
       return;
     }
 
-    // 2. TẠO FILE MỚI & ĐỊNH DẠNG BẰNG EXCELJS
+    // Lưu lại để tải về sau, không tự động tải xuống ngay
+    const today = new Date();
+    const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+    airProcessedData = { allBagsData, customerName, dateStr };
+
+    renderAirPreviewTable(airProcessedData);
+    resultArea.style.display = "block";
+    box.innerHTML = `<span class="badge ok">✅ Đã xử lý xong ${allBagsData.length} bao. Vui lòng kiểm tra bảng bên dưới trước khi tải về.</span>`;
+  } catch (e) {
+    box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderAirPreviewTable(processed) {
+  const { allBagsData, customerName, dateStr } = processed;
+  const tbody = document.getElementById("airTbody");
+  document.getElementById("airPreviewTitle").innerText = `Xem trước dữ liệu - HÀNG XUẤT AIR - ${dateStr}`;
+
+  let totalSets = 0;
+  let totalWeight = 0;
+  let rowsHtml = "";
+  allBagsData.forEach((bag, idx) => {
+    totalSets += bag.QTITY;
+    totalWeight += (bag.KGS || 0);
+    rowsHtml += `<tr>
+      <td style="text-align:center;">${idx + 1}</td>
+      <td style="text-align:center;">${bag.BAG_NO}</td>
+      <td>${customerName}</td>
+      <td style="text-align:right;">${bag.QTITY}</td>
+      <td style="text-align:right;">${(bag.KGS || 0)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML = rowsHtml;
+
+  document.getElementById("airTotalBags").innerText = allBagsData.length;
+  document.getElementById("airTotalSets").innerText = totalSets;
+  document.getElementById("airTotalWeight").innerText = totalWeight.toFixed ? (Math.round(totalWeight * 100) / 100) : totalWeight;
+}
+
+async function doDownloadAirPacking() {
+  const box = document.getElementById("airResult");
+  const dlBtn = document.getElementById("downloadAirBtn");
+
+  if (!airProcessedData) {
+    box.innerHTML = '<span class="err">Vui lòng xử lý file trước khi tải về.</span>';
+    return;
+  }
+
+  const { allBagsData, customerName, dateStr } = airProcessedData;
+  dlBtn.disabled = true;
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tạo file Excel và định dạng Style (Màu, Viền)...';
+
+  try {
+    // TẠO FILE MỚI & ĐỊNH DẠNG BẰNG EXCELJS
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Sheet1');
 
-    // Tạo dòng Tiêu đề (Row 1)
-    const today = new Date();
-    const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-    
     const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
     worksheet.mergeCells('A1:E1');
     const titleCell = worksheet.getCell('A1');
@@ -2616,60 +2707,50 @@ async function doExportAirPacking() {
       right: { style: 'thin', color: { argb: 'FFBE5014' } }
     };
 
-    // Tạo dòng Header (Row 2)
     const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
-    headerRow.height = 49.5; // Chiều cao 49.5
+    headerRow.height = 49.5;
     headerRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
       cell.font = { bold: true };
-      // SỬA: vertical phải là 'middle'
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = customBorder;
     });
 
-    // Thêm dữ liệu (Từ Row 3 trở đi)
     let totalSets = 0;
     let totalWeight = 0;
     allBagsData.forEach((bag, idx) => {
       totalSets += bag.QTITY;
       totalWeight += (bag.KGS || 0);
       const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
-      
-      // Áp dụng Alignment và Border ngay trên dòng được thêm
       row.eachCell((cell) => {
-        // SỬA: vertical phải là 'middle'
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.border = customBorder;
       });
     });
 
-    // Dòng Tổng cộng
     const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
     totalRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
       cell.font = { bold: true };
-      // SỬA: vertical phải là 'middle'
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = customBorder;
     });
 
-    // 4. CHỈNH ĐỘ RỘNG CỘT
-    worksheet.getColumn(1).width = 8.38; // A
-    worksheet.getColumn(2).width = 8.38; // B
-    worksheet.getColumn(3).width = 24.38; // C
-    worksheet.getColumn(4).width = 8.38; // D
-    worksheet.getColumn(5).width = 8.38; // E
+    worksheet.getColumn(1).width = 8.38;
+    worksheet.getColumn(2).width = 8.38;
+    worksheet.getColumn(3).width = 24.38;
+    worksheet.getColumn(4).width = 8.38;
+    worksheet.getColumn(5).width = 8.38;
 
-    // 5. XUẤT FILE TỰ ĐỘNG
     const buffer = await workbook.xlsx.writeBuffer();
     const exportFileName = `AIR-${dateStr.replace(/\//g, '-')}.xlsx`;
     saveAs(new Blob([buffer], { type: "application/octet-stream" }), exportFileName);
-    
-    box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File  <b>${exportFileName}</b>  với đầy đủ Style đã được tạo ra.</span>`;    
+
+    box.innerHTML = `<span class="badge ok">🎉 Tuyệt vời! File  <b>${exportFileName}</b>  với đầy đủ Style đã được tạo ra.</span>`;
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
   } finally {
-    btn.disabled = false;
+    dlBtn.disabled = false;
   }
 }
   
