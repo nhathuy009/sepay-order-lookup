@@ -636,13 +636,17 @@
           <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
           <div class="row">
             <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
-            <button id="bankBtn" onclick="doBankStatement()">Tổng hợp GD & tải về</button>
+            <!-- Đổi tên nút để phù hợp luồng UX mới -->
+            <button id="bankBtn" onclick="doBankStatement()">Xử lý & Xem trước</button>
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
             Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.
           </div>
           <div id="bankResult" class="msg"></div>
         </div>
+        
+        <!-- Khung chứa bảng dữ liệu (mặc định ẩn) -->
+        <div id="bankTableWrap" style="display:none;" class="card"></div>
       </div>
 
       <div id="tabTransaction" class="hidden">
@@ -2376,17 +2380,107 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Khai báo biến toàn cục để lưu trữ file excel vừa được server trả về
+let bankStatementBase64 = "";
+let bankStatementFileName = "";
+
 async function doBankStatement() {
-  const fileInput = document.getElementById("bankExcelFile"); const box = document.getElementById("bankResult"); const btn = document.getElementById("bankBtn");
-  if (!fileInput.files.length) { box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; return; }
-  const file = fileInput.files[0]; btn.disabled = true; box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
+  const fileInput = document.getElementById("bankExcelFile"); 
+  const box = document.getElementById("bankResult"); 
+  const btn = document.getElementById("bankBtn");
+  const tableWrap = document.getElementById("bankTableWrap");
+  
+  if (!fileInput.files.length) { 
+    box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; 
+    return; 
+  }
+  
+  const file = fileInput.files[0]; 
+  btn.disabled = true; 
+  box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
+  if (tableWrap) tableWrap.style.display = 'none';
+
   try {
     const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }) });
+    const resp = await fetch("/api/index", { 
+      method: "POST", 
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }) 
+    });
     const data = await resp.json();
-    if (!resp.ok) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; return; }
-    downloadBase64(data.file_base64, "TongHop_" + file.name); box.innerHTML = `🎉 Hoàn tất! File tổng hợp đã được tự động tải về.`;
-  } catch (e) { box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`; } finally { btn.disabled = false; }
+    
+    if (!resp.ok) { 
+      box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; 
+      return; 
+    }
+    
+    // Lưu lại dữ liệu Base64 để dùng cho nút tải về
+    bankStatementBase64 = data.file_base64;
+    bankStatementFileName = "TongHop_" + file.name;
+
+    // Dùng SheetJS để đọc file Excel Base64 trả về
+    const wb = XLSX.read(data.file_base64, { type: 'base64', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    // Tham số raw: false giúp định dạng tiền/ngày tháng giống với hiển thị trong Excel
+    const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: "dd/mm/yyyy" });
+
+    // Tạo giao diện bảng HTML
+    let tableHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+        <h3 style="margin:0;">Xem trước Kết quả</h3>
+        <button onclick="downloadBankStatement()" style="font-size:13px; padding:8px 16px;">⬇️ Tải về Excel</button>
+      </div>
+      <div class="table-responsive">
+        <table class="sepay-table" style="width:100%; white-space:nowrap;">
+          <thead>
+    `;
+
+    if (jsonData.length > 0) {
+       const headers = jsonData[0];
+       tableHTML += '<tr>';
+       headers.forEach(h => { tableHTML += `<th>${escapeHtml(h || "")}</th>`; });
+       tableHTML += '</tr></thead><tbody>';
+
+       for (let i = 1; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          // Bỏ qua dòng trống
+          if (!row || row.length === 0) continue;
+          
+          tableHTML += '<tr>';
+          for (let j = 0; j < headers.length; j++) {
+             let cellData = row[j];
+             let displayCell = cellData !== undefined && cellData !== null ? String(cellData) : "";
+             
+             // Căn phải đối với các cột số tiền (thường là các cột cuối hoặc số dương/âm)
+             const align = (!isNaN(parseFloat(cellData)) && isFinite(cellData) && !displayCell.includes("/")) ? "text-align: right;" : "text-align: left;";
+             
+             tableHTML += `<td style="${align}">${escapeHtml(displayCell)}</td>`;
+          }
+          tableHTML += '</tr>';
+       }
+    }
+    tableHTML += '</tbody></table></div>';
+    
+    box.innerHTML = `<span class="badge ok">🎉 Đã xử lý xong! Vui lòng xem kết quả bên dưới.</span>`;
+    if (tableWrap) {
+       tableWrap.innerHTML = tableHTML;
+       tableWrap.style.display = 'block';
+    }
+
+  } catch (e) { 
+    box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`; 
+  } finally { 
+    btn.disabled = false; 
+  }
+}
+
+// Thêm hàm tải về gọi từ nút "Tải về Excel" trên bảng giao diện
+function downloadBankStatement() {
+  if (bankStatementBase64 && bankStatementFileName) {
+      downloadBase64(bankStatementBase64, bankStatementFileName);
+  } else {
+      alert("Chưa có file để tải về!");
+  }
 }
 
 async function doTxSearch() {
