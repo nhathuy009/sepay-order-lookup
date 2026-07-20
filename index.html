@@ -2493,13 +2493,15 @@ async function doTxList() {
     
     // VẼ BẢNG HTML
     let rows = "";
-    txs.forEach(tx => {
+    txs.forEach((tx, i) => {
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
       let amountInHtml = Number(tx.amount_in) > 0 ? `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')}</span>` : "";
       let amountOutHtml = Number(tx.amount_out) > 0 ? `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')}</span>` : "";
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+      const paymentCode = (tx.code || "").trim();
+      const lookupCellContent = paymentCode ? `<span class="spinner" style="color:var(--accent)"></span>` : "—";
 
       rows += `
         <tr>
@@ -2519,6 +2521,9 @@ async function doTxList() {
           <td style="text-align: right;">${amountInHtml}</td>
           <td style="text-align: right;">${amountOutHtml}</td>
           <td class="text-id">${escapeHtml(tx.code || "—")}</td>
+          <td class="text-id" id="tx-name-${i}">${lookupCellContent}</td>
+          <td class="text-id" id="tx-userid-${i}">${lookupCellContent}</td>
+          <td class="text-id" id="tx-invoice-${i}">${lookupCellContent}</td>
         </tr>`;
     });
 
@@ -2528,6 +2533,9 @@ async function doTxList() {
         <td colspan="3" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-out);">${totalAmountOut.toLocaleString('vi-VN')}</td>
+        <td></td>
+        <td></td>
+        <td></td>
         <td></td>
       </tr>`;
       
@@ -2545,16 +2553,48 @@ async function doTxList() {
               <th style="text-align: right;">Tiền vào (+)</th>
               <th style="text-align: right;">Tiền ra (-)</th>
               <th>Mã thanh toán</th>
+              <th>Tên KH</th>
+              <th>Mã KH</th>
+              <th>Số HĐ</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
+
+    // Tự động tra cứu Tên KH / Mã KH / Số HĐ cho từng dòng có Mã thanh toán
+    lookupCustomerInfoForTxList(txs);
       
   } catch (e) { 
     box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; 
   } finally { 
     btn.disabled = false; 
+  }
+}
+
+async function lookupCustomerInfoForTxList(txs) {
+  for (let i = 0; i < txs.length; i++) {
+    const code = (txs[i].code || "").trim();
+    const nameEl = document.getElementById(`tx-name-${i}`);
+    const userEl = document.getElementById(`tx-userid-${i}`);
+    const invEl = document.getElementById(`tx-invoice-${i}`);
+    if (!code) continue; // Đã hiển thị "—" sẵn khi render bảng
+
+    try {
+      const resp = await fetch("/api/index", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "lookup", code, sa_system: "", access_token: getToken() })
+      });
+      const data = await resp.json();
+      const ok = resp.ok && data.status_msg === "Thành công";
+      if (nameEl) nameEl.textContent = ok ? (data.users_name || "—") : "—";
+      if (userEl) userEl.textContent = ok ? (data.username || "—") : "—";
+      if (invEl) invEl.textContent = ok ? (data.invoice_number || "—") : "—";
+    } catch (e) {
+      if (nameEl) nameEl.textContent = "—";
+      if (userEl) userEl.textContent = "—";
+      if (invEl) invEl.textContent = "—";
+    }
   }
 }
   
