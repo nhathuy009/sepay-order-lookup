@@ -2405,7 +2405,7 @@ async function doTxSearch() {
         if (value === null) displayValue = '<span style="color:var(--text-muted)">null</span>';
         rows += `<tr><td style="color:var(--text-muted); font-weight:600; width:200px;">${escapeHtml(key)}</td><td style="word-break: break-all;">${displayValue}</td></tr>`;
     }
-    box.innerHTML = `<div style="margin-bottom:12px;"><span class="badge ok">🎉 Tìm thấy giao dịch!</span></div><div class="table-responsive"><table style="width:100%; border-collapse: collapse;"><tbody>${rows}</tbody></table></div>`;
+    box.innerHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;"><span class="badge ok">🎉 Tìm thấy giao dịch!</span><button id="copyTxSearchBtn" class="btn-outline" onclick="copyTableToClipboard('txSearchTable', 'copyTxSearchBtn')" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy</button></div><div class="table-responsive"><table id="txSearchTable" style="width:100%; border-collapse: collapse;"><tbody>${rows}</tbody></table></div>`;
   } catch (e) { box.innerHTML = `<div class="msg err">❌ Lỗi kết nối mạng: ${e.message}</div>`; } finally { btn.disabled = false; }
 }
 
@@ -2549,8 +2549,9 @@ async function doTxList() {
       </tr>`;
       
     box.innerHTML = `
-      <div style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
+        <button id="copyTxListBtn" class="btn-outline" onclick="copyTableToClipboard('txListTable', 'copyTxListBtn')" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
       </div>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px;">
         <table class="sepay-table" id="txListTable">
