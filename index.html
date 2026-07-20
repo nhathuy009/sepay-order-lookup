@@ -274,6 +274,7 @@
   .ms-checkbox-item { 
     display: flex; align-items: center; gap: 8px; padding: 8px 10px; 
     cursor: pointer; font-size: 13px; border-radius: 6px; color: var(--text-main);
+    white-space: nowrap;
   }
   
   .ms-checkbox-item:hover { 
@@ -671,11 +672,7 @@
               <label>Đến ngày</label>
               <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
             </div>
-            <div style="flex: 1.2; min-width: 140px;">
-              <label>Số dư đầu kỳ</label>
-              <input type="text" id="txInitialBalance" placeholder="Nhập số (VD: 5000000)" />
-            </div>
-            <div style="flex: 0.25; min-width: 180px;">
+            <div style="flex: 2; min-width: 280px;">
               <label>Tài khoản (Tùy chọn)</label>
               <div class="multi-select-container" id="multiSelectContainer">
                 <div class="multi-select-label" id="txBankAccountIdLabel" onclick="document.getElementById('txBankAccountIdDropdown').classList.toggle('show')">
@@ -2337,12 +2334,10 @@ async function loadBankAccounts() {
       const uniqueBrands = new Set();
 
       data.bank_accounts.forEach(bank => {
-        const balance = Number(bank.accumulated).toLocaleString('vi-VN');
-        
         // Tạo Checkbox cho từng tài khoản và chèn vào dropdown
         const label = document.createElement('label');
         label.className = 'ms-checkbox-item';
-        label.innerHTML = `<input type="checkbox" value="${bank.id}" onchange="updateMultiSelectLabel()" /> <span>${bank.bank_short_name} - ${bank.account_number} (SD: ${balance}đ)</span>`;
+        label.innerHTML = `<input type="checkbox" value="${bank.id}" onchange="updateMultiSelectLabel()" /> <span>${bank.bank_short_name} - ${bank.account_number}</span>`;
         dropdownEl.appendChild(label);
 
         if (bank.bank_short_name) uniqueBrands.add(bank.bank_short_name);
@@ -2476,9 +2471,7 @@ async function doTxList() {
     }
     
     // TÍNH TOÁN SỐ DƯ LŨY KẾ
-    // 1. Lấy số dư đầu kỳ từ ô input (Chỉ lấy số)
-    let initialBalanceStr = document.getElementById("txInitialBalance").value || "0";
-    let runningBalance = parseInt(initialBalanceStr.replace(/\D/g, '')) || 0;
+    let runningBalance = 0;
     let totalAmountIn = 0;
     let totalAmountOut = 0;
 
@@ -2501,18 +2494,15 @@ async function doTxList() {
     // VẼ BẢNG HTML
     let rows = "";
     txs.forEach(tx => {
-      const shortId = tx.id ? tx.id.substring(0, 8).toUpperCase() : "—";
       const formattedDate = formatTxDate(tx.transaction_date);
       const relativeTime = timeAgo(tx.transaction_date);
       
       let amountInHtml = Number(tx.amount_in) > 0 ? `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')}</span>` : "";
       let amountOutHtml = Number(tx.amount_out) > 0 ? `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')}</span>` : "";
-      let balanceHtml = `<strong style="color:var(--accent);">${tx.currentBalance.toLocaleString('vi-VN')}</strong>`;
       const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
 
       rows += `
         <tr>
-          <td class="text-id">${shortId}</td>
           <td>
             <div>${formattedDate}</div>
             <div class="text-muted-small">${relativeTime}</div>
@@ -2528,20 +2518,17 @@ async function doTxList() {
           </td>
           <td style="text-align: right;">${amountInHtml}</td>
           <td style="text-align: right;">${amountOutHtml}</td>
-          <td style="text-align: right;">${balanceHtml}</td>
           <td class="text-id">${escapeHtml(tx.code || "—")}</td>
-          <td class="text-id">${escapeHtml(tx.reference_number || "—")}</td>
         </tr>`;
     });
 
     // Chèn dòng Tổng phát sinh vào cuối bảng
     rows += `
       <tr class="total-row">
-        <td colspan="4" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
+        <td colspan="3" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-out);">${totalAmountOut.toLocaleString('vi-VN')}</td>
-        <td style="text-align: right; font-weight: 800; color: var(--accent);">${runningBalance.toLocaleString('vi-VN')}</td>
-        <td colspan="2"></td>
+        <td></td>
       </tr>`;
       
     box.innerHTML = `
@@ -2552,15 +2539,12 @@ async function doTxList() {
         <table class="sepay-table" id="txListTable">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Thời gian</th>
               <th>Tài khoản</th>
               <th>Nội dung</th>
               <th style="text-align: right;">Tiền vào (+)</th>
               <th style="text-align: right;">Tiền ra (-)</th>
-              <th style="text-align: right;">Số dư cuối</th>
               <th>Mã thanh toán</th>
-              <th>Mã tham chiếu</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
