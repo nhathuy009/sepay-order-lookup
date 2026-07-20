@@ -2424,13 +2424,14 @@ async function doBankStatement() {
     const ws = wb.Sheets[wb.SheetNames[0]];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: "dd/mm/yyyy" });
 
-    // TẠO SẴN DỮ LIỆU COPY (TSV) TỪ JSON (Để khi copy dán vào Excel sẽ chia cột chuẩn)
-    bankStatementTsv = jsonData.map(row => {
-        return row.map(cell => {
-            let cellStr = cell !== undefined && cell !== null ? String(cell) : "";
-            // Lọc bỏ ký tự tab/xuống dòng thừa để không vỡ cột khi dán
-            return cellStr.replace(/\t/g, " ").replace(/\n/g, " ");
-        }).join("\t");
+    // TẠO SẴN DỮ LIỆU COPY (TSV) TỪ JSON 
+    // Chỉ lấy từ index 1 trở đi (bỏ qua dòng tiêu đề ở index 0)
+    bankStatementTsv = jsonData.slice(1).map(row => {
+      return row.map(cell => {
+        let cellStr = cell !== undefined && cell !== null ? String(cell) : "";
+        // Lọc bỏ ký tự tab/xuống dòng thừa để không vỡ cột khi dán
+        return cellStr.replace(/\t/g, " ").replace(/\n/g, " ");
+      }).join("\t");
     }).join("\n");
 
     // Tạo giao diện bảng HTML - Đã thêm cụm nút Tải về & Copy
