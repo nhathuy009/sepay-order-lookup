@@ -2525,6 +2525,7 @@ async function doTxList() {
           <td id="tx-name-${i}">${lookupCellContent}</td>
           <td id="tx-userid-${i}">${lookupCellContent}</td>
           <td id="tx-invoice-${i}">${lookupCellContent}</td>
+          <td id="tx-arisingdate-${i}">${lookupCellContent}</td>
         </tr>`;
     });
 
@@ -2534,6 +2535,7 @@ async function doTxList() {
         <td colspan="3" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-out);">${totalAmountOut.toLocaleString('vi-VN')}</td>
+        <td></td>
         <td></td>
         <td></td>
         <td></td>
@@ -2557,6 +2559,7 @@ async function doTxList() {
               <th>Tên KH</th>
               <th>Mã KH</th>
               <th>Số HĐ</th>
+              <th>Ngày lập</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -2579,8 +2582,10 @@ async function lookupCustomerInfoForTxList(txs) {
     const nameEl = document.getElementById(`tx-name-${i}`);
     const userEl = document.getElementById(`tx-userid-${i}`);
     const invEl = document.getElementById(`tx-invoice-${i}`);
+    const dateEl = document.getElementById(`tx-arisingdate-${i}`);
     if (!code) continue; // Đã hiển thị "—" sẵn khi render bảng
 
+    let invoiceNumber = "";
     try {
       const resp = await fetch("/api/index", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -2590,11 +2595,29 @@ async function lookupCustomerInfoForTxList(txs) {
       const ok = resp.ok && data.status_msg === "Thành công";
       if (nameEl) nameEl.textContent = ok ? (data.users_name || "—") : "—";
       if (userEl) userEl.textContent = ok ? (data.username || "—") : "—";
-      if (invEl) invEl.textContent = ok ? (data.invoice_number || "—") : "—";
+      invoiceNumber = ok ? (data.invoice_number || "") : "";
+      if (invEl) invEl.textContent = invoiceNumber || "—";
     } catch (e) {
       if (nameEl) nameEl.textContent = "—";
       if (userEl) userEl.textContent = "—";
       if (invEl) invEl.textContent = "—";
+    }
+
+    // Nếu tìm được Số HĐ, tra cứu tiếp Ngày lập của hóa đơn đó
+    if (!invoiceNumber) {
+      if (dateEl) dateEl.textContent = "—";
+      continue;
+    }
+    try {
+      const respInv = await fetch("/api/index", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "invoice", code: invoiceNumber, access_token: getToken() })
+      });
+      const dataInv = await respInv.json();
+      const okInv = respInv.ok && dataInv.status_msg === "Thành công";
+      if (dateEl) dateEl.textContent = okInv ? (dataInv.arising_date || "—") : "—";
+    } catch (e) {
+      if (dateEl) dateEl.textContent = "—";
     }
   }
 }
