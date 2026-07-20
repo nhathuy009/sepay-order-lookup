@@ -2526,6 +2526,9 @@ async function doTxList() {
           <td id="tx-userid-${i}">${lookupCellContent}</td>
           <td id="tx-invoice-${i}">${lookupCellContent}</td>
           <td id="tx-arisingdate-${i}">${lookupCellContent}</td>
+          <td id="tx-amountbeforetax-${i}" style="text-align: right;">${lookupCellContent}</td>
+          <td id="tx-vatamount-${i}" style="text-align: right;">${lookupCellContent}</td>
+          <td id="tx-totalamount-${i}" style="text-align: right;">${lookupCellContent}</td>
         </tr>`;
     });
 
@@ -2535,6 +2538,9 @@ async function doTxList() {
         <td colspan="3" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-out);">${totalAmountOut.toLocaleString('vi-VN')}</td>
+        <td></td>
+        <td></td>
+        <td></td>
         <td></td>
         <td></td>
         <td></td>
@@ -2560,6 +2566,9 @@ async function doTxList() {
               <th>Mã KH</th>
               <th>Số HĐ</th>
               <th>Ngày lập</th>
+              <th style="text-align: right;">Tiền hàng</th>
+              <th style="text-align: right;">Tiền thuế</th>
+              <th style="text-align: right;">Tổng tiền</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -2577,12 +2586,16 @@ async function doTxList() {
 }
 
 async function lookupCustomerInfoForTxList(txs) {
+  const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "—" : Number(v).toLocaleString('vi-VN');
   for (let i = 0; i < txs.length; i++) {
     const code = (txs[i].code || "").trim();
     const nameEl = document.getElementById(`tx-name-${i}`);
     const userEl = document.getElementById(`tx-userid-${i}`);
     const invEl = document.getElementById(`tx-invoice-${i}`);
     const dateEl = document.getElementById(`tx-arisingdate-${i}`);
+    const beforeTaxEl = document.getElementById(`tx-amountbeforetax-${i}`);
+    const vatEl = document.getElementById(`tx-vatamount-${i}`);
+    const totalEl = document.getElementById(`tx-totalamount-${i}`);
     if (!code) continue; // Đã hiển thị "—" sẵn khi render bảng
 
     let invoiceNumber = "";
@@ -2603,9 +2616,12 @@ async function lookupCustomerInfoForTxList(txs) {
       if (invEl) invEl.textContent = "—";
     }
 
-    // Nếu tìm được Số HĐ, tra cứu tiếp Ngày lập của hóa đơn đó
+    // Nếu tìm được Số HĐ, tra cứu tiếp thông tin hóa đơn (Ngày lập, Tiền hàng, Tiền thuế, Tổng tiền)
     if (!invoiceNumber) {
       if (dateEl) dateEl.textContent = "—";
+      if (beforeTaxEl) beforeTaxEl.textContent = "—";
+      if (vatEl) vatEl.textContent = "—";
+      if (totalEl) totalEl.textContent = "—";
       continue;
     }
     try {
@@ -2616,8 +2632,14 @@ async function lookupCustomerInfoForTxList(txs) {
       const dataInv = await respInv.json();
       const okInv = respInv.ok && dataInv.status_msg === "Thành công";
       if (dateEl) dateEl.textContent = okInv ? (dataInv.arising_date || "—") : "—";
+      if (beforeTaxEl) beforeTaxEl.textContent = okInv ? amountFmt(dataInv.amount_before_tax) : "—";
+      if (vatEl) vatEl.textContent = okInv ? amountFmt(dataInv.vat_amount) : "—";
+      if (totalEl) totalEl.textContent = okInv ? amountFmt(dataInv.total_amount) : "—";
     } catch (e) {
       if (dateEl) dateEl.textContent = "—";
+      if (beforeTaxEl) beforeTaxEl.textContent = "—";
+      if (vatEl) vatEl.textContent = "—";
+      if (totalEl) totalEl.textContent = "—";
     }
   }
 }
