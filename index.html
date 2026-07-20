@@ -2521,9 +2521,9 @@ async function doTxList() {
           <td style="text-align: right;">${amountInHtml}</td>
           <td style="text-align: right;">${amountOutHtml}</td>
           <td class="text-id">${escapeHtml(tx.code || "—")}</td>
-          <td class="text-id" id="tx-name-${i}">${lookupCellContent}</td>
-          <td class="text-id" id="tx-userid-${i}">${lookupCellContent}</td>
-          <td class="text-id" id="tx-invoice-${i}">${lookupCellContent}</td>
+          <td id="tx-name-${i}">${lookupCellContent}</td>
+          <td id="tx-userid-${i}">${lookupCellContent}</td>
+          <td id="tx-invoice-${i}">${lookupCellContent}</td>
         </tr>`;
     });
 
