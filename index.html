@@ -673,7 +673,7 @@
               <label>Đến ngày</label>
               <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
             </div>
-            <div style="flex: 2; min-width: 280px;">
+            <div style="flex: 1; min-width: 200px;">
               <label>Tài khoản (Tùy chọn)</label>
               <div class="multi-select-container" id="multiSelectContainer">
                 <div class="multi-select-label" id="txBankAccountIdLabel" onclick="document.getElementById('txBankAccountIdDropdown').classList.toggle('show')">
@@ -682,9 +682,12 @@
                 <div class="multi-select-dropdown" id="txBankAccountIdDropdown">
                   </div>
               </div>
+            </div>
+            <div style="flex: 1; min-width: 120px;">
+              <label>&nbsp;</label>
+              <button id="txListBtn" onclick="doTxList()" style="width: 100%;">Lấy danh sách</button>
+            </div>
           </div>
-          </div> <!-- THÊM THẺ NÀY: Để đóng hoàn toàn <div class="row"> -->
-          <div><button id="txListBtn" onclick="doTxList()">Lấy danh sách</button></div>
           <div id="txListResult" style="margin-top: 20px;"></div>
         </div>
 
