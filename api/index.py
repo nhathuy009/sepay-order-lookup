@@ -207,7 +207,7 @@ def handle_bank_statement(body):
             so_du_cuoi_ky = 0
 
     tat_ca_gia_tri = set(dem_gui_vao.keys()).union(set(dem_rut_ra.keys()))
-    tat_ca_gia_tri = sorted(list(tat_ca_gia_tri), reverse=True) 
+    tat_ca_gia_tri = sorted(list(tat_ca_gia_tri)) 
 
     wb_new = openpyxl.Workbook()
     ws = wb_new.active
