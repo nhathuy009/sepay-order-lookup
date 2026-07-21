@@ -16,3 +16,6 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
+{
+  "regions": ["sin1"]
+}
