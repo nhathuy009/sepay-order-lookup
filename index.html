@@ -1143,6 +1143,7 @@ function renderBulkTable() {
 
 let globalSheetsData = {};
 let currentBankTransferRows = [];
+let currentTxListData = []; // Lưu dữ liệu gốc (đã gộp thông tin KH/hóa đơn) của bảng Kiểm tra giao dịch SePay v2 để phục vụ nút Copy
 let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
 let bankGroupsData = {};
@@ -2614,6 +2615,9 @@ async function doTxList() {
     // 3. Đảo ngược mảng để hiển thị Giao dịch mới nhất lên đầu bảng (Tùy chọn UX)
     txs.reverse();
     
+    // Lưu lại dữ liệu gốc để nút Copy dùng (không phụ thuộc vào innerText của DOM)
+    currentTxListData = txs;
+
     // VẼ BẢNG HTML
     let rows = "";
     txs.forEach((tx, i) => {
@@ -2673,7 +2677,7 @@ async function doTxList() {
     box.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
-        <button id="copyTxListBtn" class="btn-outline" onclick="copyTableToClipboard('txListTable', 'copyTxListBtn')" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
+        <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
       </div>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px;">
         <table class="sepay-table" id="txListTable">
@@ -2733,10 +2737,17 @@ async function lookupCustomerInfoForTxList(txs) {
       if (userEl) userEl.textContent = ok ? (data.username || "—") : "—";
       invoiceNumber = ok ? (data.invoice_number || "") : "";
       if (invEl) invEl.textContent = invoiceNumber || "—";
+      // Lưu lại vào đối tượng tx gốc để nút Copy dùng
+      txs[i].customer_name = ok ? (data.users_name || "") : "";
+      txs[i].customer_code = ok ? (data.username || "") : "";
+      txs[i].invoice_number = invoiceNumber;
     } catch (e) {
       if (nameEl) nameEl.textContent = "—";
       if (userEl) userEl.textContent = "—";
       if (invEl) invEl.textContent = "—";
+      txs[i].customer_name = "";
+      txs[i].customer_code = "";
+      txs[i].invoice_number = "";
     }
 
     // Nếu tìm được Số HĐ, tra cứu tiếp thông tin hóa đơn (Ngày lập, Tiền hàng, Tiền thuế, Tổng tiền)
@@ -2745,6 +2756,10 @@ async function lookupCustomerInfoForTxList(txs) {
       if (beforeTaxEl) beforeTaxEl.textContent = "—";
       if (vatEl) vatEl.textContent = "—";
       if (totalEl) totalEl.textContent = "—";
+      txs[i].invoice_date = "";
+      txs[i].amount_before_tax = "";
+      txs[i].vat_amount = "";
+      txs[i].total_amount = "";
       continue;
     }
     try {
@@ -2758,11 +2773,20 @@ async function lookupCustomerInfoForTxList(txs) {
       if (beforeTaxEl) beforeTaxEl.textContent = okInv ? amountFmt(dataInv.amount_before_tax) : "—";
       if (vatEl) vatEl.textContent = okInv ? amountFmt(dataInv.vat_amount) : "—";
       if (totalEl) totalEl.textContent = okInv ? amountFmt(dataInv.total_amount) : "—";
+      // Lưu lại vào đối tượng tx gốc để nút Copy dùng (giữ số thô, không định dạng)
+      txs[i].invoice_date = okInv ? (dataInv.arising_date || "") : "";
+      txs[i].amount_before_tax = okInv ? (dataInv.amount_before_tax ?? "") : "";
+      txs[i].vat_amount = okInv ? (dataInv.vat_amount ?? "") : "";
+      txs[i].total_amount = okInv ? (dataInv.total_amount ?? "") : "";
     } catch (e) {
       if (dateEl) dateEl.textContent = "—";
       if (beforeTaxEl) beforeTaxEl.textContent = "—";
       if (vatEl) vatEl.textContent = "—";
       if (totalEl) totalEl.textContent = "—";
+      txs[i].invoice_date = "";
+      txs[i].amount_before_tax = "";
+      txs[i].vat_amount = "";
+      txs[i].total_amount = "";
     }
   }
 }
@@ -2803,6 +2827,49 @@ function copyTableToClipboard(tableId, btnId) {
       setTimeout(() => { btn.innerText = originalText; }, 2000);
     }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+}
+
+// Nút Copy riêng cho bảng "Kiểm tra giao dịch SePay v2"
+// Lấy trực tiếp từ dữ liệu gốc (currentTxListData) thay vì đọc innerText của DOM,
+// để mỗi giao dịch luôn ra đúng 1 hàng ngang, không bị tách dòng do "44 phút trước" / icon ngân hàng,
+// và không copy kèm dòng "Tổng phát sinh".
+function copyTxListTable() {
+  try {
+    if (!currentTxListData || currentTxListData.length === 0) {
+      alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
+      return;
+    }
+    let tsv = "";
+    currentTxListData.forEach(tx => {
+      const formattedDate = formatTxDate(tx.transaction_date); // ngày tháng năm giờ giao dịch
+      const soTaiKhoan = tx.account_number || "";
+      const noiDung = (tx.transaction_content || "").replace(/[\r\n\t]+/g, " ").trim();
+
+      const inAmt = Number(tx.amount_in || 0);
+      const outAmt = Number(tx.amount_out || 0);
+      let soTien = "0";
+      if (inAmt > 0) soTien = "+" + inAmt.toLocaleString('vi-VN');
+      else if (outAmt > 0) soTien = "-" + outAmt.toLocaleString('vi-VN');
+
+      const maDonHang = tx.code || "";
+      const tenKh = tx.customer_name || "";
+      const maKh = tx.customer_code || "";
+      const soHd = tx.invoice_number || "";
+      const ngayHd = tx.invoice_date || "";
+      const tienChuaVat = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : Number(tx.amount_before_tax).toLocaleString('vi-VN');
+      const soTienVat = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : Number(tx.vat_amount).toLocaleString('vi-VN');
+      const tongTien = (tx.total_amount === "" || tx.total_amount === undefined || tx.total_amount === null) ? "" : Number(tx.total_amount).toLocaleString('vi-VN');
+
+      tsv += [formattedDate, soTaiKhoan, noiDung, soTien, maDonHang, tenKh, maKh, soHd, ngayHd, tienChuaVat, soTienVat, tongTien].join("\t") + "\n";
+    });
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyTxListBtn");
+      const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
+      setTimeout(() => { btn.innerText = originalText; }, 2000);
+    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch (e) {
+    alert("Đã xảy ra lỗi khi copy: " + e.message);
+  }
 }
 
 async function doInvoiceLookup() {
