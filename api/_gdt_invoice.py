@@ -95,16 +95,24 @@ def make_session() -> requests.Session:
 
 def login_tax_system(session: requests.Session, username: str, password: str, max_retries: int = 3):
     """Trả về (token, error_message). Thành công: (token, None). Thất bại: (None, "lý do")."""
+    last_message = None
+    empty_captcha_count = 0
+
     for attempt in range(1, max_retries + 1):
         try:
             resp_captcha = session.get(CAPTCHA_URL, timeout=10)
             try:
                 c_data = resp_captcha.json()
             except Exception:
-                return None, "Không đọc được dữ liệu captcha từ máy chủ Thuế."
+                return None, (
+                    f"Không đọc được dữ liệu captcha từ máy chủ Thuế "
+                    f"(HTTP {resp_captcha.status_code}, nội dung: {resp_captcha.text[:150]!r})."
+                )
 
-            c_value = detect_svg_captcha(c_data.get("content", ""))
+            raw_content = c_data.get("content", "")
+            c_value = detect_svg_captcha(raw_content)
             if not c_value:
+                empty_captcha_count += 1
                 time.sleep(1)
                 continue
 
@@ -115,12 +123,16 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
             try:
                 auth_data = resp_auth.json()
             except Exception:
-                return None, "Máy chủ Thuế trả về dữ liệu đăng nhập không hợp lệ."
+                return None, (
+                    f"Máy chủ Thuế trả về dữ liệu đăng nhập không hợp lệ "
+                    f"(HTTP {resp_auth.status_code}, nội dung: {resp_auth.text[:150]!r})."
+                )
 
             if "token" in auth_data:
                 return auth_data["token"], None
 
             message = str(auth_data.get("message", "Unknown Error"))
+            last_message = message
             message_lower = message.lower()
             if any(kw in message_lower for kw in WRONG_CREDENTIAL_KEYWORDS):
                 return None, f"Sai tài khoản hoặc mật khẩu: {message}"
@@ -128,13 +140,20 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
             time.sleep(1)  # có thể do captcha đoán sai -> thử lại
 
         except requests.exceptions.Timeout:
+            last_message = "Timeout khi gọi máy chủ Thuế."
             time.sleep(1)
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError as e:
+            last_message = f"Lỗi kết nối mạng: {e}"
             time.sleep(1)
         except Exception as e:
             return None, f"Lỗi không xác định khi đăng nhập: {e}"
 
-    return None, "Đăng nhập thất bại sau nhiều lần thử (có thể do captcha hoặc mạng)."
+    detail_parts = [f"Đăng nhập thất bại sau {max_retries} lần thử."]
+    if last_message:
+        detail_parts.append(f"Phản hồi gần nhất từ máy chủ Thuế: \"{last_message}\".")
+    if empty_captcha_count:
+        detail_parts.append(f"Không giải được captcha {empty_captcha_count}/{max_retries} lần.")
+    return None, " ".join(detail_parts)
 
 
 # ==========================================
@@ -252,3 +271,59 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         "invoices": invoices,
         "warnings": warnings,
     }
+
+
+# ==========================================
+# CÁC HÀM CHIA NHỎ THEO BƯỚC (cho luồng gọi tuần tự từ frontend,
+# để hiển thị tiến trình thật thay vì 1 request duy nhất chạy ngầm)
+# ==========================================
+
+LOAI_MAP = {
+    5: "Hóa đơn có mã CQT",
+    6: "Hóa đơn không mã",
+    8: "Hóa đơn từ máy tính tiền",
+}
+
+
+def gdt_login(username: str, password: str):
+    """Chỉ thực hiện đăng nhập. Trả về (token, error_message)."""
+    session = make_session()
+    return login_tax_system(session, username, password)
+
+
+def gdt_fetch_one_page(token: str, url_type: str, ttxly: int, state: str, start_date: str, end_date: str):
+    """
+    Lấy ĐÚNG 1 TRANG của ĐÚNG 1 LOẠI hóa đơn.
+    Trả về (invoices, next_state, error_message).
+    next_state rỗng/None nghĩa là đã hết trang cho loại này.
+    """
+    session = make_session()
+    base_url = f"{BASE_API}/sco-query/invoices/{url_type}" if ttxly == 8 else f"{BASE_API}/query/invoices/{url_type}"
+
+    search_param = f"tdlap=ge={start_date}T00:00:00;tdlap=le={end_date}T23:59:59;ttxly=={ttxly}"
+    query_string = f"?sort=tdlap:desc&size={PAGE_SIZE}&search={search_param}"
+    if state:
+        query_string += f"&state={state}"
+    full_url = base_url + query_string
+
+    data, err = api_get(session, full_url, token)
+    if err:
+        return [], None, err
+    if not data:
+        return [], None, None
+
+    datas = data.get("datas", [])
+    invoices = []
+    for item in datas:
+        invoices.append({
+            "loai": LOAI_MAP.get(ttxly, ""),
+            "khhdon": item.get("khhdon"),
+            "shdon": item.get("shdon"),
+            "khmshdon": item.get("khmshdon"),
+            "nbmst": item.get("nbmst"),
+            "nbten": item.get("nbten"),
+            "tdlap": item.get("tdlap"),
+            "tgtttbso": item.get("tgtttbso"),
+        })
+
+    return invoices, data.get("state"), None
