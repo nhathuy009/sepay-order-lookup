@@ -3056,10 +3056,11 @@ async function doGdtInvoiceLookup() {
   progress.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đăng nhập & tra cứu hóa đơn... (có thể mất khoảng 10-30 giây)';
 
   try {
-    const resp = await fetch("/api/hoadondientu", {
+    const resp = await fetch("/api/index", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        action: "gdt_invoice",
         username, password,
         start_date: dateFrom, end_date: dateTo,
         is_purchase: isPurchase,
@@ -3071,8 +3072,8 @@ async function doGdtInvoiceLookup() {
     // Xoá mật khẩu khỏi ô nhập ngay sau khi gửi xong, không giữ lại trên form
     document.getElementById("gdtPassword").value = "";
 
-    if (!resp.ok || !data.success) {
-      progress.innerHTML = `<span class="err">❌ ${escapeHtml(data.message || "Lỗi không xác định")}</span>`;
+    if (!resp.ok) {
+      progress.innerHTML = `<span class="err">❌ ${escapeHtml(data.error || "Lỗi không xác định")}</span>`;
       return;
     }
 
