@@ -404,6 +404,13 @@
     width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff;
     display: flex; justify-content: center; align-items: center; font-size: 11px; font-weight: 800;
   }
+  .bank-logo-img {
+    width: 22px; height: 22px; border-radius: 50%; object-fit: contain; background: #fff;
+    border: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .tx-content-cell { cursor: pointer; transition: background-color 0.15s ease; }
+  .tx-content-cell:hover { background-color: var(--accent-soft, rgba(37, 99, 235, 0.08)); text-decoration: underline dotted; }
 
   .sepay-table .total-row td {
     background-color: var(--total-row-bg) !important; 
@@ -1100,6 +1107,41 @@ function timeAgo(dateString) {
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24) return `${diffHours} giờ trước`;
   return `${Math.floor(diffHours / 24)} ngày trước`;
+}
+
+// Trả về HTML icon ngân hàng: dùng logo thật cho ACB / MB, ngân hàng khác dùng badge chữ cái như cũ
+function getBankIconHtml(bankBrandName) {
+  const name = (bankBrandName || "").toLowerCase();
+  let logoUrl = "";
+  if (name.includes("acb")) {
+    logoUrl = "https://my.sepay.vn/assets/images/banklogo/acb-icon.png";
+  } else if (name.includes("mb")) {
+    logoUrl = "https://my.sepay.vn/assets/images/banklogo/mbbank-icon.png";
+  }
+  if (logoUrl) {
+    return `<img src="${logoUrl}" alt="${escapeHtml(bankBrandName || "")}" class="bank-logo-img">`;
+  }
+  const bankLetter = bankBrandName ? bankBrandName.charAt(0) : "B";
+  return `<span class="bank-icon">${escapeHtml(bankLetter)}</span>`;
+}
+
+// Copy riêng lẻ nội dung giao dịch của 1 dòng khi bấm vào ô "Nội dung"
+function copyTxContentByIndex(i) {
+  try {
+    const tx = currentTxListData[i];
+    if (!tx) return;
+    const text = tx.transaction_content || "";
+    const cell = document.getElementById(`tx-content-${i}`);
+    navigator.clipboard.writeText(text).then(() => {
+      if (cell) {
+        const original = cell.innerHTML;
+        cell.innerHTML = "✅ Đã copy nội dung!";
+        setTimeout(() => { cell.innerHTML = original; }, 1200);
+      }
+    }).catch(() => { alert("Không thể copy nội dung. Vui lòng thử lại."); });
+  } catch (e) {
+    alert("Đã xảy ra lỗi khi copy: " + e.message);
+  }
 }
 
 /* Các hàm Kéo Thả & Tra cứu Bulk */
@@ -2626,7 +2668,7 @@ async function doTxList() {
       
       let amountInHtml = Number(tx.amount_in) > 0 ? `<span class="amount-in">+${Number(tx.amount_in).toLocaleString('vi-VN')}</span>` : "";
       let amountOutHtml = Number(tx.amount_out) > 0 ? `<span class="amount-out">-${Number(tx.amount_out).toLocaleString('vi-VN')}</span>` : "";
-      const bankLetter = tx.bank_brand_name ? tx.bank_brand_name.charAt(0) : "B";
+      const bankIconHtml = getBankIconHtml(tx.bank_brand_name);
       const paymentCode = (tx.code || "").trim();
       const lookupCellContent = paymentCode ? `<span class="spinner" style="color:var(--accent)"></span>` : "—";
 
@@ -2638,11 +2680,11 @@ async function doTxList() {
           </td>
           <td>
             <div class="bank-tag">
-              <span class="bank-icon">${bankLetter}</span>
+              ${bankIconHtml}
               ${escapeHtml(tx.account_number)}
             </div>
           </td>
-          <td class="tx-content-cell" title="${escapeHtml(tx.transaction_content)}">
+          <td class="tx-content-cell" id="tx-content-${i}" title="${escapeHtml(tx.transaction_content)} — Click để copy" onclick="copyTxContentByIndex(${i})">
             ${escapeHtml(tx.transaction_content)}
           </td>
           <td style="text-align: right;">${amountInHtml}</td>
