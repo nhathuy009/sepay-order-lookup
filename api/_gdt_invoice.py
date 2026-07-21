@@ -4,7 +4,7 @@ Dùng bởi action "gdt_invoice" trong index.py.
 
 Hàm chính: lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
 Trả về dict:
-  - Thành công: {"count": N, "invoices": [...], "warnings": [...]}
+  - Thành công: {"count": N, "invoices": [...], "warnings": [...], "chunks_processed": M}
   - Thất bại:   {"error": "..."}
 
 LƯU Ý BẢO MẬT: username/password của GDT chỉ tồn tại trong biến cục bộ của lần gọi này,
@@ -12,7 +12,8 @@ KHÔNG được log, KHÔNG được lưu vào bất kỳ đâu (file, DB, biế
 """
 import re
 import time
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta
 
 import requests
 
@@ -31,7 +32,6 @@ WRONG_CREDENTIAL_KEYWORDS = [
     "mật khẩu", "password", "tài khoản", "sai tên đăng nhập",
     "không tồn tại", "invalid", "unauthorized", "incorrect"
 ]
-
 
 # ==========================================
 # GIẢI MÃ SVG CAPTCHA
@@ -254,28 +254,65 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
     if start_dt > end_dt:
         return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'."}
 
-    # username/password chỉ tồn tại trong các biến cục bộ này, không log, không lưu.
+    # ---------------------------------------------------------
+    # DATE CHUNKING: Chia nhỏ khoảng thời gian tối đa 1 tháng
+    # Dùng thư viện chuẩn calendar và datetime thay vì dateutil
+    # ---------------------------------------------------------
+    date_chunks = []
+    cursor = start_dt
+    while cursor <= end_dt:
+        # Lấy ngày cuối cùng của tháng thuộc biến cursor hiện tại
+        last_day_of_month = calendar.monthrange(cursor.year, cursor.month)[1]
+        end_of_month = cursor.replace(day=last_day_of_month)
+        
+        # Điểm kết thúc của chunk này là ngày cuối tháng hoặc end_dt (nếu end_dt đến sớm hơn)
+        chunk_end = min(end_of_month, end_dt)
+        
+        date_chunks.append((
+            cursor.strftime("%d/%m/%Y"), 
+            chunk_end.strftime("%d/%m/%Y")
+        ))
+        
+        # Tiến cursor sang ngày đầu tiên của tháng tiếp theo
+        cursor = chunk_end + timedelta(days=1)
+
+    # Đăng nhập vào hệ thống thuế
     session = make_session()
     token, err = login_tax_system(session, username, password)
     if not token:
         return {"error": err or "Đăng nhập thất bại."}
 
-    invoices, warnings = fetch_invoice_list(
-        session, token,
-        start_dt.strftime("%d/%m/%Y"), end_dt.strftime("%d/%m/%Y"),
-        is_purchase
-    )
+    all_invoices = []
+    all_warnings = []
+
+    # Lặp qua từng khoảng chunk (tối đa 1 tháng) để gọi API
+    for i, (s_date, e_date) in enumerate(date_chunks):
+        # Nghỉ nhẹ giữa các chunk nếu có nhiều chunk để tránh WAF block
+        if i > 0:
+            time.sleep(1)
+
+        invoices, warnings = fetch_invoice_list(
+            session, token,
+            s_date, e_date,
+            is_purchase
+        )
+        all_invoices.extend(invoices)
+        
+        # Gắn thêm nhãn thời gian vào warning để biết lỗi ở giai đoạn nào
+        if warnings:
+            all_warnings.extend([f"[{s_date} - {e_date}] {w}" for w in warnings])
 
     return {
-        "count": len(invoices),
-        "invoices": invoices,
-        "warnings": warnings,
+        "count": len(all_invoices),
+        "invoices": all_invoices,
+        "warnings": all_warnings,
+        "chunks_processed": len(date_chunks)
     }
 
 
 # ==========================================
-# CÁC HÀM CHIA NHỎ THEO BƯỚC (cho luồng gọi tuần tự từ frontend,
-# để hiển thị tiến trình thật thay vì 1 request duy nhất chạy ngầm)
+# CÁC HÀM CHIA NHỎ THEO BƯỚC 
+# (Dùng khi frontend muốn kiểm soát luồng chạy theo từng trang)
 # ==========================================
 
 LOAI_MAP = {
@@ -294,8 +331,8 @@ def gdt_login(username: str, password: str):
 def gdt_fetch_one_page(token: str, url_type: str, ttxly: int, state: str, start_date: str, end_date: str):
     """
     Lấy ĐÚNG 1 TRANG của ĐÚNG 1 LOẠI hóa đơn.
-    Trả về (invoices, next_state, error_message).
-    next_state rỗng/None nghĩa là đã hết trang cho loại này.
+    Lưu ý: Nếu frontend dùng hàm này, frontend phải tự chia chunk ngày tháng
+    và đảm bảo start_date đến end_date <= 31 ngày.
     """
     session = make_session()
     base_url = f"{BASE_API}/sco-query/invoices/{url_type}" if ttxly == 8 else f"{BASE_API}/query/invoices/{url_type}"
@@ -324,7 +361,6 @@ def gdt_fetch_one_page(token: str, url_type: str, ttxly: int, state: str, start_
             "nbten": item.get("nbten"),
             "tdlap": item.get("tdlap"),
             "tgtttbso": item.get("tgtttbso"),
-            "msttcgp": item.get("msttcgp"),
         })
 
     return invoices, data.get("state"), None
