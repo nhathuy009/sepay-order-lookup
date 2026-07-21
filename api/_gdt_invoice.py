@@ -324,6 +324,7 @@ def gdt_fetch_one_page(token: str, url_type: str, ttxly: int, state: str, start_
             "nbten": item.get("nbten"),
             "tdlap": item.get("tdlap"),
             "tgtttbso": item.get("tgtttbso"),
+            "msttcgp": item.get("msttcgp"),
         })
 
     return invoices, data.get("state"), None
