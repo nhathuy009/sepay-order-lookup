@@ -959,6 +959,7 @@
                   <th>MST đối tác</th>
                   <th>Tên đối tác</th>
                   <th style="text-align:right;">Tổng tiền</th>
+                  <th>MST.t-van</th>
                 </tr>
               </thead>
               <tbody id="gdtTbody"></tbody>
@@ -3103,6 +3104,7 @@ async function doGdtInvoiceLookup() {
         <td>${escapeHtml(inv.nbmst)}</td>
         <td>${escapeHtml(inv.nbten)}</td>
         <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>
+        <td>${escapeHtml(inv.msttcgp)}</td>
       </tr>`;
     });
     tbody.innerHTML = rowsHtml;
