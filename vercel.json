@@ -14,8 +14,6 @@
     { "src": "/jav", "dest": "/player2.html" },
     { "src": "/ebook", "dest": "/ebook.html" },
     { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
-{
+  ],
   "regions": ["sin1"]
 }
