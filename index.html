@@ -2472,7 +2472,7 @@ function copyForMisaAmis() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBtn"); 
       const originalText = btn.innerText; 
-      btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
+      btn.innerText = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
@@ -2561,7 +2561,7 @@ function copyForMisaAmisBhxh() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBhxhBtn");
       const originalText = btn.innerText;
-      btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
+      btn.innerText = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
@@ -2637,7 +2637,7 @@ function copyForMisaAmisBhxhNld() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyAmisBhxhNldBtn");
       const originalText = btn.innerText;
-      btn.innerText = "✅ Đã Copy! Dán vào ô A (dòng trống) file MISA";
+      btn.innerText = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào ô A (dòng trống) file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
@@ -3212,7 +3212,7 @@ function copyBankTransferForBank() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyBankTransferBtn");
       const originalText = btn.innerText;
-      btn.innerText = "✅ Đã Copy! Dán vào ô A3 file NH";
+      btn.innerText = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file NH';
       setTimeout(() => { btn.innerText = originalText; }, 2500);
     }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
