@@ -27,7 +27,7 @@ from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 from _invoice import lookup_invoice
-from _gdt_invoice import lookup_gdt_invoices, gdt_fetch_invoice_detail
+from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -110,6 +110,28 @@ def handle_gdt_invoice(body):
         return 400, {"error": "Vui lòng chọn Từ ngày và Đến ngày."}
 
     res = lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
+    status = 400 if "error" in res else 200
+    return status, res
+
+def handle_gdt_invoice_by_type(body):
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    start_date = (body.get("start_date") or "").strip()
+    end_date = (body.get("end_date") or "").strip()
+    is_purchase = bool(body.get("is_purchase", True))
+    token = (body.get("token") or "").strip() or None
+
+    if not username or not password:
+        return 400, {"error": "Vui lòng nhập Mã số thuế và Mật khẩu."}
+    if not start_date or not end_date:
+        return 400, {"error": "Vui lòng chọn Từ ngày và Đến ngày."}
+
+    try:
+        ttxly = int(body.get("ttxly"))
+    except (TypeError, ValueError):
+        return 400, {"error": "Thiếu hoặc sai tham số ttxly (chỉ chấp nhận 5, 6 hoặc 8)."}
+
+    res = lookup_gdt_invoices_by_type(username, password, start_date, end_date, is_purchase, ttxly, token=token)
     status = 400 if "error" in res else 200
     return status, res
 
@@ -373,6 +395,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_invoice(body)
         elif action == "gdt_invoice":
             status, payload = handle_gdt_invoice(body)
+        elif action == "gdt_invoice_by_type":
+            status, payload = handle_gdt_invoice_by_type(body)
         elif action == "gdt_invoice_detail":
             status, payload = handle_gdt_invoice_detail(body)
         elif action == "fetch_employees_excel":
