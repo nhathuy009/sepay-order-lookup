@@ -362,6 +362,53 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* --- MODAL CHI TIẾT HÓA ĐƠN GDT --- */
+  .gdt-modal-overlay {
+    position: fixed; inset: 0; background: rgba(6,10,28,.6);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px; animation: gdtFadeIn .18s ease;
+  }
+  @keyframes gdtFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .gdt-modal-box {
+    background: var(--card-bg-solid); border: 1px solid var(--border);
+    border-radius: 16px; box-shadow: var(--card-shadow);
+    width: 100%; max-width: 720px; max-height: 88vh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .gdt-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .gdt-modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; }
+  .gdt-modal-close {
+    background: transparent; box-shadow: none; color: var(--text-muted);
+    padding: 4px 10px; font-size: 18px; line-height: 1; border-radius: 8px;
+  }
+  .gdt-modal-close:hover { background: var(--border); color: var(--text-main); transform: none; box-shadow: none; }
+  .gdt-modal-body { padding: 20px 24px; overflow-y: auto; }
+  .gdt-field-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px 20px;
+  }
+  .gdt-field {
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+    background: var(--checkbox-bg);
+  }
+  .gdt-field .gdt-field-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px;
+  }
+  .gdt-field .gdt-field-value {
+    font-size: 13.5px; color: var(--text-main); word-break: break-word; white-space: pre-wrap;
+  }
+  .gdt-section-title {
+    font-size: 13px; font-weight: 800; color: var(--heading-color);
+    margin: 22px 0 10px; padding-top: 16px; border-top: 1px dashed var(--border);
+  }
+  .gdt-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+  #gdtTable tbody tr { cursor: pointer; }
+
   /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
   .sepay-table { 
     width: 100%; border-collapse: collapse; background: transparent; 
@@ -959,7 +1006,6 @@
                   <th>MST đối tác</th>
                   <th>Tên đối tác</th>
                   <th style="text-align:right;">Tổng tiền</th>
-                  <th>MST.t-van</th>
                 </tr>
               </thead>
               <tbody id="gdtTbody"></tbody>
@@ -1031,6 +1077,18 @@
       </div>
     </main>
   </div>
+
+<div id="gdtDetailOverlay" class="gdt-modal-overlay hidden" onclick="if(event.target===this) closeGdtInvoiceDetail()">
+  <div class="gdt-modal-box">
+    <div class="gdt-modal-header">
+      <h3>📄 Chi tiết hóa đơn</h3>
+      <button type="button" class="gdt-modal-close" onclick="closeGdtInvoiceDetail()">✕</button>
+    </div>
+    <div class="gdt-modal-body" id="gdtDetailBody">
+      <span class="spinner" style="color:var(--accent)"></span> Đang tải chi tiết hóa đơn...
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
@@ -1259,6 +1317,8 @@ let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
 let bankGroupsData = {};
 let bankActiveTab = '';
+let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
+let gdtLastCreds = null;  // { username, password, is_purchase } dùng để gọi lại API lấy chi tiết hóa đơn
 
 function removeVietnameseDiacritics(str) {
   if (!str) return "";
@@ -3093,9 +3153,13 @@ async function doGdtInvoiceLookup() {
       return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
     };
 
+    // Lưu lại để dùng khi bấm vào từng dòng xem chi tiết
+    gdtLastInvoices = invoices;
+    gdtLastCreds = { username, password, is_purchase: isPurchase };
+
     let rowsHtml = "";
     invoices.forEach((inv, idx) => {
-      rowsHtml += `<tr>
+      rowsHtml += `<tr onclick="openGdtInvoiceDetail(${idx})" title="Bấm để xem chi tiết hóa đơn">
         <td style="text-align:center;">${idx + 1}</td>
         <td>${escapeHtml(inv.loai)}</td>
         <td>${escapeHtml(inv.khhdon)}</td>
@@ -3104,7 +3168,6 @@ async function doGdtInvoiceLookup() {
         <td>${escapeHtml(inv.nbmst)}</td>
         <td>${escapeHtml(inv.nbten)}</td>
         <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>
-        <td>${escapeHtml(inv.msttcgp)}</td>
       </tr>`;
     });
     tbody.innerHTML = rowsHtml;
@@ -3123,6 +3186,150 @@ async function doGdtInvoiceLookup() {
     btn.disabled = false;
   }
 }
+
+// Nhãn tiếng Việt thân thiện cho các trường hay gặp trong dữ liệu hóa đơn GDT.
+// Trường nào không có trong danh sách này vẫn được hiển thị bình thường (dùng luôn tên trường gốc).
+const GDT_FIELD_LABELS = {
+  loai: "Loại hóa đơn", khhdon: "Ký hiệu hóa đơn", khmshdon: "Mẫu số hóa đơn",
+  shdon: "Số hóa đơn", tdlap: "Ngày lập", nbmst: "MST người bán", nbten: "Tên người bán",
+  nbdchi: "Địa chỉ người bán", nmmst: "MST người mua", nmten: "Tên người mua",
+  nmdchi: "Địa chỉ người mua", tgtcthue: "Tổng tiền trước thuế", tgtthue: "Tổng tiền thuế",
+  tgtttbso: "Tổng tiền thanh toán", thtruocthue: "Tổng tiền trước thuế", ttxly: "Trạng thái xử lý",
+  ttcktmai: "Tiền chiết khấu thương mại", nlap: "Người lập", hdon: "Mã hóa đơn", id: "ID hóa đơn",
+  hthdon: "Hình thức hóa đơn", tthai: "Trạng thái", dvtte: "Đơn vị tiền tệ", tgia: "Tỷ giá",
+  hsgcnkntt: "Ký hiệu mã CQT", cqt: "Cơ quan thuế", khdon: "Ký hiệu đơn hàng"
+};
+
+function gdtFieldLabel(key) {
+  if (GDT_FIELD_LABELS[key]) return GDT_FIELD_LABELS[key];
+  return String(key).replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function gdtFormatValue(val) {
+  if (val === null || val === undefined || val === "") return "—";
+  if (typeof val === "boolean") return val ? "Có" : "Không";
+  if (typeof val === "number") {
+    // Các trường số tiền lớn hiển thị theo định dạng VN, còn lại giữ nguyên
+    return Number.isInteger(val) || Math.abs(val) >= 1000 ? val.toLocaleString('vi-VN') : String(val);
+  }
+  if (typeof val === "string") {
+    // Nhận diện chuỗi ngày dạng ISO để hiển thị dễ đọc hơn
+    const isoMatch = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val);
+    if (isoMatch) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+    }
+    return escapeHtml(val);
+  }
+  return escapeHtml(JSON.stringify(val));
+}
+
+// Render một object phẳng (key -> giá trị đơn) thành lưới các ô field
+function renderGdtFieldGrid(obj) {
+  const keys = Object.keys(obj).filter(k => {
+    const v = obj[k];
+    return !(Array.isArray(v) || (v && typeof v === "object"));
+  });
+  if (keys.length === 0) return '<div class="hint">Không có trường dữ liệu nào.</div>';
+  return `<div class="gdt-field-grid">` + keys.map(k => `
+    <div class="gdt-field">
+      <div class="gdt-field-label">${escapeHtml(gdtFieldLabel(k))}</div>
+      <div class="gdt-field-value">${gdtFormatValue(obj[k])}</div>
+    </div>`).join("") + `</div>`;
+}
+
+// Render một mảng object (VD: danh sách hàng hóa/dịch vụ) thành bảng con
+function renderGdtArrayTable(title, arr) {
+  if (!arr || arr.length === 0) return "";
+  const allKeys = [];
+  arr.forEach(item => {
+    if (item && typeof item === "object") {
+      Object.keys(item).forEach(k => { if (!allKeys.includes(k)) allKeys.push(k); });
+    }
+  });
+  if (allKeys.length === 0) return "";
+  let html = `<div class="gdt-section-title">${escapeHtml(title)}</div>`;
+  html += `<div class="table-responsive"><table class="bulk-table"><thead><tr>` +
+    allKeys.map(k => `<th>${escapeHtml(gdtFieldLabel(k))}</th>`).join("") + `</tr></thead><tbody>`;
+  arr.forEach(item => {
+    html += "<tr>" + allKeys.map(k => `<td>${gdtFormatValue(item ? item[k] : "")}</td>`).join("") + "</tr>";
+  });
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+// Render toàn bộ dữ liệu chi tiết hóa đơn nhận được từ API (không giả định trước cấu trúc,
+// hiển thị đầy đủ mọi trường trả về: field đơn -> lưới ô, field là mảng object -> bảng con,
+// field là object lồng -> đệ quy thành 1 khối riêng có tiêu đề).
+function renderGdtDetailContent(data) {
+  if (!data || typeof data !== "object") {
+    return `<div class="hint">Không có dữ liệu chi tiết.</div>`;
+  }
+  let html = "";
+  html += `<div class="gdt-section-title">Thông tin chung</div>`;
+  html += renderGdtFieldGrid(data);
+
+  Object.keys(data).forEach(k => {
+    const v = data[k];
+    if (Array.isArray(v)) {
+      html += renderGdtArrayTable(gdtFieldLabel(k), v);
+    } else if (v && typeof v === "object") {
+      html += `<div class="gdt-section-title">${escapeHtml(gdtFieldLabel(k))}</div>`;
+      html += renderGdtFieldGrid(v);
+    }
+  });
+  return html;
+}
+
+async function openGdtInvoiceDetail(idx) {
+  const inv = gdtLastInvoices[idx];
+  if (!inv || !gdtLastCreds) return;
+
+  const overlay = document.getElementById("gdtDetailOverlay");
+  const body = document.getElementById("gdtDetailBody");
+  overlay.classList.remove("hidden");
+  body.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải chi tiết hóa đơn...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "gdt_invoice_detail",
+        username: gdtLastCreds.username,
+        password: gdtLastCreds.password,
+        is_purchase: gdtLastCreds.is_purchase,
+        invoice: inv,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      body.innerHTML = `<span class="err">❌ ${escapeHtml(data.error || "Không lấy được chi tiết hóa đơn.")}</span>`;
+      return;
+    }
+
+    // Chấp nhận cả trường hợp API trả thẳng object chi tiết hoặc bọc trong { detail: {...} } / { invoice: {...} }
+    const detail = data.detail || data.invoice || data;
+    body.innerHTML = renderGdtDetailContent(detail);
+  } catch (e) {
+    body.innerHTML = `<span class="err">❌ Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function closeGdtInvoiceDetail() {
+  document.getElementById("gdtDetailOverlay").classList.add("hidden");
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const overlay = document.getElementById("gdtDetailOverlay");
+    if (overlay && !overlay.classList.contains("hidden")) closeGdtInvoiceDetail();
+  }
+});
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
