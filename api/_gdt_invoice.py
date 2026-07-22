@@ -1,10 +1,18 @@
 """
 Module tra cứu Hóa đơn điện tử (hoadondientu.gdt.gov.vn).
-Dùng bởi action "gdt_invoice" trong index.py.
+Dùng bởi action "gdt_invoice" (lấy DANH SÁCH) và action "gdt_invoice_detail"
+(lấy CHI TIẾT một hóa đơn cụ thể) trong index.py.
 
-Hàm chính: lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
+Hàm chính:
+  - lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
+      -> lấy danh sách hóa đơn trong khoảng ngày.
+  - gdt_fetch_invoice_detail(username, password, invoice)
+      -> lấy chi tiết đầy đủ (người mua/bán, hàng hóa dịch vụ, thuế suất...)
+         của MỘT hóa đơn, dựa trên object hóa đơn đã có từ danh sách ở trên.
+
 Trả về dict:
   - Thành công: {"count": N, "invoices": [...], "warnings": [...], "chunks_processed": M}
+                hoặc {"detail": {...}} (đối với gdt_fetch_invoice_detail)
   - Thất bại:   {"error": "..."}
 
 LƯU Ý BẢO MẬT: username/password của GDT chỉ tồn tại trong biến cục bộ của lần gọi này,
@@ -14,6 +22,7 @@ import re
 import time
 import calendar
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import requests
 
@@ -173,6 +182,8 @@ def api_get(session: requests.Session, url: str, token: str, max_retries: int = 
             if resp.status_code in (500, 504):
                 time.sleep(2)
                 continue
+            if resp.status_code == 404:
+                return None, "Không tìm thấy hóa đơn này trên hệ thống Thuế (HTTP 404)."
             resp.raise_for_status()
             return resp.json(), None
         except requests.exceptions.Timeout:
@@ -242,7 +253,7 @@ def fetch_invoice_list(session: requests.Session, token: str, start_date: str, e
 
 
 # ==========================================
-# HÀM CHÍNH - gọi từ index.py
+# HÀM CHÍNH - gọi từ index.py (action "gdt_invoice")
 # ==========================================
 def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date: str, is_purchase: bool = True) -> dict:
     try:
@@ -264,15 +275,15 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         # Lấy ngày cuối cùng của tháng thuộc biến cursor hiện tại
         last_day_of_month = calendar.monthrange(cursor.year, cursor.month)[1]
         end_of_month = cursor.replace(day=last_day_of_month)
-        
+
         # Điểm kết thúc của chunk này là ngày cuối tháng hoặc end_dt (nếu end_dt đến sớm hơn)
         chunk_end = min(end_of_month, end_dt)
-        
+
         date_chunks.append((
-            cursor.strftime("%d/%m/%Y"), 
+            cursor.strftime("%d/%m/%Y"),
             chunk_end.strftime("%d/%m/%Y")
         ))
-        
+
         # Tiến cursor sang ngày đầu tiên của tháng tiếp theo
         cursor = chunk_end + timedelta(days=1)
 
@@ -297,7 +308,7 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
             is_purchase
         )
         all_invoices.extend(invoices)
-        
+
         # Gắn thêm nhãn thời gian vào warning để biết lỗi ở giai đoạn nào
         if warnings:
             all_warnings.extend([f"[{s_date} - {e_date}] {w}" for w in warnings])
@@ -311,7 +322,64 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
 
 
 # ==========================================
-# CÁC HÀM CHIA NHỎ THEO BƯỚC 
+# CHI TIẾT MỘT HÓA ĐƠN - gọi từ index.py (action "gdt_invoice_detail")
+# ==========================================
+def gdt_fetch_invoice_detail(username: str, password: str, invoice: dict) -> dict:
+    """
+    Lấy CHI TIẾT đầy đủ (thông tin người mua/bán, danh sách hàng hóa dịch vụ,
+    thuế suất, tiền thuế từng dòng...) của MỘT hóa đơn cụ thể.
+
+    `invoice` chính là object hóa đơn đã có trong danh sách trả về bởi
+    lookup_gdt_invoices() / gdt_fetch_one_page() (frontend gửi nguyên object này
+    lên khi người dùng bấm vào 1 dòng trong bảng kết quả). Cần tối thiểu các khóa:
+    nbmst, khhdon, shdon (khmshdon là tùy chọn, một số hệ thống không trả về);
+    khóa "loai" dùng để xác định có phải hóa đơn máy tính tiền hay không
+    (quyết định gọi endpoint sco-query hay query).
+
+    Trả về:
+      - Thành công: {"detail": {...}}   (nguyên dữ liệu JSON máy chủ Thuế trả về)
+      - Thất bại:   {"error": "..."}
+    """
+    if not isinstance(invoice, dict):
+        return {"error": "Thiếu thông tin hóa đơn cần tra cứu chi tiết."}
+
+    nbmst = invoice.get("nbmst")
+    khhdon = invoice.get("khhdon")
+    shdon = invoice.get("shdon")
+    khmshdon = invoice.get("khmshdon")
+    loai = invoice.get("loai", "")
+
+    missing = [name for name, val in [("nbmst", nbmst), ("khhdon", khhdon), ("shdon", shdon)] if not val]
+    if missing:
+        return {"error": f"Thiếu thông tin định danh hóa đơn ({', '.join(missing)}) để tra cứu chi tiết."}
+
+    session = make_session()
+    token, err = login_tax_system(session, username, password)
+    if not token:
+        return {"error": err or "Đăng nhập thất bại."}
+
+    # "Hóa đơn từ máy tính tiền" (ttxly=8) dùng endpoint sco-query, còn lại dùng query
+    is_sco = (loai == LOAI_MAP.get(8))
+    base_url = f"{BASE_API}/sco-query/invoices/detail" if is_sco else f"{BASE_API}/query/invoices/detail"
+
+    params = {"nbmst": nbmst, "khhdon": khhdon, "shdon": shdon}
+    if khmshdon not in (None, ""):
+        params["khmshdon"] = khmshdon
+
+    query_string = "?" + "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
+    full_url = base_url + query_string
+
+    data, err = api_get(session, full_url, token)
+    if err:
+        return {"error": err}
+    if not data:
+        return {"error": "Máy chủ Thuế không trả về dữ liệu chi tiết cho hóa đơn này."}
+
+    return {"detail": data}
+
+
+# ==========================================
+# CÁC HÀM CHIA NHỎ THEO BƯỚC
 # (Dùng khi frontend muốn kiểm soát luồng chạy theo từng trang)
 # ==========================================
 
