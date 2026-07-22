@@ -407,7 +407,7 @@
     margin: 22px 0 10px; padding-top: 16px; border-top: 1px dashed var(--border);
   }
   .gdt-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-  #gdtTable tbody tr { cursor: pointer; }
+  #gdtResultsContainer table tbody tr { cursor: pointer; }
 
   /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
   .sepay-table { 
@@ -994,23 +994,7 @@
 
         <div id="gdtResultArea">
           <div class="msg" id="gdtProgress" style="display:none; margin-bottom: 12px;"></div>
-          <div class="table-responsive" style="display:none;" id="gdtTableWrap">
-            <table class="bulk-table" id="gdtTable">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Loại</th>
-                  <th>Ký hiệu</th>
-                  <th>Số HĐ</th>
-                  <th>Ngày lập</th>
-                  <th>MST đối tác</th>
-                  <th>Tên đối tác</th>
-                  <th style="text-align:right;">Tổng tiền</th>
-                </tr>
-              </thead>
-              <tbody id="gdtTbody"></tbody>
-            </table>
-          </div>
+          <div id="gdtResultsContainer"></div>
         </div>
       </div>
       <div id="tabAir" class="hidden">
@@ -3087,6 +3071,14 @@ async function doInvoiceLookup() {
 }
 
 // TRA CỨU HÓA ĐƠN ĐIỆN TỬ (GDT) - đăng nhập bằng MST/mật khẩu + khoảng ngày
+// Chia làm 3 lần gọi API tuần tự theo từng loại hóa đơn (ttxly), mỗi lần trả kết quả
+// xong là hiển thị luôn 1 bảng riêng, nối tiếp bảng trước, không cần chờ đủ cả 3 loại.
+const GDT_INVOICE_TYPES = [
+  { ttxly: 5, title: "Hóa đơn có mã CQT" },
+  { ttxly: 6, title: "Hóa đơn không mã" },
+  { ttxly: 8, title: "Hóa đơn từ máy tính tiền" },
+];
+
 async function doGdtInvoiceLookup() {
   const username = document.getElementById("gdtUsername").value.trim();
   const password = document.getElementById("gdtPassword").value;
@@ -3096,8 +3088,7 @@ async function doGdtInvoiceLookup() {
 
   const btn = document.getElementById("gdtSearchBtn");
   const progress = document.getElementById("gdtProgress");
-  const tableWrap = document.getElementById("gdtTableWrap");
-  const tbody = document.getElementById("gdtTbody");
+  const resultsContainer = document.getElementById("gdtResultsContainer");
 
   if (!username || !password) {
     progress.style.display = "block";
@@ -3112,79 +3103,140 @@ async function doGdtInvoiceLookup() {
 
   btn.disabled = true;
   progress.style.display = "block";
-  tableWrap.style.display = "none";
-  tbody.innerHTML = "";
-  progress.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đăng nhập & tra cứu hóa đơn... (có thể mất khoảng 10-30 giây)';
+  resultsContainer.innerHTML = "";
+  gdtLastInvoices = [];
+  gdtLastCreds = { username, password, is_purchase: isPurchase };
 
-  try {
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "gdt_invoice",
-        username, password,
-        start_date: dateFrom, end_date: dateTo,
-        is_purchase: isPurchase,
-        access_token: getToken()
-      })
-    });
-    const data = await resp.json();
+  let sharedToken = null;   // Dùng lại token đăng nhập lần đầu cho 2 lần gọi sau, khỏi phải giải captcha lại
+  let totalFound = 0;
+  const problems = [];
 
-    // Xoá mật khẩu khỏi ô nhập ngay sau khi gửi xong, không giữ lại trên form
-    document.getElementById("gdtPassword").value = "";
+  for (let t = 0; t < GDT_INVOICE_TYPES.length; t++) {
+    const { ttxly, title } = GDT_INVOICE_TYPES[t];
+    progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang tra cứu "${escapeHtml(title)}"... (${t + 1}/${GDT_INVOICE_TYPES.length})`;
 
-    if (!resp.ok) {
-      progress.innerHTML = `<span class="err">❌ ${escapeHtml(data.error || "Lỗi không xác định")}</span>`;
-      return;
+    try {
+      const resp = await fetch("/api/index", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "gdt_invoice_by_type",
+          username, password,
+          start_date: dateFrom, end_date: dateTo,
+          is_purchase: isPurchase,
+          ttxly,
+          token: sharedToken,
+          access_token: getToken()
+        })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        problems.push(`${title}: ${data.error || "Lỗi không xác định"}`);
+        // Nếu ngay lần đầu tiên (đăng nhập) đã lỗi thì dừng luôn, không thử tiếp các loại còn lại
+        if (t === 0) break;
+        continue;
+      }
+
+      if (data.token) sharedToken = data.token;
+      const invoices = data.invoices || [];
+      totalFound += invoices.length;
+      renderGdtTypeTable(title, invoices);
+
+      if (data.warnings && data.warnings.length > 0) {
+        problems.push(...data.warnings.map(w => `${title}: ${w}`));
+      }
+    } catch (e) {
+      problems.push(`${title}: Lỗi kết nối - ${e.message}`);
+      if (t === 0) break;
     }
-
-    const invoices = data.invoices || [];
-    if (invoices.length === 0) {
-      progress.innerHTML = '⚠️ Không tìm thấy hóa đơn nào trong khoảng thời gian đã chọn.';
-      return;
-    }
-
-    const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
-    const dateFmt = (v) => {
-      if (!v) return "";
-      // API trả dạng "2026-07-19T17:00:00Z" -> hiển thị dd/mm/yyyy
-      const d = new Date(v);
-      if (isNaN(d.getTime())) return escapeHtml(v);
-      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-    };
-
-    // Lưu lại để dùng khi bấm vào từng dòng xem chi tiết
-    gdtLastInvoices = invoices;
-    gdtLastCreds = { username, password, is_purchase: isPurchase };
-
-    let rowsHtml = "";
-    invoices.forEach((inv, idx) => {
-      rowsHtml += `<tr onclick="openGdtInvoiceDetail(${idx})" title="Bấm để xem chi tiết hóa đơn">
-        <td style="text-align:center;">${idx + 1}</td>
-        <td>${escapeHtml(inv.loai)}</td>
-        <td>${escapeHtml(inv.khhdon)}</td>
-        <td>${escapeHtml(inv.shdon)}</td>
-        <td>${dateFmt(inv.tdlap)}</td>
-        <td>${escapeHtml(inv.nbmst)}</td>
-        <td>${escapeHtml(inv.nbten)}</td>
-        <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>
-      </tr>`;
-    });
-    tbody.innerHTML = rowsHtml;
-    tableWrap.style.display = "block";
-
-    let warnHtml = "";
-    if (data.warnings && data.warnings.length > 0) {
-      warnHtml = `<div style="margin-top:8px; color: var(--amount-out);">⚠️ ${data.warnings.map(escapeHtml).join("<br>")}</div>`;
-    }
-    progress.innerHTML = `🎉 Tìm thấy <strong style="color:var(--badge-ok-text)">${invoices.length}</strong> hóa đơn.` + warnHtml;
-
-  } catch (e) {
-    document.getElementById("gdtPassword").value = "";
-    progress.innerHTML = `<span class="err">❌ Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
-  } finally {
-    btn.disabled = false;
   }
+
+  // Xoá mật khẩu khỏi ô nhập ngay sau khi gửi xong, không giữ lại trên form
+  document.getElementById("gdtPassword").value = "";
+
+  let summaryHtml;
+  if (totalFound > 0) {
+    summaryHtml = `🎉 Tìm thấy tổng cộng <strong style="color:var(--badge-ok-text)">${totalFound}</strong> hóa đơn.`;
+  } else if (problems.length === 0) {
+    summaryHtml = "⚠️ Không tìm thấy hóa đơn nào trong khoảng thời gian đã chọn.";
+  } else {
+    summaryHtml = "";
+  }
+
+  let problemHtml = "";
+  if (problems.length > 0) {
+    problemHtml = `<div style="margin-top:8px; color: var(--amount-out);">⚠️ ${problems.map(escapeHtml).join("<br>")}</div>`;
+  }
+  progress.innerHTML = summaryHtml + problemHtml;
+  btn.disabled = false;
+}
+
+// Vẽ 1 bảng kết quả cho MỘT loại hóa đơn, nối tiếp vào bên dưới các bảng trước đó.
+// Mỗi dòng trong bảng được gán index toàn cục trong gdtLastInvoices để mở popup chi tiết đúng hóa đơn.
+function renderGdtTypeTable(title, invoices) {
+  const container = document.getElementById("gdtResultsContainer");
+  const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+  const dateFmt = (v) => {
+    if (!v) return "";
+    // API trả dạng "2026-07-19T17:00:00Z" -> hiển thị dd/mm/yyyy
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return escapeHtml(v);
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  };
+
+  const wrap = document.createElement("div");
+  wrap.style.marginBottom = "20px";
+
+  const heading = document.createElement("h3");
+  heading.style.cssText = "margin:0 0 10px; font-size:14px;";
+  heading.innerHTML = `${escapeHtml(title)} <span style="color:var(--text-muted); font-weight:600;">(${invoices.length})</span>`;
+  wrap.appendChild(heading);
+
+  if (invoices.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.innerText = "Không có hóa đơn nào thuộc loại này.";
+    wrap.appendChild(empty);
+    container.appendChild(wrap);
+    return;
+  }
+
+  const tableResponsive = document.createElement("div");
+  tableResponsive.className = "table-responsive";
+  const table = document.createElement("table");
+  table.className = "bulk-table";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>#</th><th>Ký hiệu</th><th>Số HĐ</th><th>Ngày lập</th>
+        <th>MST đối tác</th><th>Tên đối tác</th><th style="text-align:right;">Tổng tiền</th>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  invoices.forEach((inv, idx) => {
+    const globalIdx = gdtLastInvoices.length;
+    gdtLastInvoices.push(inv);
+
+    const tr = document.createElement("tr");
+    tr.title = "Bấm để xem chi tiết hóa đơn";
+    tr.onclick = () => openGdtInvoiceDetail(globalIdx);
+    tr.innerHTML = `
+      <td style="text-align:center;">${idx + 1}</td>
+      <td>${escapeHtml(inv.khhdon)}</td>
+      <td>${escapeHtml(inv.shdon)}</td>
+      <td>${dateFmt(inv.tdlap)}</td>
+      <td>${escapeHtml(inv.nbmst)}</td>
+      <td>${escapeHtml(inv.nbten)}</td>
+      <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  tableResponsive.appendChild(table);
+  wrap.appendChild(tableResponsive);
+  container.appendChild(wrap);
 }
 
 // Nhãn tiếng Việt thân thiện cho các trường hay gặp trong dữ liệu hóa đơn GDT.
