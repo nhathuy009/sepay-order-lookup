@@ -27,7 +27,7 @@ from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 from _invoice import lookup_invoice
-from _gdt_invoice import lookup_gdt_invoices
+from _gdt_invoice import lookup_gdt_invoices, gdt_fetch_invoice_detail
 
 def handle_movie(body):
     code = (body.get("code") or "").strip()
@@ -110,6 +110,20 @@ def handle_gdt_invoice(body):
         return 400, {"error": "Vui lòng chọn Từ ngày và Đến ngày."}
 
     res = lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
+    status = 400 if "error" in res else 200
+    return status, res
+
+def handle_gdt_invoice_detail(body):
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    invoice = body.get("invoice") or {}
+
+    if not username or not password:
+        return 400, {"error": "Vui lòng nhập Mã số thuế và Mật khẩu."}
+    if not isinstance(invoice, dict) or not invoice:
+        return 400, {"error": "Thiếu thông tin hóa đơn cần tra cứu chi tiết."}
+
+    res = gdt_fetch_invoice_detail(username, password, invoice)
     status = 400 if "error" in res else 200
     return status, res
 
@@ -359,6 +373,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_invoice(body)
         elif action == "gdt_invoice":
             status, payload = handle_gdt_invoice(body)
+        elif action == "gdt_invoice_detail":
+            status, payload = handle_gdt_invoice_detail(body)
         elif action == "fetch_employees_excel":
             status, payload = handle_fetch_employees_excel(body)
         elif action == "search_transaction":
