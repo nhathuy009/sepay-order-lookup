@@ -195,59 +195,73 @@ def api_get(session: requests.Session, url: str, token: str, max_retries: int = 
     return None, f"Không tải được dữ liệu sau {max_retries} lần thử: {url}"
 
 
-def fetch_invoice_list(session: requests.Session, token: str, start_date: str, end_date: str, is_purchase: bool):
-    """Trả về (invoices, warnings). Chỉ lấy DANH SÁCH (không gọi API chi tiết)."""
+def fetch_invoices_of_type(session: requests.Session, token: str, start_date: str, end_date: str,
+                            is_purchase: bool, ttxly: int):
+    """
+    Lấy toàn bộ hóa đơn của DUY NHẤT 1 loại (ttxly: 5, 6 hoặc 8) trong MỘT khoảng ngày
+    (khoảng ngày này phải đã <= 1 tháng, việc chia chunk theo tháng do lớp gọi bên trên xử lý).
+    Trả về (invoices, warnings).
+    """
     url_type = "purchase" if is_purchase else "sold"
-
-    query_configs = [
-        {"url": f"{BASE_API}/query/invoices/{url_type}", "ttxly": 5, "loai": "Hóa đơn có mã CQT"},
-        {"url": f"{BASE_API}/query/invoices/{url_type}", "ttxly": 6, "loai": "Hóa đơn không mã"},
-        {"url": f"{BASE_API}/sco-query/invoices/{url_type}", "ttxly": 8, "loai": "Hóa đơn từ máy tính tiền"},
-    ]
+    base_url = f"{BASE_API}/sco-query/invoices/{url_type}" if ttxly == 8 else f"{BASE_API}/query/invoices/{url_type}"
+    loai = LOAI_MAP.get(ttxly, "")
 
     invoices = []
     warnings = []
+    state = ""
+    page = 0
+    while page < MAX_PAGES_PER_TYPE:
+        page += 1
+        search_param = f"tdlap=ge={start_date}T00:00:00;tdlap=le={end_date}T23:59:59;ttxly=={ttxly}"
+        query_string = f"?sort=tdlap:desc&size={PAGE_SIZE}&search={search_param}"
+        if state:
+            query_string += f"&state={state}"
+        full_url = base_url + query_string
 
-    for cfg in query_configs:
-        state = ""
-        page = 0
-        while page < MAX_PAGES_PER_TYPE:
-            page += 1
-            search_param = f"tdlap=ge={start_date}T00:00:00;tdlap=le={end_date}T23:59:59;ttxly=={cfg['ttxly']}"
-            query_string = f"?sort=tdlap:desc&size={PAGE_SIZE}&search={search_param}"
-            if state:
-                query_string += f"&state={state}"
-            full_url = cfg["url"] + query_string
+        data, err = api_get(session, full_url, token)
+        if err:
+            warnings.append(err)
+            break
+        if not data:
+            break
 
-            data, err = api_get(session, full_url, token)
-            if err:
-                warnings.append(f"[{cfg['loai']}] {err}")
-                break
-            if not data:
-                break
+        datas = data.get("datas", [])
+        if not datas:
+            break
 
-            datas = data.get("datas", [])
-            if not datas:
-                break
+        for item in datas:
+            invoices.append({
+                "loai": loai,
+                "khhdon": item.get("khhdon"),
+                "shdon": item.get("shdon"),
+                "khmshdon": item.get("khmshdon"),
+                "nbmst": item.get("nbmst"),
+                "nbten": item.get("nbten"),
+                "tdlap": item.get("tdlap"),
+                "tgtttbso": item.get("tgtttbso"),
+            })
 
-            for item in datas:
-                invoices.append({
-                    "loai": cfg["loai"],
-                    "khhdon": item.get("khhdon"),
-                    "shdon": item.get("shdon"),
-                    "khmshdon": item.get("khmshdon"),
-                    "nbmst": item.get("nbmst"),
-                    "nbten": item.get("nbten"),
-                    "tdlap": item.get("tdlap"),
-                    "tgtttbso": item.get("tgtttbso"),
-                })
+        state = data.get("state")
+        if not state:
+            break
 
-            state = data.get("state")
-            if not state:
-                break
+    if page >= MAX_PAGES_PER_TYPE:
+        warnings.append(f"Đã đạt giới hạn {MAX_PAGES_PER_TYPE} trang, có thể còn hóa đơn chưa lấy hết.")
 
-        if page >= MAX_PAGES_PER_TYPE:
-            warnings.append(f"[{cfg['loai']}] Đã đạt giới hạn {MAX_PAGES_PER_TYPE} trang, có thể còn hóa đơn chưa lấy hết.")
+    return invoices, warnings
+
+
+def fetch_invoice_list(session: requests.Session, token: str, start_date: str, end_date: str, is_purchase: bool):
+    """Trả về (invoices, warnings). Lấy DANH SÁCH cả 3 loại hóa đơn (không gọi API chi tiết)."""
+    invoices = []
+    warnings = []
+
+    for ttxly in (5, 6, 8):
+        type_invoices, type_warnings = fetch_invoices_of_type(session, token, start_date, end_date, is_purchase, ttxly)
+        invoices.extend(type_invoices)
+        if type_warnings:
+            loai = LOAI_MAP.get(ttxly, "")
+            warnings.extend([f"[{loai}] {w}" for w in type_warnings])
 
     return invoices, warnings
 
@@ -318,6 +332,90 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         "invoices": all_invoices,
         "warnings": all_warnings,
         "chunks_processed": len(date_chunks)
+    }
+
+
+# ==========================================
+# TRA CỨU RIÊNG TỪNG LOẠI HÓA ĐƠN (dùng khi frontend muốn gọi 3 lần API
+# tuần tự - mỗi loại trả kết quả về ngay, hiển thị luôn 1 bảng riêng thay vì
+# phải chờ lấy xong cả 3 loại rồi mới trả 1 lần) - action "gdt_invoice_by_type"
+# ==========================================
+def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, end_date: str,
+                                 is_purchase: bool, ttxly: int, token: str = None) -> dict:
+    """
+    Lấy DANH SÁCH hóa đơn của DUY NHẤT 1 loại (ttxly: 5, 6 hoặc 8), tự chia nhỏ
+    khoảng ngày theo từng tháng giống lookup_gdt_invoices().
+
+    Nếu đã có sẵn `token` hợp lệ (lấy từ 1 lần đăng nhập trước đó, ví dụ lần gọi
+    ttxly=5 đầu tiên trong phiên tra cứu 3 loại), truyền vào để BỎ QUA đăng nhập
+    lại (đỡ phải giải captcha thêm 2 lần nữa cho ttxly=6 và ttxly=8). Nếu không
+    truyền, hoặc token đã hết hạn giữa chừng, hàm sẽ tự đăng nhập lại bằng
+    username/password.
+
+    Trả về dict:
+      - Thành công: {"token": "...", "loai": "...", "invoices": [...], "warnings": [...]}
+        (token trả về để frontend dùng cho các lần gọi tiếp theo của 2 loại còn lại)
+      - Thất bại:   {"error": "..."}
+    """
+    if ttxly not in LOAI_MAP:
+        return {"error": f"ttxly không hợp lệ: {ttxly} (chỉ chấp nhận 5, 6 hoặc 8)."}
+
+    try:
+        start_dt = datetime.strptime(start_date, "%d/%m/%Y")
+        end_dt = datetime.strptime(end_date, "%d/%m/%Y")
+    except ValueError:
+        return {"error": "Định dạng ngày phải là dd/mm/yyyy."}
+
+    if start_dt > end_dt:
+        return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'."}
+
+    date_chunks = []
+    cursor = start_dt
+    while cursor <= end_dt:
+        last_day_of_month = calendar.monthrange(cursor.year, cursor.month)[1]
+        end_of_month = cursor.replace(day=last_day_of_month)
+        chunk_end = min(end_of_month, end_dt)
+        date_chunks.append((cursor.strftime("%d/%m/%Y"), chunk_end.strftime("%d/%m/%Y")))
+        cursor = chunk_end + timedelta(days=1)
+
+    session = make_session()
+
+    used_token = token
+    logged_in_fresh = False
+    if not used_token:
+        used_token, err = login_tax_system(session, username, password)
+        if not used_token:
+            return {"error": err or "Đăng nhập thất bại."}
+        logged_in_fresh = True
+
+    all_invoices = []
+    all_warnings = []
+
+    for i, (s_date, e_date) in enumerate(date_chunks):
+        if i > 0:
+            time.sleep(1)
+
+        invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly)
+
+        # Nếu đang dùng token cũ (không tự đăng nhập ở bước trên) mà bị từ chối/hết hạn
+        # thì thử đăng nhập lại 1 lần bằng username/password rồi gọi lại chunk này.
+        token_rejected = any(("hết hạn" in w or "từ chối" in w) for w in warnings)
+        if token_rejected and not logged_in_fresh:
+            new_token, err = login_tax_system(session, username, password)
+            if new_token:
+                used_token = new_token
+                logged_in_fresh = True
+                invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly)
+
+        all_invoices.extend(invoices)
+        if warnings:
+            all_warnings.extend([f"[{s_date} - {e_date}] {w}" for w in warnings])
+
+    return {
+        "token": used_token,
+        "loai": LOAI_MAP[ttxly],
+        "invoices": all_invoices,
+        "warnings": all_warnings,
     }
 
 
