@@ -22,7 +22,7 @@
     --card-bg-solid: #141F4E;
     --border: rgba(120,150,220,.22);          
     
-    --text-main: #FFFFFF;       
+    --text-main: #FFFFFF;        
     --text-muted: rgba(255,255,255,.6);      
     --heading-color: #FFFFFF;
     --brand-color: #F0A124;
@@ -54,6 +54,11 @@
     --total-row-bg-solid: #183265;
     --checkbox-bg: rgba(255,255,255,0.012);
     --settings-panel-bg: rgba(0,0,0,0.2);
+
+    /* BIẾN MÀU WIDGET LỊCH TUẦN */
+    --cal-active-bg: #C5221F; 
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: rgba(255,255,255,0.05);
   }
 
   /* GIAO DIỆN LIGHT MODE SẼ GHI ĐÈ CÁC BIẾN NÀY */
@@ -65,8 +70,8 @@
     --card-bg: #FFFFFF;         
     --card-bg-solid: #FFFFFF;
     --border: rgba(0,0,0,0.08);          
-    --text-main: #1E293B;       
-    --text-muted: #64748B;      
+    --text-main: #1E293B;        
+    --text-muted: #64748B;       
     --heading-color: #0F172A;
     --brand-color: #E08B10;
 
@@ -96,6 +101,10 @@
     --total-row-bg-solid: #EFF6FF;
     --checkbox-bg: #F8FAFC;
     --settings-panel-bg: rgba(0,0,0,0.04);
+
+    --cal-active-bg: #C5221F; 
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: #FFFFFF;
   }
   
   * { box-sizing: border-box; }
@@ -169,6 +178,58 @@
     font-weight: 700;
     border-radius: 8px;
     box-shadow: 0 4px 12px -2px rgba(240,161,36,.4);
+  }
+
+  /* --- WIDGET LỊCH TUẦN TRONG HEADER --- */
+  .weekly-calendar-widget {
+    display: flex; align-items: center; gap: 12px; height: 100%;
+    user-select: none; flex: 1; justify-content: center;
+  }
+  .cal-info {
+    display: flex; flex-direction: column; align-items: flex-end;
+    justify-content: center; line-height: 1.2;
+  }
+  .cal-month { font-size: 12px; font-weight: 700; color: var(--text-main); }
+  .cal-lunar { font-size: 10px; font-weight: 600; color: var(--cal-active-bg); margin-top: 2px;}
+  .cal-days-wrap { display: flex; gap: 4px; align-items: center; }
+  .cal-day-block {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 38px; height: 48px; background: var(--cal-block-bg);
+    border: 1px solid var(--border); border-radius: 8px; transition: 0.2s ease; cursor: default;
+  }
+  .cal-day-block:hover { border-color: var(--text-muted); }
+  .cal-dow { font-size: 9px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+  .cal-date { font-size: 15px; font-weight: 800; color: var(--text-main); line-height: 1; }
+  .cal-lunar-date { font-size: 9px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+  
+  /* Highlight ngày nghỉ Thứ 7, Chủ Nhật (Màu pastel xanh lá) */
+  .cal-day-block.weekend {
+    background-color: #e6f4ea; 
+    border-color: #ceead6;
+  }
+  .cal-day-block.weekend .cal-dow {
+    color: #137333; 
+  }
+  .cal-day-block.weekend .cal-date { color: #1E293B; }
+  .cal-day-block.weekend .cal-lunar-date { color: #64748B; }
+
+  /* Đảm bảo nếu hôm nay là cuối tuần thì màu đỏ vẫn được ưu tiên hiển thị */
+  .cal-day-block.active {
+    background: var(--cal-active-bg); border-color: var(--cal-active-bg);
+    box-shadow: 0 4px 8px -2px rgba(197, 34, 31, 0.4); transform: translateY(-1px);
+  }
+  .cal-day-block.active.weekend {
+    background-color: var(--cal-active-bg); border-color: var(--cal-active-bg);
+  }
+  .cal-day-block.active .cal-dow,
+  .cal-day-block.active .cal-date,
+  .cal-day-block.active .cal-lunar-date { color: var(--cal-active-text); }
+  
+  .cal-dot { display: none; width: 4px; height: 4px; background: var(--cal-active-bg); border-radius: 50%; margin-top: 2px; }
+  .cal-day-block.active .cal-dot { background: var(--cal-active-text); display: block;}
+
+  @media (max-width: 1024px) {
+    .weekly-calendar-widget { display: none; } /* Ẩn lịch trên màn hình nhỏ để tránh vỡ Header */
   }
 
   /* BODY LAYOUT */
@@ -608,6 +669,16 @@
     <div class="header-brand">
       <button id="toggleSidebarBtn" onclick="toggleSidebar()" title="Thu gọn / Mở rộng Sidebar">☰</button>
     </div>
+    
+    <!-- MODULE LỊCH TUẦN -->
+    <div class="weekly-calendar-widget" id="weeklyCalendar">
+      <div class="cal-info">
+        <div class="cal-month" id="calMonthText"></div>
+        <div class="cal-lunar" id="calLunarText"></div>
+      </div>
+      <div class="cal-days-wrap" id="calDaysWrap"></div>
+    </div>
+
     <div class="header-actions" id="authCard">
       <div class="acc-seg-wrap" id="themeSegWrap">
         <button type="button" class="acc-seg-btn" id="themeBtnDark" onclick="changeTheme(false)">Tối</button>
@@ -1081,6 +1152,181 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script>
+// =======================================================
+// THUẬT TOÁN TÍNH ÂM LỊCH CỦA HỒ NGỌC ĐỨC (Múi giờ +7)
+// =======================================================
+const PI = Math.PI;
+
+function jdFromDate(dd, mm, yyyy) {
+    let a, b, c, e, f;
+    if (mm < 3) { yyyy--; mm += 12; }
+    a = Math.floor(yyyy / 100);
+    b = Math.floor(a / 4);
+    c = 2 - a + b;
+    e = Math.floor(365.25 * (yyyy + 4716));
+    f = Math.floor(30.6001 * (mm + 1));
+    return dd + c + e + f - 1524.5;
+}
+
+function jdToDate(jd) {
+    let a, b, c, d, e, m, day, month, year;
+    let z, f, alpha;
+    z = Math.floor(jd + 0.5);
+    f = (jd + 0.5) - z;
+    if (z < 2299161) { a = z; } 
+    else {
+        alpha = Math.floor((z - 1867216.25) / 36524.25);
+        a = z + 1 + alpha - Math.floor(alpha / 4);
+    }
+    b = a + 1524;
+    c = Math.floor((b - 122.1) / 365.25);
+    d = Math.floor(365.25 * c);
+    e = Math.floor((b - d) / 30.6001);
+    day = b - d - Math.floor(30.6001 * e) + f;
+    month = (e < 14) ? (e - 1) : (e - 13);
+    year = (month > 2) ? (c - 4716) : (c - 4715);
+    return [day, month, year];
+}
+
+function getSunLongitude(jdn, timeZone) {
+    let T = (jdn - 2451545.0 - timeZone / 24.0) / 36525.0;
+    let T2 = T * T;
+    let dr = PI / 180.0;
+    let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T2;
+    let M = 357.52911 + 35999.05029 * T - 0.0001537 * T2;
+    let e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T2;
+    let C = (1.914602 - 0.004817 * T - 0.000014 * T2) * Math.sin(M * dr) +
+            (0.019993 - 0.000101 * T) * Math.sin(2 * M * dr) +
+            0.000289 * Math.sin(3 * M * dr);
+    let theta = L0 + C;
+    return theta - 360.0 * Math.floor(theta / 360.0);
+}
+
+function getNewMoonDay(k, timeZone) {
+    let T = k / 1236.85;
+    let T2 = T * T;
+    let T3 = T2 * T;
+    let dr = PI / 180.0;
+    let Jd1 = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
+    let Jd2 = Jd1 + 0.1734 - 0.000393 * T * Math.sin(145.1 * dr) + 0.0021 * Math.sin(199.5 * dr);
+    let M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
+    let Mprime = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
+    let F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
+    let deltaJd = (0.1734 - 0.000393 * T) * Math.sin(M * dr) +
+                  0.0021 * Math.sin(2 * M * dr) - 0.4068 * Math.sin(Mprime * dr) +
+                  0.0161 * Math.sin(2 * Mprime * dr) - 0.0004 * Math.sin(3 * Mprime * dr) +
+                  0.0104 * Math.sin(2 * F * dr) - 0.0051 * Math.sin(M * dr + Mprime * dr) -
+                  0.0074 * Math.sin(M * dr - Mprime * dr) + 0.0004 * Math.sin(2 * F * dr + M * dr) -
+                  0.0004 * Math.sin(2 * F * dr - M * dr) - 0.0006 * Math.sin(2 * F * dr + Mprime * dr) +
+                  0.0010 * Math.sin(2 * F * dr - Mprime * dr) + 0.0005 * Math.sin(M * dr + 2 * Mprime * dr);
+    return Math.floor(Jd1 + deltaJd + 0.5 + timeZone / 24.0);
+}
+
+function getLunarMonth11(yy, timeZone) {
+    let off = yy - 1900;
+    let k = Math.floor(off * 12.3685);
+    let nm = getNewMoonDay(k, timeZone);
+    let sunLong = getSunLongitude(nm, timeZone);
+    if (sunLong >= 9) nm = getNewMoonDay(k - 1, timeZone);
+    return nm;
+}
+
+function getLeapMonthOffset(a11, timeZone) {
+    let k, arc, i, leapMonth = 0, isLeap = false;
+    let last = a11;
+    arc = getSunLongitude(last, timeZone);
+    for (i = 1; i <= 14; i++) {
+        let next = getNewMoonDay(1, timeZone); 
+    }
+    return leapMonth;
+}
+
+function convertSolar2Lunar(dd, mm, yyyy, timeZone) {
+    let jdn = jdFromDate(dd, mm, yyyy);
+    let k = Math.floor((jdn - 2415021.076998695) / 29.530588853);
+    let monthStart = getNewMoonDay(k + 1, timeZone);
+    if (monthStart > jdn) monthStart = getNewMoonDay(k, timeZone);
+    let a11 = getLunarMonth11(yyyy, timeZone);
+    let b11 = a11;
+    if (a11 >= monthStart) {
+        a11 = getLunarMonth11(yyyy - 1, timeZone);
+    } else {
+        b11 = getLunarMonth11(yyyy + 1, timeZone);
+    }
+    let lunarDay = jdn - monthStart + 1;
+    let diff = Math.floor((monthStart - a11) / 29);
+    let lunarMonth = diff + 11;
+    let lunarYear = yyyy;
+    if (lunarMonth > 12) { lunarMonth -= 12; }
+    if (lunarMonth < 11) { lunarYear++; }
+    
+    return { 
+        lunarDay: lunarDay, 
+        lunarMonth: lunarMonth, 
+        lunarYear: lunarYear 
+    };
+}
+
+// =======================================================
+// RENDER LỊCH TUẦN LÊN HEADER (Bắt đầu từ Thứ 2)
+// =======================================================
+function renderWeeklyCalendar() {
+    const wrap = document.getElementById("calDaysWrap");
+    const monthText = document.getElementById("calMonthText");
+    const lunarText = document.getElementById("calLunarText");
+    
+    if (!wrap) return;
+
+    const today = new Date();
+    const currentDayOfWeek = today.getDay(); // 0: CN, 1: T2, ..., 6: T7
+    
+    // TÍNH TOÁN LÙI VỀ THỨ 2 ĐẦU TUẦN
+    const offset = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - offset);
+
+    // Mảng thứ tự bắt đầu từ Thứ 2
+    const daysOfWeek = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+    let html = "";
+
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        
+        const isToday = d.toDateString() === today.toDateString();
+        
+        // Vì mảng bắt đầu từ T2 (index 0), nên T7 là index 5 và CN là index 6
+        const isWeekend = i === 5 || i === 6; 
+        
+        const dateNum = d.getDate();
+        const monthNum = d.getMonth() + 1;
+        const yearNum = d.getFullYear();
+        
+        // GỌI HÀM ÂM LỊCH CHUẨN (Múi giờ +7)
+        const lunar = convertSolar2Lunar(dateNum, monthNum, yearNum, 7);
+        
+        if (isToday) {
+            if (monthText) monthText.innerText = `Tháng ${monthNum} - ${yearNum}`;
+            if (lunarText) lunarText.innerText = `Âm Lịch tháng ${lunar.lunarMonth}`;
+        }
+
+        let classes = "cal-day-block";
+        if (isToday) classes += " active";
+        if (isWeekend) classes += " weekend"; // Đánh dấu màu pastel cho T7, CN
+
+        html += `
+            <div class="${classes}">
+                <div class="cal-dow">${daysOfWeek[i]}</div>
+                <div class="cal-date">${dateNum}</div>
+                <div class="cal-lunar-date">${lunar.lunarDay}</div>
+                <div class="cal-dot"></div>
+            </div>
+        `;
+    }
+    
+    wrap.innerHTML = html;
+}
+
 const FIELDS = [
   ["order_code", "Mã đơn/KH"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
   ["lead_phone", "SĐT KH"], ["lead_cccd", "Số CCCD"], ["username", "Username"],
@@ -1174,6 +1420,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const elGdtTo = document.getElementById('gdtDateTo');
   if (elGdtFrom && typeof flatpickr !== 'undefined') flatpickr(elGdtFrom, dateConfig);
   if (elGdtTo && typeof flatpickr !== 'undefined') flatpickr(elGdtTo, dateConfig);
+  
+  // RENDER LỊCH TUẦN LÊN HEADER
+  renderWeeklyCalendar();
 });
 
 function switchTab(which) {
@@ -1373,7 +1622,7 @@ async function doFetchEmployeesExcel() {
           const stk_raw = row[30];              // AE: STK
           const ngan_hang_raw = row[31];        // AF: Ngân hàng
           const ht_tt_raw = row[35];             // AJ: HT-TT
-          const od_ts_raw = row[36];              // AK: ÔĐ-TS
+          const od_ts_raw = row[36];             // AK: ÔĐ-TS
           const tnld_bnn_raw = row[37];           // AL: TNLĐ-BNN
           const bhyt_cty_raw = row[38];           // AM: BHYT
           const bhtn_cty_raw = row[39];           // AN: BHTN
