@@ -26,7 +26,7 @@ from _subtitle import search_subtitle
 from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
-from _invoice import lookup_invoice
+from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
 
 def handle_movie(body):
@@ -96,6 +96,20 @@ def handle_invoice(body):
     if not code:
         return 400, {"error": "Thiếu số hóa đơn"}
     return 200, lookup_invoice(code)
+
+def handle_invoice_by_date(body):
+    start_date = (body.get("start_date") or "").strip()
+    end_date = (body.get("end_date") or "").strip()
+    invoice_kind = (body.get("invoice_kind") or "2").strip()
+
+    if not start_date or not end_date:
+        return 400, {"error": "Vui lòng chọn Từ ngày và Đến ngày."}
+
+    result = fetch_invoices_by_date(start_date, end_date, invoice_kind)
+    if result is None:
+        return 400, {"error": "Không lấy được dữ liệu hóa đơn (lỗi đăng nhập hoặc kết nối tới hệ thống hóa đơn)."}
+
+    return 200, {"invoices": result, "total": len(result)}
 
 def handle_gdt_invoice(body):
     username = (body.get("username") or "").strip()
@@ -393,6 +407,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_lookup(body)
         elif action == "invoice":
             status, payload = handle_invoice(body)
+        elif action == "invoice_by_date":
+            status, payload = handle_invoice_by_date(body)
         elif action == "gdt_invoice":
             status, payload = handle_gdt_invoice(body)
         elif action == "gdt_invoice_by_type":
