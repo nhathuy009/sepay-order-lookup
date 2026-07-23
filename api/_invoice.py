@@ -83,6 +83,19 @@ def empty_details():
     return {f: "" for f in FIELD_ORDER}
 
 
+def _extract_adjusted_invoice_no(process_note):
+    """Trích số hóa đơn GỐC bị điều chỉnh từ trường ProcessInvNote, dạng:
+    "Điều chỉnh cho hóa đơn điện tử  Mẫu số 1, ký hiệu C26MSL, số 1071, ngày..."
+
+    Chỉ khớp số đứng ngay sau "ký hiệu <ký hiệu>, số " để tránh nhầm với
+    "Mẫu số 1" (số mẫu hóa đơn - luôn là "1", không phải số hóa đơn gốc).
+    """
+    if not process_note:
+        return ""
+    match = re.search(r"ký hiệu\s+[^,]+,\s*số\s+(\d+)", process_note, re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
 def _extract_hidden(field_id, html_text):
     match = re.search(rf'id="{field_id}"[^>]*value="([^"]*)"', html_text)
     if not match:
@@ -262,6 +275,13 @@ class InvoiceClient:
         details["invoice_type"] = inv.get("LoaiHoaDon") or "Hóa đơn thông thường"
         details["status_msg"] = "Thành công"
         details["invoice_no"] = str(inv.get("No", "")).split(".")[0]
+        # Hóa đơn điều chỉnh giảm (số tiền âm) có ProcessInvNote ghi rõ số hóa đơn
+        # gốc bị điều chỉnh - trích ra để phía gọi hàm (index.py) tự tra cứu ngược
+        # xem hóa đơn gốc đó có nằm trong cùng đợt tra cứu không.
+        process_note = inv.get("ProcessInvNote", "") or ""
+        details["process_note"] = process_note
+        details["adjusts_invoice_no"] = _extract_adjusted_invoice_no(process_note)
+        details["note"] = ""
         return details
 
     def _fetch_batch(self, from_date, to_date, invoice_kind="2"):
