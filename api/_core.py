@@ -336,7 +336,11 @@ class SepayClient:
                 details["lead_email"] = lead.get("email", "")
                 details["lead_phone"] = lead.get("phone", "")
                 details["lead_cccd"] = lead.get("cccd", "")
+                details["lead_name"] = lead.get("name", "")
                 details["orders_amount"] = order.get("amount", "")
+                details["ref_username"] = order.get("ref_username", "")
+                details["commission_rate"] = order.get("commissionRate", "")
+                details["hoahong"] = order.get("hoahong", "")
                 einvoice = order.get("einvoice") or {}
                 details["einvoice_created_at"] = einvoice.get("created_at", "")
                 details["invoice_number"] = einvoice.get("invoice_number", "")
