@@ -151,18 +151,32 @@ def handle_invoice_by_date(body):
             inv["item_id"] = match.get("item_id", "")
             inv["item_title"] = match.get("item_title", "")
 
-    # Hóa đơn điều chỉnh giảm (số tiền âm) có "adjusts_invoice_no" (trích từ
-    # ProcessInvNote ở _invoice.py) là số hóa đơn GỐC bị điều chỉnh. Tra trong
-    # CHÍNH danh sách hóa đơn vừa lấy được (cùng đợt/khoảng ngày) - nếu thấy,
-    # ghi chú vào cột Note của DÒNG HÓA ĐƠN GỐC (không phải dòng điều chỉnh).
+    # Hóa đơn số tiền âm có "adjusts_invoice_no" (trích từ ProcessInvNote ở
+    # _invoice.py) là số hóa đơn GỐC bị điều chỉnh/thay thế. Tra trong CHÍNH danh
+    # sách hóa đơn vừa lấy được (cùng đợt/khoảng ngày) - nếu thấy, ghi chú vào cột
+    # Note của DÒNG HÓA ĐƠN GỐC (không phải dòng điều chỉnh/thay thế), phân biệt 2 loại:
+    #   - "dieu_chinh" (điều chỉnh giảm, thường là hoàn tiền): tiền hóa đơn gốc
+    #     không còn giá trị thật -> frontend sẽ xóa trắng 7 cột tiền/ref của dòng gốc.
+    #   - "thay_the" (thay thế, VD đổi cá nhân sang công ty): tiền hóa đơn gốc vẫn
+    #     là tiền thật -> giữ nguyên 7 cột, chỉ thêm ghi chú.
     invoice_by_no = {inv.get("invoice_no", ""): inv for inv in result if inv.get("invoice_no")}
     for inv in result:
         adjusts_no = inv.get("adjusts_invoice_no", "")
         if not adjusts_no:
             continue
         original = invoice_by_no.get(adjusts_no)
-        if original is not None:
-            original["note"] = f"KH hoàn tiền, HĐ điều chỉnh {inv.get('invoice_no', '')}"
+        if original is None:
+            continue
+        adj_type = inv.get("adjustment_type", "")
+        inv_no = inv.get("invoice_no", "")
+        if adj_type == "thay_the":
+            original["note"] = f"KH đổi sang cty, HĐ thay thế {inv_no}"
+            original["note_type"] = "thay_the"
+        else:
+            # Mặc định coi là điều chỉnh giảm (giữ hành vi cũ) nếu ProcessInvNote
+            # không khớp mẫu "Thay thế..." đã biết.
+            original["note"] = f"KH hoàn tiền, HĐ điều chỉnh {inv_no}"
+            original["note_type"] = "dieu_chinh"
 
     # Phân loại hàng hóa: mỗi item.id là 1 khóa học/kỳ hạn khác nhau. Một số khóa
     # học có nhiều kỳ hạn con (VD "... - 3 tháng", "... - 6 tháng", "... - 12 tháng")
