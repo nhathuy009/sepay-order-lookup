@@ -3581,7 +3581,7 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = "flex: 1 1 380px; min-width: 300px;";
+  wrap.style.cssText = "flex: 3 1 560px; min-width: 480px;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
@@ -3685,10 +3685,12 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
 
   // Một số mã ref thực chất là CÙNG 1 NGƯỜI, chỉ khác mã do đổi username/mã KH
   // theo thời gian - gộp về đúng 1 tên chuẩn duy nhất trước khi tính tổng.
+  // Key của map này PHẢI viết thường (chữ thường) vì bước chuẩn hóa bên dưới
+  // luôn so khớp theo dạng chữ thường, không phân biệt hoa/thường.
   const REF_ALIAS_MAP = {
-    "SA0005": "phk",
-    "SA0003": "cqm",
-    "SA0009": "bigman",
+    "sa0005": "phk",
+    "sa0003": "cqm",
+    "sa0009": "bigman",
   };
 
   // refMap: { [mã ref đã chuẩn hóa]: { total: number, byCourse: { [tên khóa học]: number } } }
@@ -3698,20 +3700,24 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
       if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - đã loại khỏi tổng tiền, ref cũng loại theo
       const rawRef = (inv.ref_username || "").trim();
       if (!rawRef) return;
-      const ref = REF_ALIAS_MAP[rawRef] || rawRef;
+      // Không phân biệt hoa/thường: "phk", "PHK", "Phk" đều gộp về cùng 1 dòng.
+      const normalizedRef = rawRef.toLowerCase();
+      const ref = REF_ALIAS_MAP[normalizedRef] || normalizedRef;
       const amount = Number(inv.hoahong) || 0;
       if (!refMap[ref]) refMap[ref] = { total: 0, byCourse: {} };
       refMap[ref].total += amount;
       refMap[ref].byCourse[course.title] = (refMap[ref].byCourse[course.title] || 0) + amount;
     });
   });
-  // Bỏ qua mã ref có tổng tiền REF bằng 0 (VD hoa hồng 0% hoặc dữ liệu rỗng) - không cần liệt kê.
+  // Bỏ qua mã ref có tổng tiền REF bằng 0 (VD hoa hồng 0% hoặc dữ liệu rỗng).
+  // Dùng Math.round thay vì so sánh !== 0 trực tiếp - phép cộng/trừ số thực có
+  // thể để lại sai số cực nhỏ (VD 0.0000000001) khiến tổng không đúng bằng 0 tuyệt đối.
   const refEntries = Object.entries(refMap)
-    .filter(([, data]) => data.total !== 0)
+    .filter(([, data]) => Math.round(data.total) !== 0)
     .sort((a, b) => b[1].total - a[1].total);
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = "flex: 1 1 380px; min-width: 300px;";
+  wrap.style.cssText = "flex: 1 1 300px; max-width: 400px; min-width: 280px;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
