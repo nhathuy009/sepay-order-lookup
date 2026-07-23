@@ -277,6 +277,23 @@
   .menu-icon { font-size: 15px; flex-shrink: 0; }
   .menu-text { transition: opacity 0.2s ease; }
 
+  /* TAB CHUYỂN ĐỔI GIỮA CÁC BẢNG KHÓA HỌC (tra cứu hóa đơn theo khoảng ngày) */
+  .course-tab-bar {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+  }
+  .course-tab {
+    padding: 8px 16px; border-radius: 999px; border: 1px solid var(--input-border);
+    background: var(--input-bg); color: var(--text-muted);
+    font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .course-tab:hover { background: var(--border); color: var(--text-main); }
+  .course-tab.active {
+    background: var(--btn-orange); color: var(--btn-orange-text);
+    border-color: var(--btn-orange); font-weight: 800;
+  }
+  .course-tab .count { opacity: 0.75; margin-left: 4px; }
+
   /* SWITCH TOGGLE GIAO DIỆN */
   .settings-panel {
     padding: 12px 18px; margin: 4px 14px 0;
@@ -3430,7 +3447,7 @@ async function doInvoiceLookupByDate() {
     }
 
     const courses = data.courses || [];
-    courses.forEach((course, courseIdx) => renderInvoiceByDateCourseTable(course, courseIdx));
+    renderInvoiceByDateTabs(courses);
 
     const total = data.total || 0;
     progress.innerHTML = total
@@ -3442,24 +3459,58 @@ async function doInvoiceLookupByDate() {
   btn.disabled = false;
 }
 
+// Dựng tab-bar + các bảng khóa học (mỗi khóa học 1 bảng, ẩn/hiện qua lại bằng tab
+// thay vì xếp chồng dài từ trên xuống). Mỗi bảng vẫn dùng chung 13 cột đã thống nhất
+// và có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
+function renderInvoiceByDateTabs(courses) {
+  const container = document.getElementById("invoiceByDateResultsContainer");
+  container.innerHTML = "";
+  if (courses.length === 0) return;
+
+  const tabBar = document.createElement("div");
+  tabBar.className = "course-tab-bar";
+  courses.forEach((course, idx) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "course-tab" + (idx === 0 ? " active" : "");
+    tab.id = `courseTab_${idx}`;
+    tab.innerHTML = `${escapeHtml(course.title)} <span class="count">(${(course.invoices || []).length})</span>`;
+    tab.onclick = () => switchInvoiceCourseTab(idx, courses.length);
+    tabBar.appendChild(tab);
+  });
+  container.appendChild(tabBar);
+
+  courses.forEach((course, idx) => {
+    const panel = document.createElement("div");
+    panel.id = `coursePanel_${idx}`;
+    panel.style.display = idx === 0 ? "block" : "none";
+    renderInvoiceByDateCourseTable(course, idx, panel);
+    container.appendChild(panel);
+  });
+}
+
+function switchInvoiceCourseTab(activeIdx, total) {
+  for (let i = 0; i < total; i++) {
+    const tab = document.getElementById(`courseTab_${i}`);
+    const panel = document.getElementById(`coursePanel_${i}`);
+    if (tab) tab.classList.toggle("active", i === activeIdx);
+    if (panel) panel.style.display = i === activeIdx ? "block" : "none";
+  }
+}
+
 // Dựng 1 bảng riêng cho 1 khóa học (item.id), dùng chung 13 cột đã thống nhất.
 // Mỗi bảng có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
-function renderInvoiceByDateCourseTable(course, courseIdx) {
-  const container = document.getElementById("invoiceByDateResultsContainer");
+function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
   const invoices = course.invoices || [];
   const tableId = `invoiceByDateTable_${courseIdx}`;
   const btnId = `copyInvoiceByDateBtn_${courseIdx}`;
 
-  const wrap = document.createElement("div");
-  wrap.style.marginBottom = "24px";
-
   const headerRow = document.createElement("div");
-  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
+  headerRow.style.cssText = "display:flex; justify-content:flex-end; align-items:center; margin-bottom:10px;";
   headerRow.innerHTML = `
-    <h3 style="margin:0; font-size:14px;">${escapeHtml(course.title)} <span style="color:var(--text-muted); font-weight:600;">(${invoices.length})</span></h3>
     <button id="${btnId}" class="btn-outline" onclick="copyTableToClipboard('${tableId}', '${btnId}')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
-  wrap.appendChild(headerRow);
+  panel.appendChild(headerRow);
 
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
@@ -3503,8 +3554,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx) {
   });
 
   tableResponsive.appendChild(table);
-  wrap.appendChild(tableResponsive);
-  container.appendChild(wrap);
+  panel.appendChild(tableResponsive);
 }
 
 // TRA CỨU HÓA ĐƠN ĐIỆN TỬ (GDT) - đăng nhập bằng MST/mật khẩu + khoảng ngày
