@@ -151,6 +151,19 @@ def handle_invoice_by_date(body):
             inv["item_id"] = match.get("item_id", "")
             inv["item_title"] = match.get("item_title", "")
 
+    # Hóa đơn điều chỉnh giảm (số tiền âm) có "adjusts_invoice_no" (trích từ
+    # ProcessInvNote ở _invoice.py) là số hóa đơn GỐC bị điều chỉnh. Tra trong
+    # CHÍNH danh sách hóa đơn vừa lấy được (cùng đợt/khoảng ngày) - nếu thấy,
+    # ghi chú vào cột Note của DÒNG HÓA ĐƠN GỐC (không phải dòng điều chỉnh).
+    invoice_by_no = {inv.get("invoice_no", ""): inv for inv in result if inv.get("invoice_no")}
+    for inv in result:
+        adjusts_no = inv.get("adjusts_invoice_no", "")
+        if not adjusts_no:
+            continue
+        original = invoice_by_no.get(adjusts_no)
+        if original is not None:
+            original["note"] = f"KH hoàn tiền, HĐ điều chỉnh {inv.get('invoice_no', '')}"
+
     # Phân loại hàng hóa: mỗi item.id là 1 khóa học/kỳ hạn khác nhau. Một số khóa
     # học có nhiều kỳ hạn con (VD "... - 3 tháng", "... - 6 tháng", "... - 12 tháng")
     # nhưng vẫn nên gộp chung 1 bảng/1 tab - nên gộp nhóm theo TÊN ĐÃ CHUẨN HÓA
@@ -163,6 +176,13 @@ def handle_invoice_by_date(body):
         if group_key not in courses:
             courses[group_key] = {"title": group_key, "invoices": []}
         courses[group_key]["invoices"].append(inv)
+
+    # SePay eInvoice trả về mặc định mới nhất trước - đổi lại thành cũ -> mới
+    # theo "arising_date" (định dạng "YYYY-MM-DD" nên so sánh chuỗi trực tiếp
+    # là đủ, không cần parse ngày). Hóa đơn thiếu ngày (hiếm khi xảy ra) đẩy
+    # xuống cuối bảng thay vì lên đầu.
+    for group in courses.values():
+        group["invoices"].sort(key=lambda inv: inv.get("arising_date") or "9999-99-99")
 
     return 200, {"courses": list(courses.values()), "total": len(result)}
 
