@@ -132,6 +132,10 @@ def handle_invoice_by_date(body):
             match = order_map.get(inv.get("invoice_no", ""), {})
             inv["order_code"] = match.get("order_code", "")
             inv["order_system"] = match.get("system", "")
+            inv["lead_name"] = match.get("lead_name", "")
+            inv["ref_username"] = match.get("ref_username", "")
+            inv["commission_rate"] = match.get("commission_rate", "")
+            inv["hoahong"] = match.get("hoahong", "")
 
     return 200, {"invoices": result, "total": len(result)}
 
