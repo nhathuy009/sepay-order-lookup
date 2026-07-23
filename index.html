@@ -3559,6 +3559,29 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
     tbody.appendChild(tr);
   });
 
+  // Dòng tổng cộng đặt trong <tfoot> (KHÔNG phải <tbody>) - vì copyTableToClipboard()
+  // chỉ đọc dữ liệu trong <tbody>, nên đặt ở đây là cách tự nhiên nhất để nút copy
+  // không vô tình copy luôn dòng tổng này.
+  let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
+  invoices.forEach((inv) => {
+    sumAmount += Number(inv.amount_before_tax) || 0;
+    sumVat += Number(inv.vat_amount) || 0;
+    sumTotal += Number(inv.total_amount) || 0;
+    sumRef += Number(inv.hoahong) || 0;
+  });
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = `
+    <tr style="font-weight:700; background:var(--total-row-bg);">
+      <td colspan="4" style="text-align:right;">Tổng cộng</td>
+      <td>${amountFmt(sumAmount)}</td>
+      <td>${amountFmt(sumVat)}</td>
+      <td>${amountFmt(sumTotal)}</td>
+      <td colspan="3"></td>
+      <td>${amountFmt(sumRef)}</td>
+      <td colspan="3"></td>
+    </tr>`;
+  table.appendChild(tfoot);
+
   tableResponsive.appendChild(table);
   panel.appendChild(tableResponsive);
 }
