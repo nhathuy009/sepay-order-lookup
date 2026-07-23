@@ -258,6 +258,117 @@ class SepayClient:
         """Tra cứu 1 đơn, tự đăng nhập và refresh token khi cần (thread-safe)."""
         return self._run_with_relogin(self._build_details, order_code)
 
+    def _fetch_all_orders(self, page_limit=1000, date_from=None, date_to=None, status=None):
+        """Tải toàn bộ đơn hàng của hệ thống (phân trang), dùng cho tra ngược hàng loạt.
+
+        date_from, date_to: chuỗi "YYYY-MM-DD" (khớp tham số dateFrom/dateTo của
+        API admin/orders). Nếu truyền vào, server tự lọc theo khoảng ngày - giảm
+        hẳn dữ liệu phải tải, thay vì lấy toàn bộ lịch sử đơn hàng.
+        status: bộ lọc trạng thái đơn hàng (VD "new"), tùy chọn - CHƯA xác nhận
+        cùng tên/giá trị giữa 10X và Solobiz, nên mặc định để trống (không lọc)
+        trừ khi bạn đã kiểm tra kỹ giá trị phù hợp cho từng hệ thống.
+
+        KHÁC với _fetch_orders (search theo 'q', chỉ trả 1 đơn) - hàm này lấy hết
+        (trong khoảng ngày, nếu có) để dựng map tra cứu 1 lần cho nhiều số hóa đơn.
+        Trả về: list[dict] đơn hàng, hoặc UNAUTHORIZED, hoặc None nếu lỗi kết nối.
+        """
+        base_url = self.config["orders_url"].split("?")[0]
+        headers = {"Authorization": self.token or "", "Origin": self.config["origin_orders"]}
+        all_data = []
+        page = 1
+        while True:
+            params = {"page": page, "limit": page_limit}
+            if date_from:
+                params["dateFrom"] = date_from
+            if date_to:
+                params["dateTo"] = date_to
+            if status:
+                params["status"] = status
+            try:
+                resp = self.session.get(
+                    base_url, params=params,
+                    headers=headers, timeout=REQUEST_TIMEOUT,
+                )
+            except requests.exceptions.RequestException:
+                return None
+            if resp.status_code in (401, 403):
+                return UNAUTHORIZED
+            if resp.status_code != 200:
+                return None
+
+            payload = resp.json()
+            page_data = payload.get("data", [])
+            all_data.extend(page_data)
+            total = payload.get("total", len(page_data))
+            if not page_data or page * page_limit >= total:
+                break
+            page += 1
+        return all_data
+
+    def _build_batch_reverse(self, invoice_numbers, date_from=None, date_to=None, status=None):
+        """Fetch đơn hàng trong khoảng ngày (nếu có) ĐÚNG 1 LẦN, dựng map
+        invoice_number -> order, rồi tra cứu ngược cho cả danh sách số hóa đơn.
+        """
+        all_orders = self._fetch_all_orders(date_from=date_from, date_to=date_to, status=status)
+        if all_orders is None:
+            return None
+        if all_orders == UNAUTHORIZED:
+            return UNAUTHORIZED
+
+        index = {}
+        for order in all_orders:
+            einvoice = order.get("einvoice") or {}
+            inv_no = str(einvoice.get("invoice_number", "")).strip()
+            if inv_no:
+                index[inv_no] = order
+
+        results = {}
+        for inv_no in invoice_numbers:
+            key = str(inv_no).strip()
+            details = empty_details()
+            order = index.get(key)
+            if order is None:
+                details["order_code"] = ""
+                details["status_msg"] = "Không tìm thấy đơn hàng khớp số hóa đơn này"
+            else:
+                lead = order.get("lead") or {}
+                details["order_code"] = order.get("code", "")
+                details["lead_email"] = lead.get("email", "")
+                details["lead_phone"] = lead.get("phone", "")
+                details["lead_cccd"] = lead.get("cccd", "")
+                details["orders_amount"] = order.get("amount", "")
+                einvoice = order.get("einvoice") or {}
+                details["einvoice_created_at"] = einvoice.get("created_at", "")
+                details["invoice_number"] = einvoice.get("invoice_number", "")
+                details["status_msg"] = "Thành công"
+            results[inv_no] = details
+        return results
+
+    def reverse_lookup_batch(self, invoice_numbers, date_from=None, date_to=None, status=None):
+        """Tra ngược hàng loạt số hóa đơn -> mã đơn hàng, tự đăng nhập/refresh token (thread-safe).
+
+        invoice_numbers: list[str]. date_from/date_to: "YYYY-MM-DD" (tùy chọn) để
+        giới hạn phạm vi fetch đơn hàng, giảm dữ liệu tải về. status: bộ lọc
+        trạng thái đơn hàng (tùy chọn, xem docstring _fetch_all_orders).
+        Trả về dict {invoice_number: details} nếu thành công, hoặc None nếu lỗi
+        kết nối/không đăng nhập được (khác None nghĩa là đã có kết quả, kể cả khi
+        từng số không tìm thấy đơn khớp).
+        """
+        with self._lock:
+            if not self.token and not self.login():
+                return None
+
+        result = self._build_batch_reverse(invoice_numbers, date_from=date_from, date_to=date_to, status=status)
+        if result == UNAUTHORIZED:
+            with self._lock:
+                relogged = self.login()
+            if not relogged:
+                return None
+            result = self._build_batch_reverse(invoice_numbers, date_from=date_from, date_to=date_to, status=status)
+        if result == UNAUTHORIZED or result is None:
+            return None
+        return result
+
     def _build_user_details(self, code):
         """Tra cứu trực tiếp theo mã KH (SA...) qua API Users, không qua Orders."""
         details = empty_details()
@@ -323,6 +434,55 @@ def lookup_order(order_code):
     result["order_code"] = order_code
     result["system"] = system_name
     return result
+
+
+def reverse_lookup_orders_by_invoices(invoice_numbers, date_from=None, date_to=None, status=None):
+    """Điểm vào chính: nhận danh sách số hóa đơn -> dict tra ngược mã đơn hàng.
+
+    Dùng khi cần tra nhiều số hóa đơn cùng lúc (VD 100-300 số theo 1 khoảng ngày).
+    Mỗi hệ thống (10X, Solobiz) chỉ fetch đơn hàng ĐÚNG 1 LẦN rồi tra map ngược
+    cho tất cả số hóa đơn trong danh sách - không lặp gọi API theo từng số.
+
+    invoice_numbers: list[str] các số hóa đơn cần tra.
+    date_from, date_to: "YYYY-MM-DD" (khuyến nghị luôn truyền vào) - giới hạn
+    server chỉ trả đơn hàng trong khoảng ngày này, nhẹ hơn hẳn so với fetch toàn
+    bộ lịch sử. Nên bao trùm rộng hơn khoảng ngày lập hóa đơn 1-2 ngày để tránh
+    lệch múi giờ/ngày ghi nhận giữa 2 hệ thống.
+    status: bộ lọc trạng thái đơn hàng (VD "new"), tùy chọn - CHƯA xác nhận cùng
+    tên/giá trị giữa 10X và Solobiz nên để mặc định None (không lọc) trừ khi đã
+    kiểm tra kỹ, tránh vô tình loại bỏ đơn hợp lệ có trạng thái khác.
+    Trả về: dict { invoice_number: {..."order_code", "system", "status_msg"...} }
+    """
+    invoice_numbers = [str(n).strip() for n in (invoice_numbers or []) if str(n).strip()]
+    if not invoice_numbers:
+        return {}
+
+    remaining = set(invoice_numbers)
+    final = {}
+
+    for system_name in ("10X", "SOLOBIZ"):
+        if not remaining:
+            break
+        batch_result = get_client(system_name).reverse_lookup_batch(
+            list(remaining), date_from=date_from, date_to=date_to, status=status
+        )
+        if not isinstance(batch_result, dict):
+            # Lỗi kết nối/đăng nhập ở hệ thống này - bỏ qua, vẫn thử hệ thống còn lại
+            continue
+        for inv_no, details in batch_result.items():
+            if inv_no in remaining and details.get("status_msg") == "Thành công":
+                details["system"] = system_name
+                final[inv_no] = details
+                remaining.discard(inv_no)
+
+    for inv_no in remaining:
+        d = empty_details()
+        d["order_code"] = ""
+        d["system"] = ""
+        d["status_msg"] = "Không tìm thấy đơn hàng khớp số hóa đơn này ở cả 2 hệ thống (10X & Solobiz)"
+        final[inv_no] = d
+
+    return final
 
 
 def lookup_customer(code, sa_system=None):
