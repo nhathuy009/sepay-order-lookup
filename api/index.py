@@ -17,6 +17,7 @@ from _core import (  # noqa: E402
     lookup_customer,
     check_access,
     detect_system,
+    reverse_lookup_orders_by_invoices,
     APP_ACCESS_TOKEN,
     EXCEL_HEADERS,
     EXCEL_FIELDS,
@@ -97,6 +98,16 @@ def handle_invoice(body):
         return 400, {"error": "Thiếu số hóa đơn"}
     return 200, lookup_invoice(code)
 
+def _dmy_to_iso_date(d):
+    """Đổi 'DD/MM/YYYY' (định dạng flatpickr đang dùng ở frontend) sang 'YYYY-MM-DD'
+    (định dạng dateFrom/dateTo mà API admin/orders của 10X & Solobiz yêu cầu)."""
+    d = (d or "").strip()
+    parts = d.split("/")
+    if len(parts) == 3:
+        dd, mm, yyyy = parts
+        return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}"
+    return d
+
 def handle_invoice_by_date(body):
     start_date = (body.get("start_date") or "").strip()
     end_date = (body.get("end_date") or "").strip()
@@ -108,6 +119,19 @@ def handle_invoice_by_date(body):
     result = fetch_invoices_by_date(start_date, end_date, invoice_kind)
     if result is None:
         return 400, {"error": "Không lấy được dữ liệu hóa đơn (lỗi đăng nhập hoặc kết nối tới hệ thống hóa đơn)."}
+
+    # Tra ngược mã đơn hàng (10X/Solobiz) cho từng số hóa đơn vừa lấy được từ SePay eInvoice.
+    invoice_numbers = [inv.get("invoice_no", "") for inv in result if inv.get("invoice_no")]
+    if invoice_numbers:
+        order_map = reverse_lookup_orders_by_invoices(
+            invoice_numbers,
+            date_from=_dmy_to_iso_date(start_date),
+            date_to=_dmy_to_iso_date(end_date),
+        )
+        for inv in result:
+            match = order_map.get(inv.get("invoice_no", ""), {})
+            inv["order_code"] = match.get("order_code", "")
+            inv["order_system"] = match.get("system", "")
 
     return 200, {"invoices": result, "total": len(result)}
 
