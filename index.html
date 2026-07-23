@@ -1068,19 +1068,19 @@
             <table class="bulk-table" id="invoiceByDateTable">
               <thead>
                 <tr>
-                  <th>Mã đơn hàng</th>
-                  <th>Trạng thái</th>
-                  <th>Số hóa đơn</th>
-                  <th>Mẫu số &amp; Ký hiệu</th>
-                  <th>Ngày lập</th>
-                  <th>Khách hàng</th>
-                  <th>Số CCCD</th>
-                  <th>Địa chỉ</th>
-                  <th>Tiền hàng</th>
-                  <th>Tiền thuế</th>
+                  <th>STT</th>
+                  <th>Mã ĐH</th>
+                  <th>Họ và Tên</th>
+                  <th>Số tiền</th>
+                  <th>VAT (8%)</th>
                   <th>Tổng tiền</th>
-                  <th>Hình thức TT</th>
-                  <th>Loại hóa đơn</th>
+                  <th>Mã ref</th>
+                  <th>Tên ref</th>
+                  <th>% Ref</th>
+                  <th>Số tiền REF</th>
+                  <th>Số HĐ</th>
+                  <th>Note</th>
+                  <th>Ngày GD</th>
                 </tr>
               </thead>
               <tbody id="invoiceByDateTbody"></tbody>
@@ -3460,29 +3460,28 @@ async function doInvoiceLookupByDate() {
     const invoices = data.invoices || [];
     const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
 
-    invoices.forEach((inv) => {
-      const ok = inv.status_msg === "Thành công";
-      const badgeHTML = ok
-        ? `<span class="badge ok">${escapeHtml(inv.status_msg)}</span>`
-        : `<span class="badge err">${escapeHtml(inv.status_msg || 'Thất bại')}</span>`;
+    invoices.forEach((inv, idx) => {
       const orderCodeHTML = inv.order_code
-        ? `${escapeHtml(inv.order_code)} <span style="color:var(--text-muted); font-size:12px;">(${escapeHtml(inv.order_system || '')})</span>`
-        : `<span class="err">Không tìm thấy</span>`;
+        ? escapeHtml(inv.order_code)
+        : `<span style="color:var(--text-muted);">—</span>`;
+      const refRateHTML = (inv.commission_rate === "" || inv.commission_rate === null || inv.commission_rate === undefined)
+        ? ""
+        : `${escapeHtml(inv.commission_rate)}%`;
       const tr = document.createElement("tr");
       tr.innerHTML = `
+        <td>${idx + 1}</td>
         <td>${orderCodeHTML}</td>
-        <td>${badgeHTML}</td>
-        <td>${escapeHtml(inv.invoice_no)}</td>
-        <td>${escapeHtml(inv.pattern_serial)}</td>
-        <td>${escapeHtml(inv.arising_date)}</td>
-        <td>${escapeHtml(inv.customer_name)}</td>
-        <td>${escapeHtml(inv.customer_id)}</td>
-        <td>${escapeHtml(inv.customer_address)}</td>
+        <td>${escapeHtml(inv.lead_name)}</td>
         <td>${amountFmt(inv.amount_before_tax)}</td>
         <td>${amountFmt(inv.vat_amount)}</td>
         <td>${amountFmt(inv.total_amount)}</td>
-        <td>${escapeHtml(inv.payment_method)}</td>
-        <td>${escapeHtml(inv.invoice_type)}</td>`;
+        <td>${escapeHtml(inv.ref_username)}</td>
+        <td></td>
+        <td>${refRateHTML}</td>
+        <td>${amountFmt(inv.hoahong)}</td>
+        <td>${escapeHtml(inv.invoice_no)}</td>
+        <td></td>
+        <td>${escapeHtml(inv.arising_date)}</td>`;
       tbody.appendChild(tr);
     });
 
