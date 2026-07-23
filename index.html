@@ -1035,6 +1035,57 @@
             </table>
           </div>
         </div>
+        <div class="card" style="margin-top: 20px;">
+          <h3 style="margin: 0 0 14px 0;">Tra cứu theo khoảng ngày (lấy toàn bộ hóa đơn)</h3>
+          <div class="row" style="align-items: flex-end;">
+            <div style="flex: 1; min-width: 120px;">
+              <label>Từ ngày</label>
+              <input type="text" id="invDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            </div>
+            <div style="flex: 1; min-width: 120px;">
+              <label>Đến ngày</label>
+              <input type="text" id="invDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+              <label>Loại hóa đơn</label>
+              <select id="invInvoiceKind" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
+                <option value="2" selected>Chỉ hóa đơn gốc</option>
+                <option value="-1">Tất cả (gồm điều chỉnh/thay thế)</option>
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 140px;">
+              <label>&nbsp;</label>
+              <button id="invByDateBtn" onclick="doInvoiceLookupByDate()" style="width: 100%;">Lấy toàn bộ hóa đơn</button>
+            </div>
+          </div>
+        </div>
+        <div id="invoiceByDateResultArea" style="margin-top: 16px;">
+          <div class="msg" id="invoiceByDateProgress" style="display:none; margin-bottom: 12px;"></div>
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+            <button id="copyInvoiceByDateBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceByDateTable', 'copyInvoiceByDateBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
+          </div>
+          <div class="table-responsive" style="display:none;" id="invoiceByDateTableWrap">
+            <table class="bulk-table" id="invoiceByDateTable">
+              <thead>
+                <tr>
+                  <th>Trạng thái</th>
+                  <th>Số hóa đơn</th>
+                  <th>Mẫu số &amp; Ký hiệu</th>
+                  <th>Ngày lập</th>
+                  <th>Khách hàng</th>
+                  <th>Số CCCD</th>
+                  <th>Địa chỉ</th>
+                  <th>Tiền hàng</th>
+                  <th>Tiền thuế</th>
+                  <th>Tổng tiền</th>
+                  <th>Hình thức TT</th>
+                  <th>Loại hóa đơn</th>
+                </tr>
+              </thead>
+              <tbody id="invoiceByDateTbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
       <div id="tabGdt" class="hidden">
         <h2 style="margin:0 0 16px 0">Tra cứu Hóa đơn điện tử (Tổng cục Thuế)</h2>
@@ -1457,6 +1508,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const elGdtTo = document.getElementById('gdtDateTo');
   if (elGdtFrom && typeof flatpickr !== 'undefined') flatpickr(elGdtFrom, dateConfig);
   if (elGdtTo && typeof flatpickr !== 'undefined') flatpickr(elGdtTo, dateConfig);
+
+  const elInvFrom = document.getElementById('invDateFrom');
+  const elInvTo = document.getElementById('invDateTo');
+  if (elInvFrom && typeof flatpickr !== 'undefined') flatpickr(elInvFrom, dateConfig);
+  if (elInvTo && typeof flatpickr !== 'undefined') flatpickr(elInvTo, dateConfig);
   
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
@@ -3354,6 +3410,86 @@ async function doInvoiceLookup() {
     tbody.appendChild(tr);
   }
   progress.innerHTML = `🎉 Hoàn tất! Thành công <strong style="color:var(--badge-ok-text)">${successCount}/${codes.length}</strong> hóa đơn.`; copyBtn.style.display = "inline-flex"; btn.disabled = false;
+}
+
+// TRA CỨU HÓA ĐƠN THEO KHOẢNG NGÀY (SePay eInvoice) - lấy toàn bộ hóa đơn 1 lần,
+// không cần nhập từng số hóa đơn như doInvoiceLookup() ở trên.
+async function doInvoiceLookupByDate() {
+  const dateFrom = document.getElementById("invDateFrom").value.trim();
+  const dateTo = document.getElementById("invDateTo").value.trim();
+  const invoiceKind = document.getElementById("invInvoiceKind").value;
+  const btn = document.getElementById("invByDateBtn");
+  const progress = document.getElementById("invoiceByDateProgress");
+  const tableWrap = document.getElementById("invoiceByDateTableWrap");
+  const copyBtn = document.getElementById("copyInvoiceByDateBtn");
+  const tbody = document.getElementById("invoiceByDateTbody");
+
+  if (!dateFrom || !dateTo) {
+    progress.style.display = 'block';
+    progress.innerHTML = '<span class="err">Vui lòng chọn Từ ngày và Đến ngày.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  progress.style.display = 'block';
+  progress.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải toàn bộ hóa đơn...';
+  tableWrap.style.display = 'none';
+  copyBtn.style.display = 'none';
+  tbody.innerHTML = '';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "invoice_by_date",
+        start_date: dateFrom,
+        end_date: dateTo,
+        invoice_kind: invoiceKind,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      progress.innerHTML = `<span class="err">${escapeHtml(data.error || "Lỗi server")}</span>`;
+      btn.disabled = false;
+      return;
+    }
+
+    const invoices = data.invoices || [];
+    const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+
+    invoices.forEach((inv) => {
+      const ok = inv.status_msg === "Thành công";
+      const badgeHTML = ok
+        ? `<span class="badge ok">${escapeHtml(inv.status_msg)}</span>`
+        : `<span class="badge err">${escapeHtml(inv.status_msg || 'Thất bại')}</span>`;
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${badgeHTML}</td>
+        <td>${escapeHtml(inv.invoice_no)}</td>
+        <td>${escapeHtml(inv.pattern_serial)}</td>
+        <td>${escapeHtml(inv.arising_date)}</td>
+        <td>${escapeHtml(inv.customer_name)}</td>
+        <td>${escapeHtml(inv.customer_id)}</td>
+        <td>${escapeHtml(inv.customer_address)}</td>
+        <td>${amountFmt(inv.amount_before_tax)}</td>
+        <td>${amountFmt(inv.vat_amount)}</td>
+        <td>${amountFmt(inv.total_amount)}</td>
+        <td>${escapeHtml(inv.payment_method)}</td>
+        <td>${escapeHtml(inv.invoice_type)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    tableWrap.style.display = invoices.length ? 'block' : 'none';
+    copyBtn.style.display = invoices.length ? 'inline-flex' : 'none';
+    progress.innerHTML = invoices.length
+      ? `🎉 Hoàn tất! Tìm thấy <strong style="color:var(--badge-ok-text)">${invoices.length}</strong> hóa đơn.`
+      : 'Không tìm thấy hóa đơn nào trong khoảng ngày này.';
+  } catch (e) {
+    progress.innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`;
+  }
+  btn.disabled = false;
 }
 
 // TRA CỨU HÓA ĐƠN ĐIỆN TỬ (GDT) - đăng nhập bằng MST/mật khẩu + khoảng ngày
