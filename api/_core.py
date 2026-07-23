@@ -332,6 +332,7 @@ class SepayClient:
                 details["status_msg"] = "Không tìm thấy đơn hàng khớp số hóa đơn này"
             else:
                 lead = order.get("lead") or {}
+                item = order.get("item") or {}
                 details["order_code"] = order.get("code", "")
                 details["lead_email"] = lead.get("email", "")
                 details["lead_phone"] = lead.get("phone", "")
@@ -341,6 +342,8 @@ class SepayClient:
                 details["ref_username"] = order.get("ref_username", "")
                 details["commission_rate"] = order.get("commissionRate", "")
                 details["hoahong"] = order.get("hoahong", "")
+                details["item_id"] = item.get("id", "")
+                details["item_title"] = item.get("title", "")
                 einvoice = order.get("einvoice") or {}
                 details["einvoice_created_at"] = einvoice.get("created_at", "")
                 details["invoice_number"] = einvoice.get("invoice_number", "")
