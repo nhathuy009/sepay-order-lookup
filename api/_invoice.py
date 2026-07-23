@@ -246,6 +246,105 @@ class InvoiceClient:
         details["status_msg"] = "Thành công"
         return details
 
+    def _parse_invoice(self, inv):
+        """Chuẩn hoá 1 bản ghi hóa đơn thô từ API thành dict theo FIELD_ORDER."""
+        details = empty_details()
+        arising = inv.get("ArisingDate", "") or ""
+        details["pattern_serial"] = inv.get("PatternSerial", "")
+        details["arising_date"] = arising[:10]
+        details["customer_name"] = inv.get("CusName", "")
+        details["customer_id"] = inv.get("CMND", "")
+        details["customer_address"] = inv.get("CusAddress", "")
+        details["amount_before_tax"] = inv.get("Total", "")
+        details["vat_amount"] = inv.get("VATAmount", "")
+        details["total_amount"] = inv.get("Amount", "")
+        details["payment_method"] = inv.get("PaymentMethod", "")
+        details["invoice_type"] = inv.get("LoaiHoaDon") or "Hóa đơn thông thường"
+        details["status_msg"] = "Thành công"
+        details["invoice_no"] = str(inv.get("No", "")).split(".")[0]
+        return details
+
+    def _fetch_batch(self, from_date, to_date, invoice_kind="2"):
+        """Gọi API 1 lần, lấy toàn bộ hóa đơn trong khoảng ngày (không lọc theo invNo).
+
+        invoice_kind: mã lọc loại hóa đơn (tham số 'paymentMethod' trên API,
+        tên gọi gây hiểu nhầm nhưng thực chất đây là loại hóa đơn):
+          "-1" = tất cả (gốc + điều chỉnh + thay thế)
+          "2"  = chỉ hóa đơn gốc (mới), loại trừ điều chỉnh/thay thế
+          Các mã khác cần xác nhận thêm qua giao diện web trước khi dùng.
+        """
+        url = EINVOICE_BASE_URL + "/ajax/Envoice/method.aspx"
+        params = {
+            "r": "0." + str(int(datetime.now().timestamp() * 1000) % 10**8),
+            "type": "GetListInvoice",
+            "fromDate": from_date,
+            "toDate": to_date,
+            "pattern": "1",
+            "serial": EINVOICE_SERIAL,
+            "nameCus": "",
+            "invNo": "",
+            "typeInvoice": "-1",
+            "status": "-1",
+            "paymentMethod": invoice_kind,
+            "pageSizeSelect": "0",
+        }
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": EINVOICE_BASE_URL + "/Pages/IndexVatInvoice.aspx",
+        }
+        try:
+            resp = self.session.get(
+                url, params=params, headers=headers,
+                cookies=self.cookies, timeout=REQUEST_TIMEOUT,
+            )
+        except requests.exceptions.RequestException:
+            return None
+
+        if resp.status_code != 200:
+            return None
+        raw_text = resp.text.strip()
+        if not raw_text:
+            return None
+        if "<html" in raw_text.lower() or "login" in resp.url.lower():
+            return UNAUTHORIZED
+        if raw_text == "Không có dữ liệu":
+            return []
+        try:
+            return resp.json()
+        except ValueError:
+            return None
+
+    def fetch_all_invoices(self, from_date, to_date, invoice_kind="2"):
+        """Lấy toàn bộ hóa đơn trong khoảng ngày, tự re-login khi session hết hạn.
+
+        from_date, to_date: chuỗi định dạng "dd/MM/yyyy" (giống UI, VD "01/07/2026")
+        invoice_kind: "-1" tất cả | "2" chỉ hóa đơn gốc, xem docstring _fetch_batch
+        Trả về: list[dict] đã chuẩn hoá theo FIELD_ORDER (kèm invoice_no),
+                 [] nếu không có dữ liệu, hoặc None nếu lỗi kết nối/không đăng nhập được.
+        """
+        with self._lock:
+            if not self.cookies and not self.login():
+                self.last_error = self.last_error or "Không đăng nhập được"
+                return None
+
+        data = self._fetch_batch(from_date, to_date, invoice_kind)
+
+        if data == UNAUTHORIZED:
+            with self._lock:
+                relogged = self.login()
+            if not relogged:
+                return None
+            data = self._fetch_batch(from_date, to_date, invoice_kind)
+
+        if data == UNAUTHORIZED or data is None:
+            return None
+        if not data:
+            return []
+
+        return [self._parse_invoice(inv) for inv in data]
+
     def lookup(self, invoice_no):
         """Tra cứu 1 hóa đơn, tự đăng nhập và re-login khi cần (thread-safe)."""
         with self._lock:
@@ -295,3 +394,14 @@ def lookup_invoice(invoice_no):
     result = get_client().lookup(invoice_no)
     result["invoice_no"] = invoice_no
     return result
+
+
+def fetch_invoices_by_date(from_date, to_date, invoice_kind="2"):
+    """Điểm vào chính cho tra cứu hàng loạt theo khoảng ngày (1 request, không lặp invNo).
+
+    from_date, to_date: chuỗi "dd/MM/yyyy", VD "01/07/2026"
+    invoice_kind: "-1" tất cả | "2" chỉ hóa đơn gốc (mặc định)
+    Trả về: list[dict] hoặc [] (không có dữ liệu); None nghĩa là lỗi kết nối/đăng nhập,
+             kiểm tra get_client().last_error để biết chi tiết.
+    """
+    return get_client().fetch_all_invoices(from_date, to_date, invoice_kind)
