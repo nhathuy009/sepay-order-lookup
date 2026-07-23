@@ -3683,20 +3683,32 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
 function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
 
-  // refMap: { [mã ref]: { total: number, byCourse: { [tên khóa học]: number } } }
+  // Một số mã ref thực chất là CÙNG 1 NGƯỜI, chỉ khác mã do đổi username/mã KH
+  // theo thời gian - gộp về đúng 1 tên chuẩn duy nhất trước khi tính tổng.
+  const REF_ALIAS_MAP = {
+    "SA0005": "phk",
+    "SA0003": "cqm",
+    "SA0009": "bigman",
+  };
+
+  // refMap: { [mã ref đã chuẩn hóa]: { total: number, byCourse: { [tên khóa học]: number } } }
   const refMap = {};
   courses.forEach((course) => {
     (course.invoices || []).forEach((inv) => {
       if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - đã loại khỏi tổng tiền, ref cũng loại theo
-      const ref = (inv.ref_username || "").trim();
-      if (!ref) return;
+      const rawRef = (inv.ref_username || "").trim();
+      if (!rawRef) return;
+      const ref = REF_ALIAS_MAP[rawRef] || rawRef;
       const amount = Number(inv.hoahong) || 0;
       if (!refMap[ref]) refMap[ref] = { total: 0, byCourse: {} };
       refMap[ref].total += amount;
       refMap[ref].byCourse[course.title] = (refMap[ref].byCourse[course.title] || 0) + amount;
     });
   });
-  const refEntries = Object.entries(refMap).sort((a, b) => b[1].total - a[1].total);
+  // Bỏ qua mã ref có tổng tiền REF bằng 0 (VD hoa hồng 0% hoặc dữ liệu rỗng) - không cần liệt kê.
+  const refEntries = Object.entries(refMap)
+    .filter(([, data]) => data.total !== 0)
+    .sort((a, b) => b[1].total - a[1].total);
 
   const wrap = document.createElement("div");
   wrap.style.cssText = "flex: 1 1 380px; min-width: 300px;";
