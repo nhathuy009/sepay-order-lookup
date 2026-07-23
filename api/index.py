@@ -144,6 +144,7 @@ def handle_invoice_by_date(body):
             inv["order_code"] = match.get("order_code", "")
             inv["order_system"] = match.get("system", "")
             inv["lead_name"] = match.get("lead_name", "")
+            inv["username"] = match.get("username", "")
             inv["ref_username"] = match.get("ref_username", "")
             inv["commission_rate"] = match.get("commission_rate", "")
             inv["hoahong"] = match.get("hoahong", "")
