@@ -1061,31 +1061,7 @@
         </div>
         <div id="invoiceByDateResultArea" style="margin-top: 16px;">
           <div class="msg" id="invoiceByDateProgress" style="display:none; margin-bottom: 12px;"></div>
-          <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-            <button id="copyInvoiceByDateBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceByDateTable', 'copyInvoiceByDateBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
-          </div>
-          <div class="table-responsive" style="display:none;" id="invoiceByDateTableWrap">
-            <table class="bulk-table" id="invoiceByDateTable">
-              <thead>
-                <tr>
-                  <th>STT</th>
-                  <th>Mã ĐH</th>
-                  <th>Họ và Tên</th>
-                  <th>Số tiền</th>
-                  <th>VAT (8%)</th>
-                  <th>Tổng tiền</th>
-                  <th>Mã ref</th>
-                  <th>Tên ref</th>
-                  <th>% Ref</th>
-                  <th>Số tiền REF</th>
-                  <th>Số HĐ</th>
-                  <th>Note</th>
-                  <th>Ngày GD</th>
-                </tr>
-              </thead>
-              <tbody id="invoiceByDateTbody"></tbody>
-            </table>
-          </div>
+          <div id="invoiceByDateResultsContainer"></div>
         </div>
       </div>
       <div id="tabGdt" class="hidden">
@@ -3421,9 +3397,7 @@ async function doInvoiceLookupByDate() {
   const invoiceKind = document.getElementById("invInvoiceKind").value;
   const btn = document.getElementById("invByDateBtn");
   const progress = document.getElementById("invoiceByDateProgress");
-  const tableWrap = document.getElementById("invoiceByDateTableWrap");
-  const copyBtn = document.getElementById("copyInvoiceByDateBtn");
-  const tbody = document.getElementById("invoiceByDateTbody");
+  const resultsContainer = document.getElementById("invoiceByDateResultsContainer");
 
   if (!dateFrom || !dateTo) {
     progress.style.display = 'block';
@@ -3434,9 +3408,7 @@ async function doInvoiceLookupByDate() {
   btn.disabled = true;
   progress.style.display = 'block';
   progress.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải toàn bộ hóa đơn...';
-  tableWrap.style.display = 'none';
-  copyBtn.style.display = 'none';
-  tbody.innerHTML = '';
+  resultsContainer.innerHTML = '';
 
   try {
     const resp = await fetch("/api/index", {
@@ -3457,43 +3429,82 @@ async function doInvoiceLookupByDate() {
       return;
     }
 
-    const invoices = data.invoices || [];
-    const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+    const courses = data.courses || [];
+    courses.forEach((course, courseIdx) => renderInvoiceByDateCourseTable(course, courseIdx));
 
-    invoices.forEach((inv, idx) => {
-      const orderCodeHTML = inv.order_code
-        ? escapeHtml(inv.order_code)
-        : `<span style="color:var(--text-muted);">—</span>`;
-      const refRateHTML = (inv.commission_rate === "" || inv.commission_rate === null || inv.commission_rate === undefined)
-        ? ""
-        : `${escapeHtml(inv.commission_rate)}%`;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${idx + 1}</td>
-        <td>${orderCodeHTML}</td>
-        <td>${escapeHtml(inv.lead_name)}</td>
-        <td>${amountFmt(inv.amount_before_tax)}</td>
-        <td>${amountFmt(inv.vat_amount)}</td>
-        <td>${amountFmt(inv.total_amount)}</td>
-        <td>${escapeHtml(inv.ref_username)}</td>
-        <td></td>
-        <td>${refRateHTML}</td>
-        <td>${amountFmt(inv.hoahong)}</td>
-        <td>${escapeHtml(inv.invoice_no)}</td>
-        <td></td>
-        <td>${escapeHtml(inv.arising_date)}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    tableWrap.style.display = invoices.length ? 'block' : 'none';
-    copyBtn.style.display = invoices.length ? 'inline-flex' : 'none';
-    progress.innerHTML = invoices.length
-      ? `🎉 Hoàn tất! Tìm thấy <strong style="color:var(--badge-ok-text)">${invoices.length}</strong> hóa đơn.`
+    const total = data.total || 0;
+    progress.innerHTML = total
+      ? `🎉 Hoàn tất! Tìm thấy <strong style="color:var(--badge-ok-text)">${total}</strong> hóa đơn, chia thành <strong style="color:var(--badge-ok-text)">${courses.length}</strong> khóa học.`
       : 'Không tìm thấy hóa đơn nào trong khoảng ngày này.';
   } catch (e) {
     progress.innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`;
   }
   btn.disabled = false;
+}
+
+// Dựng 1 bảng riêng cho 1 khóa học (item.id), dùng chung 13 cột đã thống nhất.
+// Mỗi bảng có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
+function renderInvoiceByDateCourseTable(course, courseIdx) {
+  const container = document.getElementById("invoiceByDateResultsContainer");
+  const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+  const invoices = course.invoices || [];
+  const tableId = `invoiceByDateTable_${courseIdx}`;
+  const btnId = `copyInvoiceByDateBtn_${courseIdx}`;
+
+  const wrap = document.createElement("div");
+  wrap.style.marginBottom = "24px";
+
+  const headerRow = document.createElement("div");
+  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
+  headerRow.innerHTML = `
+    <h3 style="margin:0; font-size:14px;">${escapeHtml(course.title)} <span style="color:var(--text-muted); font-weight:600;">(${invoices.length})</span></h3>
+    <button id="${btnId}" class="btn-outline" onclick="copyTableToClipboard('${tableId}', '${btnId}')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
+  wrap.appendChild(headerRow);
+
+  const tableResponsive = document.createElement("div");
+  tableResponsive.className = "table-responsive";
+  const table = document.createElement("table");
+  table.className = "bulk-table";
+  table.id = tableId;
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>STT</th><th>Mã ĐH</th><th>Họ và Tên</th><th>Số tiền</th><th>VAT (8%)</th>
+        <th>Tổng tiền</th><th>Mã ref</th><th>Tên ref</th><th>% Ref</th><th>Số tiền REF</th>
+        <th>Số HĐ</th><th>Note</th><th>Ngày GD</th>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  invoices.forEach((inv, idx) => {
+    const orderCodeHTML = inv.order_code
+      ? escapeHtml(inv.order_code)
+      : `<span style="color:var(--text-muted);">—</span>`;
+    const refRateHTML = (inv.commission_rate === "" || inv.commission_rate === null || inv.commission_rate === undefined)
+      ? ""
+      : `${escapeHtml(inv.commission_rate)}%`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${orderCodeHTML}</td>
+      <td>${escapeHtml(inv.lead_name)}</td>
+      <td>${amountFmt(inv.amount_before_tax)}</td>
+      <td>${amountFmt(inv.vat_amount)}</td>
+      <td>${amountFmt(inv.total_amount)}</td>
+      <td>${escapeHtml(inv.ref_username)}</td>
+      <td></td>
+      <td>${refRateHTML}</td>
+      <td>${amountFmt(inv.hoahong)}</td>
+      <td>${escapeHtml(inv.invoice_no)}</td>
+      <td></td>
+      <td>${escapeHtml(inv.arising_date)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  tableResponsive.appendChild(table);
+  wrap.appendChild(tableResponsive);
+  container.appendChild(wrap);
 }
 
 // TRA CỨU HÓA ĐƠN ĐIỆN TỬ (GDT) - đăng nhập bằng MST/mật khẩu + khoảng ngày
