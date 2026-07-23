@@ -3611,7 +3611,7 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
     const invoices = course.invoices || [];
     let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
     invoices.forEach((inv) => {
-      if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - bỏ qua, giống logic từng bảng chi tiết
+      if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), hóa đơn bị thay thế vẫn tính vì tiền vẫn là thật
       sumAmount += Number(inv.amount_before_tax) || 0;
       sumVat += Number(inv.vat_amount) || 0;
       sumTotal += Number(inv.total_amount) || 0;
@@ -3697,7 +3697,7 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
   const refMap = {};
   courses.forEach((course) => {
     (course.invoices || []).forEach((inv) => {
-      if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - đã loại khỏi tổng tiền, ref cũng loại theo
+      if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), thay thế vẫn tính ref
       const rawRef = (inv.ref_username || "").trim();
       if (!rawRef) return;
       // Không phân biệt hoa/thường: "phk", "PHK", "Phk" đều gộp về cùng 1 dòng.
@@ -3864,10 +3864,11 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const tbody = table.querySelector("tbody");
 
   invoices.forEach((inv, idx) => {
-    // Hóa đơn GỐC đã bị điều chỉnh giảm (đánh dấu qua cột Note) -> xóa trắng các
-    // cột tiền/ref để không cộng nhầm vào tổng cuối bảng (số tiền thật đã nằm ở
-    // dòng hóa đơn điều chỉnh riêng, cộng cả 2 dòng sẽ bị trùng).
-    const hasNote = !!inv.note;
+    // Hóa đơn GỐC bị điều chỉnh giảm (note_type = "dieu_chinh", thường là hoàn
+    // tiền) -> xóa trắng 7 cột tiền/ref để không cộng nhầm vào tổng cuối bảng.
+    // Hóa đơn GỐC bị thay thế (note_type = "thay_the", VD đổi cá nhân sang công
+    // ty) -> tiền vẫn là tiền thật, GIỮ NGUYÊN 7 cột, chỉ thêm ghi chú.
+    const blankColumns = !!inv.note && inv.note_type !== "thay_the";
     const orderCodeHTML = inv.order_code
       ? escapeHtml(inv.order_code)
       : `<span style="color:var(--text-muted);">—</span>`;
@@ -3875,22 +3876,22 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       ? ""
       : `${escapeHtml(inv.commission_rate)}%`;
     const tr = document.createElement("tr");
-    tr.dataset.amount = hasNote ? "0" : (Number(inv.amount_before_tax) || 0);
-    tr.dataset.vat = hasNote ? "0" : (Number(inv.vat_amount) || 0);
-    tr.dataset.total = hasNote ? "0" : (Number(inv.total_amount) || 0);
-    tr.dataset.ref = hasNote ? "0" : (Number(inv.hoahong) || 0);
+    tr.dataset.amount = blankColumns ? "0" : (Number(inv.amount_before_tax) || 0);
+    tr.dataset.vat = blankColumns ? "0" : (Number(inv.vat_amount) || 0);
+    tr.dataset.total = blankColumns ? "0" : (Number(inv.total_amount) || 0);
+    tr.dataset.ref = blankColumns ? "0" : (Number(inv.hoahong) || 0);
     tr.innerHTML = `
       <td>${idx + 1}</td>
       <td>${orderCodeHTML}</td>
       <td>${escapeHtml(inv.lead_name)}</td>
       <td>${escapeHtml(inv.username)}</td>
-      <td>${hasNote ? "" : amountFmt(inv.amount_before_tax)}</td>
-      <td>${hasNote ? "" : amountFmt(inv.vat_amount)}</td>
-      <td>${hasNote ? "" : amountFmt(inv.total_amount)}</td>
-      <td>${hasNote ? "" : escapeHtml(inv.ref_username)}</td>
+      <td>${blankColumns ? "" : amountFmt(inv.amount_before_tax)}</td>
+      <td>${blankColumns ? "" : amountFmt(inv.vat_amount)}</td>
+      <td>${blankColumns ? "" : amountFmt(inv.total_amount)}</td>
+      <td>${blankColumns ? "" : escapeHtml(inv.ref_username)}</td>
       <td></td>
-      <td>${hasNote ? "" : refRateHTML}</td>
-      <td>${hasNote ? "" : amountFmt(inv.hoahong)}</td>
+      <td>${blankColumns ? "" : refRateHTML}</td>
+      <td>${blankColumns ? "" : amountFmt(inv.hoahong)}</td>
       <td>${escapeHtml(inv.invoice_no)}</td>
       <td>${escapeHtml(inv.note)}</td>
       <td>${escapeHtml(inv.arising_date)}</td>`;
@@ -3902,7 +3903,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   // không vô tình copy luôn dòng tổng này.
   let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
   invoices.forEach((inv) => {
-    if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - bỏ qua, không cộng vào tổng
+    if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), thay thế vẫn cộng vào tổng
     sumAmount += Number(inv.amount_before_tax) || 0;
     sumVat += Number(inv.vat_amount) || 0;
     sumTotal += Number(inv.total_amount) || 0;
