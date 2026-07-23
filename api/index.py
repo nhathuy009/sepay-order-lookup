@@ -136,8 +136,21 @@ def handle_invoice_by_date(body):
             inv["ref_username"] = match.get("ref_username", "")
             inv["commission_rate"] = match.get("commission_rate", "")
             inv["hoahong"] = match.get("hoahong", "")
+            inv["item_id"] = match.get("item_id", "")
+            inv["item_title"] = match.get("item_title", "")
 
-    return 200, {"invoices": result, "total": len(result)}
+    # Phân loại hàng hóa: mỗi item.id là 1 khóa học khác nhau -> gộp thành từng
+    # nhóm riêng để frontend hiển thị 1 bảng/khóa học. Đơn không tra ngược được
+    # (chưa rõ khóa học nào) gộp vào nhóm "unknown".
+    courses = {}
+    for inv in result:
+        item_id = inv.get("item_id") or "unknown"
+        item_title = inv.get("item_title") or "Chưa xác định (không tra ngược được đơn hàng)"
+        if item_id not in courses:
+            courses[item_id] = {"item_id": item_id, "title": item_title, "invoices": []}
+        courses[item_id]["invoices"].append(inv)
+
+    return 200, {"courses": list(courses.values()), "total": len(result)}
 
 def handle_gdt_invoice(body):
     username = (body.get("username") or "").strip()
