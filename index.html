@@ -3520,7 +3520,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>STT</th><th>Mã ĐH</th><th>Họ và Tên</th><th>Số tiền</th><th>VAT (8%)</th>
+        <th>STT</th><th>Mã ĐH</th><th>Họ và Tên</th><th>Mã KH</th><th>Số tiền</th><th>VAT (8%)</th>
         <th>Tổng tiền</th><th>Mã ref</th><th>Tên ref</th><th>% Ref</th><th>Số tiền REF</th>
         <th>Số HĐ</th><th>Note</th><th>Ngày GD</th>
       </tr>
@@ -3540,6 +3540,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td>${idx + 1}</td>
       <td>${orderCodeHTML}</td>
       <td>${escapeHtml(inv.lead_name)}</td>
+      <td>${escapeHtml(inv.username)}</td>
       <td>${amountFmt(inv.amount_before_tax)}</td>
       <td>${amountFmt(inv.vat_amount)}</td>
       <td>${amountFmt(inv.total_amount)}</td>
