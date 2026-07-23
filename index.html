@@ -294,6 +294,16 @@
   }
   .course-tab .count { opacity: 0.75; margin-left: 4px; }
 
+  /* LỌC + SẮP XẾP KIỂU EXCEL cho các bảng tra cứu hóa đơn */
+  .table-filter-row td { padding: 4px 8px !important; }
+  .table-filter-input {
+    width: 100%; box-sizing: border-box; padding: 4px 6px; font-size: 12px;
+    border: 1px solid var(--input-border); border-radius: 6px;
+    background: var(--input-bg); color: var(--text-main);
+  }
+  .table-filter-input:focus { outline: none; border-color: var(--accent); }
+  .sort-indicator { font-size: 10px; opacity: 0.7; margin-left: 3px; }
+
   /* SWITCH TOGGLE GIAO DIỆN */
   .settings-panel {
     padding: 12px 18px; margin: 4px 14px 0;
@@ -3315,7 +3325,10 @@ function copyTableToClipboard(tableId, btnId) {
     // Dùng join("\n") giữa các dòng thay vì nối "\n" sau MỖI dòng (kể cả dòng cuối) -
     // tránh để lại ký tự xuống dòng thừa ở cuối chuỗi, thứ khiến Excel hiểu nhầm là
     // còn thêm 1 dòng nữa (trống) sau khi dán.
+    // Bỏ qua dòng đang bị ẩn (display:none) do người dùng đang áp dụng bộ lọc -
+    // giống hành vi copy trong Excel khi có AutoFilter, chỉ copy đúng phần đang xem.
     const tsv = rows
+      .filter(row => row.style.display !== 'none')
       .map(row => Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()).join("\t"))
       .join("\n");
     navigator.clipboard.writeText(tsv).then(() => {
@@ -3323,6 +3336,98 @@ function copyTableToClipboard(tableId, btnId) {
       setTimeout(() => { btn.innerText = originalText; }, 2000);
     }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+}
+
+// ==== LỌC + SẮP XẾP KIỂU EXCEL cho các bảng tra cứu hóa đơn theo khoảng ngày ====
+// colTypes: mảng cùng độ dài số cột header, giá trị 'text' | 'number' | null.
+// null = cột không có ô lọc/không sắp xếp được (VD cột STT, cột luôn để trống).
+// onVisibilityChange(visibleRows): callback tùy chọn, gọi lại mỗi khi bộ lọc đổi -
+// dùng để tính lại dòng "Tổng cộng" đúng theo các dòng đang hiển thị (giống AutoFilter + SUBTOTAL trong Excel).
+function attachTableFilterSort(table, colTypes, onVisibilityChange) {
+  const thead = table.querySelector('thead');
+  const headerRow = thead.querySelector('tr');
+  const ths = Array.from(headerRow.children);
+
+  const filterRow = document.createElement('tr');
+  filterRow.className = 'table-filter-row';
+  ths.forEach((th, i) => {
+    const td = document.createElement('td');
+    if (colTypes[i] !== null) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Lọc...';
+      input.className = 'table-filter-input';
+      input.addEventListener('input', () => applyTableFilters(table, onVisibilityChange));
+      td.appendChild(input);
+    }
+    filterRow.appendChild(td);
+  });
+  thead.appendChild(filterRow);
+
+  ths.forEach((th, i) => {
+    if (colTypes[i] === null) return;
+    th.style.cursor = 'pointer';
+    th.title = 'Bấm để sắp xếp';
+    th.dataset.sortDir = '';
+    th.addEventListener('click', () => sortTableByColumn(table, i, colTypes[i], th, ths));
+  });
+}
+
+function applyTableFilters(table, onVisibilityChange) {
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const filters = [];
+  Array.from(table.querySelectorAll('.table-filter-row td')).forEach((td, i) => {
+    const input = td.querySelector('.table-filter-input');
+    const val = input ? input.value.trim().toLowerCase() : '';
+    if (val) filters.push({ col: i, val });
+  });
+
+  rows.forEach((row) => {
+    const cells = Array.from(row.children);
+    const visible = filters.every(f => (cells[f.col]?.innerText || '').toLowerCase().includes(f.val));
+    row.style.display = visible ? '' : 'none';
+  });
+
+  if (onVisibilityChange) {
+    onVisibilityChange(rows.filter(r => r.style.display !== 'none'));
+  }
+}
+
+function sortTableByColumn(table, colIdx, colType, th, allThs) {
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const dir = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+  allThs.forEach((h) => {
+    h.dataset.sortDir = '';
+    const ind = h.querySelector('.sort-indicator');
+    if (ind) ind.remove();
+  });
+  th.dataset.sortDir = dir;
+
+  const getValue = (row) => {
+    const text = (row.children[colIdx]?.innerText || '').trim();
+    if (colType === 'number') {
+      // Số Việt Nam dùng dấu chấm ngăn cách hàng nghìn (VD "7.388.889") - bỏ dấu
+      // chấm trước khi parse, kèm bỏ ký tự "%" và "—" (ô trống/không xác định).
+      const num = parseFloat(text.replace(/\./g, '').replace(',', '.').replace('%', '').replace('—', ''));
+      return isNaN(num) ? -Infinity : num;
+    }
+    return text.toLowerCase();
+  };
+
+  rows.sort((a, b) => {
+    const va = getValue(a), vb = getValue(b);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  rows.forEach(row => tbody.appendChild(row));
+
+  const indicator = document.createElement('span');
+  indicator.className = 'sort-indicator';
+  indicator.textContent = dir === 'asc' ? ' ▲' : ' ▼';
+  th.appendChild(indicator);
 }
 
 // Nút Copy riêng cho bảng "Kiểm tra giao dịch SePay v2"
@@ -3513,6 +3618,11 @@ function renderInvoiceByDateSummaryTable(courses) {
     grandCount += invoices.length;
 
     const tr = document.createElement("tr");
+    tr.dataset.count = invoices.length;
+    tr.dataset.amount = sumAmount;
+    tr.dataset.vat = sumVat;
+    tr.dataset.total = sumTotal;
+    tr.dataset.ref = sumRef;
     tr.style.cursor = "pointer";
     tr.title = "Bấm để xem chi tiết khóa học này";
     tr.onclick = () => switchInvoiceCourseTab(idx, courses.length);
@@ -3540,6 +3650,25 @@ function renderInvoiceByDateSummaryTable(courses) {
       <td>${amountFmt(grandRef)}</td>
     </tr>`;
   table.appendChild(tfoot);
+
+  // Lọc kiểu Excel + sắp xếp, giống bảng chi tiết từng khóa học.
+  const summaryColTypes = [null, 'text', 'number', 'number', 'number', 'number', 'number'];
+  attachTableFilterSort(table, summaryColTypes, (visibleRows) => {
+    let vCount = 0, vAmount = 0, vVat = 0, vTotal = 0, vRef = 0;
+    visibleRows.forEach((row) => {
+      vCount += Number(row.dataset.count) || 0;
+      vAmount += Number(row.dataset.amount) || 0;
+      vVat += Number(row.dataset.vat) || 0;
+      vTotal += Number(row.dataset.total) || 0;
+      vRef += Number(row.dataset.ref) || 0;
+    });
+    const tfootTds = tfoot.querySelectorAll('tr td');
+    tfootTds[1].textContent = vCount;
+    tfootTds[2].textContent = amountFmt(vAmount);
+    tfootTds[3].textContent = amountFmt(vVat);
+    tfootTds[4].textContent = amountFmt(vTotal);
+    tfootTds[5].textContent = amountFmt(vRef);
+  });
 
   tableResponsive.appendChild(table);
   wrap.appendChild(tableResponsive);
@@ -3626,6 +3755,10 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       ? ""
       : `${escapeHtml(inv.commission_rate)}%`;
     const tr = document.createElement("tr");
+    tr.dataset.amount = hasNote ? "0" : (Number(inv.amount_before_tax) || 0);
+    tr.dataset.vat = hasNote ? "0" : (Number(inv.vat_amount) || 0);
+    tr.dataset.total = hasNote ? "0" : (Number(inv.total_amount) || 0);
+    tr.dataset.ref = hasNote ? "0" : (Number(inv.hoahong) || 0);
     tr.innerHTML = `
       <td>${idx + 1}</td>
       <td>${orderCodeHTML}</td>
@@ -3667,6 +3800,25 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td colspan="3"></td>
     </tr>`;
   table.appendChild(tfoot);
+
+  // Lọc kiểu Excel (ô nhập dưới mỗi tiêu đề cột) + bấm tiêu đề để sắp xếp.
+  // Khi lọc thay đổi, tính lại dòng "Tổng cộng" theo đúng các dòng đang hiển thị,
+  // dùng data-amount/vat/total/ref đã gắn sẵn (tránh phải parse lại số đã format).
+  const courseColTypes = [null, 'text', 'text', 'text', 'number', 'number', 'number', 'text', null, 'number', 'number', 'text', 'text', 'text'];
+  attachTableFilterSort(table, courseColTypes, (visibleRows) => {
+    let vSumAmount = 0, vSumVat = 0, vSumTotal = 0, vSumRef = 0;
+    visibleRows.forEach((row) => {
+      vSumAmount += Number(row.dataset.amount) || 0;
+      vSumVat += Number(row.dataset.vat) || 0;
+      vSumTotal += Number(row.dataset.total) || 0;
+      vSumRef += Number(row.dataset.ref) || 0;
+    });
+    const tfootTds = tfoot.querySelectorAll('tr td');
+    tfootTds[1].textContent = amountFmt(vSumAmount);
+    tfootTds[2].textContent = amountFmt(vSumVat);
+    tfootTds[3].textContent = amountFmt(vSumTotal);
+    tfootTds[5].textContent = amountFmt(vSumRef);
+  });
 
   tableResponsive.appendChild(table);
   panel.appendChild(tableResponsive);
