@@ -305,6 +305,38 @@ class SepayClient:
             page += 1
         return all_data
 
+    def _fetch_all_users(self, page_limit=1000):
+        """Tải toàn bộ user (phân trang), dùng để dựng map email -> username (mã KH)
+        cho tra ngược hàng loạt. Cùng pattern với _fetch_all_orders, KHÁC với
+        _fetch_users (search theo 'q', chỉ trả 1 user khớp).
+        Trả về: list[dict] user, hoặc UNAUTHORIZED, hoặc None nếu lỗi kết nối.
+        """
+        base_url = self.config["users_url"].split("?")[0]
+        headers = {"Authorization": self.token or "", "Origin": self.config["origin_users"]}
+        all_data = []
+        page = 1
+        while True:
+            try:
+                resp = self.session.get(
+                    base_url, params={"page": page, "limit": page_limit},
+                    headers=headers, timeout=REQUEST_TIMEOUT,
+                )
+            except requests.exceptions.RequestException:
+                return None
+            if resp.status_code in (401, 403):
+                return UNAUTHORIZED
+            if resp.status_code != 200:
+                return None
+
+            payload = resp.json()
+            page_data = payload.get("data", [])
+            all_data.extend(page_data)
+            total = payload.get("total", len(page_data))
+            if not page_data or page * page_limit >= total:
+                break
+            page += 1
+        return all_data
+
     def _build_batch_reverse(self, invoice_numbers, date_from=None, date_to=None, status=None):
         """Fetch đơn hàng trong khoảng ngày (nếu có) ĐÚNG 1 LẦN, dựng map
         invoice_number -> order, rồi tra cứu ngược cho cả danh sách số hóa đơn.
@@ -314,6 +346,19 @@ class SepayClient:
             return None
         if all_orders == UNAUTHORIZED:
             return UNAUTHORIZED
+
+        # Fetch toàn bộ user 1 lần để dựng map email -> username (Mã KH), tái sử
+        # dụng đúng nguồn dữ liệu mà "Tra cứu hàng loạt" (_build_details) dùng qua
+        # API Users - nhưng ở đây lấy 1 lần cho cả lô, không lặp gọi theo từng KH.
+        all_users = self._fetch_all_users()
+        if all_users == UNAUTHORIZED:
+            return UNAUTHORIZED
+        email_to_username = {}
+        if isinstance(all_users, list):
+            for u in all_users:
+                email = str(u.get("email", "")).strip()
+                if email:
+                    email_to_username[email] = u.get("code", "")
 
         index = {}
         for order in all_orders:
@@ -338,6 +383,7 @@ class SepayClient:
                 details["lead_phone"] = lead.get("phone", "")
                 details["lead_cccd"] = lead.get("cccd", "")
                 details["lead_name"] = lead.get("name", "")
+                details["username"] = email_to_username.get(str(lead.get("email", "")).strip(), "")
                 details["orders_amount"] = order.get("amount", "")
                 details["ref_username"] = order.get("ref_username", "")
                 details["commission_rate"] = order.get("commissionRate", "")
