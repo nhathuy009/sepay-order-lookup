@@ -84,8 +84,9 @@ def empty_details():
 
 
 def _extract_adjusted_invoice_no(process_note):
-    """Trích số hóa đơn GỐC bị điều chỉnh từ trường ProcessInvNote, dạng:
+    """Trích số hóa đơn GỐC bị điều chỉnh/thay thế từ trường ProcessInvNote, dạng:
     "Điều chỉnh cho hóa đơn điện tử  Mẫu số 1, ký hiệu C26MSL, số 1071, ngày..."
+    "Thay thế cho hóa đơn điện tử  Mẫu số 1, ký hiệu C26MSL, số 1071, ngày..."
 
     Chỉ khớp số đứng ngay sau "ký hiệu <ký hiệu>, số " để tránh nhầm với
     "Mẫu số 1" (số mẫu hóa đơn - luôn là "1", không phải số hóa đơn gốc).
@@ -94,6 +95,25 @@ def _extract_adjusted_invoice_no(process_note):
         return ""
     match = re.search(r"ký hiệu\s+[^,]+,\s*số\s+(\d+)", process_note, re.IGNORECASE)
     return match.group(1) if match else ""
+
+
+def _detect_adjustment_type(process_note):
+    """Phân loại hóa đơn số tiền âm dựa vào tiền tố của ProcessInvNote:
+    - "dieu_chinh": "Điều chỉnh cho hóa đơn điện tử..." -> hóa đơn điều chỉnh giảm
+      (thường là hoàn tiền cho khách, tiền không còn giá trị thật ở hóa đơn gốc).
+    - "thay_the": "Thay thế cho hóa đơn điện tử..." -> hóa đơn thay thế (thường do
+      đổi thông tin xuất hóa đơn, VD khách đổi từ cá nhân sang công ty; tiền ở
+      hóa đơn gốc vẫn là tiền thật, không nên xóa).
+    - "": không khớp mẫu nào (không phải hóa đơn điều chỉnh/thay thế đã biết).
+    """
+    if not process_note:
+        return ""
+    note = process_note.strip()
+    if note.lower().startswith("điều chỉnh cho hóa đơn điện tử".lower()):
+        return "dieu_chinh"
+    if note.lower().startswith("thay thế cho hóa đơn điện tử".lower()):
+        return "thay_the"
+    return ""
 
 
 def _extract_hidden(field_id, html_text):
@@ -281,6 +301,7 @@ class InvoiceClient:
         process_note = inv.get("ProcessInvNote", "") or ""
         details["process_note"] = process_note
         details["adjusts_invoice_no"] = _extract_adjusted_invoice_no(process_note)
+        details["adjustment_type"] = _detect_adjustment_type(process_note)
         details["note"] = ""
         return details
 
