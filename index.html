@@ -232,6 +232,19 @@
     .weekly-calendar-widget { display: none; } /* Ẩn lịch trên màn hình nhỏ để tránh vỡ Header */
   }
 
+  /* Khi máy đã lưu mật khẩu (ô input được ẩn đi), nhường chỗ đó cho widget lịch
+     kể cả trên tablet/mobile. Cho phép header tự xuống dòng nếu vẫn không đủ chỗ
+     để không bao giờ vỡ layout. */
+  @media (max-width: 1024px) {
+    body.has-token .top-header { flex-wrap: wrap; row-gap: 8px; }
+    body.has-token .weekly-calendar-widget {
+      display: flex; order: 3; flex: 1 1 auto; justify-content: center;
+    }
+    body.has-token .header-actions { flex: 0 0 auto; }
+  }
+  /* Ẩn ô nhập mật khẩu khi đã có mật khẩu lưu sẵn */
+  body.has-token #accessToken { display: none; }
+
   /* BODY LAYOUT */
   .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 
@@ -685,7 +698,7 @@
         <button type="button" class="acc-seg-btn" id="themeBtnLight" onclick="changeTheme(true)">Sáng</button>
       </div>
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
-      <button onclick="saveToken()">Lưu khóa</button>
+      <button id="saveTokenBtn" onclick="saveToken()">Lưu khóa</button>
     </div>
   </header>
 
@@ -1344,12 +1357,35 @@ function getToken() {
   try { return localStorage.getItem("sepay_access_token") || ""; } catch(e) { return ""; } 
 }
 
+// Cập nhật giao diện ô mật khẩu / nút theo trạng thái đã lưu hay chưa.
+// showInput = true  -> hiện ô nhập để gõ/đổi mật khẩu
+// showInput = false -> ẩn ô nhập, nhường chỗ cho widget lịch, đổi nút thành "Đổi mật khẩu"
+function setAuthUIState(showInput) {
+  const input = document.getElementById("accessToken");
+  const btn = document.getElementById("saveTokenBtn");
+  if (!input || !btn) return;
+
+  if (showInput) {
+    document.body.classList.remove("has-token");
+    input.style.display = "";
+    input.value = "";
+    input.placeholder = "Mật khẩu hệ thống";
+    btn.innerText = "Lưu khóa";
+    btn.onclick = saveToken;
+  } else {
+    document.body.classList.add("has-token");
+    input.style.display = "none";
+    btn.innerText = "Đổi mật khẩu";
+    btn.onclick = function () { setAuthUIState(true); };
+  }
+}
+
 function saveToken() {
   const token = document.getElementById("accessToken").value.trim();
+  if (!token) { return; } // Không lưu chuỗi rỗng
   try {
     localStorage.setItem("sepay_access_token", token);
-    document.getElementById("accessToken").value = "";
-    document.getElementById("accessToken").placeholder = "Đã lưu mật khẩu";
+    setAuthUIState(false);
   } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
@@ -1383,8 +1419,7 @@ function changeTheme(isLight) {
 
 document.addEventListener("DOMContentLoaded", () => {
   try {
-    const inputToken = document.getElementById("accessToken");
-    if(inputToken) inputToken.placeholder = getToken() ? "Đã lưu mật khẩu" : "Mật khẩu hệ thống";
+    setAuthUIState(!getToken());
   } catch(e) {}
 
   // Đọc cấu hình giao diện từ bộ nhớ
