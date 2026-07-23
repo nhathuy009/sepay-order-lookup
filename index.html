@@ -3309,10 +3309,15 @@ function copyBankTransferForBank() {
 
 function copyTableToClipboard(tableId, btnId) {
   try {
-    const table = document.getElementById(tableId); if (!table) return; let tsv = "";
+    const table = document.getElementById(tableId); if (!table) return;
     const tbody = table.querySelector('tbody');
     const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
-    rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
+    // Dùng join("\n") giữa các dòng thay vì nối "\n" sau MỖI dòng (kể cả dòng cuối) -
+    // tránh để lại ký tự xuống dòng thừa ở cuối chuỗi, thứ khiến Excel hiểu nhầm là
+    // còn thêm 1 dòng nữa (trống) sau khi dán.
+    const tsv = rows
+      .map(row => Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()).join("\t"))
+      .join("\n");
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById(btnId); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
