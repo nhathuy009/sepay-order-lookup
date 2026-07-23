@@ -1445,7 +1445,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initColumnSelector();
 
   // Khởi tạo Flatpickr
-  const dateConfig = { dateFormat: "d/m/Y", locale: "vn", defaultDate: new Date(), allowInput: true };
+  // disableMobile: true -> BẮT BUỘC dùng giao diện lịch tùy chỉnh của Flatpickr trên mọi thiết bị.
+  // Nếu để mặc định (false), trên điện thoại/tablet Flatpickr sẽ tự chuyển sang date-picker
+  // gốc của hệ điều hành/trình duyệt (mất hết style, hiển thị dạng mm/dd/yyyy như báo lỗi).
+  const dateConfig = { dateFormat: "d/m/Y", locale: "vn", defaultDate: new Date(), allowInput: true, disableMobile: true };
   const elFrom = document.getElementById('txDateFrom');
   const elTo = document.getElementById('txDateTo');
   if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
