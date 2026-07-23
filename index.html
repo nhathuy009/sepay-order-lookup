@@ -3557,7 +3557,11 @@ async function doInvoiceLookupByDate() {
     }
 
     const courses = data.courses || [];
-    renderInvoiceByDateSummaryTable(courses);
+    const summaryRow = document.createElement("div");
+    summaryRow.style.cssText = "display:flex; flex-wrap:wrap; gap:20px; margin-bottom:24px; align-items:flex-start;";
+    resultsContainer.appendChild(summaryRow);
+    renderInvoiceByDateSummaryTable(courses, summaryRow);
+    renderInvoiceByDateRefSummaryTable(courses, summaryRow);
     renderInvoiceByDateTabs(courses);
 
     const total = data.total || 0;
@@ -3573,12 +3577,11 @@ async function doInvoiceLookupByDate() {
 // Bảng tổng hợp: mỗi khóa học 1 dòng, kèm dòng TỔNG CỘNG gộp tất cả khóa học.
 // Dùng lại đúng logic loại trừ hóa đơn gốc đã bị điều chỉnh (inv.note) như từng
 // bảng chi tiết, để không cộng trùng tiền.
-function renderInvoiceByDateSummaryTable(courses) {
-  const container = document.getElementById("invoiceByDateResultsContainer");
+function renderInvoiceByDateSummaryTable(courses, targetContainer) {
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
 
   const wrap = document.createElement("div");
-  wrap.style.marginBottom = "24px";
+  wrap.style.cssText = "flex: 1 1 380px; min-width: 300px;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
@@ -3672,9 +3675,108 @@ function renderInvoiceByDateSummaryTable(courses) {
 
   tableResponsive.appendChild(table);
   wrap.appendChild(tableResponsive);
-  container.appendChild(wrap);
+  targetContainer.appendChild(wrap);
 }
 
+// Bảng tổng hợp tiền REF theo Mã ref (gộp từ TẤT CẢ khóa học). Bấm vào 1 dòng
+// để mở rộng xem breakdown: mã ref đó kiếm được bao nhiêu tiền REF từ mỗi khóa học.
+function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
+  const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+
+  // refMap: { [mã ref]: { total: number, byCourse: { [tên khóa học]: number } } }
+  const refMap = {};
+  courses.forEach((course) => {
+    (course.invoices || []).forEach((inv) => {
+      if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - đã loại khỏi tổng tiền, ref cũng loại theo
+      const ref = (inv.ref_username || "").trim();
+      if (!ref) return;
+      const amount = Number(inv.hoahong) || 0;
+      if (!refMap[ref]) refMap[ref] = { total: 0, byCourse: {} };
+      refMap[ref].total += amount;
+      refMap[ref].byCourse[course.title] = (refMap[ref].byCourse[course.title] || 0) + amount;
+    });
+  });
+  const refEntries = Object.entries(refMap).sort((a, b) => b[1].total - a[1].total);
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "flex: 1 1 380px; min-width: 300px;";
+
+  const headerRow = document.createElement("div");
+  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
+  headerRow.innerHTML = `
+    <h3 style="margin:0; font-size:14px;">Tổng hợp tiền REF theo Mã ref</h3>
+    <button id="copyInvoiceRefSummaryBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceByDateRefSummaryTable', 'copyInvoiceRefSummaryBtn')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
+  wrap.appendChild(headerRow);
+
+  const tableResponsive = document.createElement("div");
+  tableResponsive.className = "table-responsive";
+  const table = document.createElement("table");
+  table.className = "bulk-table";
+  table.id = "invoiceByDateRefSummaryTable";
+  table.innerHTML = `
+    <thead>
+      <tr><th style="width:28px;"></th><th>STT</th><th>Mã ref</th><th>Tổng tiền REF</th></tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  let grandRef = 0;
+
+  refEntries.forEach(([ref, data], idx) => {
+    grandRef += data.total;
+    const detailId = `refDetail_${idx}`;
+
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.title = "Bấm để xem chi tiết theo khóa học";
+    tr.innerHTML = `
+      <td class="ref-toggle-icon" style="text-align:center;">▶</td>
+      <td>${idx + 1}</td>
+      <td>${escapeHtml(ref)}</td>
+      <td>${amountFmt(data.total)}</td>`;
+    tr.onclick = () => toggleRefDetailRow(detailId, tr);
+    tbody.appendChild(tr);
+
+    const courseRowsHTML = Object.entries(data.byCourse)
+      .sort((a, b) => b[1] - a[1])
+      .map(([title, amt]) => `
+        <tr>
+          <td style="padding:4px 8px 4px 24px; border:none;">${escapeHtml(title)}</td>
+          <td style="padding:4px 8px; text-align:right; border:none; white-space:nowrap;">${amountFmt(amt)}</td>
+        </tr>`)
+      .join("");
+
+    const detailTr = document.createElement("tr");
+    detailTr.id = detailId;
+    detailTr.style.display = "none";
+    detailTr.innerHTML = `
+      <td colspan="4" style="padding:0; background:var(--input-bg);">
+        <table style="width:100%; border-collapse:collapse;"><tbody>${courseRowsHTML}</tbody></table>
+      </td>`;
+    tbody.appendChild(detailTr);
+  });
+
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = `
+    <tr style="font-weight:700; background:var(--total-row-bg);">
+      <td colspan="3" style="text-align:right;">TỔNG CỘNG</td>
+      <td>${amountFmt(grandRef)}</td>
+    </tr>`;
+  table.appendChild(tfoot);
+
+  tableResponsive.appendChild(table);
+  wrap.appendChild(tableResponsive);
+  targetContainer.appendChild(wrap);
+}
+
+function toggleRefDetailRow(detailId, triggerRow) {
+  const detailRow = document.getElementById(detailId);
+  if (!detailRow) return;
+  const isOpen = detailRow.style.display !== "none";
+  detailRow.style.display = isOpen ? "none" : "table-row";
+  const icon = triggerRow.querySelector(".ref-toggle-icon");
+  if (icon) icon.textContent = isOpen ? "▶" : "▼";
+}
 // Dựng tab-bar + các bảng khóa học (mỗi khóa học 1 bảng, ẩn/hiện qua lại bằng tab
 // thay vì xếp chồng dài từ trên xuống). Mỗi bảng vẫn dùng chung 13 cột đã thống nhất
 // và có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
