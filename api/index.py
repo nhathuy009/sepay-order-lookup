@@ -108,6 +108,17 @@ def _dmy_to_iso_date(d):
         return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}"
     return d
 
+def _strip_course_duration_suffix(title):
+    """Bỏ hậu tố kỳ hạn dạng '- N tháng' ở cuối tên khóa học, để gộp các kỳ hạn
+    (3/6/12 tháng...) của cùng 1 khóa học vào chung 1 nhóm/1 bảng.
+
+    VD: "MEMBERSHIP-10xVIP (Thầy Hùng Bigman) - 3 tháng"
+        -> "MEMBERSHIP-10xVIP (Thầy Hùng Bigman)"
+    Nếu tên không khớp mẫu (không có hậu tố kỳ hạn), trả về nguyên văn.
+    """
+    title = (title or "").strip()
+    return re.sub(r"\s*-\s*\d+\s*th[áa]ng\s*$", "", title, flags=re.IGNORECASE).strip() or title
+
 def handle_invoice_by_date(body):
     start_date = (body.get("start_date") or "").strip()
     end_date = (body.get("end_date") or "").strip()
@@ -139,16 +150,18 @@ def handle_invoice_by_date(body):
             inv["item_id"] = match.get("item_id", "")
             inv["item_title"] = match.get("item_title", "")
 
-    # Phân loại hàng hóa: mỗi item.id là 1 khóa học khác nhau -> gộp thành từng
-    # nhóm riêng để frontend hiển thị 1 bảng/khóa học. Đơn không tra ngược được
-    # (chưa rõ khóa học nào) gộp vào nhóm "unknown".
+    # Phân loại hàng hóa: mỗi item.id là 1 khóa học/kỳ hạn khác nhau. Một số khóa
+    # học có nhiều kỳ hạn con (VD "... - 3 tháng", "... - 6 tháng", "... - 12 tháng")
+    # nhưng vẫn nên gộp chung 1 bảng/1 tab - nên gộp nhóm theo TÊN ĐÃ CHUẨN HÓA
+    # (bỏ hậu tố kỳ hạn) thay vì theo item_id thô. Đơn không tra ngược được
+    # (chưa rõ khóa học nào) gộp vào nhóm "Chưa xác định".
     courses = {}
     for inv in result:
-        item_id = inv.get("item_id") or "unknown"
         item_title = inv.get("item_title") or "Chưa xác định (không tra ngược được đơn hàng)"
-        if item_id not in courses:
-            courses[item_id] = {"item_id": item_id, "title": item_title, "invoices": []}
-        courses[item_id]["invoices"].append(inv)
+        group_key = _strip_course_duration_suffix(item_title)
+        if group_key not in courses:
+            courses[group_key] = {"title": group_key, "invoices": []}
+        courses[group_key]["invoices"].append(inv)
 
     return 200, {"courses": list(courses.values()), "total": len(result)}
 
