@@ -3452,6 +3452,7 @@ async function doInvoiceLookupByDate() {
     }
 
     const courses = data.courses || [];
+    renderInvoiceByDateSummaryTable(courses);
     renderInvoiceByDateTabs(courses);
 
     const total = data.total || 0;
@@ -3464,12 +3465,92 @@ async function doInvoiceLookupByDate() {
   btn.disabled = false;
 }
 
+// Bảng tổng hợp: mỗi khóa học 1 dòng, kèm dòng TỔNG CỘNG gộp tất cả khóa học.
+// Dùng lại đúng logic loại trừ hóa đơn gốc đã bị điều chỉnh (inv.note) như từng
+// bảng chi tiết, để không cộng trùng tiền.
+function renderInvoiceByDateSummaryTable(courses) {
+  const container = document.getElementById("invoiceByDateResultsContainer");
+  const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+
+  const wrap = document.createElement("div");
+  wrap.style.marginBottom = "24px";
+
+  const headerRow = document.createElement("div");
+  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
+  headerRow.innerHTML = `
+    <h3 style="margin:0; font-size:14px;">Tổng hợp theo khóa học</h3>
+    <button id="copyInvoiceSummaryBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceByDateSummaryTable', 'copyInvoiceSummaryBtn')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
+  wrap.appendChild(headerRow);
+
+  const tableResponsive = document.createElement("div");
+  tableResponsive.className = "table-responsive";
+  const table = document.createElement("table");
+  table.className = "bulk-table";
+  table.id = "invoiceByDateSummaryTable";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>STT</th><th>Tên khóa học</th><th>Số lượng HĐ</th>
+        <th>Số tiền</th><th>VAT (8%)</th><th>Tổng tiền</th><th>Số tiền REF</th>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector("tbody");
+
+  let grandAmount = 0, grandVat = 0, grandTotal = 0, grandRef = 0, grandCount = 0;
+
+  courses.forEach((course, idx) => {
+    const invoices = course.invoices || [];
+    let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
+    invoices.forEach((inv) => {
+      if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - bỏ qua, giống logic từng bảng chi tiết
+      sumAmount += Number(inv.amount_before_tax) || 0;
+      sumVat += Number(inv.vat_amount) || 0;
+      sumTotal += Number(inv.total_amount) || 0;
+      sumRef += Number(inv.hoahong) || 0;
+    });
+    grandAmount += sumAmount; grandVat += sumVat; grandTotal += sumTotal; grandRef += sumRef;
+    grandCount += invoices.length;
+
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.title = "Bấm để xem chi tiết khóa học này";
+    tr.onclick = () => switchInvoiceCourseTab(idx, courses.length);
+    tr.innerHTML = `
+      <td>${idx + 1}</td>
+      <td>${escapeHtml(course.title)}</td>
+      <td>${invoices.length}</td>
+      <td>${amountFmt(sumAmount)}</td>
+      <td>${amountFmt(sumVat)}</td>
+      <td>${amountFmt(sumTotal)}</td>
+      <td>${amountFmt(sumRef)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Dòng tổng cộng đặt trong <tfoot> - không bị copyTableToClipboard() lấy vào
+  // (hàm này chỉ đọc <tbody>), tránh copy nhầm dòng tổng khi dán qua Excel/Sheets.
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = `
+    <tr style="font-weight:700; background:var(--total-row-bg);">
+      <td colspan="2" style="text-align:right;">TỔNG CỘNG TẤT CẢ KHÓA HỌC</td>
+      <td>${grandCount}</td>
+      <td>${amountFmt(grandAmount)}</td>
+      <td>${amountFmt(grandVat)}</td>
+      <td>${amountFmt(grandTotal)}</td>
+      <td>${amountFmt(grandRef)}</td>
+    </tr>`;
+  table.appendChild(tfoot);
+
+  tableResponsive.appendChild(table);
+  wrap.appendChild(tableResponsive);
+  container.appendChild(wrap);
+}
+
 // Dựng tab-bar + các bảng khóa học (mỗi khóa học 1 bảng, ẩn/hiện qua lại bằng tab
 // thay vì xếp chồng dài từ trên xuống). Mỗi bảng vẫn dùng chung 13 cột đã thống nhất
 // và có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
 function renderInvoiceByDateTabs(courses) {
   const container = document.getElementById("invoiceByDateResultsContainer");
-  container.innerHTML = "";
   if (courses.length === 0) return;
 
   const tabBar = document.createElement("div");
