@@ -1068,6 +1068,7 @@
             <table class="bulk-table" id="invoiceByDateTable">
               <thead>
                 <tr>
+                  <th>Mã đơn hàng</th>
                   <th>Trạng thái</th>
                   <th>Số hóa đơn</th>
                   <th>Mẫu số &amp; Ký hiệu</th>
@@ -3464,8 +3465,12 @@ async function doInvoiceLookupByDate() {
       const badgeHTML = ok
         ? `<span class="badge ok">${escapeHtml(inv.status_msg)}</span>`
         : `<span class="badge err">${escapeHtml(inv.status_msg || 'Thất bại')}</span>`;
+      const orderCodeHTML = inv.order_code
+        ? `${escapeHtml(inv.order_code)} <span style="color:var(--text-muted); font-size:12px;">(${escapeHtml(inv.order_system || '')})</span>`
+        : `<span class="err">Không tìm thấy</span>`;
       const tr = document.createElement("tr");
       tr.innerHTML = `
+        <td>${orderCodeHTML}</td>
         <td>${badgeHTML}</td>
         <td>${escapeHtml(inv.invoice_no)}</td>
         <td>${escapeHtml(inv.pattern_serial)}</td>
