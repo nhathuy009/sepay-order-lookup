@@ -3534,6 +3534,10 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const tbody = table.querySelector("tbody");
 
   invoices.forEach((inv, idx) => {
+    // Hóa đơn GỐC đã bị điều chỉnh giảm (đánh dấu qua cột Note) -> xóa trắng các
+    // cột tiền/ref để không cộng nhầm vào tổng cuối bảng (số tiền thật đã nằm ở
+    // dòng hóa đơn điều chỉnh riêng, cộng cả 2 dòng sẽ bị trùng).
+    const hasNote = !!inv.note;
     const orderCodeHTML = inv.order_code
       ? escapeHtml(inv.order_code)
       : `<span style="color:var(--text-muted);">—</span>`;
@@ -3546,13 +3550,13 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td>${orderCodeHTML}</td>
       <td>${escapeHtml(inv.lead_name)}</td>
       <td>${escapeHtml(inv.username)}</td>
-      <td>${amountFmt(inv.amount_before_tax)}</td>
-      <td>${amountFmt(inv.vat_amount)}</td>
-      <td>${amountFmt(inv.total_amount)}</td>
-      <td>${escapeHtml(inv.ref_username)}</td>
+      <td>${hasNote ? "" : amountFmt(inv.amount_before_tax)}</td>
+      <td>${hasNote ? "" : amountFmt(inv.vat_amount)}</td>
+      <td>${hasNote ? "" : amountFmt(inv.total_amount)}</td>
+      <td>${hasNote ? "" : escapeHtml(inv.ref_username)}</td>
       <td></td>
-      <td>${refRateHTML}</td>
-      <td>${amountFmt(inv.hoahong)}</td>
+      <td>${hasNote ? "" : refRateHTML}</td>
+      <td>${hasNote ? "" : amountFmt(inv.hoahong)}</td>
       <td>${escapeHtml(inv.invoice_no)}</td>
       <td>${escapeHtml(inv.note)}</td>
       <td>${escapeHtml(inv.arising_date)}</td>`;
@@ -3564,6 +3568,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   // không vô tình copy luôn dòng tổng này.
   let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
   invoices.forEach((inv) => {
+    if (inv.note) return; // hóa đơn gốc đã bị điều chỉnh - bỏ qua, không cộng vào tổng
     sumAmount += Number(inv.amount_before_tax) || 0;
     sumVat += Number(inv.vat_amount) || 0;
     sumTotal += Number(inv.total_amount) || 0;
