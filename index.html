@@ -704,9 +704,9 @@
   }
   
   .sepay-table th { 
-    background: var(--table-th-bg); color: var(--table-th-text); font-weight: 600; font-size: 12px; 
-    text-transform: uppercase; padding: 14px 16px; 
-    border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
+    background: var(--accent-gradient); color: #FFFFFF; font-weight: 700; font-size: 12px; 
+    text-transform: uppercase; letter-spacing: 0.4px; padding: 14px 16px; 
+    border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.22); 
   }
   .sepay-table td { 
     padding: 14px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
@@ -3699,9 +3699,9 @@ async function doInvoiceLookup() {
           <td>${escapeHtml(data.customer_name)}</td>
           <td>${escapeHtml(data.customer_id)}</td>
           <td>${escapeHtml(data.customer_address)}</td>
-          <td>${amountFmt(data.amount_before_tax)}</td>
-          <td>${amountFmt(data.vat_amount)}</td>
-          <td>${amountFmt(data.total_amount)}</td>
+          <td style="text-align:right;">${amountFmt(data.amount_before_tax)}</td>
+          <td style="text-align:right;">${amountFmt(data.vat_amount)}</td>
+          <td style="text-align:right;"><span class="amount-in">+${amountFmt(data.total_amount)}</span></td>
           <td>${escapeHtml(data.payment_method)}</td>
           <td>${escapeHtml(data.invoice_type)}</td>`;
       } else {
@@ -4086,7 +4086,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td>${escapeHtml(inv.username)}</td>
       <td>${blankColumns ? "" : amountFmt(inv.amount_before_tax)}</td>
       <td>${blankColumns ? "" : amountFmt(inv.vat_amount)}</td>
-      <td>${blankColumns ? "" : amountFmt(inv.total_amount)}</td>
+      <td>${blankColumns ? "" : `<span class="amount-in">+${amountFmt(inv.total_amount)}</span>`}</td>
       <td>${blankColumns ? "" : escapeHtml(inv.ref_username)}</td>
       <td></td>
       <td>${blankColumns ? "" : refRateHTML}</td>
@@ -4114,7 +4114,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td colspan="4" style="text-align:right;">Tổng cộng</td>
       <td>${amountFmt(sumAmount)}</td>
       <td>${amountFmt(sumVat)}</td>
-      <td>${amountFmt(sumTotal)}</td>
+      <td><span class="amount-in">+${amountFmt(sumTotal)}</span></td>
       <td colspan="3"></td>
       <td>${amountFmt(sumRef)}</td>
       <td colspan="3"></td>
@@ -4136,7 +4136,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
     const tfootTds = tfoot.querySelectorAll('tr td');
     tfootTds[1].textContent = amountFmt(vSumAmount);
     tfootTds[2].textContent = amountFmt(vSumVat);
-    tfootTds[3].textContent = amountFmt(vSumTotal);
+    tfootTds[3].innerHTML = `<span class="amount-in">+${amountFmt(vSumTotal)}</span>`;
     tfootTds[5].textContent = amountFmt(vSumRef);
   });
 
@@ -4215,7 +4215,7 @@ async function doGdtInvoiceLookup() {
       if (data.token) sharedToken = data.token;
       const invoices = data.invoices || [];
       totalFound += invoices.length;
-      renderGdtTypeTable(title, invoices);
+      renderGdtTypeTable(title, invoices, isPurchase);
 
       if (data.warnings && data.warnings.length > 0) {
         problems.push(...data.warnings.map(w => `${title}: ${w}`));
@@ -4248,9 +4248,13 @@ async function doGdtInvoiceLookup() {
 
 // Vẽ 1 bảng kết quả cho MỘT loại hóa đơn, nối tiếp vào bên dưới các bảng trước đó.
 // Mỗi dòng trong bảng được gán index toàn cục trong gdtLastInvoices để mở popup chi tiết đúng hóa đơn.
-function renderGdtTypeTable(title, invoices) {
+function renderGdtTypeTable(title, invoices, isPurchase) {
   const container = document.getElementById("gdtResultsContainer");
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
+  // Mua vào = tiền chi ra (cam/đỏ, dấu "-") | Bán ra = tiền thu vào (xanh lá, dấu "+")
+  // Dùng đúng cách tô màu của bảng "Kiểm tra giao dịch SePay v2" (amount-in / amount-out).
+  const amountClass = isPurchase ? "amount-out" : "amount-in";
+  const amountSign = isPurchase ? "-" : "+";
   const dateFmt = (v) => {
     if (!v) return "";
     // API trả dạng "2026-07-19T17:00:00Z" -> hiển thị dd/mm/yyyy
@@ -4304,7 +4308,7 @@ function renderGdtTypeTable(title, invoices) {
       <td>${dateFmt(inv.tdlap)}</td>
       <td>${escapeHtml(inv.nbmst)}</td>
       <td class="tx-content-cell" style="max-width:220px;" title="${escapeHtml(inv.nbten)}">${escapeHtml(inv.nbten)}</td>
-      <td style="text-align:right; font-weight:600;">${amountFmt(inv.tgtttbso)}</td>`;
+      <td style="text-align:right;"><span class="${amountClass}">${amountSign}${amountFmt(inv.tgtttbso)}</span></td>`;
     tbody.appendChild(tr);
   });
 
@@ -4314,7 +4318,7 @@ function renderGdtTypeTable(title, invoices) {
   tfoot.innerHTML = `
     <tr style="font-weight:700; background:var(--total-row-bg);">
       <td colspan="6" style="text-align:right;">Tổng cộng</td>
-      <td style="text-align:right;">${amountFmt(sumTotal)}</td>
+      <td style="text-align:right;"><span class="${amountClass}">${amountSign}${amountFmt(sumTotal)}</span></td>
     </tr>`;
   table.appendChild(tfoot);
 
