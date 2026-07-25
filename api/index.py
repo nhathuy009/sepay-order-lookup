@@ -22,27 +22,12 @@ from _core import (  # noqa: E402
     EXCEL_HEADERS,
     EXCEL_FIELDS,
 )
-from _missav import get_movie_detail, get_category_list
-from _subtitle import search_subtitle
+
 from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
-
-def handle_movie(body):
-    code = (body.get("code") or "").strip()
-    if not code:
-        return 400, {"error": "Thiếu mã phim"}
-    
-    detail = get_movie_detail(code)
-    if not detail:
-        return 404, {"error": "Không tìm thấy phim hoặc mã không hợp lệ"}
-        
-    # Tự động quét và lấy link phụ đề
-    detail["subtitle_url"] = search_subtitle(code)
-    
-    return 200, detail
 
 def handle_fetch_employees_excel(body):
     file_b64 = body.get("file_base64", "")
@@ -85,13 +70,6 @@ def handle_fetch_employees_excel(body):
     except Exception as e:
         return 400, {"error": f"Lỗi đọc file Excel: {str(e)}"}
         
-def handle_category(body):
-    slug = (body.get("slug") or "").strip()
-    if not slug:
-        return 400, {"error": "Thiếu slug danh mục"}
-    movies = get_category_list(slug)
-    return 200, {"movies": movies}
-
 def handle_invoice(body):
     code = (body.get("code") or "").strip()
     if not code:
@@ -439,33 +417,6 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        # ------ TRẠM TRUNG CHUYỂN PHỤ ĐỀ (CORS & SRT to VTT Proxy) ------
-        parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/api/subtitle":
-            qs = urllib.parse.parse_qs(parsed.query)
-            url = qs.get("url", [""])[0]
-            if url:
-                try:
-                    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-                    if resp.status_code == 200:
-                        # Biến đổi SRT sang WebVTT chuẩn xác (Chỉ thay đổi dấu phẩy ở mốc thời gian thành dấu chấm)
-                        vtt_text = "WEBVTT\n\n" + re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', resp.text)
-                        body = vtt_text.encode("utf-8")
-                        
-                        self.send_response(200)
-                        self.send_header("Content-Type", "text/vtt; charset=utf-8")
-                        self.send_header("Content-Length", str(len(body)))
-                        self.send_header("Access-Control-Allow-Origin", "*") # Mở khóa CORS
-                        self.end_headers()
-                        self.wfile.write(body)
-                        return
-                except Exception:
-                    pass
-            self.send_response(404)
-            self.end_headers()
-            return
-        # -----------------------------------------------------------------
-
         self._send(200, {"auth_required": bool(APP_ACCESS_TOKEN)})
 
     def do_POST(self):
@@ -484,11 +435,7 @@ class handler(BaseHTTPRequestHandler):
 
         action = body.get("action", "lookup")
         
-        if action == "movie":
-            status, payload = handle_movie(body)
-        elif action == "category":
-            status, payload = handle_category(body)
-        elif action == "excel":
+        if action == "excel":
             status, payload = handle_excel(body)
         elif action == "bank_statement":
             status, payload = handle_bank_statement(body)

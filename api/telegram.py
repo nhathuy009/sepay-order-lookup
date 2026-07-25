@@ -7,28 +7,16 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 sys.path.append(os.path.dirname(__file__))
-from _core import lookup_order, detect_system  
-from _missav import search_missav, get_movie_detail, get_category_list  
+from _core import lookup_order, detect_system
 
 VERCEL_DOMAIN = "https://nhathuy009.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 ALLOWED_IDS = set(x.strip() for x in os.environ.get("TELEGRAM_ALLOWED_IDS", "").split(",") if x.strip())
 WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
-CATEGORIES = [
-    {'slug': 'vi/today-hot', 'title': '🔥 Hot Hôm Nay'},
-    {'slug': 'vi/weekly-hot', 'title': '📅 Hot Trong Tuần'},
-    {'slug': 'vi/monthly-hot', 'title': '📆 Hot Trong Tháng'},
-    {'slug': 'vi/uncensored-leak', 'title': '🔞 Không Che'},
-    {'slug': 'vi/release', 'title': '🆕 Mới Cập Nhật'}
-]
-
 HELP_TEXT = (
     "👋 <b>Bot tích hợp Đơn hàng & Giải trí</b>\n\n"
-    "<b>1. Tra cứu đơn:</b> Gửi mã <code>DH18700</code> hoặc <code>BIZ02120</code>\n"
-    "<b>2. Phim ảnh:</b>\n"
-    "• Gõ <code>/menu</code> để xem danh sách Hot.\n"
-    "• Gửi mã phim (VD: <code>snos-056</code>) để lấy link xem trực tiếp."
+    "<b>Tra cứu đơn:</b> Gửi mã <code>DH18700</code> hoặc <code>BIZ02120</code>\n"
 )
 
 def tg_call(method, payload):
@@ -41,12 +29,6 @@ def tg_call(method, payload):
 
 def send_message(chat_id, text):
     tg_call("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True})
-
-def show_main_menu(chat_id):
-    keyboard = {"inline_keyboard": []}
-    for cat in CATEGORIES:
-        keyboard["inline_keyboard"].append([{"text": cat['title'], "callback_data": f"cat_{cat['slug']}"}])
-    tg_call("sendMessage", {"chat_id": chat_id, "text": "🍿 <b>Danh mục phim:</b>", "parse_mode": "HTML", "reply_markup": keyboard})
 
 def esc(s):
     return str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -71,19 +53,6 @@ def handle_update(update):
         query = update["callback_query"]
         chat_id = query["message"]["chat"]["id"]
         data = query["data"]
-        
-        if data.startswith("cat_"):
-            slug = data.replace("cat_", "")
-            movies = get_category_list(slug)
-            cat_title = next((c['title'] for c in CATEGORIES if c['slug'] == slug), "Danh sách phim")
-            if movies:
-                text = f"<b>{cat_title} (Top 10):</b>\n"
-                for m in movies: text += f"\n• <code>{m['code']}</code>\n  👉 {esc(m['title'])}\n"
-            else:
-                text = "⚠️ Hệ thống không lấy được danh sách."
-            tg_call("answerCallbackQuery", {"callback_query_id": query["id"]})
-            send_message(chat_id, text)
-        return
 
     message = update.get("message") or update.get("edited_message")
     if not message: return
@@ -93,9 +62,6 @@ def handle_update(update):
 
     if text.startswith("/start") or text.startswith("/help"):
         send_message(chat_id, HELP_TEXT)
-        return
-    if text.lower() == "/menu":
-        show_main_menu(chat_id)
         return
 
     lines = [l.strip() for l in text.split("\n") if l.strip()]
@@ -107,29 +73,6 @@ def handle_update(update):
             replies.append(format_result(lookup_order(code)))
         send_message(chat_id, "\n\n".join(replies) if replies else HELP_TEXT)
         return
-
-    target = lines[0]
-    movie_detail = get_movie_detail(target)
-    
-    if movie_detail:
-        stream_url = movie_detail['stream_url']
-        subtitle_url = movie_detail.get('subtitle_url', '')
-        print(f"DEBUG: Subtitle URL truyền đi là: {subtitle_url}")
-        web_app_url = f"{VERCEL_DOMAIN}/player.html?vid={urllib.parse.quote(stream_url)}&sub={urllib.parse.quote(subtitle_url)}"
-        reply = f"🎬 <b>{esc(movie_detail['title'])}</b>\n\nPhim đã sẵn sàng. Nhấn nút bên dưới để xem!"
-        keyboard = {"inline_keyboard": [[{"text": "▶️ Xem Phim (Giao diện gốc)", "web_app": {"url": web_app_url}}]]}
-        tg_call("sendMessage", {"chat_id": chat_id, "text": reply, "parse_mode": "HTML", "reply_markup": keyboard})
-        return
-
-    search_results = search_missav(target)
-    if search_results:
-        output_lines = [f"🔍 <b>Kết quả tìm kiếm cho: {esc(target)}</b>\n"]
-        for res in search_results[:8]:
-            short_code = res['slug'].replace("vi/", "")
-            output_lines.append(f"• <b>{esc(res['code'])}</b>\n  👉 <i>Gửi mã:</i> <code>{short_code}</code>")
-        send_message(chat_id, "\n".join(output_lines))
-    else:
-        send_message(chat_id, f"⚠️ Không tìm thấy: <b>{esc(target)}</b>")
 
 class handler(BaseHTTPRequestHandler):
     def _ok(self):
