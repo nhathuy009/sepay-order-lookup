@@ -817,45 +817,65 @@
       </div>
 
       <div id="tabTransaction" class="hidden">
-        <h2>Kiểm tra giao dịch SePay v2</h2>
-        
-        <div class="card">
-          <label>Mã đơn hàng / Nội dung CK cần tìm (Enter để tìm)</label>
-          <div class="row">
-            <div><input type="text" id="txSearchCode" placeholder="Nhập mã... VD: DH18700" onkeydown="if(event.key==='Enter') doTxSearch()" /></div>
-            <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu 1 mã</button>
-          </div>
-          <div id="txSearchResult" style="margin-top: 20px;"></div>
-        </div>
+  <h2>Kiểm tra giao dịch SePay v2</h2>
 
-        <div class="card">
-          <h3 style="margin-top:0; font-size:16px; font-weight:700;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
-          <div class="row" style="align-items: flex-end; margin-bottom: 20px;">
-            <div style="flex: 1; min-width: 120px;">
-              <label>Từ ngày</label>
-              <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
-            </div>
-            <div style="flex: 1; min-width: 120px;">
-              <label>Đến ngày</label>
-              <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
-            </div>
-            <div style="flex: 1; min-width: 200px;">
-              <label>Tài khoản (Tùy chọn)</label>
-              <div class="multi-select-container" id="multiSelectContainer">
-                <div class="multi-select-label" id="txBankAccountIdLabel" onclick="document.getElementById('txBankAccountIdDropdown').classList.toggle('show')">
-                  -- Tất cả tài khoản --
-                </div>
-                <div class="multi-select-dropdown" id="txBankAccountIdDropdown">
-                  </div>
-              </div>
-            </div>
-            <div style="flex: 1; min-width: 120px;">
-              <label>&nbsp;</label>
-              <button id="txListBtn" onclick="doTxList()" style="width: 100%;">Lấy danh sách</button>
-            </div>
-          </div>
-          <div id="txListResult" style="margin-top: 20px;"></div>
+  <div class="card">
+    <div class="row" style="align-items: flex-end;">
+      <div>
+        <label>Mã đơn hàng / Nội dung CK cần tìm (Enter để tìm)</label>
+        <div class="row" style="margin-top: 8px;">
+          <div><input type="text" id="txSearchCode" placeholder="Nhập mã... VD: DH18700" onkeydown="if(event.key==='Enter') doTxSearch()" /></div>
+          <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu 1 mã</button>
         </div>
+      </div>
+      <div>
+        <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
+        <div class="row" style="margin-top: 8px;">
+          <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
+          <button id="bankBtn" onclick="doBankStatement()">Xử lý & Xem trước</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
+      Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.
+    </div>
+    <div id="txSearchResult" style="margin-top: 20px;"></div>
+    <div id="bankResult" class="msg"></div>
+  </div>
+
+  <!-- Khung chứa bảng dữ liệu Sao kê (mặc định ẩn) -->
+  <div id="bankTableWrap" style="display:none;" class="card"></div>
+
+  <div class="card">
+    <h3 style="margin-top:0; font-size:16px; font-weight:700;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
+    <div class="row" style="align-items: flex-end; margin-bottom: 20px;">
+      <div style="flex: 1; min-width: 120px;">
+        <label>Từ ngày</label>
+        <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+      </div>
+      <div style="flex: 1; min-width: 120px;">
+        <label>Đến ngày</label>
+        <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <label>Tài khoản (Tùy chọn)</label>
+        <div class="multi-select-container" id="multiSelectContainer">
+          <div class="multi-select-label" id="txBankAccountIdLabel" onclick="document.getElementById('txBankAccountIdDropdown').classList.toggle('show')">
+            -- Tất cả tài khoản --
+          </div>
+          <div class="multi-select-dropdown" id="txBankAccountIdDropdown">
+            </div>
+        </div>
+      </div>
+      <div style="flex: 1; min-width: 120px;">
+        <label>&nbsp;</label>
+        <button id="txListBtn" onclick="doTxList()" style="width: 100%;">Lấy danh sách</button>
+      </div>
+    </div>
+    <div id="txListResult" style="margin-top: 20px;"></div>
+  </div>
+
+</div>
 
       </div>
       <div id="tabEmployee" class="hidden">
