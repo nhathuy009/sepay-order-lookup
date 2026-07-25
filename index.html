@@ -977,7 +977,7 @@
         <div id="bulkResultArea">
           <div class="msg" id="bulkProgress" style="display:none; margin-bottom: 12px;"></div>
           <div class="table-responsive" style="display:none;" id="bulkTableWrap">
-            <table class="bulk-table" id="bulkTable">
+            <table class="sepay-table" id="bulkTable">
               <thead id="bulkThead"></thead>
               <tbody id="bulkTbody"></tbody>
             </table>
@@ -1229,7 +1229,7 @@
         <div id="invoiceResultArea">
           <div class="msg" id="invoiceProgress" style="display:none; margin-bottom: 12px;"></div>
           <div class="table-responsive" style="display:none;" id="invoiceTableWrap">
-            <table class="bulk-table" id="invoiceTable">
+            <table class="sepay-table" id="invoiceTable">
               <thead>
                 <tr>
                   <th>Trạng thái</th>
@@ -1351,7 +1351,7 @@
             </div>
             <div style="display:flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px;">
               <div class="table-responsive" style="width: fit-content; max-width: 100%; flex: 0 0 auto;">
-                <table class="bulk-table" id="airTable" style="width: auto;">
+                <table class="sepay-table" id="airTable" style="width: auto;">
                   <thead>
                     <tr>
                       <th>STT</th>
@@ -3792,7 +3792,7 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "bulk-table";
+  table.className = "sepay-table";
   table.id = "invoiceByDateSummaryTable";
   table.innerHTML = `
     <thead>
@@ -3928,7 +3928,7 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "bulk-table";
+  table.className = "sepay-table";
   table.id = "invoiceByDateRefSummaryTable";
   table.innerHTML = `
     <thead>
@@ -4049,7 +4049,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "bulk-table";
+  table.className = "sepay-table";
   table.id = tableId;
   table.innerHTML = `
     <thead>
@@ -4279,7 +4279,7 @@ function renderGdtTypeTable(title, invoices) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "bulk-table";
+  table.className = "sepay-table";
   table.innerHTML = `
     <thead>
       <tr>
@@ -4303,10 +4303,20 @@ function renderGdtTypeTable(title, invoices) {
       <td>${escapeHtml(inv.shdon)}</td>
       <td>${dateFmt(inv.tdlap)}</td>
       <td>${escapeHtml(inv.nbmst)}</td>
-      <td>${escapeHtml(inv.nbten)}</td>
-      <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>`;
+      <td class="tx-content-cell" style="max-width:220px;" title="${escapeHtml(inv.nbten)}">${escapeHtml(inv.nbten)}</td>
+      <td style="text-align:right; font-weight:600;">${amountFmt(inv.tgtttbso)}</td>`;
     tbody.appendChild(tr);
   });
+
+  // Dòng tổng cộng — cộng "Tổng tiền" của tất cả hóa đơn trong nhóm này.
+  const sumTotal = invoices.reduce((s, inv) => s + (Number(inv.tgtttbso) || 0), 0);
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = `
+    <tr style="font-weight:700; background:var(--total-row-bg);">
+      <td colspan="6" style="text-align:right;">Tổng cộng</td>
+      <td style="text-align:right;">${amountFmt(sumTotal)}</td>
+    </tr>`;
+  table.appendChild(tfoot);
 
   tableResponsive.appendChild(table);
   wrap.appendChild(tableResponsive);
@@ -4377,7 +4387,7 @@ function renderGdtArrayTable(title, arr) {
   });
   if (allKeys.length === 0) return "";
   let html = `<div class="gdt-section-title">${escapeHtml(title)}</div>`;
-  html += `<div class="table-responsive"><table class="bulk-table"><thead><tr>` +
+  html += `<div class="table-responsive"><table class="sepay-table"><thead><tr>` +
     allKeys.map(k => `<th>${escapeHtml(gdtFieldLabel(k))}</th>`).join("") + `</tr></thead><tbody>`;
   arr.forEach(item => {
     html += "<tr>" + allKeys.map(k => `<td>${gdtFormatValue(item ? item[k] : "")}</td>`).join("") + "</tr>";
