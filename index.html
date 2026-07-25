@@ -794,25 +794,6 @@
         </div>
       </div>
 
-      <div id="tabBank" class="hidden">
-        <h2>Tổng hợp Sao kê Ngân hàng</h2>
-        <div class="card">
-          <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
-          <div class="row">
-            <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
-            <!-- Đổi tên nút để phù hợp luồng UX mới -->
-            <button id="bankBtn" onclick="doBankStatement()">Xử lý & Xem trước</button>
-          </div>
-          <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
-            Hệ thống sẽ gộp các giao dịch có chung số tiền thành 1 dòng, tính toán và tự thiết lập file có sẵn công thức số dư lũy kế.
-          </div>
-          <div id="bankResult" class="msg"></div>
-        </div>
-        
-        <!-- Khung chứa bảng dữ liệu (mặc định ẩn) -->
-        <div id="bankTableWrap" style="display:none;" class="card"></div>
-      </div>
-
       <div id="tabTransaction" class="hidden">
   <h2>Kiểm tra giao dịch SePay v2</h2>
 
@@ -874,7 +855,6 @@
 
 </div>
 
-      </div>
       <div id="tabEmployee" class="hidden">
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
