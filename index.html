@@ -704,9 +704,9 @@
   }
   
   .sepay-table th { 
-    background: var(--accent-gradient); color: #FFFFFF; font-weight: 700; font-size: 12px; 
-    text-transform: uppercase; letter-spacing: 0.4px; padding: 14px 16px; 
-    border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.22); 
+    background: var(--table-th-bg); color: var(--table-th-text); font-weight: 600; font-size: 12px; 
+    text-transform: uppercase; padding: 14px 16px; 
+    border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
   }
   .sepay-table td { 
     padding: 14px 16px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); 
@@ -977,7 +977,7 @@
         <div id="bulkResultArea">
           <div class="msg" id="bulkProgress" style="display:none; margin-bottom: 12px;"></div>
           <div class="table-responsive" style="display:none;" id="bulkTableWrap">
-            <table class="sepay-table" id="bulkTable">
+            <table class="bulk-table" id="bulkTable">
               <thead id="bulkThead"></thead>
               <tbody id="bulkTbody"></tbody>
             </table>
@@ -1229,7 +1229,7 @@
         <div id="invoiceResultArea">
           <div class="msg" id="invoiceProgress" style="display:none; margin-bottom: 12px;"></div>
           <div class="table-responsive" style="display:none;" id="invoiceTableWrap">
-            <table class="sepay-table" id="invoiceTable">
+            <table class="bulk-table" id="invoiceTable">
               <thead>
                 <tr>
                   <th>Trạng thái</th>
@@ -1351,7 +1351,7 @@
             </div>
             <div style="display:flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px;">
               <div class="table-responsive" style="width: fit-content; max-width: 100%; flex: 0 0 auto;">
-                <table class="sepay-table" id="airTable" style="width: auto;">
+                <table class="bulk-table" id="airTable" style="width: auto;">
                   <thead>
                     <tr>
                       <th>STT</th>
@@ -3699,9 +3699,9 @@ async function doInvoiceLookup() {
           <td>${escapeHtml(data.customer_name)}</td>
           <td>${escapeHtml(data.customer_id)}</td>
           <td>${escapeHtml(data.customer_address)}</td>
-          <td style="text-align:right;">${amountFmt(data.amount_before_tax)}</td>
-          <td style="text-align:right;">${amountFmt(data.vat_amount)}</td>
-          <td style="text-align:right;"><span class="amount-in">+${amountFmt(data.total_amount)}</span></td>
+          <td>${amountFmt(data.amount_before_tax)}</td>
+          <td>${amountFmt(data.vat_amount)}</td>
+          <td>${amountFmt(data.total_amount)}</td>
           <td>${escapeHtml(data.payment_method)}</td>
           <td>${escapeHtml(data.invoice_type)}</td>`;
       } else {
@@ -3792,7 +3792,7 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "sepay-table";
+  table.className = "bulk-table";
   table.id = "invoiceByDateSummaryTable";
   table.innerHTML = `
     <thead>
@@ -3928,7 +3928,7 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "sepay-table";
+  table.className = "bulk-table";
   table.id = "invoiceByDateRefSummaryTable";
   table.innerHTML = `
     <thead>
@@ -4049,7 +4049,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "sepay-table";
+  table.className = "bulk-table";
   table.id = tableId;
   table.innerHTML = `
     <thead>
@@ -4086,7 +4086,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td>${escapeHtml(inv.username)}</td>
       <td>${blankColumns ? "" : amountFmt(inv.amount_before_tax)}</td>
       <td>${blankColumns ? "" : amountFmt(inv.vat_amount)}</td>
-      <td>${blankColumns ? "" : `<span class="amount-in">+${amountFmt(inv.total_amount)}</span>`}</td>
+      <td>${blankColumns ? "" : amountFmt(inv.total_amount)}</td>
       <td>${blankColumns ? "" : escapeHtml(inv.ref_username)}</td>
       <td></td>
       <td>${blankColumns ? "" : refRateHTML}</td>
@@ -4114,7 +4114,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
       <td colspan="4" style="text-align:right;">Tổng cộng</td>
       <td>${amountFmt(sumAmount)}</td>
       <td>${amountFmt(sumVat)}</td>
-      <td><span class="amount-in">+${amountFmt(sumTotal)}</span></td>
+      <td>${amountFmt(sumTotal)}</td>
       <td colspan="3"></td>
       <td>${amountFmt(sumRef)}</td>
       <td colspan="3"></td>
@@ -4136,7 +4136,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
     const tfootTds = tfoot.querySelectorAll('tr td');
     tfootTds[1].textContent = amountFmt(vSumAmount);
     tfootTds[2].textContent = amountFmt(vSumVat);
-    tfootTds[3].innerHTML = `<span class="amount-in">+${amountFmt(vSumTotal)}</span>`;
+    tfootTds[3].textContent = amountFmt(vSumTotal);
     tfootTds[5].textContent = amountFmt(vSumRef);
   });
 
@@ -4215,7 +4215,7 @@ async function doGdtInvoiceLookup() {
       if (data.token) sharedToken = data.token;
       const invoices = data.invoices || [];
       totalFound += invoices.length;
-      renderGdtTypeTable(title, invoices, isPurchase);
+      renderGdtTypeTable(title, invoices);
 
       if (data.warnings && data.warnings.length > 0) {
         problems.push(...data.warnings.map(w => `${title}: ${w}`));
@@ -4248,13 +4248,9 @@ async function doGdtInvoiceLookup() {
 
 // Vẽ 1 bảng kết quả cho MỘT loại hóa đơn, nối tiếp vào bên dưới các bảng trước đó.
 // Mỗi dòng trong bảng được gán index toàn cục trong gdtLastInvoices để mở popup chi tiết đúng hóa đơn.
-function renderGdtTypeTable(title, invoices, isPurchase) {
+function renderGdtTypeTable(title, invoices) {
   const container = document.getElementById("gdtResultsContainer");
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
-  // Mua vào = tiền chi ra (cam/đỏ, dấu "-") | Bán ra = tiền thu vào (xanh lá, dấu "+")
-  // Dùng đúng cách tô màu của bảng "Kiểm tra giao dịch SePay v2" (amount-in / amount-out).
-  const amountClass = isPurchase ? "amount-out" : "amount-in";
-  const amountSign = isPurchase ? "-" : "+";
   const dateFmt = (v) => {
     if (!v) return "";
     // API trả dạng "2026-07-19T17:00:00Z" -> hiển thị dd/mm/yyyy
@@ -4283,7 +4279,7 @@ function renderGdtTypeTable(title, invoices, isPurchase) {
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
   const table = document.createElement("table");
-  table.className = "sepay-table";
+  table.className = "bulk-table";
   table.innerHTML = `
     <thead>
       <tr>
@@ -4307,20 +4303,10 @@ function renderGdtTypeTable(title, invoices, isPurchase) {
       <td>${escapeHtml(inv.shdon)}</td>
       <td>${dateFmt(inv.tdlap)}</td>
       <td>${escapeHtml(inv.nbmst)}</td>
-      <td class="tx-content-cell" style="max-width:220px;" title="${escapeHtml(inv.nbten)}">${escapeHtml(inv.nbten)}</td>
-      <td style="text-align:right;"><span class="${amountClass}">${amountSign}${amountFmt(inv.tgtttbso)}</span></td>`;
+      <td>${escapeHtml(inv.nbten)}</td>
+      <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>`;
     tbody.appendChild(tr);
   });
-
-  // Dòng tổng cộng — cộng "Tổng tiền" của tất cả hóa đơn trong nhóm này.
-  const sumTotal = invoices.reduce((s, inv) => s + (Number(inv.tgtttbso) || 0), 0);
-  const tfoot = document.createElement("tfoot");
-  tfoot.innerHTML = `
-    <tr style="font-weight:700; background:var(--total-row-bg);">
-      <td colspan="6" style="text-align:right;">Tổng cộng</td>
-      <td style="text-align:right;"><span class="${amountClass}">${amountSign}${amountFmt(sumTotal)}</span></td>
-    </tr>`;
-  table.appendChild(tfoot);
 
   tableResponsive.appendChild(table);
   wrap.appendChild(tableResponsive);
@@ -4391,7 +4377,7 @@ function renderGdtArrayTable(title, arr) {
   });
   if (allKeys.length === 0) return "";
   let html = `<div class="gdt-section-title">${escapeHtml(title)}</div>`;
-  html += `<div class="table-responsive"><table class="sepay-table"><thead><tr>` +
+  html += `<div class="table-responsive"><table class="bulk-table"><thead><tr>` +
     allKeys.map(k => `<th>${escapeHtml(gdtFieldLabel(k))}</th>`).join("") + `</tr></thead><tbody>`;
   arr.forEach(item => {
     html += "<tr>" + allKeys.map(k => `<td>${gdtFormatValue(item ? item[k] : "")}</td>`).join("") + "</tr>";
