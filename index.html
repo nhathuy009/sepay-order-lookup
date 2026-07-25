@@ -736,9 +736,6 @@
         <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-text-search-icon lucide-text-search"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><circle cx="17" cy="15" r="3"/><path d="m21 19-1.9-1.9"/></svg><span class="menu-text">Tra cứu hàng loạt</span>
         </div>
-        <div class="menu-item" id="tabBankBtn" onclick="switchTab('bank')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-chart-column-icon lucide-file-chart-column"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 18v-1"/><path d="M12 18v-6"/><path d="M16 18v-3"/></svg><span class="menu-text">Tổng hợp sao kê</span>
-        </div>
         <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-piggy-bank-icon lucide-piggy-bank"><path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/></svg><span class="menu-text">Tra cứu CK (SePay)</span>
         </div>
@@ -1543,7 +1540,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "bank", "transaction", "invoice", "gdt", "employee", "air"];
+  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
