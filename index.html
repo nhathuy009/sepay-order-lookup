@@ -32,7 +32,7 @@
     --accent-hover: #63B8F0; 
     
     --btn-orange: linear-gradient(180deg,#F4AE36,#E08B10);
-    --btn-orange-text: #241400;Đ
+    --btn-orange-text: #241400;
     --btn-text: #0C1640;
 
     --badge-ok-bg: rgba(46,151,224,.16);     
@@ -106,7 +106,147 @@
     --cal-active-text: #FFFFFF;
     --cal-block-bg: #FFFFFF;
   }
-  
+
+  /* ===================== CÁC THEME BỔ SUNG ===================== */
+  /* Theme "Xanh Rêu Chuyên Nghiệp" (nền sáng) — dựa palette #5D8696/#78ABAF/#8FAFCC/#CCA885 */
+  body.theme-teal {
+    --bg-app: #F0F4F5;
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(93,134,150,.10), transparent 70%),
+                   linear-gradient(180deg, #F0F4F5, #E4EBEC);
+    --header-bg: rgba(255,255,255,0.85);
+    --card-bg: #FFFFFF;
+    --card-bg-solid: #FFFFFF;
+    --border: rgba(93,134,150,0.18);
+    --text-main: #2A3B40;
+    --text-muted: #6B8288;
+    --heading-color: #1F2D30;
+    --brand-color: #5D8696;
+
+    --accent: #5D8696;
+    --accent-gradient: linear-gradient(90deg, #5D8696, #78ABAF);
+    --accent-hover: #78ABAF;
+
+    --btn-orange: linear-gradient(180deg, #CCA885, #B5905F);
+    --btn-orange-text: #FFFFFF;
+    --btn-text: #FFFFFF;
+
+    --badge-ok-bg: #E1EFE9;
+    --badge-ok-text: #2F6B4F;
+    --badge-err-bg: #FBEAE0;
+    --badge-err-text: #A15A2A;
+
+    --input-bg: #F8FAFA;
+    --input-border: #C7D3D5;
+    --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    --table-th-bg: #EEF3F3;
+    --table-th-text: #4C6367;
+    --table-row-hover: #F5F8F8;
+
+    --amount-in: #2F8F6B;
+    --amount-out: #C1622E;
+    --total-row-bg: #E7F0F1;
+    --total-row-bg-solid: #E7F0F1;
+    --checkbox-bg: #F8FAFA;
+    --settings-panel-bg: rgba(0,0,0,0.03);
+
+    --cal-active-bg: #C5221F;
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: #FFFFFF;
+  }
+
+  /* Theme "Nâu Đất Tối" (dark mode thay thế) — dựa palette #534739/#9E8774/#1F2D33/#0D0D0C */
+  body.theme-earth-dark {
+    --bg-app: #14171A;
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(158,135,116,.14), transparent 70%),
+                   linear-gradient(180deg, #14171A, #0D0D0C);
+    --header-bg: rgba(20,23,26,0.4);
+    --card-bg: linear-gradient(180deg, rgba(31,45,51,.9), rgba(20,23,26,.8));
+    --card-bg-solid: #1F2D33;
+    --border: rgba(158,135,116,.22);
+    --text-main: #F0F2F1;
+    --text-muted: rgba(240,242,241,.6);
+    --heading-color: #FFFFFF;
+    --brand-color: #9E8774;
+
+    --accent: #9E8774;
+    --accent-gradient: linear-gradient(90deg, #9E8774, #C2AB94);
+    --accent-hover: #C2AB94;
+
+    --btn-orange: linear-gradient(180deg, #C2AB94, #9E8774);
+    --btn-orange-text: #14171A;
+    --btn-text: #14171A;
+
+    --badge-ok-bg: rgba(158,135,116,.18);
+    --badge-ok-text: #D8C4B0;
+    --badge-err-bg: rgba(232,99,73,.18);
+    --badge-err-text: #F0A98F;
+
+    --input-bg: rgba(31,45,51,.5);
+    --input-border: rgba(240,242,241,.14);
+    --card-shadow: 0 12px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+    --table-th-bg: rgba(0,0,0,0.25);
+    --table-th-text: #C2AB94;
+    --table-row-hover: rgba(255,255,255,0.04);
+
+    --amount-in: #A9D8C0;
+    --amount-out: #F0A98F;
+    --total-row-bg: rgba(158,135,116,.16);
+    --total-row-bg-solid: #2A2016;
+    --checkbox-bg: rgba(255,255,255,0.02);
+    --settings-panel-bg: rgba(0,0,0,0.25);
+
+    --cal-active-bg: #C5221F;
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: rgba(255,255,255,0.05);
+  }
+
+  /* Theme "San Hô Đêm" (dark mode thay thế) — dựa palette #213271/#367098/#79BBCF/#E86349/#DDFAFB */
+  body.theme-coral-dark {
+    --bg-app: #10182E;
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(232,99,73,.12), transparent 70%),
+                   linear-gradient(180deg, #10182E, #0A0F20);
+    --header-bg: rgba(16,24,46,0.4);
+    --card-bg: linear-gradient(180deg, rgba(33,50,113,.9), rgba(16,24,46,.8));
+    --card-bg-solid: #213271;
+    --border: rgba(140,160,220,.20);
+    --text-main: #EAF9FA;
+    --text-muted: rgba(234,249,250,.6);
+    --heading-color: #FFFFFF;
+    --brand-color: #E86349;
+
+    --accent: #367098;
+    --accent-gradient: linear-gradient(90deg, #367098, #79BBCF);
+    --accent-hover: #79BBCF;
+
+    --btn-orange: linear-gradient(180deg, #F08066, #E86349);
+    --btn-orange-text: #10182E;
+    --btn-text: #10182E;
+
+    --badge-ok-bg: rgba(121,187,207,.18);
+    --badge-ok-text: #C6EEF5;
+    --badge-err-bg: rgba(232,99,73,.20);
+    --badge-err-text: #FFC0AE;
+
+    --input-bg: rgba(33,50,113,.5);
+    --input-border: rgba(234,249,250,.14);
+    --card-shadow: 0 12px 30px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+    --table-th-bg: rgba(0,0,0,0.22);
+    --table-th-text: #9FC7DA;
+    --table-row-hover: rgba(255,255,255,0.04);
+
+    --amount-in: #A9E6EF;
+    --amount-out: #FFC0AE;
+    --total-row-bg: rgba(56,112,152,.20);
+    --total-row-bg-solid: #1B2A5C;
+    --checkbox-bg: rgba(255,255,255,0.02);
+    --settings-panel-bg: rgba(0,0,0,0.22);
+
+    --cal-active-bg: #C5221F;
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: rgba(255,255,255,0.05);
+  }
+  /* ================================================================ */
+
   * { box-sizing: border-box; }
   html { height: 100%; height: 100dvh; }
   body { 
@@ -640,8 +780,11 @@
       flex-wrap: wrap;
       gap: 8px;
     }
-    .header-actions #themeSegWrap {
+    .header-actions #themeSelect {
       order: 1;
+      flex: 0 0 auto;
+      padding: 6px 8px;
+      font-size: 12px;
     }
     .header-actions #accessToken {
       order: 2;
@@ -653,10 +796,6 @@
       padding: 8px 14px;
       font-size: 12.5px;
       white-space: nowrap;
-    }
-    .header-actions #themeSegWrap .acc-seg-btn {
-      padding: 6px 10px;
-      font-size: 12px;
     }
   }
 
@@ -719,10 +858,14 @@
     </div>
 
     <div class="header-actions" id="authCard">
-      <div class="acc-seg-wrap" id="themeSegWrap">
-        <button type="button" class="acc-seg-btn" id="themeBtnDark" onclick="changeTheme(false)">Tối</button>
-        <button type="button" class="acc-seg-btn" id="themeBtnLight" onclick="changeTheme(true)">Sáng</button>
-      </div>
+      <select id="themeSelect" onchange="setTheme(this.value)" title="Chọn giao diện"
+        style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 13px; font-weight: 600; outline: none; cursor: pointer;">
+        <option value="dark">🌙 Tối (mặc định)</option>
+        <option value="light">☀️ Sáng</option>
+        <option value="teal">🌿 Xanh Rêu</option>
+        <option value="earth-dark">🪵 Nâu Đất Tối</option>
+        <option value="coral-dark">🪸 San Hô Đêm</option>
+      </select>
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
       <button id="saveTokenBtn" onclick="saveToken()">Lưu khóa</button>
     </div>
@@ -1448,23 +1591,35 @@ function toggleSidebar() {
   localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
 }
 
-function changeTheme(isLight) {
+// Danh sách toàn bộ theme hiện có. Mỗi theme khai báo:
+//  - class: class gắn lên <body> ("" nghĩa là theme mặc định, không cần class)
+//  - flatpickr: bảng màu lịch flatpickr dùng kèm ("light" hoặc "dark")
+const THEMES = {
+  "dark":        { class: "",                 flatpickr: "dark"  },
+  "light":       { class: "light-mode",        flatpickr: "light" },
+  "teal":        { class: "theme-teal",         flatpickr: "light" },
+  "earth-dark":  { class: "theme-earth-dark",   flatpickr: "dark"  },
+  "coral-dark":  { class: "theme-coral-dark",   flatpickr: "dark"  },
+};
+const THEME_CLASSES = Object.values(THEMES).map(t => t.class).filter(Boolean);
+
+function setTheme(themeName) {
+  if (!THEMES[themeName]) themeName = "dark";
+  const cfg = THEMES[themeName];
+
+  // Gỡ hết class theme cũ trước khi gắn theme mới (không đụng tới các class khác như "has-token").
+  document.body.classList.remove(...THEME_CLASSES);
+  if (cfg.class) document.body.classList.add(cfg.class);
+
   const flatpickrTheme = document.getElementById("flatpickr-theme");
-  const btnDark = document.getElementById("themeBtnDark");
-  const btnLight = document.getElementById("themeBtnLight");
-  if(isLight) {
-    document.body.classList.add("light-mode");
-    localStorage.setItem("app_theme", "light");
-    flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css";
-    if(btnLight) btnLight.classList.add("active");
-    if(btnDark) btnDark.classList.remove("active");
-  } else {
-    document.body.classList.remove("light-mode");
-    localStorage.setItem("app_theme", "dark");
-    flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css";
-    if(btnDark) btnDark.classList.add("active");
-    if(btnLight) btnLight.classList.remove("active");
+  if (flatpickrTheme) {
+    flatpickrTheme.href = "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/" + cfg.flatpickr + ".css";
   }
+
+  const select = document.getElementById("themeSelect");
+  if (select) select.value = themeName;
+
+  try { localStorage.setItem("app_theme", themeName); } catch(e) {}
 }
 /* ----------------------------------------------------------- */
 
@@ -1478,13 +1633,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
     if (isCollapsed) document.getElementById("appSidebar").classList.add("collapsed");
 
+    // Tương thích ngược: người dùng cũ chỉ có "light" hoặc "dark" trong localStorage,
+    // người dùng mới có thể đã chọn "teal" / "earth-dark" / "coral-dark".
     const savedTheme = localStorage.getItem("app_theme");
-    if(savedTheme === "dark") {
-      changeTheme(false);
-    } else {
-      changeTheme(true);
-    }
-  } catch(e) {}
+    setTheme(savedTheme || "light");
+  } catch(e) { setTheme("light"); }
 
   fetch("/api/index").then(r => r.json()).then(d => {
     if (d && d.auth_required === false) {
