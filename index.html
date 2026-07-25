@@ -4260,10 +4260,10 @@ function renderGdtTypeTable(title, invoices) {
   };
 
   const wrap = document.createElement("div");
-  wrap.style.marginBottom = "20px";
+  wrap.className = "card";
 
   const heading = document.createElement("h3");
-  heading.style.cssText = "margin:0 0 10px; font-size:14px;";
+  heading.style.cssText = "margin:0 0 14px; font-size:14px;";
   heading.innerHTML = `${escapeHtml(title)} <span style="color:var(--text-muted); font-weight:600;">(${invoices.length})</span>`;
   wrap.appendChild(heading);
 
