@@ -3780,7 +3780,8 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
   const amountFmt = (v) => (v === "" || v === null || v === undefined) ? "" : Number(v).toLocaleString('vi-VN');
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = "flex: 3 1 560px; min-width: 480px;";
+  wrap.className = "card";
+  wrap.style.cssText = "flex: 3 1 560px; min-width: 480px; margin-bottom: 0;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
@@ -3916,7 +3917,8 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
     .sort((a, b) => b[1].total - a[1].total);
 
   const wrap = document.createElement("div");
-  wrap.style.cssText = "flex: 1 1 300px; max-width: 400px; min-width: 280px;";
+  wrap.className = "card";
+  wrap.style.cssText = "flex: 1 1 300px; max-width: 400px; min-width: 280px; margin-bottom: 0;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
@@ -4040,11 +4042,15 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   const tableId = `invoiceByDateTable_${courseIdx}`;
   const btnId = `copyInvoiceByDateBtn_${courseIdx}`;
 
+  const card = document.createElement("div");
+  card.className = "card";
+  panel.appendChild(card);
+
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:flex-end; align-items:center; margin-bottom:10px;";
   headerRow.innerHTML = `
     <button id="${btnId}" class="btn-outline" onclick="copyTableToClipboard('${tableId}', '${btnId}')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
-  panel.appendChild(headerRow);
+  card.appendChild(headerRow);
 
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
@@ -4141,7 +4147,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   });
 
   tableResponsive.appendChild(table);
-  panel.appendChild(tableResponsive);
+  card.appendChild(tableResponsive);
 }
 
 // TRA CỨU HÓA ĐƠN ĐIỆN TỬ (GDT) - đăng nhập bằng MST/mật khẩu + khoảng ngày
