@@ -453,7 +453,14 @@
     padding: 12px 20px; margin: 4px 14px; border-radius: 11px;
     display: flex; align-items: center; gap: 12px;
     cursor: pointer; color: var(--text-muted); font-weight: 600; transition: all 0.2s;
+    position: relative; overflow: hidden;
   }
+  .menu-item::before { /* ANIMATION 6: thanh chỉ báo trượt/mọc ra khi item được chọn */
+    content: ""; position: absolute; left: 0; top: 50%; width: 3px; height: 0;
+    background: var(--btn-orange-text, #fff); border-radius: 0 4px 4px 0;
+    transform: translateY(-50%); transition: height 0.25s ease;
+  }
+  .menu-item.active::before { height: 60%; }
   .menu-item:hover { background: var(--border); color: var(--text-main); }
   .menu-item.active { 
     background: var(--btn-orange); 
@@ -516,7 +523,7 @@
   }
   .slider:before {
     position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
-    background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    background-color: white; transition: transform .4s cubic-bezier(.68,-0.55,.27,1.55); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
   input:checked + .slider { background-color: var(--accent); }
   input:checked + .slider:before { transform: translateX(18px); }
@@ -603,12 +610,32 @@
     box-shadow: 0 4px 12px rgba(46,151,224,0.2);
   }
   button:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(46,151,224,0.35); }
+  button:active { transform: scale(0.97); } /* ANIMATION 2: phản hồi khi bấm */
   button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
   
   .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--input-border); box-shadow: none; }
   .btn-outline:hover { background: var(--border); color: var(--text-main); box-shadow: none;}
 
   .hidden { display: none !important; }
+
+  /* ANIMATION 1: nội dung tab xuất hiện fade + trượt lên khi chuyển tab */
+  .tab-panel { animation: tabFadeIn 0.35s ease; }
+  @keyframes tabFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ANIMATION 3: từng dòng bảng hiện lần lượt (stagger) khi có dữ liệu mới */
+  @keyframes rowFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  tbody tr { animation: rowFadeIn 0.3s ease both; }
+  tbody tr:nth-child(1)  { animation-delay: 0.02s; }
+  tbody tr:nth-child(2)  { animation-delay: 0.04s; }
+  tbody tr:nth-child(3)  { animation-delay: 0.06s; }
+  tbody tr:nth-child(4)  { animation-delay: 0.08s; }
+  tbody tr:nth-child(5)  { animation-delay: 0.10s; }
+  tbody tr:nth-child(6)  { animation-delay: 0.12s; }
+  tbody tr:nth-child(7)  { animation-delay: 0.14s; }
+  tbody tr:nth-child(8)  { animation-delay: 0.16s; }
+  tbody tr:nth-child(9)  { animation-delay: 0.18s; }
+  tbody tr:nth-child(10) { animation-delay: 0.20s; }
+  tbody tr:nth-child(n+11) { animation-delay: 0.22s; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
   .row > div { flex: 1; min-width: 250px; }
 
@@ -643,7 +670,8 @@
   .badge.ok { background: var(--badge-ok-bg); color: var(--badge-ok-text); }
   .badge.err { background: var(--badge-err-bg); color: var(--badge-err-text); }
   
-  .msg { margin-top: 12px; font-size: 14px; }
+  .msg { margin-top: 12px; font-size: 14px; animation: msgSlideIn 0.25s ease; } /* ANIMATION 7 */
+  @keyframes msgSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
   .msg.err { color: var(--badge-err-text); }
   .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 
@@ -667,7 +695,9 @@
     border-radius: 16px; box-shadow: var(--card-shadow);
     width: 100%; max-width: 720px; max-height: 88vh;
     display: flex; flex-direction: column; overflow: hidden;
+    animation: gdtBoxIn .22s ease; /* ANIMATION 5: scale + trượt lên khi mở modal */
   }
+  @keyframes gdtBoxIn { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .gdt-modal-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -954,7 +984,7 @@
 
     <main class="content main-content">
 
-      <div id="tabBulk">
+      <div id="tabBulk" class="tab-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="margin:0">Tra cứu hàng loạt</h2>
           <button id="copyExcelBtn" class="btn-outline" onclick="copyTableToExcel()" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
@@ -989,7 +1019,7 @@
         </div>
       </div>
 
-      <div id="tabTransaction" class="hidden">
+      <div id="tabTransaction" class="hidden tab-panel">
   <h2>Kiểm tra giao dịch SePay v2</h2>
 
   <div class="card">
@@ -1050,7 +1080,7 @@
 
 </div>
 
-      <div id="tabEmployee" class="hidden">
+      <div id="tabEmployee" class="hidden tab-panel">
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
@@ -1218,7 +1248,7 @@
           </div>
         </div>
       </div>
-      <div id="tabInvoice" class="hidden">
+      <div id="tabInvoice" class="hidden tab-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h2 style="margin:0">Tra cứu hóa đơn</h2>
           <button id="copyInvoiceBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceTable', 'copyInvoiceBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
@@ -1283,7 +1313,7 @@
           <div id="invoiceByDateResultsContainer"></div>
         </div>
       </div>
-      <div id="tabGdt" class="hidden">
+      <div id="tabGdt" class="hidden tab-panel">
         <h2 style="margin:0 0 16px 0">Tra cứu Hóa đơn điện tử (Tổng cục Thuế)</h2>
         <div class="card">
           <div class="row">
@@ -1327,7 +1357,7 @@
           <div id="gdtResultsContainer"></div>
         </div>
       </div>
-      <div id="tabAir" class="hidden">
+      <div id="tabAir" class="hidden tab-panel">
         <h2>Phần mềm Xuất Air Packing List</h2>
         <div class="card">
           <label>Chọn file Excel gốc (.xlsx, .xls) để xử lý</label>
