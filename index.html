@@ -618,6 +618,31 @@
 
   .hidden { display: none !important; }
 
+  /* MỤC 1: 2 bảng tổng hợp dùng grid, không còn hụt khoảng trống khi xuống dòng */
+  .invoice-summary-row {
+    display: grid; grid-template-columns: minmax(480px, 3fr) minmax(280px, 1fr);
+    gap: 20px; align-items: start; margin-bottom: 24px;
+  }
+  @media (max-width: 900px) {
+    .invoice-summary-row { grid-template-columns: 1fr; }
+  }
+
+  /* MỤC 4: dải chỉ số nhanh thay cho câu văn tóm tắt */
+  .stat-pills { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--badge-ok-bg); color: var(--badge-ok-text);
+    font-size: 13px; font-weight: 600;
+  }
+
+  /* MỤC 3: highlight dòng khóa học đang được chọn để xem chi tiết (thay cho tab-bar rời) */
+  tr.active-course-row { background: var(--badge-ok-bg) !important; }
+  tr.active-course-row td { color: var(--badge-ok-text); font-weight: 700; }
+
+  /* MỤC 6: dòng tổng cộng dính lại khi cuộn bảng dài */
+  table tfoot tr { position: sticky; bottom: 0; z-index: 1; }
+
   /* ANIMATION 1: nội dung tab xuất hiện fade + trượt lên khi chuyển tab */
   .tab-panel { animation: tabFadeIn 0.35s ease; }
   @keyframes tabFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -3791,7 +3816,7 @@ async function doInvoiceLookupByDate() {
 
     const courses = data.courses || [];
     const summaryRow = document.createElement("div");
-    summaryRow.style.cssText = "display:flex; flex-wrap:wrap; gap:20px; margin-bottom:24px; align-items:flex-start;";
+    summaryRow.className = "invoice-summary-row";
     resultsContainer.appendChild(summaryRow);
     renderInvoiceByDateSummaryTable(courses, summaryRow);
     renderInvoiceByDateRefSummaryTable(courses, summaryRow);
@@ -3799,7 +3824,11 @@ async function doInvoiceLookupByDate() {
 
     const total = data.total || 0;
     progress.innerHTML = total
-      ? `🎉 Hoàn tất! Tìm thấy <strong style="color:var(--badge-ok-text)">${total}</strong> hóa đơn, chia thành <strong style="color:var(--badge-ok-text)">${courses.length}</strong> khóa học.`
+      ? `<div class="stat-pills">
+           <span class="stat-pill">🎉 Hoàn tất</span>
+           <span class="stat-pill"><strong>${total}</strong>&nbsp;hóa đơn</span>
+           <span class="stat-pill"><strong>${courses.length}</strong>&nbsp;khóa học</span>
+         </div>`
       : 'Không tìm thấy hóa đơn nào trong khoảng ngày này.';
   } catch (e) {
     progress.innerHTML = `<span class="err">${escapeHtml(e.message)}</span>`;
@@ -3815,14 +3844,18 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
 
   const wrap = document.createElement("div");
   wrap.className = "card";
-  wrap.style.cssText = "flex: 3 1 560px; min-width: 480px; margin-bottom: 0;";
+  wrap.style.cssText = "margin-bottom: 0;";
 
   const headerRow = document.createElement("div");
-  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
+  headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;";
   headerRow.innerHTML = `
     <h3 style="margin:0; font-size:14px;">Tổng hợp theo khóa học</h3>
     <button id="copyInvoiceSummaryBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceByDateSummaryTable', 'copyInvoiceSummaryBtn')" style="font-size: 13px;">📋 Copy cho Excel / Sheets</button>`;
   wrap.appendChild(headerRow);
+  const hintRow = document.createElement("div");
+  hintRow.style.cssText = "font-size:12px; color:var(--text-muted); margin-bottom:10px;";
+  hintRow.textContent = "💡 Bấm vào 1 dòng để xem chi tiết khóa học đó bên dưới";
+  wrap.appendChild(hintRow);
 
   const tableResponsive = document.createElement("div");
   tableResponsive.className = "table-responsive";
@@ -3855,6 +3888,8 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
     grandCount += invoices.length;
 
     const tr = document.createElement("tr");
+    tr.id = `courseSummaryRow_${idx}`;
+    if (idx === 0) tr.classList.add("active-course-row");
     tr.dataset.count = invoices.length;
     tr.dataset.amount = sumAmount;
     tr.dataset.vat = sumVat;
@@ -3906,6 +3941,9 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
     tfootTds[4].textContent = amountFmt(vTotal);
     tfootTds[5].textContent = amountFmt(vRef);
   });
+  // Bảng tổng hợp chỉ có vài dòng, hàng "Lọc..." không cần thiết - bỏ đi, chỉ giữ sắp xếp theo cột.
+  const filterRow = table.querySelector('.table-filter-row');
+  if (filterRow) filterRow.remove();
 
   tableResponsive.appendChild(table);
   wrap.appendChild(tableResponsive);
@@ -3952,7 +3990,7 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
 
   const wrap = document.createElement("div");
   wrap.className = "card";
-  wrap.style.cssText = "flex: 1 1 300px; max-width: 400px; min-width: 280px; margin-bottom: 0;";
+  wrap.style.cssText = "margin-bottom: 0;";
 
   const headerRow = document.createElement("div");
   headerRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;";
@@ -4030,25 +4068,12 @@ function toggleRefDetailRow(detailId, triggerRow) {
   const icon = triggerRow.querySelector(".ref-toggle-icon");
   if (icon) icon.textContent = isOpen ? "▶" : "▼";
 }
-// Dựng tab-bar + các bảng khóa học (mỗi khóa học 1 bảng, ẩn/hiện qua lại bằng tab
-// thay vì xếp chồng dài từ trên xuống). Mỗi bảng vẫn dùng chung 13 cột đã thống nhất
-// và có nút copy riêng (copyTableToClipboard đã có sẵn, dùng chung cho toàn app).
+// Dựng các panel bảng chi tiết theo khóa học, ẩn/hiện qua lại bằng cách bấm vào
+// dòng tương ứng trong bảng "Tổng hợp theo khóa học" phía trên (switchInvoiceCourseTab).
+// Không còn dải tab pill riêng vì trùng lặp với danh sách đã có sẵn trong bảng tổng hợp.
 function renderInvoiceByDateTabs(courses) {
   const container = document.getElementById("invoiceByDateResultsContainer");
   if (courses.length === 0) return;
-
-  const tabBar = document.createElement("div");
-  tabBar.className = "course-tab-bar";
-  courses.forEach((course, idx) => {
-    const tab = document.createElement("button");
-    tab.type = "button";
-    tab.className = "course-tab" + (idx === 0 ? " active" : "");
-    tab.id = `courseTab_${idx}`;
-    tab.innerHTML = `${escapeHtml(course.title)} <span class="count">(${(course.invoices || []).length})</span>`;
-    tab.onclick = () => switchInvoiceCourseTab(idx, courses.length);
-    tabBar.appendChild(tab);
-  });
-  container.appendChild(tabBar);
 
   courses.forEach((course, idx) => {
     const panel = document.createElement("div");
@@ -4061,9 +4086,9 @@ function renderInvoiceByDateTabs(courses) {
 
 function switchInvoiceCourseTab(activeIdx, total) {
   for (let i = 0; i < total; i++) {
-    const tab = document.getElementById(`courseTab_${i}`);
+    const row = document.getElementById(`courseSummaryRow_${i}`);
     const panel = document.getElementById(`coursePanel_${i}`);
-    if (tab) tab.classList.toggle("active", i === activeIdx);
+    if (row) row.classList.toggle("active-course-row", i === activeIdx);
     if (panel) panel.style.display = i === activeIdx ? "block" : "none";
   }
 }
