@@ -574,11 +574,13 @@
   h2 { margin: 0 0 20px; font-size: 20px; font-weight: 800; color: var(--heading-color); font-family: 'Inter', sans-serif;}
   h3 { color: var(--heading-color); font-family: 'Inter', sans-serif;}
   .card { 
-    background: var(--card-bg); 
-    border: 1px solid var(--accent); /* fallback: trùng màu nút mặc định trong card */
-    border-color: color-mix(in srgb, var(--accent) 35%, transparent); /* viền mỏng, nhạt như ảnh mẫu */
+    background: var(--card-bg); border: 1px solid var(--border); 
     border-radius: 16px; padding: 24px; margin-bottom: 24px; 
     box-shadow: var(--card-shadow); transition: 0.3s;
+  }
+  .card:hover {
+    border-color: var(--accent); /* fallback: trùng màu nút mặc định trong card */
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent); /* viền mỏng, nhạt như ảnh mẫu */
   }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
   
