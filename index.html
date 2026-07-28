@@ -1342,10 +1342,11 @@
             </div>
             <div style="flex: 1; min-width: 200px;">
               <label>Loại hóa đơn</label>
-              <select id="invInvoiceKind" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
-                <option value="2" selected>Chỉ hóa đơn gốc</option>
-                <option value="-1">Tất cả (gồm điều chỉnh/thay thế)</option>
-              </select>
+              <div class="mst-choice-group">
+                <button type="button" class="mst-choice-btn active" id="invInvoiceKindBtnA" onclick="selectChoiceGroup('invInvoiceKind', '2', this)">Chỉ hóa đơn gốc</button>
+                <button type="button" class="mst-choice-btn" id="invInvoiceKindBtnB" onclick="selectChoiceGroup('invInvoiceKind', '-1', this)">Tất cả (gồm điều chỉnh/thay thế)</button>
+              </div>
+              <input type="hidden" id="invInvoiceKind" value="2" />
             </div>
             <div style="flex: 1; min-width: 140px;">
               <label>&nbsp;</label>
@@ -1365,8 +1366,8 @@
             <div style="flex: 1; min-width: 180px;">
               <label>Mã số thuế (Username)</label>
               <div class="mst-choice-group">
-                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnA" onclick="selectGdtUsername('0319353578', this)">0319353578</button>
-                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnB" onclick="selectGdtUsername('1300622250', this)">1300622250</button>
+                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnA" onclick="selectChoiceGroup('gdtUsername', '0319353578', this)">0319353578</button>
+                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnB" onclick="selectChoiceGroup('gdtUsername', '1300622250', this)">1300622250</button>
               </div>
               <input type="hidden" id="gdtUsername" value="" />
             </div>
@@ -1386,10 +1387,11 @@
             </div>
             <div style="flex: 1; min-width: 160px;">
               <label>Loại hóa đơn</label>
-              <select id="gdtIsPurchase" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
-                <option value="true">Mua vào</option>
-                <option value="false">Bán ra</option>
-              </select>
+              <div class="mst-choice-group">
+                <button type="button" class="mst-choice-btn active" id="gdtIsPurchaseBtnA" onclick="selectChoiceGroup('gdtIsPurchase', 'true', this)">Mua vào</button>
+                <button type="button" class="mst-choice-btn" id="gdtIsPurchaseBtnB" onclick="selectChoiceGroup('gdtIsPurchase', 'false', this)">Bán ra</button>
+              </div>
+              <input type="hidden" id="gdtIsPurchase" value="true" />
             </div>
             <div style="flex: 1; min-width: 140px;">
               <label>&nbsp;</label>
@@ -4242,10 +4244,11 @@ const GDT_INVOICE_TYPES = [
   { ttxly: 8, title: "Hóa đơn từ máy tính tiền" },
 ];
 
-function selectGdtUsername(value, btnEl) {
-  document.getElementById("gdtUsername").value = value;
-  document.querySelectorAll(".mst-choice-btn").forEach(b => b.classList.remove("active"));
-  if (btnEl) btnEl.classList.add("active");
+function selectChoiceGroup(hiddenInputId, value, btnEl) {
+  document.getElementById(hiddenInputId).value = value;
+  const group = btnEl.closest(".mst-choice-group");
+  if (group) group.querySelectorAll(".mst-choice-btn").forEach(b => b.classList.remove("active"));
+  btnEl.classList.add("active");
 }
 
 async function doGdtInvoiceLookup() {
