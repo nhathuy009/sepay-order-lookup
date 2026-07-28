@@ -777,6 +777,23 @@
   .gdt-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
   #gdtResultsContainer table tbody tr { cursor: pointer; }
 
+  /* DÒNG HÓA ĐƠN ĐÃ ĐÁNH DẤU (tick checkbox) TRONG KẾT QUẢ TRA CỨU GDT */
+  #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked td {
+    background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-solid));
+    color: color-mix(in srgb, var(--accent) 70%, black);
+    border-top: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    border-bottom: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked td:first-child {
+    border-left: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked td:last-child {
+    border-right: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+  #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked:hover td {
+    background: color-mix(in srgb, var(--accent) 14%, var(--card-bg-solid));
+  }
+
   /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
   .sepay-table { 
     width: 100%; border-collapse: collapse; background: transparent; 
@@ -4245,6 +4262,12 @@ const GDT_INVOICE_TYPES = [
   { ttxly: 8, title: "Hóa đơn từ máy tính tiền" },
 ];
 
+function toggleGdtRowMark(checkboxEl) {
+  const tr = checkboxEl.closest("tr");
+  if (!tr) return;
+  tr.classList.toggle("gdt-row-marked", checkboxEl.checked);
+}
+
 function selectChoiceGroup(hiddenInputId, value, btnEl) {
   document.getElementById(hiddenInputId).value = value;
   const group = btnEl.closest(".mst-choice-group");
@@ -4382,6 +4405,7 @@ function renderGdtTypeTable(title, invoices) {
   table.innerHTML = `
     <thead>
       <tr>
+        <th style="width:40px;"></th>
         <th>#</th><th>Ký hiệu</th><th>Số HĐ</th><th>Ngày lập</th>
         <th>MST đối tác</th><th>Tên đối tác</th><th style="text-align:right;">Tổng tiền</th>
       </tr>
@@ -4397,6 +4421,9 @@ function renderGdtTypeTable(title, invoices) {
     tr.title = "Bấm để xem chi tiết hóa đơn";
     tr.onclick = () => openGdtInvoiceDetail(globalIdx);
     tr.innerHTML = `
+      <td style="text-align:center;" onclick="event.stopPropagation();">
+        <input type="checkbox" class="gdt-row-check" onchange="toggleGdtRowMark(this)" />
+      </td>
       <td style="text-align:center;">${idx + 1}</td>
       <td>${escapeHtml(inv.khhdon)}</td>
       <td>${escapeHtml(inv.shdon)}</td>
