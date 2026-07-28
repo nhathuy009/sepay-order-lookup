@@ -625,7 +625,11 @@
     font-weight: 600; cursor: pointer; text-align: center;
     box-shadow: none; transition: all 0.2s ease;
   }
-  .mst-choice-btn:hover { filter: none; transform: none; border-color: var(--accent); box-shadow: none; }
+  .mst-choice-btn:not(.active):hover {
+    background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+    border-color: var(--accent);
+    color: color-mix(in srgb, var(--accent) 75%, black);
+  }
   .mst-choice-btn:active { transform: scale(0.97); }
   .mst-choice-btn.active {
     background: var(--accent-gradient); color: var(--btn-text);
