@@ -616,6 +616,22 @@
   .btn-outline { background: transparent; color: var(--text-muted); border: 1px solid var(--input-border); box-shadow: none; }
   .btn-outline:hover { background: var(--border); color: var(--text-main); box-shadow: none;}
 
+  /* NHÓM NÚT LỰA CHỌN MÃ SỐ THUẾ (thay cho ô nhập text) */
+  .mst-choice-group { display: flex; gap: 10px; flex-wrap: wrap; }
+  .mst-choice-btn {
+    flex: 1; min-width: 150px; padding: 12px 14px; border-radius: 11px;
+    border: 1px solid var(--input-border); background: var(--input-bg);
+    color: var(--text-main); font-size: 14px; font-family: inherit;
+    font-weight: 600; cursor: pointer; text-align: center;
+    box-shadow: none; transition: all 0.2s ease;
+  }
+  .mst-choice-btn:hover { filter: none; transform: none; border-color: var(--accent); box-shadow: none; }
+  .mst-choice-btn:active { transform: scale(0.97); }
+  .mst-choice-btn.active {
+    background: var(--accent-gradient); color: var(--btn-text);
+    border-color: transparent; box-shadow: 0 4px 12px rgba(46,151,224,0.2);
+  }
+
   .hidden { display: none !important; }
 
   /* MỤC 1: 2 bảng tổng hợp dùng grid, không còn hụt khoảng trống khi xuống dòng */
@@ -1344,7 +1360,11 @@
           <div class="row">
             <div style="flex: 1; min-width: 180px;">
               <label>Mã số thuế (Username)</label>
-              <input type="text" id="gdtUsername" placeholder="VD: 0319353578" autocomplete="off" />
+              <div class="mst-choice-group">
+                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnA" onclick="selectGdtUsername('0319353578', this)">0319353578</button>
+                <button type="button" class="mst-choice-btn" id="gdtUsernameBtnB" onclick="selectGdtUsername('1300622250', this)">1300622250</button>
+              </div>
+              <input type="hidden" id="gdtUsername" value="" />
             </div>
             <div style="flex: 1; min-width: 180px;">
               <label>Mật khẩu (Password)</label>
@@ -4217,6 +4237,12 @@ const GDT_INVOICE_TYPES = [
   { ttxly: 6, title: "Hóa đơn không mã" },
   { ttxly: 8, title: "Hóa đơn từ máy tính tiền" },
 ];
+
+function selectGdtUsername(value, btnEl) {
+  document.getElementById("gdtUsername").value = value;
+  document.querySelectorAll(".mst-choice-btn").forEach(b => b.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+}
 
 async function doGdtInvoiceLookup() {
   const username = document.getElementById("gdtUsername").value.trim();
