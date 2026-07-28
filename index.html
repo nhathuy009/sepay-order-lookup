@@ -3750,20 +3750,19 @@ function copyTxListTable() {
 
       const inAmt = Number(tx.amount_in || 0);
       const outAmt = Number(tx.amount_out || 0);
-      let soTien = "0";
-      if (inAmt > 0) soTien = "+" + inAmt.toLocaleString('vi-VN');
-      else if (outAmt > 0) soTien = "-" + outAmt.toLocaleString('vi-VN');
+      const tienVao = inAmt > 0 ? String(inAmt) : "";
+      const tienRa = outAmt > 0 ? String(outAmt) : "";
 
       const maDonHang = tx.code || "";
       const tenKh = tx.customer_name || "";
       const maKh = tx.customer_code || "";
       const soHd = tx.invoice_number || "";
       const ngayHd = tx.invoice_date || "";
-      const tienChuaVat = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : Number(tx.amount_before_tax).toLocaleString('vi-VN');
-      const soTienVat = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : Number(tx.vat_amount).toLocaleString('vi-VN');
-      const tongTien = (tx.total_amount === "" || tx.total_amount === undefined || tx.total_amount === null) ? "" : Number(tx.total_amount).toLocaleString('vi-VN');
+      const tienChuaVat = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : String(Number(tx.amount_before_tax));
+      const soTienVat = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : String(Number(tx.vat_amount));
+      const tongTien = (tx.total_amount === "" || tx.total_amount === undefined || tx.total_amount === null) ? "" : String(Number(tx.total_amount));
 
-      tsv += [formattedDate, soTaiKhoan, noiDung, soTien, maDonHang, tenKh, maKh, soHd, ngayHd, tienChuaVat, soTienVat, tongTien].join("\t") + "\n";
+      tsv += [formattedDate, soTaiKhoan, noiDung, tienVao, tienRa, maDonHang, tenKh, maKh, soHd, ngayHd, tienChuaVat, soTienVat, tongTien].join("\t") + "\n";
     });
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListBtn");
