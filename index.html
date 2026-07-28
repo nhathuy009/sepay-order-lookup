@@ -1854,6 +1854,15 @@ function formatTxDate(dateString) {
   return `${d}/${m}/${y} ${time}`;
 }
 
+// Chuẩn hóa ngày về dạng dd/mm/yyyy (luôn 2 chữ số ngày/tháng, bỏ giờ) - dùng khi copy sang Excel/Sheets
+function formatDateOnly(dateString) {
+  if (!dateString) return "";
+  const [date] = dateString.split(" ");
+  const [y, m, d] = date.split("-");
+  const pad2 = (v) => String(v).padStart(2, "0");
+  return `${pad2(d)}/${pad2(m)}/${y}`;
+}
+
 function timeAgo(dateString) {
   if (!dateString) return "";
   const txDate = new Date(dateString.replace(" ", "T") + "+07:00");
@@ -3744,7 +3753,7 @@ function copyTxListTable() {
     }
     let tsv = "";
     currentTxListData.forEach(tx => {
-      const formattedDate = formatTxDate(tx.transaction_date); // ngày tháng năm giờ giao dịch
+      const formattedDate = formatDateOnly(tx.transaction_date); // chỉ ngày tháng năm, dạng dd/mm/yyyy
       const soTaiKhoan = tx.account_number || "";
       const noiDung = (tx.transaction_content || "").replace(/[\r\n\t]+/g, " ").trim();
 
@@ -3757,7 +3766,7 @@ function copyTxListTable() {
       const tenKh = tx.customer_name || "";
       const maKh = tx.customer_code || "";
       const soHd = tx.invoice_number || "";
-      const ngayHd = tx.invoice_date || "";
+      const ngayHd = formatDateOnly(tx.invoice_date || "");
       const tienChuaVat = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : String(Number(tx.amount_before_tax));
       const soTienVat = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : String(Number(tx.vat_amount));
       const tongTien = (tx.total_amount === "" || tx.total_amount === undefined || tx.total_amount === null) ? "" : String(Number(tx.total_amount));
