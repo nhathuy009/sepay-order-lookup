@@ -3592,6 +3592,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].customer_code = ok ? (data.username || "") : "";
       txs[i].invoice_number = invoiceNumber;
       txs[i].ref_username = ok ? (data.ref_username || "") : "";
+      txs[i].invoice_item_name = ok ? (data.invoice_item_name || "") : "";
     } catch (e) {
       if (nameEl) nameEl.textContent = "—";
       if (userEl) userEl.textContent = "—";
@@ -3600,6 +3601,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].customer_code = "";
       txs[i].invoice_number = "";
       txs[i].ref_username = "";
+      txs[i].invoice_item_name = "";
     }
 
     // Nếu tìm được Số HĐ, tra cứu tiếp thông tin hóa đơn (Ngày lập, Tiền hàng, Tiền thuế, Tổng tiền)
@@ -3612,7 +3614,6 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = "";
       txs[i].vat_amount = "";
       txs[i].total_amount = "";
-      txs[i].invoice_item_name = "";
       continue;
     }
     try {
@@ -3631,7 +3632,6 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = okInv ? (dataInv.amount_before_tax ?? "") : "";
       txs[i].vat_amount = okInv ? (dataInv.vat_amount ?? "") : "";
       txs[i].total_amount = okInv ? (dataInv.total_amount ?? "") : "";
-      txs[i].invoice_item_name = okInv ? (dataInv.invoice_item_name || "") : "";
     } catch (e) {
       if (dateEl) dateEl.textContent = "—";
       if (beforeTaxEl) beforeTaxEl.textContent = "—";
@@ -3641,7 +3641,6 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = "";
       txs[i].vat_amount = "";
       txs[i].total_amount = "";
-      txs[i].invoice_item_name = "";
     }
   }
 }
@@ -3845,12 +3844,12 @@ function copyTxListTable() {
   }
 }
 
-// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 23 cột theo cấu trúc file mẫu
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 29 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
-// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản. Chỉ cột 1 (Ngày lập
+// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản. Cột 1 (Ngày lập
 // đầu tiên, đi kèm Mã thanh toán ở cột 2) có thêm 1 cột trống ngay bên phải
-// (cột 3); cột 7 (Ngày lập thứ hai) không có cột trống đi kèm.
+// (cột 3). Ngay bên phải cột Tên KH (cột 9) có thêm 6 cột trống (cột 10-15).
 // Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
 // "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
 // đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
@@ -3889,20 +3888,26 @@ function copyTxListForMisa() {
         asText(ngayLap),         // 7.  Ngày lập (văn bản)
         maKh,                    // 8.  Mã KH
         tenKh,                    // 9.  Tên KH
-        tenHang,                  // 10. Tên hàng (invoice_item_name)
-        "",                       // 11. (trống)
-        tenHang,                  // 12. Tên hàng (invoice_item_name)
-        "",                       // 13. (trống)
-        "",                       // 14. (trống)
-        asText("131"),            // 15. TK Nợ
-        asText(tkCoDoanhThu),     // 16. TK Có doanh thu
-        asText("Khóa"),           // 17. Đvt
-        asText("1"),              // 18. Số lượng
-        tienHang,                  // 19. Tiền hàng
-        tienHang,                  // 20. Tiền hàng
-        asText("8"),               // 21. Thuế suất
-        tienThue,                   // 22. Tiền thuế
-        asText("33311"),            // 23. TK thuế
+        "",                       // 10. (trống - mới chèn)
+        "",                       // 11. (trống - mới chèn)
+        "",                       // 12. (trống - mới chèn)
+        "",                       // 13. (trống - mới chèn)
+        "",                       // 14. (trống - mới chèn)
+        "",                       // 15. (trống - mới chèn)
+        tenHang,                  // 16. Tên hàng (invoice_item_name)
+        "",                       // 17. (trống)
+        tenHang,                  // 18. Tên hàng (invoice_item_name)
+        "",                       // 19. (trống)
+        "",                       // 20. (trống)
+        asText("131"),            // 21. TK Nợ
+        asText(tkCoDoanhThu),     // 22. TK Có doanh thu
+        asText("Khóa"),           // 23. Đvt
+        asText("1"),              // 24. Số lượng
+        tienHang,                  // 25. Tiền hàng
+        tienHang,                  // 26. Tiền hàng
+        asText("8"),               // 27. Thuế suất
+        tienThue,                   // 28. Tiền thuế
+        asText("33311"),            // 29. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
