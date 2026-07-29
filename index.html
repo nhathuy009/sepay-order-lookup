@@ -3845,17 +3845,19 @@ function copyTxListTable() {
   }
 }
 
-// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 44 cột theo cấu trúc file mẫu
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 50 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
 // Chỉ lấy các dòng "Tiền vào (+)" (bỏ qua các dòng "Tiền ra (-)").
-// Cột "Ngày lập" xuất hiện 2 lần (cột 1 và cột 7). Cột 1 (đi kèm Mã thanh toán
-// ở cột 2) có thêm 1 cột trống ngay bên phải (cột 3). Ngay bên phải cột Tên KH
-// (cột 9) có thêm 6 cột trống (cột 10-15). Ngay bên phải cột trống ở cột 17
-// (sau Tên hàng lần 1, cột 16) có thêm 6 cột trống (cột 18-23), trước khi tới
-// Tên hàng lần 2 (cột 24). Thêm 1 cột trống nữa ngay trước "131" (cột 27) nên
-// TK Nợ "131" ở cột 28. Thêm 7 cột trống bên trái "8" (cột 34-40, "8" ở cột
-// 41) và 1 cột trống bên trái Tiền thuế (cột 42, Tiền thuế ở cột 43).
+// Cột 1-5 là nội dung cố định: "Bán hàng hóa trong nước", "Chưa thu tiền",
+// "Không", "Có", "Đã lập". Cột 6 lấy cùng nội dung Ngày lập (giống cột 7).
+// Cột "Ngày lập" xuất hiện thêm 2 lần nữa (cột 7 và cột 13). Cột 7 (đi kèm Mã
+// thanh toán ở cột 8) có thêm 3 cột trống ngay bên phải (cột 9-11). Ngay bên
+// phải cột Tên KH (cột 15) có thêm 6 cột trống (cột 16-21). Ngay bên phải cột
+// trống ở cột 23 (sau Tên hàng lần 1, cột 22) có thêm 6 cột trống (cột 24-29),
+// trước khi tới Tên hàng lần 2 (cột 30). Thêm 1 cột trống nữa ngay trước "131"
+// (cột 33) nên TK Nợ "131" ở cột 34. Thêm 7 cột trống bên trái "8" (cột 40-46,
+// "8" ở cột 47) và 1 cột trống bên trái Tiền thuế (cột 48, Tiền thuế ở cột 49).
 function copyTxListForMisa() {
   try {
     if (!currentTxListData || currentTxListData.length === 0) {
@@ -3887,50 +3889,56 @@ function copyTxListForMisa() {
       const tkCoDoanhThu = isTT ? "5113.TT" : "5113.AFF";
 
       const cols = [
-        ngayLap,                 // 1.  Ngày lập
-        maThanhToan,             // 2.  Mã thanh toán
-        "",                      // 3.  (trống)
-        "",                      // 4.  (trống)
-        "",                      // 5.  (trống)
-        soHd,                    // 6.  Số HĐ
+        "Bán hàng hóa trong nước", // 1.  (cố định)
+        "Chưa thu tiền",           // 2.  (cố định)
+        "Không",                   // 3.  (cố định)
+        "Có",                      // 4.  (cố định)
+        "Đã lập",                  // 5.  (cố định)
+        ngayLap,                   // 6.  Ngày lập
         ngayLap,                 // 7.  Ngày lập
-        maKh,                    // 8.  Mã KH
-        tenKh,                    // 9.  Tên KH
-        "",                       // 10. (trống - mới chèn)
-        "",                       // 11. (trống - mới chèn)
-        "",                       // 12. (trống - mới chèn)
-        "",                       // 13. (trống - mới chèn)
-        "",                       // 14. (trống - mới chèn)
-        "",                       // 15. (trống - mới chèn)
-        tenHang,                  // 16. Tên hàng (invoice_item_name)
-        "",                       // 17. (trống)
+        maThanhToan,             // 8.  Mã thanh toán
+        "",                      // 9.  (trống)
+        "",                      // 10. (trống)
+        "",                      // 11. (trống)
+        soHd,                    // 12. Số HĐ
+        ngayLap,                 // 13. Ngày lập
+        maKh,                    // 14. Mã KH
+        tenKh,                    // 15. Tên KH
+        "",                       // 16. (trống - mới chèn)
+        "",                       // 17. (trống - mới chèn)
         "",                       // 18. (trống - mới chèn)
         "",                       // 19. (trống - mới chèn)
         "",                       // 20. (trống - mới chèn)
         "",                       // 21. (trống - mới chèn)
-        "",                       // 22. (trống - mới chèn)
-        "",                       // 23. (trống - mới chèn)
-        tenHang,                  // 24. Tên hàng (invoice_item_name)
-        "",                       // 25. (trống)
-        "",                       // 26. (trống)
+        tenHang,                  // 22. Tên hàng (invoice_item_name)
+        "",                       // 23. (trống)
+        "",                       // 24. (trống - mới chèn)
+        "",                       // 25. (trống - mới chèn)
+        "",                       // 26. (trống - mới chèn)
         "",                       // 27. (trống - mới chèn)
-        "131",                    // 28. TK Nợ
-        tkCoDoanhThu,             // 29. TK Có doanh thu
-        "Khóa",                   // 30. Đvt
-        "1",                      // 31. Số lượng
-        tienHang,                  // 32. Tiền hàng
-        tienHang,                  // 33. Tiền hàng
-        "",                        // 34. (trống - mới chèn)
-        "",                        // 35. (trống - mới chèn)
-        "",                        // 36. (trống - mới chèn)
-        "",                        // 37. (trống - mới chèn)
-        "",                        // 38. (trống - mới chèn)
-        "",                        // 39. (trống - mới chèn)
+        "",                       // 28. (trống - mới chèn)
+        "",                       // 29. (trống - mới chèn)
+        tenHang,                  // 30. Tên hàng (invoice_item_name)
+        "",                       // 31. (trống)
+        "",                       // 32. (trống)
+        "",                       // 33. (trống - mới chèn)
+        "131",                    // 34. TK Nợ
+        tkCoDoanhThu,             // 35. TK Có doanh thu
+        "Khóa",                   // 36. Đvt
+        "1",                      // 37. Số lượng
+        tienHang,                  // 38. Tiền hàng
+        tienHang,                  // 39. Tiền hàng
         "",                        // 40. (trống - mới chèn)
-        "8",                       // 41. Thuế suất
+        "",                        // 41. (trống - mới chèn)
         "",                        // 42. (trống - mới chèn)
-        tienThue,                   // 43. Tiền thuế
-        "33311",                    // 44. TK thuế
+        "",                        // 43. (trống - mới chèn)
+        "",                        // 44. (trống - mới chèn)
+        "",                        // 45. (trống - mới chèn)
+        "",                        // 46. (trống - mới chèn)
+        "8",                       // 47. Thuế suất
+        "",                        // 48. (trống - mới chèn)
+        tienThue,                   // 49. Tiền thuế
+        "33311",                    // 50. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
