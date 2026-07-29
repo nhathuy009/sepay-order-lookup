@@ -3844,7 +3844,7 @@ function copyTxListTable() {
   }
 }
 
-// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 36 cột theo cấu trúc file mẫu
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 44 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
 // Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản. Cột 1 (Ngày lập
@@ -3852,7 +3852,9 @@ function copyTxListTable() {
 // (cột 3). Ngay bên phải cột Tên KH (cột 9) có thêm 6 cột trống (cột 10-15).
 // Ngay bên phải cột trống ở cột 17 (sau Tên hàng lần 1, cột 16) có thêm 6 cột
 // trống (cột 18-23), trước khi tới Tên hàng lần 2 (cột 24). Thêm 1 cột trống
-// nữa ngay trước "131" (cột 27), nên TK Nợ "131" giờ ở cột 28.
+// nữa ngay trước "131" (cột 27), nên TK Nợ "131" ở cột 28. Thêm 7 cột trống
+// bên trái "8" (cột 34-40, "8" ở cột 41) và 1 cột trống bên trái Tiền thuế
+// (cột 42, Tiền thuế ở cột 43).
 // Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
 // "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
 // đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
@@ -3915,9 +3917,17 @@ function copyTxListForMisa() {
         asText("1"),              // 31. Số lượng
         tienHang,                  // 32. Tiền hàng
         tienHang,                  // 33. Tiền hàng
-        asText("8"),               // 34. Thuế suất
-        tienThue,                   // 35. Tiền thuế
-        asText("33311"),            // 36. TK thuế
+        "",                        // 34. (trống - mới chèn)
+        "",                        // 35. (trống - mới chèn)
+        "",                        // 36. (trống - mới chèn)
+        "",                        // 37. (trống - mới chèn)
+        "",                        // 38. (trống - mới chèn)
+        "",                        // 39. (trống - mới chèn)
+        "",                        // 40. (trống - mới chèn)
+        asText("8"),               // 41. Thuế suất
+        "",                        // 42. (trống - mới chèn)
+        tienThue,                   // 43. Tiền thuế
+        asText("33311"),            // 44. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
