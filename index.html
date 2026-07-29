@@ -606,7 +606,6 @@
   .card:hover {
     border-color: var(--accent); /* fallback: trùng màu nút mặc định trong card */
     border-color: color-mix(in srgb, var(--accent) 70%, transparent); /* đậm gấp đôi mức trước (35% -> 70%) */
-    background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-solid));
   }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
   
@@ -1133,13 +1132,11 @@
   <div class="card">
     <h3 style="margin-top:0; font-size:16px; font-weight:700;">Liệt kê giao dịch theo thời gian & Ngân hàng</h3>
     <div class="row" style="align-items: flex-end; margin-bottom: 20px;">
-      <div style="flex: 1; min-width: 120px;">
-        <label>Từ ngày</label>
-        <input type="text" id="txDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
-      </div>
-      <div style="flex: 1; min-width: 120px;">
-        <label>Đến ngày</label>
-        <input type="text" id="txDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+      <div style="flex: 1; min-width: 220px;">
+        <label>Khoảng ngày (Từ ngày - Đến ngày)</label>
+        <input type="text" id="txDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+        <input type="hidden" id="txDateFrom" />
+        <input type="hidden" id="txDateTo" />
       </div>
       <div style="flex: 1; min-width: 200px;">
         <label>Tài khoản (Tùy chọn)</label>
@@ -1368,13 +1365,11 @@
         <div class="card" style="margin-top: 20px;">
           <h3 style="margin: 0 0 14px 0;">Tra cứu theo khoảng ngày (lấy toàn bộ hóa đơn)</h3>
           <div class="row" style="align-items: flex-end;">
-            <div style="flex: 1; min-width: 120px;">
-              <label>Từ ngày</label>
-              <input type="text" id="invDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
-            </div>
-            <div style="flex: 1; min-width: 120px;">
-              <label>Đến ngày</label>
-              <input type="text" id="invDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            <div style="flex: 1; min-width: 220px;">
+              <label>Khoảng ngày (Từ ngày - Đến ngày)</label>
+              <input type="text" id="invDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+              <input type="hidden" id="invDateFrom" />
+              <input type="hidden" id="invDateTo" />
             </div>
             <div style="flex: 1; min-width: 200px;">
               <label>Loại hóa đơn</label>
@@ -1820,40 +1815,34 @@ document.addEventListener("DOMContentLoaded", () => {
   // disableMobile: true -> BẮT BUỘC dùng giao diện lịch tùy chỉnh của Flatpickr trên mọi thiết bị.
   // Nếu để mặc định (false), trên điện thoại/tablet Flatpickr sẽ tự chuyển sang date-picker
   // gốc của hệ điều hành/trình duyệt (mất hết style, hiển thị dạng mm/dd/yyyy như báo lỗi).
-  const dateConfig = { dateFormat: "d/m/Y", locale: "vn", defaultDate: new Date(), allowInput: true, disableMobile: true };
-  const elFrom = document.getElementById('txDateFrom');
-  const elTo = document.getElementById('txDateTo');
-  if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
-  if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
-
-  // GDT (Tổng cục Thuế): gộp Từ ngày/Đến ngày vào 1 ô duy nhất, hiển thị
-  // dạng "dd/mm/yyyy-dd/mm/yyyy" (rangeSeparator: "-"), tô sáng cả khoảng
-  // đã chọn kể cả khi 2 mốc cách nhau hơn 1 tháng.
-  const elGdtRange = document.getElementById('gdtDateRange');
-  const elGdtFrom = document.getElementById('gdtDateFrom');   // input ẩn, giữ cho logic cũ (doGdtInvoiceLookup) đọc như trước
-  const elGdtTo = document.getElementById('gdtDateTo');       // input ẩn, giữ cho logic cũ (doGdtInvoiceLookup) đọc như trước
-  if (elGdtRange && elGdtFrom && elGdtTo && typeof flatpickr !== 'undefined') {
-    flatpickr(elGdtRange, {
+  //
+  // Cả 3 cặp Từ ngày/Đến ngày (giao dịch, GDT, hóa đơn nội bộ) đều dùng chung 1 lịch range
+  // gộp vào ô hiển thị "dd/mm/yyyy-dd/mm/yyyy", đồng bộ ngược ra 2 input ẩn from/to để các
+  // hàm xử lý cũ (đọc .value của <id>DateFrom/<id>DateTo) không cần sửa gì thêm.
+  function initRangeDatePicker(rangeInputId, fromInputId, toInputId) {
+    const elRange = document.getElementById(rangeInputId);
+    const elFrom = document.getElementById(fromInputId);
+    const elTo = document.getElementById(toInputId);
+    if (!elRange || !elFrom || !elTo || typeof flatpickr === 'undefined') return;
+    flatpickr(elRange, {
       mode: "range",
       dateFormat: "d/m/Y",
-      rangeSeparator: "-",   // ô hiển thị sẽ ra đúng dạng 01/01/2026-29/07/2026, không khoảng trắng
+      rangeSeparator: "-",   // ô hiển thị ra đúng dạng 01/01/2026-29/07/2026, không khoảng trắng
       locale: "vn",
       showMonths: 2,         // hiện 2 tháng song song để dễ chọn khoảng dài
       allowInput: true,
       disableMobile: true,
       onChange: function (selectedDates, dateStr, instance) {
-        // Đồng bộ sang 2 input ẩn để các hàm xử lý cũ (đọc gdtDateFrom/gdtDateTo) không cần sửa
-        elGdtFrom.value = selectedDates.length >= 1 ? instance.formatDate(selectedDates[0], "d/m/Y") : "";
-        elGdtTo.value = selectedDates.length === 2 ? instance.formatDate(selectedDates[1], "d/m/Y") : "";
+        elFrom.value = selectedDates.length >= 1 ? instance.formatDate(selectedDates[0], "d/m/Y") : "";
+        elTo.value = selectedDates.length === 2 ? instance.formatDate(selectedDates[1], "d/m/Y") : "";
       }
     });
   }
 
-  const elInvFrom = document.getElementById('invDateFrom');
-  const elInvTo = document.getElementById('invDateTo');
-  if (elInvFrom && typeof flatpickr !== 'undefined') flatpickr(elInvFrom, dateConfig);
-  if (elInvTo && typeof flatpickr !== 'undefined') flatpickr(elInvTo, dateConfig);
-  
+  initRangeDatePicker('txDateRange', 'txDateFrom', 'txDateTo');
+  initRangeDatePicker('gdtDateRange', 'gdtDateFrom', 'gdtDateTo');
+  initRangeDatePicker('invDateRange', 'invDateFrom', 'invDateTo');
+
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
 });
