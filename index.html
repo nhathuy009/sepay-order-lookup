@@ -3845,11 +3845,12 @@ function copyTxListTable() {
   }
 }
 
-// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 24 cột theo cấu trúc file mẫu
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 23 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
-// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản và có 1 cột trống
-// ngay bên phải (cột 2 và cột 8).
+// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản. Chỉ cột 1 (Ngày lập
+// đầu tiên, đi kèm Mã thanh toán ở cột 2) có thêm 1 cột trống ngay bên phải
+// (cột 3); cột 7 (Ngày lập thứ hai) không có cột trống đi kèm.
 // Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
 // "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
 // đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
@@ -3881,28 +3882,27 @@ function copyTxListForMisa() {
       const cols = [
         asText(ngayLap),        // 1.  Ngày lập (văn bản)
         maThanhToan,             // 2.  Mã thanh toán
-        "",                      // 3.  (trống - mới chèn, bên phải Mã thanh toán)
+        "",                      // 3.  (trống)
         "",                      // 4.  (trống)
         "",                      // 5.  (trống)
         soHd,                    // 6.  Số HĐ
         asText(ngayLap),         // 7.  Ngày lập (văn bản)
-        "",                      // 8.  (trống - mới chèn)
-        maKh,                    // 9.  Mã KH
-        tenKh,                    // 10. Tên KH
-        tenHang,                  // 11. Tên hàng (invoice_item_name)
-        "",                       // 12. (trống)
-        tenHang,                  // 13. Tên hàng (invoice_item_name)
+        maKh,                    // 8.  Mã KH
+        tenKh,                    // 9.  Tên KH
+        tenHang,                  // 10. Tên hàng (invoice_item_name)
+        "",                       // 11. (trống)
+        tenHang,                  // 12. Tên hàng (invoice_item_name)
+        "",                       // 13. (trống)
         "",                       // 14. (trống)
-        "",                       // 15. (trống)
-        asText("131"),            // 16. TK Nợ
-        asText(tkCoDoanhThu),     // 17. TK Có doanh thu
-        asText("Khóa"),           // 18. Đvt
-        asText("1"),              // 19. Số lượng
+        asText("131"),            // 15. TK Nợ
+        asText(tkCoDoanhThu),     // 16. TK Có doanh thu
+        asText("Khóa"),           // 17. Đvt
+        asText("1"),              // 18. Số lượng
+        tienHang,                  // 19. Tiền hàng
         tienHang,                  // 20. Tiền hàng
-        tienHang,                  // 21. Tiền hàng
-        asText("8"),               // 22. Thuế suất
-        tienThue,                   // 23. Tiền thuế
-        asText("33311"),            // 24. TK thuế
+        asText("8"),               // 21. Thuế suất
+        tienThue,                   // 22. Tiền thuế
+        asText("33311"),            // 23. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
