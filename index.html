@@ -8,6 +8,16 @@
 <link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css">
 
 <style>
+  /* Khi showMonths > 1, flatpickr mặc định ẩn các ngày tràn sang tháng kế bên
+     bằng visibility:hidden nhưng vẫn giữ chỗ trong lưới 7 cột -> dòng tuần
+     cuối của mỗi tháng bị trống lệch, nhìn rời rạc. Đổi sang display:none để
+     các ô đó không chiếm chỗ, các số ngày thật sẽ tự dồn sang trái. */
+  .flatpickr-calendar .dayContainer .flatpickr-day.hidden {
+    display: none !important;
+  }
+</style>
+
+<style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
   /* 10X DESIGN SYSTEM - CÁC BIẾN MẶC ĐỊNH LÀ DARK MODE */
   :root { 
@@ -1395,13 +1405,11 @@
             </div>
           </div>
           <div class="row" style="align-items: flex-end; margin-top: 14px;">
-            <div style="flex: 1; min-width: 120px;">
-              <label>Từ ngày</label>
-              <input type="text" id="gdtDateFrom" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
-            </div>
-            <div style="flex: 1; min-width: 120px;">
-              <label>Đến ngày</label>
-              <input type="text" id="gdtDateTo" placeholder="DD/MM/YYYY" style="cursor: pointer;" />
+            <div style="flex: 1; min-width: 220px;">
+              <label>Khoảng ngày (Từ ngày - Đến ngày)</label>
+              <input type="text" id="gdtDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+              <input type="hidden" id="gdtDateFrom" />
+              <input type="hidden" id="gdtDateTo" />
             </div>
             <div style="flex: 1; min-width: 160px;">
               <label>Loại hóa đơn</label>
@@ -1810,10 +1818,28 @@ document.addEventListener("DOMContentLoaded", () => {
   if (elFrom && typeof flatpickr !== 'undefined') flatpickr(elFrom, dateConfig);
   if (elTo && typeof flatpickr !== 'undefined') flatpickr(elTo, dateConfig);
 
-  const elGdtFrom = document.getElementById('gdtDateFrom');
-  const elGdtTo = document.getElementById('gdtDateTo');
-  if (elGdtFrom && typeof flatpickr !== 'undefined') flatpickr(elGdtFrom, dateConfig);
-  if (elGdtTo && typeof flatpickr !== 'undefined') flatpickr(elGdtTo, dateConfig);
+  // GDT (Tổng cục Thuế): gộp Từ ngày/Đến ngày vào 1 ô duy nhất, hiển thị
+  // dạng "dd/mm/yyyy-dd/mm/yyyy" (rangeSeparator: "-"), tô sáng cả khoảng
+  // đã chọn kể cả khi 2 mốc cách nhau hơn 1 tháng.
+  const elGdtRange = document.getElementById('gdtDateRange');
+  const elGdtFrom = document.getElementById('gdtDateFrom');   // input ẩn, giữ cho logic cũ (doGdtInvoiceLookup) đọc như trước
+  const elGdtTo = document.getElementById('gdtDateTo');       // input ẩn, giữ cho logic cũ (doGdtInvoiceLookup) đọc như trước
+  if (elGdtRange && elGdtFrom && elGdtTo && typeof flatpickr !== 'undefined') {
+    flatpickr(elGdtRange, {
+      mode: "range",
+      dateFormat: "d/m/Y",
+      rangeSeparator: "-",   // ô hiển thị sẽ ra đúng dạng 01/01/2026-29/07/2026, không khoảng trắng
+      locale: "vn",
+      showMonths: 2,         // hiện 2 tháng song song để dễ chọn khoảng dài
+      allowInput: true,
+      disableMobile: true,
+      onChange: function (selectedDates, dateStr, instance) {
+        // Đồng bộ sang 2 input ẩn để các hàm xử lý cũ (đọc gdtDateFrom/gdtDateTo) không cần sửa
+        elGdtFrom.value = selectedDates.length >= 1 ? instance.formatDate(selectedDates[0], "d/m/Y") : "";
+        elGdtTo.value = selectedDates.length === 2 ? instance.formatDate(selectedDates[1], "d/m/Y") : "";
+      }
+    });
+  }
 
   const elInvFrom = document.getElementById('invDateFrom');
   const elInvTo = document.getElementById('invDateTo');
