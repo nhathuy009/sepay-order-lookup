@@ -3867,8 +3867,16 @@ function copyTxListForMisa() {
     }
     const asText = (v) => "'" + v;
 
+    // Bỏ qua các dòng "Tiền ra (-)" (giao dịch tiền ra, VD hoàn tiền) - mẫu DS bán
+    // MISA chỉ cần các giao dịch "Tiền vào (+)" (giao dịch bán hàng thực tế).
+    const rowsToExport = currentTxListData.filter(tx => Number(tx.amount_in || 0) > 0);
+    if (rowsToExport.length === 0) {
+      alert("Không có giao dịch \"Tiền vào (+)\" nào để copy.");
+      return;
+    }
+
     let tsv = "";
-    currentTxListData.forEach(tx => {
+    rowsToExport.forEach(tx => {
       const ngayLap = formatDateOnly(tx.invoice_date || "");
       const maThanhToan = tx.code || "";
       const soHd = tx.invoice_number || "";
