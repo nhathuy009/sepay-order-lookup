@@ -3493,8 +3493,10 @@ async function doTxList() {
         </tr>`;
     });
 
-    // Chèn dòng Tổng phát sinh vào cuối bảng
-    rows += `
+    // Dòng Tổng phát sinh đặt trong <tfoot> (không phải trong rows/<tbody>) để khi
+    // bấm sort theo cột Tiền vào/Tiền ra, dòng tổng luôn nằm cố định ở cuối bảng
+    // thay vì bị xáo trộn lẫn vào giữa các dòng giao dịch.
+    const totalRowHtml = `
       <tr class="total-row">
         <td colspan="3" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng phát sinh:</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${totalAmountIn.toLocaleString('vi-VN')}</td>
@@ -3512,6 +3514,7 @@ async function doTxList() {
     box.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
+        <span class="text-muted-small" style="flex-shrink:0;">💡 Bấm vào tiêu đề cột "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp, gom nhóm các giao dịch cùng số tiền lại gần nhau</span>
         <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
       </div>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px;">
@@ -3534,8 +3537,17 @@ async function doTxList() {
             </tr>
           </thead>
           <tbody>${rows}</tbody>
+          <tfoot>${totalRowHtml}</tfoot>
         </table>
       </div>`;
+
+    // Cho phép bấm vào tiêu đề cột "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp
+    // (tăng dần/giảm dần khi bấm lặp lại), giúp các giao dịch có số tiền
+    // giống hoặc gần nhau tự gom lại thành từng nhóm liền kề, dễ đối chiếu.
+    const txListTableEl = document.getElementById("txListTable");
+    if (txListTableEl) {
+      attachSortableHeaders(txListTableEl, { 3: 'number', 4: 'number' });
+    }
 
     // Tự động tra cứu Tên KH / Mã KH / Số HĐ cho từng dòng có Mã thanh toán
     lookupCustomerInfoForTxList(txs);
@@ -3726,6 +3738,25 @@ function applyTableFilters(table, onVisibilityChange) {
   if (onVisibilityChange) {
     onVisibilityChange(rows.filter(r => r.style.display !== 'none'));
   }
+}
+
+// Gắn sự kiện sort cho các cột được chỉ định (mà KHÔNG chèn thêm hàng ô lọc
+// như attachTableFilterSort), dùng cho các bảng chỉ cần bấm-để-sắp-xếp ở
+// một vài cột cụ thể (VD: cột Tiền vào / Tiền ra trong bảng liệt kê giao dịch).
+// colIndexToType: object dạng { [chỉ số cột]: 'number' | 'text' }
+function attachSortableHeaders(table, colIndexToType) {
+  const thead = table.querySelector('thead');
+  const headerRow = thead.querySelector('tr');
+  const ths = Array.from(headerRow.children);
+  Object.keys(colIndexToType).forEach((idxStr) => {
+    const i = Number(idxStr);
+    const th = ths[i];
+    if (!th) return;
+    th.style.cursor = 'pointer';
+    th.title = 'Bấm để sắp xếp';
+    th.dataset.sortDir = '';
+    th.addEventListener('click', () => sortTableByColumn(table, i, colIndexToType[i], th, ths));
+  });
 }
 
 function sortTableByColumn(table, colIdx, colType, th, allThs) {
