@@ -3467,7 +3467,7 @@ async function doTxList() {
 
       rows += `
         <tr>
-          <td>
+          <td data-sort-value="${tx.transaction_date}">
             <div>${formattedDate}</div>
             <div class="text-muted-small">${relativeTime}</div>
           </td>
@@ -3514,7 +3514,7 @@ async function doTxList() {
     box.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
-        <span class="text-muted-small" style="flex-shrink:0;">💡 Bấm vào tiêu đề cột "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp, gom nhóm các giao dịch cùng số tiền lại gần nhau</span>
+        <span class="text-muted-small" style="flex-shrink:0;">💡 Bấm vào tiêu đề cột "Thời gian" / "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp. Bấm lại cột "Thời gian" bất cứ lúc nào để đưa bảng về đúng thứ tự thời gian ban đầu.</span>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
           <button id="copyTxListMisaBtn" class="btn-outline" onclick="copyTxListForMisa()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho mẫu DS bán MISA</button>
@@ -3549,7 +3549,7 @@ async function doTxList() {
     // giống hoặc gần nhau tự gom lại thành từng nhóm liền kề, dễ đối chiếu.
     const txListTableEl = document.getElementById("txListTable");
     if (txListTableEl) {
-      attachSortableHeaders(txListTableEl, { 3: 'number', 4: 'number' });
+      attachSortableHeaders(txListTableEl, { 0: 'date', 3: 'number', 4: 'number' });
     }
 
     // Tự động tra cứu Tên KH / Mã KH / Số HĐ cho từng dòng có Mã thanh toán
@@ -3778,6 +3778,14 @@ function sortTableByColumn(table, colIdx, colType, th, allThs) {
   th.dataset.sortDir = dir;
 
   const getValue = (row) => {
+    if (colType === 'date') {
+      // Dùng ngày giờ gốc (ISO/"YYYY-MM-DD HH:mm:ss") gắn sẵn trong data-sort-value
+      // thay vì đọc text hiển thị (dd/mm/yyyy + "X phút trước"), để sort chính xác
+      // theo thời gian thực và không bị lệch khi giá trị "X phút trước" thay đổi.
+      const raw = row.children[colIdx]?.dataset.sortValue || '';
+      const t = new Date(raw.replace(' ', 'T')).getTime();
+      return isNaN(t) ? -Infinity : t;
+    }
     const text = (row.children[colIdx]?.innerText || '').trim();
     if (colType === 'number') {
       // Số Việt Nam dùng dấu chấm ngăn cách hàng nghìn (VD "7.388.889") - bỏ dấu
