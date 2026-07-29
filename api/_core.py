@@ -52,6 +52,7 @@ FIELD_ORDER = [
     "orders_amount",
     "einvoice_created_at",
     "invoice_number",
+    "invoice_item_name",
     "ref_username",
     "ref_name",
     "status_msg",
@@ -200,6 +201,9 @@ class SepayClient:
         details["lead_phone"] = lead.get("phone", "")
         details["lead_cccd"] = lead.get("cccd", "")
         details["orders_amount"] = order.get("amount", "")
+
+        item = order.get("item") or {}
+        details["invoice_item_name"] = item.get("invoice_item_name", "")
 
         einvoice = order.get("einvoice") or {}
         details["einvoice_created_at"] = einvoice.get("created_at", "")
