@@ -9,11 +9,19 @@
 
 <style>
   /* Khi showMonths > 1, flatpickr mặc định ẩn các ngày tràn sang tháng kế bên
-     bằng visibility:hidden nhưng vẫn giữ chỗ trong lưới 7 cột -> dòng tuần
-     cuối của mỗi tháng bị trống lệch, nhìn rời rạc. Đổi sang display:none để
-     các ô đó không chiếm chỗ, các số ngày thật sẽ tự dồn sang trái. */
-  .flatpickr-calendar .dayContainer .flatpickr-day.hidden {
+     bằng visibility:hidden (class prevMonthDay/nextMonthDay + hidden) nhưng
+     vẫn giữ chỗ trong lưới 7 cột -> dòng tuần cuối của mỗi tháng bị trống
+     lệch, nhìn rời rạc. Đổi sang display:none để các ô đó không chiếm chỗ. */
+  .flatpickr-calendar .dayContainer .flatpickr-day.hidden,
+  .flatpickr-calendar .dayContainer .flatpickr-day.prevMonthDay,
+  .flatpickr-calendar .dayContainer .flatpickr-day.nextMonthDay {
     display: none !important;
+  }
+  /* .dayContainer mặc định dùng justify-content:space-around -> dù đã ẩn ô
+     rỗng, các số ngày còn lại ở dòng cuối vẫn bị dàn đều ra giữa hàng.
+     Ép về flex-start để chúng dồn sát bên trái như mong muốn. */
+  .flatpickr-calendar .dayContainer {
+    justify-content: flex-start !important;
   }
 </style>
 
