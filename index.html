@@ -794,6 +794,14 @@
   .gdt-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
   #gdtResultsContainer table tbody tr { cursor: pointer; }
 
+  /* CHECKBOX ĐÁNH DẤU DÒNG HÓA ĐƠN TRONG KẾT QUẢ TRA CỨU GDT - phóng to 1.5 lần
+     kích thước mặc định để bấm dễ hơn */
+  .gdt-row-check {
+    transform: scale(1.5);
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
   /* DÒNG HÓA ĐƠN ĐÃ ĐÁNH DẤU (tick checkbox) TRONG KẾT QUẢ TRA CỨU GDT */
   #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked td {
     background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-solid));
