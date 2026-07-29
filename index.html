@@ -3845,13 +3845,15 @@ function copyTxListTable() {
   }
 }
 
-// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 22 cột theo cấu trúc file mẫu
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 24 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
+// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản và có 1 cột trống
+// ngay bên phải (cột 2 và cột 8).
 // Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
 // "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
 // đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
-// bị tự động chuyển thành số (mất số 0 ở đầu, đổi định dạng...).
+// bị tự động chuyển thành số/ngày (mất số 0 ở đầu, đổi định dạng...).
 function copyTxListForMisa() {
   try {
     if (!currentTxListData || currentTxListData.length === 0) {
@@ -3871,34 +3873,36 @@ function copyTxListForMisa() {
       const tienHang = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : String(Number(tx.amount_before_tax));
       const tienThue = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : String(Number(tx.vat_amount));
 
-      // Cột 15: TK Có doanh thu - "5113.TT" nếu ref là "cqm" hoặc "SA0003", còn lại "5113.AFF"
+      // Cột 17: TK Có doanh thu - "5113.TT" nếu ref là "cqm" hoặc "SA0003", còn lại "5113.AFF"
       const refRaw = (tx.ref_username || "").trim().toLowerCase();
       const isTT = refRaw === "cqm" || refRaw === "sa0003";
       const tkCoDoanhThu = isTT ? "5113.TT" : "5113.AFF";
 
       const cols = [
-        ngayLap,              // 1.  Ngày lập
-        maThanhToan,          // 2.  Mã thanh toán
-        "",                   // 3.  (trống)
-        "",                   // 4.  (trống)
-        soHd,                 // 5.  Số HĐ
-        ngayLap,              // 6.  Ngày lập
-        maKh,                 // 7.  Mã KH
-        tenKh,                 // 8.  Tên KH
-        tenHang,               // 9.  Tên hàng (invoice_item_name)
-        "",                    // 10. (trống)
-        tenHang,                // 11. Tên hàng (invoice_item_name)
-        "",                     // 12. (trống)
-        "",                     // 13. (trống)
-        asText("131"),          // 14. TK Nợ
-        asText(tkCoDoanhThu),   // 15. TK Có doanh thu
-        asText("Khóa"),         // 16. Đvt
-        asText("1"),            // 17. Số lượng
-        tienHang,                // 18. Tiền hàng
-        tienHang,                // 19. Tiền hàng
-        asText("8"),             // 20. Thuế suất
-        tienThue,                 // 21. Tiền thuế
-        asText("33311"),          // 22. TK thuế
+        asText(ngayLap),        // 1.  Ngày lập (văn bản)
+        "",                      // 2.  (trống - mới chèn)
+        maThanhToan,             // 3.  Mã thanh toán
+        "",                      // 4.  (trống)
+        "",                      // 5.  (trống)
+        soHd,                    // 6.  Số HĐ
+        asText(ngayLap),         // 7.  Ngày lập (văn bản)
+        "",                      // 8.  (trống - mới chèn)
+        maKh,                    // 9.  Mã KH
+        tenKh,                    // 10. Tên KH
+        tenHang,                  // 11. Tên hàng (invoice_item_name)
+        "",                       // 12. (trống)
+        tenHang,                  // 13. Tên hàng (invoice_item_name)
+        "",                       // 14. (trống)
+        "",                       // 15. (trống)
+        asText("131"),            // 16. TK Nợ
+        asText(tkCoDoanhThu),     // 17. TK Có doanh thu
+        asText("Khóa"),           // 18. Đvt
+        asText("1"),              // 19. Số lượng
+        tienHang,                  // 20. Tiền hàng
+        tienHang,                  // 21. Tiền hàng
+        asText("8"),               // 22. Thuế suất
+        tienThue,                   // 23. Tiền thuế
+        asText("33311"),            // 24. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
