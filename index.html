@@ -3515,7 +3515,10 @@ async function doTxList() {
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
         <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
         <span class="text-muted-small" style="flex-shrink:0;">💡 Bấm vào tiêu đề cột "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp, gom nhóm các giao dịch cùng số tiền lại gần nhau</span>
-        <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
+          <button id="copyTxListMisaBtn" class="btn-outline" onclick="copyTxListForMisa()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho mẫu DS bán MISA</button>
+        </div>
       </div>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px;">
         <table class="sepay-table" id="txListTable">
@@ -3588,6 +3591,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].customer_name = ok ? (data.users_name || "") : "";
       txs[i].customer_code = ok ? (data.username || "") : "";
       txs[i].invoice_number = invoiceNumber;
+      txs[i].ref_username = ok ? (data.ref_username || "") : "";
     } catch (e) {
       if (nameEl) nameEl.textContent = "—";
       if (userEl) userEl.textContent = "—";
@@ -3595,6 +3599,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].customer_name = "";
       txs[i].customer_code = "";
       txs[i].invoice_number = "";
+      txs[i].ref_username = "";
     }
 
     // Nếu tìm được Số HĐ, tra cứu tiếp thông tin hóa đơn (Ngày lập, Tiền hàng, Tiền thuế, Tổng tiền)
@@ -3607,6 +3612,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = "";
       txs[i].vat_amount = "";
       txs[i].total_amount = "";
+      txs[i].invoice_item_name = "";
       continue;
     }
     try {
@@ -3625,6 +3631,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = okInv ? (dataInv.amount_before_tax ?? "") : "";
       txs[i].vat_amount = okInv ? (dataInv.vat_amount ?? "") : "";
       txs[i].total_amount = okInv ? (dataInv.total_amount ?? "") : "";
+      txs[i].invoice_item_name = okInv ? (dataInv.invoice_item_name || "") : "";
     } catch (e) {
       if (dateEl) dateEl.textContent = "—";
       if (beforeTaxEl) beforeTaxEl.textContent = "—";
@@ -3634,6 +3641,7 @@ async function lookupCustomerInfoForTxList(txs) {
       txs[i].amount_before_tax = "";
       txs[i].vat_amount = "";
       txs[i].total_amount = "";
+      txs[i].invoice_item_name = "";
     }
   }
 }
@@ -3829,6 +3837,75 @@ function copyTxListTable() {
     });
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListBtn");
+      const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
+      setTimeout(() => { btn.innerText = originalText; }, 2000);
+    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch (e) {
+    alert("Đã xảy ra lỗi khi copy: " + e.message);
+  }
+}
+
+// Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 22 cột theo cấu trúc file mẫu
+// nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
+// currentTxListData như nút Copy cho Excel/Sheets ở trên).
+// Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
+// "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
+// đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
+// bị tự động chuyển thành số (mất số 0 ở đầu, đổi định dạng...).
+function copyTxListForMisa() {
+  try {
+    if (!currentTxListData || currentTxListData.length === 0) {
+      alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
+      return;
+    }
+    const asText = (v) => "'" + v;
+
+    let tsv = "";
+    currentTxListData.forEach(tx => {
+      const ngayLap = formatDateOnly(tx.invoice_date || "");
+      const maThanhToan = tx.code || "";
+      const soHd = tx.invoice_number || "";
+      const maKh = tx.customer_code || "";
+      const tenKh = tx.customer_name || "";
+      const tenHang = (tx.invoice_item_name || "").replace(/[\r\n\t]+/g, " ").trim();
+      const tienHang = (tx.amount_before_tax === "" || tx.amount_before_tax === undefined || tx.amount_before_tax === null) ? "" : String(Number(tx.amount_before_tax));
+      const tienThue = (tx.vat_amount === "" || tx.vat_amount === undefined || tx.vat_amount === null) ? "" : String(Number(tx.vat_amount));
+
+      // Cột 15: TK Có doanh thu - "5113.TT" nếu ref là "cqm" hoặc "SA0003", còn lại "5113.AFF"
+      const refRaw = (tx.ref_username || "").trim().toLowerCase();
+      const isTT = refRaw === "cqm" || refRaw === "sa0003";
+      const tkCoDoanhThu = isTT ? "5113.TT" : "5113.AFF";
+
+      const cols = [
+        ngayLap,              // 1.  Ngày lập
+        maThanhToan,          // 2.  Mã thanh toán
+        "",                   // 3.  (trống)
+        "",                   // 4.  (trống)
+        soHd,                 // 5.  Số HĐ
+        ngayLap,              // 6.  Ngày lập
+        maKh,                 // 7.  Mã KH
+        tenKh,                 // 8.  Tên KH
+        tenHang,               // 9.  Tên hàng (invoice_item_name)
+        "",                    // 10. (trống)
+        tenHang,                // 11. Tên hàng (invoice_item_name)
+        "",                     // 12. (trống)
+        "",                     // 13. (trống)
+        asText("131"),          // 14. TK Nợ
+        asText(tkCoDoanhThu),   // 15. TK Có doanh thu
+        asText("Khóa"),         // 16. Đvt
+        asText("1"),            // 17. Số lượng
+        tienHang,                // 18. Tiền hàng
+        tienHang,                // 19. Tiền hàng
+        asText("8"),             // 20. Thuế suất
+        tienThue,                 // 21. Tiền thuế
+        asText("33311"),          // 22. TK thuế
+      ];
+
+      tsv += cols.join("\t") + "\n";
+    });
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      const btn = document.getElementById("copyTxListMisaBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
     }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
