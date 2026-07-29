@@ -3834,6 +3834,7 @@ function copyTxListTable() {
 
       tsv += [formattedDate, soTaiKhoan, noiDung, tienVao, tienRa, maDonHang, tenKh, maKh, soHd, ngayHd, tienChuaVat, soTienVat, tongTien].join("\t") + "\n";
     });
+    tsv = tsv.replace(/\n$/, ""); // bỏ dòng trống thừa ở cuối khi dán vào Excel/Sheets
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
@@ -3847,26 +3848,20 @@ function copyTxListTable() {
 // Nút Copy riêng cho mẫu "DS bán MISA" - xuất đúng 44 cột theo cấu trúc file mẫu
 // nhập khẩu Danh sách hóa đơn bán hàng của MISA (dựa trên cùng dữ liệu gốc
 // currentTxListData như nút Copy cho Excel/Sheets ở trên).
-// Cả 2 cột "Ngày lập" (cột 1 và cột 7) đều ở dạng văn bản. Cột 1 (Ngày lập
-// đầu tiên, đi kèm Mã thanh toán ở cột 2) có thêm 1 cột trống ngay bên phải
-// (cột 3). Ngay bên phải cột Tên KH (cột 9) có thêm 6 cột trống (cột 10-15).
-// Ngay bên phải cột trống ở cột 17 (sau Tên hàng lần 1, cột 16) có thêm 6 cột
-// trống (cột 18-23), trước khi tới Tên hàng lần 2 (cột 24). Thêm 1 cột trống
-// nữa ngay trước "131" (cột 27), nên TK Nợ "131" ở cột 28. Thêm 7 cột trống
-// bên trái "8" (cột 34-40, "8" ở cột 41) và 1 cột trống bên trái Tiền thuế
-// (cột 42, Tiền thuế ở cột 43).
-// Một vài cột là giá trị cố định mang tính chất mã tài khoản kế toán (VD "131",
-// "8", "33311"...) nên được ép về dạng văn bản bằng cách thêm dấu ' ở đầu -
-// đây là ký hiệu chuẩn để Excel/Google Sheets hiểu là text khi dán vào, tránh
-// bị tự động chuyển thành số/ngày (mất số 0 ở đầu, đổi định dạng...).
+// Chỉ lấy các dòng "Tiền vào (+)" (bỏ qua các dòng "Tiền ra (-)").
+// Cột "Ngày lập" xuất hiện 2 lần (cột 1 và cột 7). Cột 1 (đi kèm Mã thanh toán
+// ở cột 2) có thêm 1 cột trống ngay bên phải (cột 3). Ngay bên phải cột Tên KH
+// (cột 9) có thêm 6 cột trống (cột 10-15). Ngay bên phải cột trống ở cột 17
+// (sau Tên hàng lần 1, cột 16) có thêm 6 cột trống (cột 18-23), trước khi tới
+// Tên hàng lần 2 (cột 24). Thêm 1 cột trống nữa ngay trước "131" (cột 27) nên
+// TK Nợ "131" ở cột 28. Thêm 7 cột trống bên trái "8" (cột 34-40, "8" ở cột
+// 41) và 1 cột trống bên trái Tiền thuế (cột 42, Tiền thuế ở cột 43).
 function copyTxListForMisa() {
   try {
     if (!currentTxListData || currentTxListData.length === 0) {
       alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
       return;
     }
-    const asText = (v) => "'" + v;
-
     // Bỏ qua các dòng "Tiền ra (-)" (giao dịch tiền ra, VD hoàn tiền) - mẫu DS bán
     // MISA chỉ cần các giao dịch "Tiền vào (+)" (giao dịch bán hàng thực tế).
     const rowsToExport = currentTxListData.filter(tx => Number(tx.amount_in || 0) > 0);
@@ -3892,13 +3887,13 @@ function copyTxListForMisa() {
       const tkCoDoanhThu = isTT ? "5113.TT" : "5113.AFF";
 
       const cols = [
-        asText(ngayLap),        // 1.  Ngày lập (văn bản)
+        ngayLap,                 // 1.  Ngày lập
         maThanhToan,             // 2.  Mã thanh toán
         "",                      // 3.  (trống)
         "",                      // 4.  (trống)
         "",                      // 5.  (trống)
         soHd,                    // 6.  Số HĐ
-        asText(ngayLap),         // 7.  Ngày lập (văn bản)
+        ngayLap,                 // 7.  Ngày lập
         maKh,                    // 8.  Mã KH
         tenKh,                    // 9.  Tên KH
         "",                       // 10. (trống - mới chèn)
@@ -3919,10 +3914,10 @@ function copyTxListForMisa() {
         "",                       // 25. (trống)
         "",                       // 26. (trống)
         "",                       // 27. (trống - mới chèn)
-        asText("131"),            // 28. TK Nợ
-        asText(tkCoDoanhThu),     // 29. TK Có doanh thu
-        asText("Khóa"),           // 30. Đvt
-        asText("1"),              // 31. Số lượng
+        "131",                    // 28. TK Nợ
+        tkCoDoanhThu,             // 29. TK Có doanh thu
+        "Khóa",                   // 30. Đvt
+        "1",                      // 31. Số lượng
         tienHang,                  // 32. Tiền hàng
         tienHang,                  // 33. Tiền hàng
         "",                        // 34. (trống - mới chèn)
@@ -3932,14 +3927,15 @@ function copyTxListForMisa() {
         "",                        // 38. (trống - mới chèn)
         "",                        // 39. (trống - mới chèn)
         "",                        // 40. (trống - mới chèn)
-        asText("8"),               // 41. Thuế suất
+        "8",                       // 41. Thuế suất
         "",                        // 42. (trống - mới chèn)
         tienThue,                   // 43. Tiền thuế
-        asText("33311"),            // 44. TK thuế
+        "33311",                    // 44. TK thuế
       ];
 
       tsv += cols.join("\t") + "\n";
     });
+    tsv = tsv.replace(/\n$/, ""); // bỏ dòng trống thừa ở cuối khi dán vào Excel/Sheets
 
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListMisaBtn");
