@@ -433,80 +433,20 @@
   .cal-dot { display: none; width: 4px; height: 4px; background: var(--cal-active-bg); border-radius: 50%; margin-top: 2px; }
   .cal-day-block.active .cal-dot { background: var(--cal-active-text); display: block;}
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     .weekly-calendar-widget { display: none; } /* Ẩn lịch trên màn hình nhỏ để tránh vỡ Header */
   }
 
   /* Khi máy đã lưu mật khẩu (ô input được ẩn đi), nhường chỗ đó cho widget lịch
      kể cả trên tablet/mobile. Cho phép header tự xuống dòng nếu vẫn không đủ chỗ
      để không bao giờ vỡ layout. */
-  /* --- HEADER GỌN LẠI TRÊN ĐIỆN THOẠI --- */
-.top-header {
-  height: auto;
-  flex-wrap: wrap;
-  align-items: center;
-  padding: 10px 14px;
-  row-gap: 8px;
-  gap: 8px;
-}
-.header-brand {
-  font-size: 15px;
-  letter-spacing: 0.2px;
-  flex: 0 0 auto;
-  order: 1;
-}
-
-/* Lịch tuần: hàng riêng, full width, cuộn ngang nếu cần, không đè lên gì khác */
-.weekly-calendar-widget {
-  display: flex !important;
-  order: 2;
-  flex: 1 1 100%;
-  width: 100%;
-  justify-content: flex-start;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
-}
-.weekly-calendar-widget .cal-info {
-  flex-shrink: 0;
-  margin-right: 8px;
-}
-.weekly-calendar-widget .cal-days-wrap {
-  flex-shrink: 0;
-}
-.cal-day-block {
-  width: 32px;
-  height: 42px;
-  flex-shrink: 0;
-}
-.cal-dow { font-size: 8px; }
-.cal-date { font-size: 13px; }
-.cal-lunar-date { font-size: 8px; }
-
-.header-actions {
-  width: 100%;
-  flex-wrap: wrap;
-  gap: 8px;
-  order: 3;
-}
-.header-actions #themeSelect {
-  order: 1;
-  flex: 0 0 auto;
-  padding: 6px 8px;
-  font-size: 12px;
-}
-.header-actions #accessToken {
-  order: 2;
-  flex: 1 1 140px;
-  min-width: 0;
-}
-.header-actions button:not(.acc-seg-btn) {
-  order: 3;
-  padding: 8px 14px;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-
+  @media (max-width: 1024px) {
+    body.has-token .top-header { flex-wrap: wrap; row-gap: 8px; }
+    body.has-token .weekly-calendar-widget {
+      display: flex; order: 3; flex: 1 1 auto; justify-content: center;
+    }
+    body.has-token .header-actions { flex: 0 0 auto; }
+  }
   /* Ẩn ô nhập mật khẩu khi đã có mật khẩu lưu sẵn */
   body.has-token #accessToken { display: none; }
 
