@@ -79,48 +79,94 @@
     --cal-block-bg: rgba(255,255,255,0.05);
   }
 
-  /* GIAO DIỆN LIGHT MODE SẼ GHI ĐÈ CÁC BIẾN NÀY */
+  /* GIAO DIỆN LIGHT MODE SẼ GHI ĐÈ CÁC BIẾN NÀY
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN (tham khảo VibeCoding UI Color Handbook, chương 4.1):
+       Lớp 1 - Nguyên thủy (Primitive): thang màu 50→900 cho từng hue, không gán ý nghĩa dùng để làm gì.
+       Lớp 2 - Ngữ nghĩa (Semantic)   : biến --accent/--badge-ok-bg/... trỏ vào Primitive, mang ý nghĩa cụ thể.
+       Lớp 3 - Component              : không đổi gì — mọi nơi dùng var(--accent), var(--badge-ok-bg)... trong
+                                         phần CSS phía dưới vẫn giữ nguyên, chỉ đổi NGUỒN cấp giá trị cho chúng.
+     Lợi ích: đổi màu thương hiệu chỉ cần sửa thang --blue-*, không phải dò từng nơi dùng màu trong file. */
   body.light-mode {
-    --bg-app: #F4F7F9; 
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(46,151,224,.06), transparent 70%),
-                   linear-gradient(180deg, #F4F7F9, #E9EEF2);
-    --header-bg: rgba(255,255,255,0.85);       
-    --card-bg: #FFFFFF;         
-    --card-bg-solid: #FFFFFF;
-    --border: rgba(0,0,0,0.08);          
-    --text-main: #1E293B;        
-    --text-muted: #64748B;       
-    --heading-color: #0F172A;
-    --brand-color: #E08B10;
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    /* Thang xanh dương (Accent) - giữ đúng 2 mức 600/500 đang dùng làm gradient hiện tại */
+    --blue-50:  #EFF6FF;
+    --blue-100: #DBEAFE;
+    --blue-200: #BFDBFE;
+    --blue-300: #93C5FD;
+    --blue-400: #60A5FA;
+    --blue-500: #3B82F6;
+    --blue-600: #2563EB;
+    --blue-700: #1D4ED8;
+    --blue-800: #1E40AF;
+    --blue-900: #1E3A8A;
 
-    --accent: #2563EB;          
-    --accent-gradient: linear-gradient(90deg, #2563EB, #3B82F6);
-    
-    --btn-orange: linear-gradient(180deg, #F4AE36, #E08B10);
+    /* Thang trung tính (Neutral) - nền/viền/chữ */
+    --slate-50:  #F8FAFC;
+    --slate-100: #F1F5F9;
+    --slate-200: #E2E8F0;
+    --slate-300: #CBD5E1;
+    --slate-500: #64748B;
+    --slate-600: #475569;
+    --slate-800: #1E293B;
+    --slate-900: #0F172A;
+
+    /* Thang hổ phách (Amber) - dùng cho brand-color & nút cam */
+    --amber-400: #F4AE36;
+    --amber-600: #E08B10;
+
+    /* Thang ngữ nghĩa Thành công (Success) */
+    --green-50:  #F0FDF4;
+    --green-100: #DCFCE7;
+    --green-600: #16A34A;
+    --green-800: #166534;
+
+    /* Thang ngữ nghĩa Lỗi (Error) */
+    --red-50:  #FEF2F2;
+    --red-100: #FEE2E2;
+    --red-600: #DC2626;
+    --red-800: #991B1B;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) - trỏ vào Primitive ở trên ===== */
+    --bg-app: var(--slate-50);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--blue-500) 6%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--slate-50), var(--slate-100));
+    --header-bg: rgba(255,255,255,0.85);
+    --card-bg: #FFFFFF;
+    --card-bg-solid: #FFFFFF;
+    --border: rgba(0,0,0,0.08);
+    --text-main: var(--slate-800);
+    --text-muted: var(--slate-500);
+    --heading-color: var(--slate-900);
+    --brand-color: var(--amber-600);
+
+    --accent: var(--blue-600);
+    --accent-gradient: linear-gradient(90deg, var(--blue-600), var(--blue-500));
+
+    --btn-orange: linear-gradient(180deg, var(--amber-400), var(--amber-600));
     --btn-orange-text: #FFFFFF;
     --btn-text: #FFFFFF;
 
-    --badge-ok-bg: #DCFCE7;     
-    --badge-ok-text: #166534;
-    --badge-err-bg: #FEE2E2;    
-    --badge-err-text: #991B1B;
+    --badge-ok-bg: var(--green-100);
+    --badge-ok-text: var(--green-800);
+    --badge-err-bg: var(--red-100);
+    --badge-err-text: var(--red-800);
 
-    --input-bg: #F8FAFC;
-    --input-border: #CBD5E1;
+    --input-bg: var(--slate-50);
+    --input-border: var(--slate-300);
 
     --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    --table-th-bg: #F1F5F9;
-    --table-th-text: #475569;
-    --table-row-hover: #F8FAFC;
-    
-    --amount-in: #16A34A;
-    --amount-out: #DC2626;
-    --total-row-bg: #EFF6FF;
-    --total-row-bg-solid: #EFF6FF;
-    --checkbox-bg: #F8FAFC;
+    --table-th-bg: var(--slate-100);
+    --table-th-text: var(--slate-600);
+    --table-row-hover: var(--slate-50);
+
+    --amount-in: var(--green-600);
+    --amount-out: var(--red-600);
+    --total-row-bg: var(--blue-50);
+    --total-row-bg-solid: var(--blue-50);
+    --checkbox-bg: var(--slate-50);
     --settings-panel-bg: rgba(0,0,0,0.04);
 
-    --cal-active-bg: #C5221F; 
+    --cal-active-bg: #C5221F;
     --cal-active-text: #FFFFFF;
     --cal-block-bg: #FFFFFF;
   }
