@@ -27,54 +27,79 @@
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
-  /* 10X DESIGN SYSTEM - CÁC BIẾN MẶC ĐỊNH LÀ DARK MODE */
-  :root { 
-    --bg-app: #0C1640; 
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(46,151,224,.18), transparent 70%), 
-                   radial-gradient(800px 500px at 50% 120%, rgba(240,161,36,.12), transparent 70%), 
-                   linear-gradient(180deg,#0C1640,#070D26);
-    
-    --header-bg: rgba(12,22,64,0.4);       
-    --sidebar-bg: transparent;      
-    --card-bg: linear-gradient(180deg, rgba(20,32,78,.9), rgba(15,25,64,.8));         
-    --card-bg-solid: #141F4E;
-    --border: rgba(120,150,220,.22);          
-    
-    --text-main: #FFFFFF;        
-    --text-muted: rgba(255,255,255,.6);      
+  /* 10X DESIGN SYSTEM - CÁC BIẾN MẶC ĐỊNH LÀ DARK MODE
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN (xem body.light-mode để đọc giải thích đầy đủ). */
+  :root {
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    /* Thang xanh da trời (Accent) */
+    --sky-100: #AEC0E6;
+    --sky-200: #9FD4F8;
+    --sky-300: #7896DC;
+    --sky-400: #63B8F0;
+    --sky-500: #2E97E0;
+
+    /* Thang vàng đồng (Brand / trạng thái lỗi) */
+    --gold-300: #FFD98A;
+    --gold-500: #F0A124;
+
+    /* Thang hổ phách (nút cam) - tách riêng khỏi gold vì đây là 2 sắc cam khác nhau trong thiết kế gốc */
+    --amber-400: #F4AE36;
+    --amber-600: #E08B10;
+
+    /* Thang xanh navy (nền/card/viền) */
+    --navy-600: #183265;
+    --navy-700: #14204E;
+    --navy-750: #0F1940;
+    --navy-900: #0C1640;
+    --navy-950: #070D26;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) - trỏ vào Primitive ở trên ===== */
+    --bg-app: var(--navy-900);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--sky-500) 18%, transparent), transparent 70%),
+                   radial-gradient(800px 500px at 50% 120%, color-mix(in srgb, var(--gold-500) 12%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--navy-900), var(--navy-950));
+
+    --header-bg: color-mix(in srgb, var(--navy-900) 40%, transparent);
+    --sidebar-bg: transparent;
+    --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--navy-700) 90%, transparent), color-mix(in srgb, var(--navy-750) 80%, transparent));
+    --card-bg-solid: var(--navy-700);
+    --border: color-mix(in srgb, var(--sky-300) 22%, transparent);
+
+    --text-main: #FFFFFF;
+    --text-muted: rgba(255,255,255,.6);
     --heading-color: #FFFFFF;
-    --brand-color: #F0A124;
+    --brand-color: var(--gold-500);
 
-    --accent: #2E97E0;          
-    --accent-gradient: linear-gradient(90deg,#2E97E0,#63B8F0);
-    --accent-hover: #63B8F0; 
-    
-    --btn-orange: linear-gradient(180deg,#F4AE36,#E08B10);
+    --accent: var(--sky-500);
+    --accent-gradient: linear-gradient(90deg, var(--sky-500), var(--sky-400));
+    --accent-hover: var(--sky-400);
+
+    --btn-orange: linear-gradient(180deg, var(--amber-400), var(--amber-600));
     --btn-orange-text: #241400;
-    --btn-text: #0C1640;
+    --btn-text: var(--navy-900);
 
-    --badge-ok-bg: rgba(46,151,224,.16);     
-    --badge-ok-text: rgba(159,212,248,.95);
-    --badge-err-bg: rgba(240,161,36,.16);    
-    --badge-err-text: #FFD98A;
+    --badge-ok-bg: color-mix(in srgb, var(--sky-500) 16%, transparent);
+    --badge-ok-text: color-mix(in srgb, var(--sky-200) 95%, transparent);
+    --badge-err-bg: color-mix(in srgb, var(--gold-500) 16%, transparent);
+    --badge-err-text: var(--gold-300);
 
-    --input-bg: rgba(15,25,64,.5);
+    --input-bg: color-mix(in srgb, var(--navy-750) 50%, transparent);
     --input-border: rgba(255,255,255,.14);
 
     --card-shadow: 0 12px 30px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1);
     --table-th-bg: rgba(0,0,0,0.2);
-    --table-th-text: #AEC0E6;
+    --table-th-text: var(--sky-100);
     --table-row-hover: rgba(255,255,255,0.04);
-    
-    --amount-in: rgba(159,212,248,.95);
-    --amount-out: #FFD98A;
-    --total-row-bg: rgba(46,151,224,.16);
-    --total-row-bg-solid: #183265;
+
+    --amount-in: color-mix(in srgb, var(--sky-200) 95%, transparent);
+    --amount-out: var(--gold-300);
+    --total-row-bg: color-mix(in srgb, var(--sky-500) 16%, transparent);
+    --total-row-bg-solid: var(--navy-600);
     --checkbox-bg: rgba(255,255,255,0.012);
     --settings-panel-bg: rgba(0,0,0,0.2);
 
-    /* BIẾN MÀU WIDGET LỊCH TUẦN */
-    --cal-active-bg: #C5221F; 
+    /* BIẾN MÀU WIDGET LỊCH TUẦN (dùng chung mọi theme, không thuộc hệ token thương hiệu) */
+    --cal-active-bg: #C5221F;
     --cal-active-text: #FFFFFF;
     --cal-block-bg: rgba(255,255,255,0.05);
   }
@@ -172,45 +197,75 @@
   }
 
   /* ===================== CÁC THEME BỔ SUNG ===================== */
-  /* Theme "Xanh Rêu Chuyên Nghiệp" (nền sáng) — dựa palette #5D8696/#78ABAF/#8FAFCC/#CCA885 */
+  /* Theme "Xanh Rêu Chuyên Nghiệp" (nền sáng) — dựa palette #5D8696/#78ABAF/#8FAFCC/#CCA885
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
   body.theme-teal {
-    --bg-app: #F0F4F5;
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(93,134,150,.10), transparent 70%),
-                   linear-gradient(180deg, #F0F4F5, #E4EBEC);
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    --teal-400: #78ABAF;
+    --teal-500: #5D8696;
+
+    --sand-400: #CCA885;
+    --sand-600: #B5905F;
+
+    --green-50:  #E1EFE9;
+    --green-600: #2F8F6B;
+    --green-700: #2F6B4F;
+
+    --rust-50:  #FBEAE0;
+    --rust-600: #C1622E;
+    --rust-700: #A15A2A;
+
+    --mist-25:  #F8FAFA;
+    --mist-50:  #F0F4F5;
+    --mist-75:  #F5F8F8;
+    --mist-100: #E4EBEC;
+    --mist-150: #EEF3F3;
+    --mist-total: #E7F0F1;
+    --mist-border: #C7D3D5;
+
+    --ink-500: #6B8288;
+    --ink-600: #4C6367;
+    --ink-800: #2A3B40;
+    --ink-900: #1F2D30;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
+    --bg-app: var(--mist-50);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--teal-500) 10%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--mist-50), var(--mist-100));
     --header-bg: rgba(255,255,255,0.85);
     --card-bg: #FFFFFF;
     --card-bg-solid: #FFFFFF;
-    --border: rgba(93,134,150,0.18);
-    --text-main: #2A3B40;
-    --text-muted: #6B8288;
-    --heading-color: #1F2D30;
-    --brand-color: #5D8696;
+    --border: color-mix(in srgb, var(--teal-500) 18%, transparent);
+    --text-main: var(--ink-800);
+    --text-muted: var(--ink-500);
+    --heading-color: var(--ink-900);
+    --brand-color: var(--teal-500);
 
-    --accent: #5D8696;
-    --accent-gradient: linear-gradient(90deg, #5D8696, #78ABAF);
-    --accent-hover: #78ABAF;
+    --accent: var(--teal-500);
+    --accent-gradient: linear-gradient(90deg, var(--teal-500), var(--teal-400));
+    --accent-hover: var(--teal-400);
 
-    --btn-orange: linear-gradient(180deg, #CCA885, #B5905F);
+    --btn-orange: linear-gradient(180deg, var(--sand-400), var(--sand-600));
     --btn-orange-text: #FFFFFF;
     --btn-text: #FFFFFF;
 
-    --badge-ok-bg: #E1EFE9;
-    --badge-ok-text: #2F6B4F;
-    --badge-err-bg: #FBEAE0;
-    --badge-err-text: #A15A2A;
+    --badge-ok-bg: var(--green-50);
+    --badge-ok-text: var(--green-700);
+    --badge-err-bg: var(--rust-50);
+    --badge-err-text: var(--rust-700);
 
-    --input-bg: #F8FAFA;
-    --input-border: #C7D3D5;
+    --input-bg: var(--mist-25);
+    --input-border: var(--mist-border);
     --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    --table-th-bg: #EEF3F3;
-    --table-th-text: #4C6367;
-    --table-row-hover: #F5F8F8;
+    --table-th-bg: var(--mist-150);
+    --table-th-text: var(--ink-600);
+    --table-row-hover: var(--mist-75);
 
-    --amount-in: #2F8F6B;
-    --amount-out: #C1622E;
-    --total-row-bg: #E7F0F1;
-    --total-row-bg-solid: #E7F0F1;
-    --checkbox-bg: #F8FAFA;
+    --amount-in: var(--green-600);
+    --amount-out: var(--rust-600);
+    --total-row-bg: var(--mist-total);
+    --total-row-bg-solid: var(--mist-total);
+    --checkbox-bg: var(--mist-25);
     --settings-panel-bg: rgba(0,0,0,0.03);
 
     --cal-active-bg: #C5221F;
@@ -218,44 +273,63 @@
     --cal-block-bg: #FFFFFF;
   }
 
-  /* Theme "Nâu Đất Tối" (dark mode thay thế) — dựa palette #534739/#9E8774/#1F2D33/#0D0D0C */
+  /* Theme "Nâu Đất Tối" (dark mode thay thế) — dựa palette #534739/#9E8774/#1F2D33/#0D0D0C
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
   body.theme-earth-dark {
-    --bg-app: #14171A;
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(158,135,116,.14), transparent 70%),
-                   linear-gradient(180deg, #14171A, #0D0D0C);
-    --header-bg: rgba(20,23,26,0.4);
-    --card-bg: linear-gradient(180deg, rgba(31,45,51,.9), rgba(20,23,26,.8));
-    --card-bg-solid: #1F2D33;
-    --border: rgba(158,135,116,.22);
-    --text-main: #F0F2F1;
-    --text-muted: rgba(240,242,241,.6);
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    --taupe-200: #D8C4B0;
+    --taupe-400: #C2AB94;
+    --taupe-500: #9E8774;
+    --taupe-900: #2A2016;
+
+    --coral-300: #F0A98F;
+    --coral-500: #E86349;
+
+    --mint-300: #A9D8C0;
+
+    --charcoal-800: #1F2D33;
+    --charcoal-900: #14171A;
+    --charcoal-950: #0D0D0C;
+
+    --linen-50: #F0F2F1;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
+    --bg-app: var(--charcoal-900);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--taupe-500) 14%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--charcoal-900), var(--charcoal-950));
+    --header-bg: color-mix(in srgb, var(--charcoal-900) 40%, transparent);
+    --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--charcoal-800) 90%, transparent), color-mix(in srgb, var(--charcoal-900) 80%, transparent));
+    --card-bg-solid: var(--charcoal-800);
+    --border: color-mix(in srgb, var(--taupe-500) 22%, transparent);
+    --text-main: var(--linen-50);
+    --text-muted: color-mix(in srgb, var(--linen-50) 60%, transparent);
     --heading-color: #FFFFFF;
-    --brand-color: #9E8774;
+    --brand-color: var(--taupe-500);
 
-    --accent: #9E8774;
-    --accent-gradient: linear-gradient(90deg, #9E8774, #C2AB94);
-    --accent-hover: #C2AB94;
+    --accent: var(--taupe-500);
+    --accent-gradient: linear-gradient(90deg, var(--taupe-500), var(--taupe-400));
+    --accent-hover: var(--taupe-400);
 
-    --btn-orange: linear-gradient(180deg, #C2AB94, #9E8774);
-    --btn-orange-text: #14171A;
-    --btn-text: #14171A;
+    --btn-orange: linear-gradient(180deg, var(--taupe-400), var(--taupe-500));
+    --btn-orange-text: var(--charcoal-900);
+    --btn-text: var(--charcoal-900);
 
-    --badge-ok-bg: rgba(158,135,116,.18);
-    --badge-ok-text: #D8C4B0;
-    --badge-err-bg: rgba(232,99,73,.18);
-    --badge-err-text: #F0A98F;
+    --badge-ok-bg: color-mix(in srgb, var(--taupe-500) 18%, transparent);
+    --badge-ok-text: var(--taupe-200);
+    --badge-err-bg: color-mix(in srgb, var(--coral-500) 18%, transparent);
+    --badge-err-text: var(--coral-300);
 
-    --input-bg: rgba(31,45,51,.5);
-    --input-border: rgba(240,242,241,.14);
+    --input-bg: color-mix(in srgb, var(--charcoal-800) 50%, transparent);
+    --input-border: color-mix(in srgb, var(--linen-50) 14%, transparent);
     --card-shadow: 0 12px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
     --table-th-bg: rgba(0,0,0,0.25);
-    --table-th-text: #C2AB94;
+    --table-th-text: var(--taupe-400);
     --table-row-hover: rgba(255,255,255,0.04);
 
-    --amount-in: #A9D8C0;
-    --amount-out: #F0A98F;
-    --total-row-bg: rgba(158,135,116,.16);
-    --total-row-bg-solid: #2A2016;
+    --amount-in: var(--mint-300);
+    --amount-out: var(--coral-300);
+    --total-row-bg: color-mix(in srgb, var(--taupe-500) 16%, transparent);
+    --total-row-bg-solid: var(--taupe-900);
     --checkbox-bg: rgba(255,255,255,0.02);
     --settings-panel-bg: rgba(0,0,0,0.25);
 
@@ -264,44 +338,67 @@
     --cal-block-bg: rgba(255,255,255,0.05);
   }
 
-  /* Theme "San Hô Đêm" (dark mode thay thế) — dựa palette #213271/#367098/#79BBCF/#E86349/#DDFAFB */
+  /* Theme "San Hô Đêm" (dark mode thay thế) — dựa palette #213271/#367098/#79BBCF/#E86349/#DDFAFB
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
   body.theme-coral-dark {
-    --bg-app: #10182E;
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(232,99,73,.12), transparent 70%),
-                   linear-gradient(180deg, #10182E, #0A0F20);
-    --header-bg: rgba(16,24,46,0.4);
-    --card-bg: linear-gradient(180deg, rgba(33,50,113,.9), rgba(16,24,46,.8));
-    --card-bg-solid: #213271;
-    --border: rgba(140,160,220,.20);
-    --text-main: #EAF9FA;
-    --text-muted: rgba(234,249,250,.6);
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    --cyan-300: #79BBCF;
+    --cyan-600: #367098;
+
+    /* Ba mức tint nhạt riêng biệt (không cùng 1 thang tuyến tính trong bản gốc, giữ nguyên để không lệch màu) */
+    --sky-100: #C6EEF5;
+    --sky-150: #A9E6EF;
+    --sky-200: #9FC7DA;
+
+    --coral-300: #FFC0AE;
+    --coral-400: #F08066;
+    --coral-500: #E86349;
+
+    --midnight-700: #213271;
+    --midnight-800: #1B2A5C;
+    --midnight-900: #10182E;
+    --midnight-950: #0A0F20;
+
+    --frost-50: #EAF9FA;
+    --steel-300: #8CA0DC;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
+    --bg-app: var(--midnight-900);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--coral-500) 12%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--midnight-900), var(--midnight-950));
+    --header-bg: color-mix(in srgb, var(--midnight-900) 40%, transparent);
+    --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--midnight-700) 90%, transparent), color-mix(in srgb, var(--midnight-900) 80%, transparent));
+    --card-bg-solid: var(--midnight-700);
+    --border: color-mix(in srgb, var(--steel-300) 20%, transparent);
+    --text-main: var(--frost-50);
+    --text-muted: color-mix(in srgb, var(--frost-50) 60%, transparent);
     --heading-color: #FFFFFF;
-    --brand-color: #E86349;
+    --brand-color: var(--coral-500);
 
-    --accent: #367098;
-    --accent-gradient: linear-gradient(90deg, #367098, #79BBCF);
-    --accent-hover: #79BBCF;
+    --accent: var(--cyan-600);
+    --accent-gradient: linear-gradient(90deg, var(--cyan-600), var(--cyan-300));
+    --accent-hover: var(--cyan-300);
 
-    --btn-orange: linear-gradient(180deg, #F08066, #E86349);
-    --btn-orange-text: #10182E;
-    --btn-text: #10182E;
+    --btn-orange: linear-gradient(180deg, var(--coral-400), var(--coral-500));
+    --btn-orange-text: var(--midnight-900);
+    --btn-text: var(--midnight-900);
 
-    --badge-ok-bg: rgba(121,187,207,.18);
-    --badge-ok-text: #C6EEF5;
-    --badge-err-bg: rgba(232,99,73,.20);
-    --badge-err-text: #FFC0AE;
+    --badge-ok-bg: color-mix(in srgb, var(--cyan-300) 18%, transparent);
+    --badge-ok-text: var(--sky-100);
+    --badge-err-bg: color-mix(in srgb, var(--coral-500) 20%, transparent);
+    --badge-err-text: var(--coral-300);
 
-    --input-bg: rgba(33,50,113,.5);
-    --input-border: rgba(234,249,250,.14);
+    --input-bg: color-mix(in srgb, var(--midnight-700) 50%, transparent);
+    --input-border: color-mix(in srgb, var(--frost-50) 14%, transparent);
     --card-shadow: 0 12px 30px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
     --table-th-bg: rgba(0,0,0,0.22);
-    --table-th-text: #9FC7DA;
+    --table-th-text: var(--sky-200);
     --table-row-hover: rgba(255,255,255,0.04);
 
-    --amount-in: #A9E6EF;
-    --amount-out: #FFC0AE;
-    --total-row-bg: rgba(56,112,152,.20);
-    --total-row-bg-solid: #1B2A5C;
+    --amount-in: var(--sky-150);
+    --amount-out: var(--coral-300);
+    --total-row-bg: color-mix(in srgb, var(--cyan-600) 20%, transparent);
+    --total-row-bg-solid: var(--midnight-800);
     --checkbox-bg: rgba(255,255,255,0.02);
     --settings-panel-bg: rgba(0,0,0,0.22);
 
@@ -310,53 +407,164 @@
     --cal-block-bg: rgba(255,255,255,0.05);
   }
 
-  /* Theme "Tím Lavender" (nền sáng) — dựa palette #5D7FE5/#9899EE/#B7C2ED/#FBE8FD/#FDBBDB */
+  /* Theme "Tím Lavender" (nền sáng) — dựa palette #5D7FE5/#9899EE/#B7C2ED/#FBE8FD/#FDBBDB
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
   body.theme-lavender {
-    --bg-app: #F3F2FC;
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, rgba(93,127,229,.10), transparent 70%),
-                   radial-gradient(800px 500px at 50% 120%, rgba(253,187,219,.14), transparent 70%),
-                   linear-gradient(180deg, #F3F2FC, #EDEBF9);
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    --violet-400: #9899EE;
+    --violet-500: #5D7FE5;
+    --violet-600: #4557B5;
+    --violet-700: #3F4FA8;
+
+    --pink-50:  #FDE8F1;
+    --pink-300: #FDBBDB;
+    --pink-500: #F591BC;
+    --pink-600: #C24C82;
+    --pink-700: #B23D74;
+
+    --lilac-50:  #F3F2FC;
+    --lilac-75:  #F7F7FC;
+    --lilac-100: #EDEBF9;
+    --lilac-150: #F1F1FA;
+    --lilac-input: #F8F8FD;
+    --lilac-border: #D6D9F2;
+    --lilac-badge: #E6E9FC;
+    --lilac-total: #ECEDFB;
+
+    --ink-500: #7A7FA6;
+    --ink-600: #5B5F8C;
+    --ink-800: #363A63;
+    --ink-900: #2B2F55;
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
+    --bg-app: var(--lilac-50);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--violet-500) 10%, transparent), transparent 70%),
+                   radial-gradient(800px 500px at 50% 120%, color-mix(in srgb, var(--pink-300) 14%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--lilac-50), var(--lilac-100));
     --header-bg: rgba(255,255,255,0.85);
     --card-bg: #FFFFFF;
     --card-bg-solid: #FFFFFF;
-    --border: rgba(93,127,229,0.16);
-    --text-main: #363A63;
-    --text-muted: #7A7FA6;
-    --heading-color: #2B2F55;
-    --brand-color: #5D7FE5;
+    --border: color-mix(in srgb, var(--violet-500) 16%, transparent);
+    --text-main: var(--ink-800);
+    --text-muted: var(--ink-500);
+    --heading-color: var(--ink-900);
+    --brand-color: var(--violet-500);
 
-    --accent: #5D7FE5;
-    --accent-gradient: linear-gradient(90deg, #5D7FE5, #9899EE);
-    --accent-hover: #9899EE;
+    --accent: var(--violet-500);
+    --accent-gradient: linear-gradient(90deg, var(--violet-500), var(--violet-400));
+    --accent-hover: var(--violet-400);
 
-    --btn-orange: linear-gradient(180deg, #FDBBDB, #F591BC);
+    --btn-orange: linear-gradient(180deg, var(--pink-300), var(--pink-500));
     --btn-orange-text: #4A1E33;
     --btn-text: #FFFFFF;
 
-    --badge-ok-bg: #E6E9FC;
-    --badge-ok-text: #3F4FA8;
-    --badge-err-bg: #FDE8F1;
-    --badge-err-text: #B23D74;
+    --badge-ok-bg: var(--lilac-badge);
+    --badge-ok-text: var(--violet-700);
+    --badge-err-bg: var(--pink-50);
+    --badge-err-text: var(--pink-700);
 
-    --input-bg: #F8F8FD;
-    --input-border: #D6D9F2;
-    --card-shadow: 0 4px 14px rgba(93,127,229,0.08);
-    --table-th-bg: #F1F1FA;
-    --table-th-text: #5B5F8C;
-    --table-row-hover: #F7F7FC;
+    --input-bg: var(--lilac-input);
+    --input-border: var(--lilac-border);
+    --card-shadow: 0 4px 14px color-mix(in srgb, var(--violet-500) 8%, transparent);
+    --table-th-bg: var(--lilac-150);
+    --table-th-text: var(--ink-600);
+    --table-row-hover: var(--lilac-75);
 
-    --amount-in: #4557B5;
-    --amount-out: #C24C82;
-    --total-row-bg: #ECEDFB;
-    --total-row-bg-solid: #ECEDFB;
-    --checkbox-bg: #F8F8FD;
-    --settings-panel-bg: rgba(93,127,229,0.04);
+    --amount-in: var(--violet-600);
+    --amount-out: var(--pink-600);
+    --total-row-bg: var(--lilac-total);
+    --total-row-bg-solid: var(--lilac-total);
+    --checkbox-bg: var(--lilac-input);
+    --settings-panel-bg: color-mix(in srgb, var(--violet-500) 4%, transparent);
 
     --cal-active-bg: #C5221F;
     --cal-active-text: #FFFFFF;
     --cal-block-bg: #FFFFFF;
   }
   /* ================================================================ */
+
+  /* Theme "Kế Toán" (nền sáng) — xanh navy pha xanh ngọc, xây theo đúng phương pháp
+     VibeCoding UI Color Handbook: 1 màu chủ đạo (H210° S28% L42%) → thang 50-900 →
+     4 màu ngữ nghĩa (success/warning/error/info) → màu trung tính (xám ngả xanh).
+     Mục tiêu cảm giác: Chính xác, Đáng tin cậy, Chuyên nghiệp, Bình tĩnh, An toàn tài chính. */
+  body.theme-accounting {
+    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
+    /* Thang Primary - xanh navy ngọc (H210°, S28%, L42%) */
+    --primary-50:  #F5F8FB;
+    --primary-100: #E9EFF5;
+    --primary-200: #D3DDE8;
+    --primary-300: #B5C6D8;
+    --primary-400: #8EA9C2;
+    --primary-500: #6E88A8;
+    --primary-600: #4A6A89;
+    --primary-700: #3C5770;
+    --primary-800: #2F4559;
+    --primary-900: #22313F;
+
+    /* Thang trung tính - xám ngả xanh (không dùng xám thuần) */
+    --gray-50:  #F7F9FB;
+    --gray-100: #EEF2F6;
+    --gray-200: #DCE3EA;
+    --gray-300: #C3CDD7;
+    --gray-400: #9AA7B5;
+    --gray-500: #728190;
+    --gray-600: #556270;
+    --gray-700: #404B57;
+    --gray-800: #2E3640;
+    --gray-900: #20262E;
+
+    /* 4 màu ngữ nghĩa - mỗi màu chỉ cho 1 giá trị gốc, các sắc nhạt/đậm dẫn xuất qua color-mix */
+    --success-500: #2F8F63; /* Đã hạch toán / Thanh toán thành công / Đã đối soát */
+    --warning-500: #D39A28; /* Sắp đến hạn / Cần kiểm tra / Thiếu chứng từ */
+    --error-500:   #C84E4E; /* Sai dữ liệu / Không cân sổ / Lỗi hóa đơn */
+    --info-500:    #3C82C8; /* Thông báo / Đang xử lý / Đang đồng bộ */
+
+    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) - trỏ vào Primitive ở trên =====
+       Quy tắc 60-30-10: 60% nền/xám nhạt (bg-app, card), 30% panel/bảng (table-th-bg,
+       total-row-bg), 10% nút/liên kết/số liệu quan trọng (accent, amount-in/out). */
+    --bg-app: var(--primary-50);
+    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--primary-500) 8%, transparent), transparent 70%),
+                   linear-gradient(180deg, var(--primary-50), var(--gray-100));
+    --header-bg: rgba(255,255,255,0.85);
+    --card-bg: #FFFFFF;
+    --card-bg-solid: #FFFFFF;
+    --border: var(--gray-200);
+    --text-main: var(--gray-900);
+    --text-muted: var(--gray-600);
+    --heading-color: var(--primary-800);
+    --brand-color: var(--primary-600);
+
+    --accent: var(--primary-600);
+    --accent-gradient: linear-gradient(90deg, var(--primary-600), var(--primary-500));
+    --accent-hover: var(--primary-700);
+
+    --btn-orange: linear-gradient(180deg, color-mix(in srgb, var(--warning-500) 78%, white), color-mix(in srgb, var(--warning-500) 78%, black));
+    --btn-orange-text: #FFFFFF;
+    --btn-text: #FFFFFF;
+
+    --badge-ok-bg: color-mix(in srgb, var(--success-500) 15%, white);
+    --badge-ok-text: color-mix(in srgb, var(--success-500) 65%, black);
+    --badge-err-bg: color-mix(in srgb, var(--error-500) 15%, white);
+    --badge-err-text: color-mix(in srgb, var(--error-500) 65%, black);
+
+    --input-bg: var(--gray-50);
+    --input-border: var(--gray-300);
+    --card-shadow: 0 4px 12px color-mix(in srgb, var(--primary-600) 8%, transparent);
+    --table-th-bg: var(--gray-100);
+    --table-th-text: var(--gray-600);
+    --table-row-hover: var(--gray-50);
+
+    --amount-in: var(--success-500);
+    --amount-out: var(--error-500);
+    --total-row-bg: var(--primary-100);
+    --total-row-bg-solid: var(--primary-100);
+    --checkbox-bg: var(--gray-50);
+    --settings-panel-bg: color-mix(in srgb, var(--primary-600) 4%, transparent);
+
+    --cal-active-bg: #C5221F;
+    --cal-active-text: #FFFFFF;
+    --cal-block-bg: #FFFFFF;
+  }
 
   * { box-sizing: border-box; }
   html { height: 100%; height: 100dvh; }
@@ -1081,6 +1289,7 @@
         <option value="earth-dark">🪵 Nâu Đất Tối</option>
         <option value="coral-dark">🪸 San Hô Đêm</option>
         <option value="lavender">💜 Tím Lavender</option>
+        <option value="accounting">🧾 Kế Toán</option>
       </select>
       <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
       <button id="saveTokenBtn" onclick="saveToken()">Lưu khóa</button>
@@ -1817,6 +2026,7 @@ const THEMES = {
   "earth-dark":  { class: "theme-earth-dark",   flatpickr: "dark"  },
   "coral-dark":  { class: "theme-coral-dark",   flatpickr: "dark"  },
   "lavender":    { class: "theme-lavender",     flatpickr: "light" },
+  "accounting":  { class: "theme-accounting",   flatpickr: "light" },
 };
 const THEME_CLASSES = Object.values(THEMES).map(t => t.class).filter(Boolean);
 
