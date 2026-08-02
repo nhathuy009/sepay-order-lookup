@@ -348,7 +348,7 @@ def handle_bank_statement(body):
     ws.title = "Tong_Hop_Sao_Ke"
 
     ws.append(["Nội dung diễn giải", "Gửi vào", "Rút ra", "Số dư lũy kế", "Ghi chú (Để bạn dò số)"])
-    ws.append(["Số dư đầu kỳ STK ...", "", "", so_du_dau_ky, "Tự động lấy từ ô D7 file gốc"])
+    ws.append(["Số dư đầu kỳ STK ...", "", "", so_du_dau_ky, ""])
 
     current_excel_row = 3
     for gia_tri in tat_ca_gia_tri:
@@ -376,7 +376,7 @@ def handle_bank_statement(body):
         f"=SUM(B3:B{current_excel_row-1})", 
         f"=SUM(C3:C{current_excel_row-1})", 
         so_du_cuoi_ky, 
-        f"Tự động lấy từ cột G, dòng {last_valid_row} file gốc"
+        ""
     ])
 
     # ==========================================
