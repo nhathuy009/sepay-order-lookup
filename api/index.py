@@ -233,11 +233,14 @@ def handle_invoice_by_date(body):
         # quy ước hoàn/trừ tiền REF luôn tính theo mức cố định này).
         dest["commission_rate"] = REVERSE_MATCHED_COMMISSION_RATE
         # Số tiền REF = Số tiền trước thuế (đã âm ở trên) x % REF -> tự ra số âm.
+        # Làm tròn về SỐ NGUYÊN (không thập phân) giống mọi giá trị "hoahong" khác
+        # trong hệ thống (vốn luôn là số nguyên VNĐ lấy thẳng từ đơn hàng) - tránh
+        # hiển thị lẻ kiểu "-1.041.666,75" do phép nhân phần trăm sinh ra.
         try:
             amount_num = float(dest.get("amount_before_tax") or 0)
         except (TypeError, ValueError):
             amount_num = 0.0
-        dest["hoahong"] = amount_num * (REVERSE_MATCHED_COMMISSION_RATE / 100)
+        dest["hoahong"] = round(amount_num * (REVERSE_MATCHED_COMMISSION_RATE / 100))
 
     still_missing = []  # list[(inv, adjusts_no)] cần tra ngược ngoài batch
     for inv in result:
