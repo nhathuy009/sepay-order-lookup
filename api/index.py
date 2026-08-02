@@ -216,6 +216,11 @@ def handle_invoice_by_date(body):
         dest["item_title"] = src.get("item_title", "")
         existing_note = dest.get("note") or ""
         dest["note"] = (existing_note + " " if existing_note else "") + f"(Đơn hàng lấy từ HĐ gốc {adjusts_no})"
+        # note_type riêng ("reverse_matched") để frontend phân biệt với "dieu_chinh"
+        # (hóa đơn GỐC bị điều chỉnh giảm - cần xóa trắng cột) và "thay_the" - dòng
+        # này KHÔNG được xóa trắng cột, KHÔNG bị loại khỏi tổng, vì tiền của nó
+        # (đã ép âm ở dưới) là số thật cần cộng vào tổng để trừ đi phần đã hoàn.
+        dest["note_type"] = "reverse_matched"
         # Đánh dấu để: (1) sắp dòng này xuống CUỐI bảng khi sort ở bước gộp
         # nhóm khóa học bên dưới, (2) ép toàn bộ cột tiền/% Ref liên quan về ÂM,
         # vì đây là hóa đơn điều chỉnh/thay thế (bản chất là hoàn/trừ tiền so với
