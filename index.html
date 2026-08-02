@@ -3525,30 +3525,40 @@ async function doBankStatement() {
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: "dd/mm/yyyy" });
 
     // TẠO SẴN DỮ LIỆU COPY (TSV) TỪ JSON 
-    // Chỉ lấy từ index 1 trở đi (bỏ qua dòng tiêu đề ở index 0)
-    let copyRows = jsonData.slice(1);
+    let copyRows = [];
+    
+    // Đảm bảo file có đủ dòng (Header + Đầu kỳ + Cuối kỳ)
+    if (jsonData.length > 2) {
+      const openingBalanceRow = jsonData[1]; // Dòng số dư đầu kỳ (ngay dưới header)
+      const closingBalanceRow = jsonData[jsonData.length - 1]; // Dòng số dư cuối kỳ (dòng cuối cùng)
+      const transactionRows = jsonData.slice(2, -1); // Lấy các dòng giao dịch ở giữa
 
-    // 1. Sắp xếp theo thứ tự tiền gửi vào (cột Gửi vào - index 1) từ lớn đến nhỏ
-    copyRows.sort((a, b) => {
-      let valA = a[1] !== undefined && a[1] !== null ? String(a[1]) : "";
-      let valB = b[1] !== undefined && b[1] !== null ? String(b[1]) : "";
-      // Xóa dấu phẩy/chấm trước khi ép kiểu để so sánh chính xác
-      let numA = parseFloat(valA.replace(/[,.]/g, '')) || 0;
-      let numB = parseFloat(valB.replace(/[,.]/g, '')) || 0;
-      return numB - numA;
-    });
+      // 1. Sắp xếp các dòng giao dịch theo tiền "Gửi vào" (cột index 1) giảm dần
+      transactionRows.sort((a, b) => {
+        let valA = a[1] !== undefined && a[1] !== null ? String(a[1]) : "";
+        let valB = b[1] !== undefined && b[1] !== null ? String(b[1]) : "";
+        let numA = parseFloat(valA.replace(/[,.]/g, '')) || 0;
+        let numB = parseFloat(valB.replace(/[,.]/g, '')) || 0;
+        return numB - numA;
+      });
 
+      // Ghép lại: Đầu kỳ -> Các giao dịch đã sắp xếp -> Cuối kỳ
+      copyRows = [openingBalanceRow, ...transactionRows, closingBalanceRow];
+    } else {
+      copyRows = jsonData.slice(1);
+    }
+
+    // 2. Chuyển thành chuỗi và bỏ dấu phân cách hàng ngàn
     bankStatementTsv = copyRows.map(row => {
       return row.map((cell, colIndex) => {
         let cellStr = cell !== undefined && cell !== null ? String(cell) : "";
         
-        // 2. Bỏ dấu chấm (.) hoặc phẩy (,) phân cách hàng ngàn ở các cột số 
-        // (Index 1: Gửi vào, 2: Rút ra, 3: Số dư lũy kế)
+        // Xóa dấu chấm/phẩy ở các cột: Gửi vào, Rút ra, Số dư lũy kế (Index 1, 2, 3)
         if (colIndex >= 1 && colIndex <= 3) {
           cellStr = cellStr.replace(/[,.]/g, '');
         }
         
-        // Lọc bỏ ký tự tab/xuống dòng thừa để không vỡ cột khi dán
+        // Lọc bỏ ký tự tab/xuống dòng thừa
         return cellStr.replace(/\t/g, " ").replace(/\n/g, " ");
       }).join("\t");
     }).join("\n");
