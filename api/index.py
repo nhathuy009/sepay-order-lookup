@@ -204,14 +204,14 @@ def handle_invoice_by_date(body):
             return value
         return -abs(num)
 
+    REVERSE_MATCHED_COMMISSION_RATE = 25  # % REF cố định cho hóa đơn reverse_matched
+
     def _copy_order_info(dest, src, adjusts_no):
         dest["order_code"] = src.get("order_code", "")
         dest["order_system"] = src.get("order_system") or src.get("system", "")
         dest["lead_name"] = src.get("lead_name", "")
         dest["username"] = src.get("username", "")
         dest["ref_username"] = src.get("ref_username", "")
-        dest["commission_rate"] = src.get("commission_rate", "")
-        dest["hoahong"] = src.get("hoahong", "")
         dest["item_id"] = src.get("item_id", "")
         dest["item_title"] = src.get("item_title", "")
         existing_note = dest.get("note") or ""
@@ -222,15 +222,22 @@ def handle_invoice_by_date(body):
         # (đã ép âm ở dưới) là số thật cần cộng vào tổng để trừ đi phần đã hoàn.
         dest["note_type"] = "reverse_matched"
         # Đánh dấu để: (1) sắp dòng này xuống CUỐI bảng khi sort ở bước gộp
-        # nhóm khóa học bên dưới, (2) ép toàn bộ cột tiền/% Ref liên quan về ÂM,
-        # vì đây là hóa đơn điều chỉnh/thay thế (bản chất là hoàn/trừ tiền so với
-        # hóa đơn gốc), không nên hiển thị dương như đơn hàng gốc.
+        # nhóm khóa học bên dưới, (2) ép cột tiền của CHÍNH hóa đơn về ÂM, vì đây
+        # là hóa đơn điều chỉnh/thay thế (bản chất là hoàn/trừ tiền so với hóa đơn
+        # gốc), không nên hiển thị dương như đơn hàng gốc.
         dest["is_reverse_matched"] = True
-        for money_field in (
-            "amount_before_tax", "vat_amount", "total_amount",
-            "commission_rate", "hoahong",
-        ):
+        for money_field in ("amount_before_tax", "vat_amount", "total_amount"):
             dest[money_field] = _to_negative(dest.get(money_field))
+        # % REF cố định 25% cho MỌI hóa đơn reverse_matched (không lấy commission_rate
+        # copy từ đơn hàng gốc nữa - vì đơn gốc có thể mang % hoa hồng khác, nhưng
+        # quy ước hoàn/trừ tiền REF luôn tính theo mức cố định này).
+        dest["commission_rate"] = REVERSE_MATCHED_COMMISSION_RATE
+        # Số tiền REF = Số tiền trước thuế (đã âm ở trên) x % REF -> tự ra số âm.
+        try:
+            amount_num = float(dest.get("amount_before_tax") or 0)
+        except (TypeError, ValueError):
+            amount_num = 0.0
+        dest["hoahong"] = amount_num * (REVERSE_MATCHED_COMMISSION_RATE / 100)
 
     still_missing = []  # list[(inv, adjusts_no)] cần tra ngược ngoài batch
     for inv in result:
@@ -283,6 +290,22 @@ def handle_invoice_by_date(body):
                 match = extra_order_map.get(adjusts_no)
                 if match and match.get("order_code"):
                     _copy_order_info(inv, match, adjusts_no)
+
+    # Mã ĐH (order_code) phải là DUY NHẤT trong bảng kết quả. Hóa đơn reverse_matched
+    # (đã tra ngược đơn hàng từ hóa đơn gốc) mà Mã ĐH của nó TRÙNG với 1 hóa đơn khác
+    # đã xuất hiện trước đó (thường là chính hóa đơn gốc, hoặc 1 reverse_matched khác
+    # cùng đơn) -> bị loại bỏ HOÀN TOÀN khỏi kết quả (không chỉ xóa trắng cột), để
+    # tránh hiển thị 2 dòng cho cùng 1 đơn hàng.
+    seen_order_codes = set()
+    deduped_result = []
+    for inv in result:
+        order_code = inv.get("order_code", "")
+        if order_code:
+            if order_code in seen_order_codes and inv.get("note_type") == "reverse_matched":
+                continue  # bỏ hẳn dòng này, không đưa vào deduped_result
+            seen_order_codes.add(order_code)
+        deduped_result.append(inv)
+    result = deduped_result
 
     # Phân loại hàng hóa: mỗi item.id là 1 khóa học/kỳ hạn khác nhau. Một số khóa
     # học có nhiều kỳ hạn con (VD "... - 3 tháng", "... - 6 tháng", "... - 12 tháng")
