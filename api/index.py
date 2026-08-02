@@ -301,6 +301,12 @@ def handle_bank_statement(body):
         except ValueError:
             so_du_dau_ky = 0
 
+    # Lấy số tài khoản từ ô A4, tương tự hàm RIGHT(A4, 8) trong Excel
+    so_tk_raw = sheet.cell(row=4, column=1).value
+    so_tk_str = str(so_tk_raw).strip() if so_tk_raw is not None else ""
+    so_tk_8_ky_tu = so_tk_str[-8:] if so_tk_str else ""
+    nhan_dau_ky = f"Số dư đầu kỳ STK {so_tk_8_ky_tu}" if so_tk_8_ky_tu else "Số dư đầu kỳ STK ..."
+
     dem_gui_vao = defaultdict(int)
     dem_rut_ra = defaultdict(int)
 
@@ -357,7 +363,7 @@ def handle_bank_statement(body):
     ws.title = "Tong_Hop_Sao_Ke"
 
     ws.append(["Nội dung diễn giải", "Gửi vào", "Rút ra", "Số dư lũy kế", "Ghi chú (Để bạn dò số)"])
-    ws.append(["Số dư đầu kỳ STK ...", "", "", so_du_dau_ky, ""])
+    ws.append([nhan_dau_ky, "", "", so_du_dau_ky, ""])
 
     current_excel_row = 3
     for gia_tri in tat_ca_gia_tri:
