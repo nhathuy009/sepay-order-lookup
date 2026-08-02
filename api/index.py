@@ -192,6 +192,18 @@ def handle_invoice_by_date(body):
     #      trực tiếp theo đúng số hóa đơn gốc đó.
     # Nhờ vậy hóa đơn điều chỉnh/thay thế thoát khỏi nhóm "Chưa xác định" và được
     # xếp đúng vào bảng khóa học của hóa đơn gốc.
+    def _to_negative(value):
+        """Ép 1 giá trị số về ÂM (giữ nguyên nếu không parse được thành số).
+        Dùng cho các cột tiền/% Ref copy từ hóa đơn/đơn hàng GỐC (vốn dương) sang
+        dòng hóa đơn điều chỉnh/thay thế (vốn mang ý nghĩa hoàn/trừ tiền)."""
+        if value in ("", None):
+            return value
+        try:
+            num = float(str(value).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return value
+        return -abs(num)
+
     def _copy_order_info(dest, src, adjusts_no):
         dest["order_code"] = src.get("order_code", "")
         dest["order_system"] = src.get("order_system") or src.get("system", "")
@@ -204,6 +216,16 @@ def handle_invoice_by_date(body):
         dest["item_title"] = src.get("item_title", "")
         existing_note = dest.get("note") or ""
         dest["note"] = (existing_note + " " if existing_note else "") + f"(Đơn hàng lấy từ HĐ gốc {adjusts_no})"
+        # Đánh dấu để: (1) sắp dòng này xuống CUỐI bảng khi sort ở bước gộp
+        # nhóm khóa học bên dưới, (2) ép toàn bộ cột tiền/% Ref liên quan về ÂM,
+        # vì đây là hóa đơn điều chỉnh/thay thế (bản chất là hoàn/trừ tiền so với
+        # hóa đơn gốc), không nên hiển thị dương như đơn hàng gốc.
+        dest["is_reverse_matched"] = True
+        for money_field in (
+            "amount_before_tax", "vat_amount", "total_amount",
+            "commission_rate", "hoahong",
+        ):
+            dest[money_field] = _to_negative(dest.get(money_field))
 
     still_missing = []  # list[(inv, adjusts_no)] cần tra ngược ngoài batch
     for inv in result:
@@ -274,8 +296,17 @@ def handle_invoice_by_date(body):
     # theo "arising_date" (định dạng "YYYY-MM-DD" nên so sánh chuỗi trực tiếp
     # là đủ, không cần parse ngày). Hóa đơn thiếu ngày (hiếm khi xảy ra) đẩy
     # xuống cuối bảng thay vì lên đầu.
+    # Riêng các hóa đơn điều chỉnh/thay thế được tra ngược thông tin đơn hàng từ
+    # hóa đơn GỐC (is_reverse_matched=True, xem _copy_order_info ở trên) luôn bị
+    # đẩy xuống DƯỚI CÙNG bảng, sau tất cả hóa đơn khớp trực tiếp - dù ngày phát
+    # hành của chúng là gì.
     for group in courses.values():
-        group["invoices"].sort(key=lambda inv: inv.get("arising_date") or "9999-99-99")
+        group["invoices"].sort(
+            key=lambda inv: (
+                1 if inv.get("is_reverse_matched") else 0,
+                inv.get("arising_date") or "9999-99-99",
+            )
+        )
 
     return 200, {"courses": list(courses.values()), "total": len(result)}
 
