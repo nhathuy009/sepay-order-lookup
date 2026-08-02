@@ -10,6 +10,8 @@ import re
 from http.server import BaseHTTPRequestHandler
 
 import openpyxl
+from calendar import monthrange
+from datetime import date, timedelta
 
 sys.path.append(os.path.dirname(__file__))
 from _core import (  # noqa: E402
@@ -86,6 +88,28 @@ def _dmy_to_iso_date(d):
         return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}"
     return d
 
+def _month_range_iso(dmy_date):
+    """Từ 1 ngày "dd/mm/yyyy" -> (date_from, date_to) bao trọn THÁNG chứa ngày đó,
+    định dạng "YYYY-MM-DD". Nới thêm 1 ngày đầu/cuối tháng để tránh lệch múi
+    giờ/ngày ghi nhận giữa hệ thống hóa đơn và hệ thống đơn hàng (giống khuyến
+    nghị trong docstring của reverse_lookup_orders_by_invoices). Trả về
+    (None, None) nếu không parse được (ProcessInvNote không có phần ngày).
+    """
+    dmy_date = (dmy_date or "").strip()
+    parts = dmy_date.split("/")
+    if len(parts) != 3:
+        return None, None
+    try:
+        dd, mm, yyyy = int(parts[0]), int(parts[1]), int(parts[2])
+        first_day = date(yyyy, mm, 1)
+        last_day = date(yyyy, mm, monthrange(yyyy, mm)[1])
+    except (ValueError, TypeError):
+        return None, None
+    date_from = first_day - timedelta(days=1)
+    date_to = last_day + timedelta(days=1)
+    return date_from.isoformat(), date_to.isoformat()
+
+
 def _strip_course_duration_suffix(title):
     """Bỏ hậu tố kỳ hạn dạng '- N tháng' ở cuối tên khóa học, để gộp các kỳ hạn
     (3/6/12 tháng...) của cùng 1 khóa học vào chung 1 nhóm/1 bảng.
@@ -155,6 +179,83 @@ def handle_invoice_by_date(body):
             # không khớp mẫu "Thay thế..." đã biết.
             original["note"] = f"KH hoàn tiền, HĐ điều chỉnh {inv_no}"
             original["note_type"] = "dieu_chinh"
+
+    # Hóa đơn điều chỉnh/thay thế (có adjusts_invoice_no) mà bản thân KHÔNG tra
+    # ngược được đơn hàng (order_code rỗng) -> lấy thông tin đơn hàng từ HÓA ĐƠN
+    # GỐC bị điều chỉnh, chia làm 2 bước:
+    #   B1 (trong batch): hóa đơn gốc nằm CÙNG đợt/khoảng ngày đang tra -> đã có
+    #      sẵn trong invoice_by_no, dùng lại luôn, không tốn thêm lượt gọi API.
+    #   B2 (ngoài batch): hóa đơn gốc KHÔNG nằm trong khoảng ngày đang tra (VD tra
+    #      tháng 8 nhưng hóa đơn gốc phát hành tháng 6) -> gom các "adjusts_no"
+    #      còn thiếu lại, gọi 1 LẦN reverse_lookup_orders_by_invoices KHÔNG giới
+    #      hạn date_from/date_to (tìm trong toàn bộ lịch sử đơn hàng) để tra ngược
+    #      trực tiếp theo đúng số hóa đơn gốc đó.
+    # Nhờ vậy hóa đơn điều chỉnh/thay thế thoát khỏi nhóm "Chưa xác định" và được
+    # xếp đúng vào bảng khóa học của hóa đơn gốc.
+    def _copy_order_info(dest, src, adjusts_no):
+        dest["order_code"] = src.get("order_code", "")
+        dest["order_system"] = src.get("order_system") or src.get("system", "")
+        dest["lead_name"] = src.get("lead_name", "")
+        dest["username"] = src.get("username", "")
+        dest["ref_username"] = src.get("ref_username", "")
+        dest["commission_rate"] = src.get("commission_rate", "")
+        dest["hoahong"] = src.get("hoahong", "")
+        dest["item_id"] = src.get("item_id", "")
+        dest["item_title"] = src.get("item_title", "")
+        existing_note = dest.get("note") or ""
+        dest["note"] = (existing_note + " " if existing_note else "") + f"(Đơn hàng lấy từ HĐ gốc {adjusts_no})"
+
+    still_missing = []  # list[(inv, adjusts_no)] cần tra ngược ngoài batch
+    for inv in result:
+        if inv.get("order_code"):
+            continue
+        adjusts_no = inv.get("adjusts_invoice_no", "")
+        if not adjusts_no:
+            continue
+        original = invoice_by_no.get(adjusts_no)
+        if original is not None and original.get("order_code"):
+            _copy_order_info(inv, original, adjusts_no)
+        else:
+            still_missing.append((inv, adjusts_no))
+
+    if still_missing:
+        # Gom theo THÁNG của hóa đơn gốc (lấy từ "adjusts_invoice_date" - do
+        # _invoice.py trích ra cùng với adjusts_invoice_no, dạng "dd/mm/yyyy")
+        # để mỗi lượt gọi reverse_lookup_orders_by_invoices chỉ quét đúng
+        # khoảng THÁNG đó thay vì toàn bộ lịch sử đơn hàng - nhẹ hơn hẳn.
+        # Hóa đơn nào không trích được ngày (ProcessInvNote không có "ngày...")
+        # đành gộp vào nhóm tra không giới hạn ngày (hành vi dự phòng cũ).
+        month_groups = {}  # "mm/yyyy" -> {"date_from", "date_to", "items": [(inv, adjusts_no)]}
+        no_date_items = []
+        for inv, adjusts_no in still_missing:
+            adjusts_date = inv.get("adjusts_invoice_date", "")
+            date_from, date_to = _month_range_iso(adjusts_date)
+            if date_from is None:
+                no_date_items.append((inv, adjusts_no))
+                continue
+            month_key = adjusts_date[3:]  # "mm/yyyy"
+            group = month_groups.setdefault(
+                month_key, {"date_from": date_from, "date_to": date_to, "items": []}
+            )
+            group["items"].append((inv, adjusts_no))
+
+        for group in month_groups.values():
+            extra_numbers = sorted({adjusts_no for _, adjusts_no in group["items"]})
+            extra_order_map = reverse_lookup_orders_by_invoices(
+                extra_numbers, date_from=group["date_from"], date_to=group["date_to"]
+            )
+            for inv, adjusts_no in group["items"]:
+                match = extra_order_map.get(adjusts_no)
+                if match and match.get("order_code"):
+                    _copy_order_info(inv, match, adjusts_no)
+
+        if no_date_items:
+            extra_numbers = sorted({adjusts_no for _, adjusts_no in no_date_items})
+            extra_order_map = reverse_lookup_orders_by_invoices(extra_numbers)  # không giới hạn ngày
+            for inv, adjusts_no in no_date_items:
+                match = extra_order_map.get(adjusts_no)
+                if match and match.get("order_code"):
+                    _copy_order_info(inv, match, adjusts_no)
 
     # Phân loại hàng hóa: mỗi item.id là 1 khóa học/kỳ hạn khác nhau. Một số khóa
     # học có nhiều kỳ hạn con (VD "... - 3 tháng", "... - 6 tháng", "... - 12 tháng")
