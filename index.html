@@ -4412,7 +4412,7 @@ function renderInvoiceByDateSummaryTable(courses, targetContainer) {
     const invoices = course.invoices || [];
     let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
     invoices.forEach((inv) => {
-      if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), hóa đơn bị thay thế vẫn tính vì tiền vẫn là thật
+      if (inv.note && inv.note_type !== "thay_the" && inv.note_type !== "reverse_matched") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền); thay thế và các hóa đơn điều chỉnh đã tra ngược được đơn hàng (reverse_matched) vẫn tính vì tiền là thật
       sumAmount += Number(inv.amount_before_tax) || 0;
       sumVat += Number(inv.vat_amount) || 0;
       sumTotal += Number(inv.total_amount) || 0;
@@ -4503,7 +4503,7 @@ function renderInvoiceByDateRefSummaryTable(courses, targetContainer) {
   const refMap = {};
   courses.forEach((course) => {
     (course.invoices || []).forEach((inv) => {
-      if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), thay thế vẫn tính ref
+      if (inv.note && inv.note_type !== "thay_the" && inv.note_type !== "reverse_matched") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền); thay thế và reverse_matched vẫn tính ref
       const rawRef = (inv.ref_username || "").trim();
       if (!rawRef) return;
       // Không phân biệt hoa/thường: "phk", "PHK", "Phk" đều gộp về cùng 1 dòng.
@@ -4666,7 +4666,10 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
     // tiền) -> xóa trắng 7 cột tiền/ref để không cộng nhầm vào tổng cuối bảng.
     // Hóa đơn GỐC bị thay thế (note_type = "thay_the", VD đổi cá nhân sang công
     // ty) -> tiền vẫn là tiền thật, GIỮ NGUYÊN 7 cột, chỉ thêm ghi chú.
-    const blankColumns = !!inv.note && inv.note_type !== "thay_the";
+    // Hóa đơn điều chỉnh/thay thế đã tra ngược được đơn hàng từ hóa đơn GỐC
+    // (note_type = "reverse_matched") -> GIỮ NGUYÊN 7 cột (đã được backend ép
+    // về số âm sẵn), để thể hiện đúng khoản hoàn/trừ tiền trong bảng.
+    const blankColumns = !!inv.note && inv.note_type !== "thay_the" && inv.note_type !== "reverse_matched";
     const orderCodeHTML = inv.order_code
       ? escapeHtml(inv.order_code)
       : `<span style="color:var(--text-muted);">—</span>`;
@@ -4701,7 +4704,7 @@ function renderInvoiceByDateCourseTable(course, courseIdx, panel) {
   // không vô tình copy luôn dòng tổng này.
   let sumAmount = 0, sumVat = 0, sumTotal = 0, sumRef = 0;
   invoices.forEach((inv) => {
-    if (inv.note && inv.note_type !== "thay_the") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền), thay thế vẫn cộng vào tổng
+    if (inv.note && inv.note_type !== "thay_the" && inv.note_type !== "reverse_matched") return; // chỉ bỏ qua hóa đơn gốc bị điều chỉnh giảm (hoàn tiền); thay thế và reverse_matched vẫn cộng vào tổng
     sumAmount += Number(inv.amount_before_tax) || 0;
     sumVat += Number(inv.vat_amount) || 0;
     sumTotal += Number(inv.total_amount) || 0;
