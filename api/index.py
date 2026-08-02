@@ -341,7 +341,16 @@ def handle_bank_statement(body):
             so_du_cuoi_ky = 0
 
     tat_ca_gia_tri = set(dem_gui_vao.keys()).union(set(dem_rut_ra.keys()))
-    tat_ca_gia_tri = sorted(list(tat_ca_gia_tri)) 
+
+    def sort_key_ghi_chu(gia_tri):
+        if gia_tri < 50000:
+            return (1, gia_tri)      # Nhóm số nhỏ (< 50.000) -> xếp dưới
+        elif gia_tri > 11000000:
+            return (2, gia_tri)      # Nhóm số lớn (> 11.000.000) -> xếp dưới cùng
+        else:
+            return (0, gia_tri)      # Nhóm giữa (50.000 - 11.000.000) -> xếp trên, tăng dần
+
+    tat_ca_gia_tri = sorted(tat_ca_gia_tri, key=sort_key_ghi_chu)
 
     wb_new = openpyxl.Workbook()
     ws = wb_new.active
