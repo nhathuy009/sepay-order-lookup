@@ -291,19 +291,30 @@ def handle_invoice_by_date(body):
                 if match and match.get("order_code"):
                     _copy_order_info(inv, match, adjusts_no)
 
-    # Mã ĐH (order_code) phải là DUY NHẤT trong bảng kết quả. Hóa đơn reverse_matched
-    # (đã tra ngược đơn hàng từ hóa đơn gốc) mà Mã ĐH của nó TRÙNG với 1 hóa đơn khác
-    # đã xuất hiện trước đó (thường là chính hóa đơn gốc, hoặc 1 reverse_matched khác
-    # cùng đơn) -> bị loại bỏ HOÀN TOÀN khỏi kết quả (không chỉ xóa trắng cột), để
-    # tránh hiển thị 2 dòng cho cùng 1 đơn hàng.
-    seen_order_codes = set()
+    # Mã ĐH (order_code) phải là DUY NHẤT trong bảng kết quả. LUÔN ưu tiên giữ
+    # hóa đơn KHÔNG PHẢI reverse_matched (hóa đơn gốc/khớp trực tiếp) khi trùng
+    # Mã ĐH với 1 hóa đơn reverse_matched - loại bỏ HOÀN TOÀN hóa đơn reverse_matched
+    # đó khỏi kết quả. LƯU Ý: không thể dựa vào thứ tự "gặp trước - gặp sau" khi
+    # duyệt result, vì SePay eInvoice trả về MỚI NHẤT TRƯỚC - mà hóa đơn
+    # reverse_matched (điều chỉnh/thay thế) luôn phát sinh SAU hóa đơn gốc theo
+    # thời gian, nên trong danh sách thô nó thường đứng TRƯỚC hóa đơn gốc. Vì vậy
+    # phải quét 2 lượt: lượt 1 xác định trước các Mã ĐH đã có ở hóa đơn KHÔNG phải
+    # reverse_matched, lượt 2 mới lọc bỏ.
+    order_codes_on_non_reverse = {
+        inv.get("order_code", "")
+        for inv in result
+        if inv.get("order_code") and inv.get("note_type") != "reverse_matched"
+    }
+    seen_reverse_matched_codes = set()
     deduped_result = []
     for inv in result:
         order_code = inv.get("order_code", "")
-        if order_code:
-            if order_code in seen_order_codes and inv.get("note_type") == "reverse_matched":
-                continue  # bỏ hẳn dòng này, không đưa vào deduped_result
-            seen_order_codes.add(order_code)
+        if order_code and inv.get("note_type") == "reverse_matched":
+            if order_code in order_codes_on_non_reverse:
+                continue  # đã có hóa đơn gốc/khớp trực tiếp cùng Mã ĐH -> bỏ dòng này
+            if order_code in seen_reverse_matched_codes:
+                continue  # 2 hóa đơn reverse_matched cùng Mã ĐH -> chỉ giữ dòng đầu tiên
+            seen_reverse_matched_codes.add(order_code)
         deduped_result.append(inv)
     result = deduped_result
 
