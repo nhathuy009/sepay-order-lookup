@@ -97,6 +97,20 @@ def _extract_adjusted_invoice_no(process_note):
     return match.group(1) if match else ""
 
 
+def _extract_adjusted_invoice_date(process_note):
+    """Trích ngày phát hành của hóa đơn GỐC bị điều chỉnh/thay thế từ ProcessInvNote,
+    dạng: "...ký hiệu C26MSL, số 1071, ngày 05/06/2026" -> trả về "05/06/2026".
+
+    Dùng để giới hạn khoảng ngày khi tra ngược đơn hàng cho hóa đơn gốc (thay vì
+    quét toàn bộ lịch sử đơn hàng). Trả về "" nếu ProcessInvNote không có phần
+    "ngày dd/mm/yyyy" (một số bản ghi có thể không ghi ngày trong ghi chú).
+    """
+    if not process_note:
+        return ""
+    match = re.search(r"ngày\s+(\d{1,2}/\d{1,2}/\d{4})", process_note, re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
 def _detect_adjustment_type(process_note):
     """Phân loại hóa đơn số tiền âm dựa vào tiền tố của ProcessInvNote:
     - "dieu_chinh": "Điều chỉnh cho hóa đơn điện tử..." -> hóa đơn điều chỉnh giảm
@@ -301,6 +315,7 @@ class InvoiceClient:
         process_note = inv.get("ProcessInvNote", "") or ""
         details["process_note"] = process_note
         details["adjusts_invoice_no"] = _extract_adjusted_invoice_no(process_note)
+        details["adjusts_invoice_date"] = _extract_adjusted_invoice_date(process_note)
         details["adjustment_type"] = _detect_adjustment_type(process_note)
         details["note"] = ""
         return details
