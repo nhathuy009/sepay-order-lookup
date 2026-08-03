@@ -5220,7 +5220,7 @@ async function doProcessAirPacking() {
       .slice(0, 3);
     const categoryNotes = topCategories.map(([key, qty]) => {
       const info = AIR_CATEGORY_RATES[key];
-      return `${info.label}: ${qty} cái - ĐM ${info.rate} - Giá ${info.price}`;
+      return `${qty} cái ${info.label}, định mức ${info.rate}, giá ${info.price}`;
     });
 
     // Lưu lại để tải về sau, không tự động tải xuống ngay
