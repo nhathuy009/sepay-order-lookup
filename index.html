@@ -1356,6 +1356,9 @@
         <div class="menu-item" id="tabAirBtn" onclick="switchTab('air')">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plane-takeoff-icon lucide-plane-takeoff"><path d="M2 22h20"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span class="menu-text">Xuất Air Packing List</span>
         </div>
+        <div class="menu-item" id="tabEhoadonBtn" onclick="switchTab('ehoadon')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-plus-icon lucide-file-plus"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg><span class="menu-text">Tạo hóa đơn eHoadon</span>
+        </div>
       </div>
 
       <div class="sidebar-bottom">
@@ -1799,6 +1802,77 @@
           </div>
         </div>
       </div>
+
+      <div id="tabEhoadon" class="hidden tab-panel">
+        <h2 style="margin:0 0 16px 0">Tạo hóa đơn eHoadon (van.ehoadon.vn)</h2>
+
+        <div class="card" id="ehoadonLoginCard">
+          <div class="row">
+            <div style="flex: 1; min-width: 180px;">
+              <label>Tài khoản eHoadon</label>
+              <input type="text" id="ehoadonUsername" placeholder="Username" autocomplete="off" />
+            </div>
+            <div style="flex: 1; min-width: 180px;">
+              <label>Mật khẩu</label>
+              <input type="password" id="ehoadonPassword" placeholder="Password" autocomplete="off" />
+            </div>
+            <div style="flex: 0 0 auto; align-self: flex-end;">
+              <button id="ehoadonLoginBtn" onclick="doEhoadonLogin()">Đăng nhập</button>
+            </div>
+          </div>
+          <div class="hint" style="margin-top: 12px; color: var(--text-muted); font-size: 12.5px;">
+            🔒 Tài khoản/mật khẩu chỉ được gửi trực tiếp tới van.ehoadon.vn để đăng nhập, không lưu lại ở đâu cả.
+          </div>
+          <div class="msg" id="ehoadonLoginStatus" style="display:none; margin-top: 10px;"></div>
+        </div>
+
+        <div class="card" id="ehoadonBuyerCard" style="display:none; margin-top:16px;">
+          <label>Tìm khách hàng (mã hoặc tên, vd: AT, AW)</label>
+          <div class="row" style="align-items:flex-end;">
+            <div style="flex:1; min-width:220px;">
+              <input type="text" id="ehoadonBuyerKeyword" placeholder="Nhập mã hoặc tên khách hàng..." />
+            </div>
+            <div style="flex:0 0 auto;">
+              <button id="ehoadonBuyerSearchBtn" onclick="doEhoadonBuyerSearch()">Tìm kiếm</button>
+            </div>
+          </div>
+          <div id="ehoadonBuyerResults" style="margin-top: 12px;"></div>
+        </div>
+
+        <div class="card" id="ehoadonInvoiceCard" style="display:none; margin-top:16px;">
+          <label>Ghi chú hóa đơn</label>
+          <input type="text" id="ehoadonNote" value="Hóa đơn tự động" />
+
+          <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin:0;">Hàng hóa</label>
+            <button type="button" class="btn-outline" onclick="addEhoadonItemRow()">+ Thêm hàng hóa</button>
+          </div>
+          <div id="ehoadonItemsContainer" style="margin-top:8px; display:flex; flex-direction:column; gap:8px;"></div>
+
+          <div style="margin-top:20px;">
+            <button id="ehoadonCreateBtn" onclick="doEhoadonCreateInvoice()">Tạo &amp; lưu hóa đơn</button>
+          </div>
+          <div class="msg" id="ehoadonInvoiceStatus" style="display:none; margin-top: 10px;"></div>
+        </div>
+
+        <div class="card" id="ehoadonListCard" style="display:none; margin-top:16px;">
+          <h3 style="margin:0 0 12px 0;">Danh sách hóa đơn</h3>
+          <div class="row" style="align-items:flex-end;">
+            <div style="flex:1; min-width:160px;">
+              <label>Từ ngày</label>
+              <input type="date" id="ehoadonFromDate" />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label>Đến ngày</label>
+              <input type="date" id="ehoadonToDate" />
+            </div>
+            <div style="flex:0 0 auto;">
+              <button id="ehoadonListBtn" onclick="doEhoadonFetchInvoiceList()">Lấy danh sách</button>
+            </div>
+          </div>
+          <div id="ehoadonListResults" style="margin-top: 12px;"></div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -2149,7 +2223,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air"];
+  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -2284,6 +2358,11 @@ let bankGroupsData = {};
 let bankActiveTab = '';
 let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
 let gdtLastCreds = null;  // { username, password, is_purchase } dùng để gọi lại API lấy chi tiết hóa đơn
+
+// --- eHoadon (tạo hóa đơn tự động) ---
+let ehoadonCookies = null;       // Cookie/VIEWSTATE phiên đăng nhập eHoadon (server không giữ state giữa các lần gọi)
+let ehoadonBuyerSuggestions = []; // Kết quả tìm kiếm khách hàng gần nhất
+let ehoadonSelectedBuyer = null;  // Khách hàng đã chọn để tạo hóa đơn
 
 function removeVietnameseDiacritics(str) {
   if (!str) return "";
@@ -5460,6 +5539,249 @@ function toggleAccDetail(accountId) {
     
     // Đổi icon mũi tên
     if (icon) icon.innerText = isHidden ? '▲' : '▼';
+  }
+}
+
+// =======================================================
+// EHOADON - TẠO HÓA ĐƠN TỰ ĐỘNG (van.ehoadon.vn)
+// =======================================================
+async function doEhoadonLogin() {
+  const username = document.getElementById("ehoadonUsername").value.trim();
+  const password = document.getElementById("ehoadonPassword").value;
+  const statusEl = document.getElementById("ehoadonLoginStatus");
+  const btn = document.getElementById("ehoadonLoginBtn");
+
+  if (!username || !password) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Vui lòng nhập tài khoản và mật khẩu.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.style.display = "block";
+  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đăng nhập...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ehoadon_login", username, password, access_token: getToken() })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Đăng nhập thất bại")}</span>`;
+      return;
+    }
+
+    ehoadonCookies = data.cookies || null;
+    statusEl.innerHTML = '<span class="ok">✅ Đăng nhập eHoadon thành công.</span>';
+    document.getElementById("ehoadonBuyerCard").style.display = "block";
+    document.getElementById("ehoadonListCard").style.display = "block";
+
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById("ehoadonFromDate").value = today;
+    document.getElementById("ehoadonToDate").value = today;
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    document.getElementById("ehoadonPassword").value = "";
+  }
+}
+
+async function doEhoadonBuyerSearch() {
+  const keyword = document.getElementById("ehoadonBuyerKeyword").value.trim();
+  const resultsEl = document.getElementById("ehoadonBuyerResults");
+  const btn = document.getElementById("ehoadonBuyerSearchBtn");
+
+  if (!ehoadonCookies) {
+    resultsEl.innerHTML = '<span class="err">Chưa đăng nhập eHoadon.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  resultsEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tìm...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ehoadon_buyer_search", cookies: ehoadonCookies, keyword, access_token: getToken() })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      resultsEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tìm kiếm thất bại")}</span>`;
+      return;
+    }
+    if (data.cookies) ehoadonCookies = { ...ehoadonCookies, ...data.cookies };
+
+    ehoadonBuyerSuggestions = data.suggestions || [];
+    if (ehoadonBuyerSuggestions.length === 0) {
+      resultsEl.innerHTML = '<span class="hint">Không tìm thấy khách hàng nào.</span>';
+      return;
+    }
+
+    resultsEl.innerHTML = ehoadonBuyerSuggestions.map((b, i) => {
+      const name = b.BuyerName || b.UnitName || "(Không tên)";
+      return `<div style="padding:8px 0; border-bottom: 1px solid var(--border);">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="radio" name="ehoadonBuyerChoice" onclick="selectEhoadonBuyer(${i})" />
+          <span><b>${escapeHtml(name)}</b> — ${escapeHtml(b.FullAddress || "")} (${escapeHtml(b.PayMethodName || "")})</span>
+        </label>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    resultsEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function selectEhoadonBuyer(i) {
+  ehoadonSelectedBuyer = ehoadonBuyerSuggestions[i];
+  document.getElementById("ehoadonInvoiceCard").style.display = "block";
+  const container = document.getElementById("ehoadonItemsContainer");
+  if (container.childElementCount === 0) addEhoadonItemRow();
+}
+
+function addEhoadonItemRow() {
+  const container = document.getElementById("ehoadonItemsContainer");
+  const row = document.createElement("div");
+  row.className = "row ehoadon-item-row";
+  row.style.gap = "8px";
+  row.innerHTML = `
+    <input placeholder="Tên hàng hóa" class="ehoadon-item-name" style="flex:2; min-width:160px;">
+    <input placeholder="Đơn vị (Bộ)" class="ehoadon-item-unit" style="flex:1; min-width:90px;">
+    <input placeholder="Số lượng (100)" class="ehoadon-item-qty" style="flex:1; min-width:90px;">
+    <input placeholder="Đơn giá (237.150)" class="ehoadon-item-price" style="flex:1; min-width:110px;">
+    <input placeholder="Thành tiền (tự tính nếu trống)" class="ehoadon-item-amount" style="flex:1; min-width:140px;">
+    <button type="button" class="btn-outline" onclick="this.parentElement.remove()" style="flex:0 0 auto;">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectEhoadonItems() {
+  return [...document.querySelectorAll("#ehoadonItemsContainer .ehoadon-item-row")].map(row => ({
+    name: row.querySelector(".ehoadon-item-name").value,
+    unit: row.querySelector(".ehoadon-item-unit").value,
+    qty: row.querySelector(".ehoadon-item-qty").value,
+    price: row.querySelector(".ehoadon-item-price").value,
+    amount: row.querySelector(".ehoadon-item-amount").value,
+  })).filter(item => item.name.trim() !== "");
+}
+
+async function doEhoadonCreateInvoice() {
+  const statusEl = document.getElementById("ehoadonInvoiceStatus");
+  const btn = document.getElementById("ehoadonCreateBtn");
+  const items = collectEhoadonItems();
+
+  if (!ehoadonCookies) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Chưa đăng nhập eHoadon.</span>';
+    return;
+  }
+  if (!ehoadonSelectedBuyer) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Chưa chọn khách hàng.</span>';
+    return;
+  }
+  if (items.length === 0) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Phải nhập ít nhất 1 hàng hóa.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.style.display = "block";
+  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tạo hóa đơn...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "ehoadon_invoice_create",
+        cookies: ehoadonCookies,
+        buyer_info: ehoadonSelectedBuyer,
+        note: document.getElementById("ehoadonNote").value,
+        items,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tạo hóa đơn thất bại")}</span>`;
+      return;
+    }
+    if (data.cookies) ehoadonCookies = { ...ehoadonCookies, ...data.cookies };
+
+    statusEl.innerHTML = `<span class="ok">✅ Hóa đơn đã được lưu (GUID: ${escapeHtml(data.invoice_guid || "")})</span>`;
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doEhoadonFetchInvoiceList() {
+  const fromDateRaw = document.getElementById("ehoadonFromDate").value;
+  const toDateRaw = document.getElementById("ehoadonToDate").value;
+  const resultsEl = document.getElementById("ehoadonListResults");
+  const btn = document.getElementById("ehoadonListBtn");
+
+  if (!ehoadonCookies) {
+    resultsEl.innerHTML = '<span class="err">Chưa đăng nhập eHoadon.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  resultsEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "ehoadon_invoice_list",
+        cookies: ehoadonCookies,
+        from_date: fromDateRaw,
+        to_date: toDateRaw,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      resultsEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Lấy danh sách thất bại")}</span>`;
+      return;
+    }
+    if (data.cookies) ehoadonCookies = { ...ehoadonCookies, ...data.cookies };
+
+    const invoices = data.invoices || [];
+    if (invoices.length === 0) {
+      resultsEl.innerHTML = '<span class="hint">Không có hóa đơn nào trong khoảng thời gian này.</span>';
+      return;
+    }
+
+    const rows = invoices.map(inv => `
+      <tr>
+        <td>${escapeHtml(inv.invoice_no)}</td>
+        <td>${escapeHtml(inv.buyer)}</td>
+        <td style="text-align:right;">${escapeHtml(inv.amount)}</td>
+      </tr>
+    `).join("");
+
+    resultsEl.innerHTML = `<div class="table-responsive"><table class="bulk-table" style="width:100%;">
+      <thead><tr><th>Số HĐ</th><th>Khách hàng</th><th style="text-align:right;">Tổng tiền</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  } catch (e) {
+    resultsEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
   }
 }
 </script>
