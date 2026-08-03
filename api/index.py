@@ -8,6 +8,8 @@ import urllib.parse
 import requests
 import re
 from http.server import BaseHTTPRequestHandler
+from datetime import datetime as _datetime
+from bs4 import BeautifulSoup
 
 import openpyxl
 from calendar import monthrange
@@ -596,6 +598,365 @@ def handle_bank_statement(body):
         "file_base64": base64.b64encode(out.read()).decode("ascii")
     } 
     
+# ==========================================
+# EHOADON (van.ehoadon.vn) - TẠO HÓA ĐƠN TỰ ĐỘNG
+# ==========================================
+# Vercel Functions không có state giữa các lần gọi, nên cookie/VIEWSTATE của
+# phiên đăng nhập eHoadon được trả về cho frontend giữ (dict "cookies"),
+# và frontend phải gửi lại y nguyên ở lần gọi kế tiếp (login -> tìm KH ->
+# tạo hóa đơn -> lấy danh sách).
+
+_EHOADON_LOGIN_URL = "https://van.ehoadon.vn/"
+_EHOADON_CREATE_URL = (
+    "https://van.ehoadon.vn/InvoiceNewEdit?InvoiceGUID=00000000-0000-0000-0000-000000000000"
+    "&IsMTT=false&InvoiceTypeID=1&SourceId=1&TypeCreateInvoice=0"
+)
+_EHOADON_SUGGEST_URL = "https://van.ehoadon.vn/WebServices/wsInvoice.asmx/GetSuggestion"
+_EHOADON_POPUP_URL = "https://van.ehoadon.vn/InvoiceDetailsNewEdit"
+_EHOADON_SAVE_URL = "https://van.ehoadon.vn/WebServices/wsInvoice.asmx/SaveInvoice"
+_EHOADON_LIST_URL = "https://van.ehoadon.vn/WebServices/wsInvoice.asmx/GG_GetListInvoice"
+
+
+def _ehoadon_parse_vn_number(val):
+    try:
+        return float(str(val).replace('.', '').replace(',', '.'))
+    except ValueError:
+        return 0.0
+
+
+def _ehoadon_format_vn_number(val):
+    if float(val).is_integer():
+        return f"{int(val):,}".replace(',', '.')
+    return f"{val:,}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def _ehoadon_map_pay_method(raw_method):
+    methods = {"CK": "Chuyển khoản", "TM": "Tiền mặt", "TM/CK": "Tiền mặt/Chuyển khoản"}
+    return methods.get(raw_method, raw_method)
+
+
+def _ehoadon_build_session(cookies_dict):
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+    })
+    if cookies_dict:
+        for k, v in cookies_dict.items():
+            session.cookies.set(k, v, domain="van.ehoadon.vn")
+    return session
+
+
+def _ehoadon_dump_cookies(session):
+    return session.cookies.get_dict()
+
+
+def _ehoadon_get_hidden(soup, id_name, default=""):
+    el = soup.find("input", {"id": id_name})
+    return el["value"] if el else default
+
+
+def handle_ehoadon_login(body):
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    if not username or not password:
+        return 400, {"error": "Thiếu username hoặc password eHoadon"}
+
+    session = _ehoadon_build_session(None)
+    resp_get = session.get(_EHOADON_LOGIN_URL)
+    if resp_get.status_code != 200:
+        return 400, {"error": f"Không tải được trang đăng nhập eHoadon (HTTP {resp_get.status_code})"}
+
+    soup = BeautifulSoup(resp_get.text, "html.parser")
+    try:
+        viewstate = soup.find("input", {"id": "__VIEWSTATE"})["value"]
+        viewstate_generator = soup.find("input", {"id": "__VIEWSTATEGENERATOR"})["value"]
+        event_target_tag = soup.find("input", {"id": "__EVENTTARGET"})
+        event_argument_tag = soup.find("input", {"id": "__EVENTARGUMENT"})
+        event_target = event_target_tag["value"] if event_target_tag else ""
+        event_argument = event_argument_tag["value"] if event_argument_tag else ""
+    except TypeError:
+        return 400, {"error": "Lỗi cấu trúc trang đăng nhập eHoadon (không tìm thấy VIEWSTATE)."}
+
+    payload = {
+        "__VIEWSTATE": viewstate,
+        "__VIEWSTATEGENERATOR": viewstate_generator,
+        "__EVENTTARGET": event_target,
+        "__EVENTARGUMENT": event_argument,
+        "__VIEWSTATEENCRYPTED": "",
+        "txtUserName": username,
+        "txtPassword": password,
+        "hdfToken": "",
+        "btnLogin": "Đăng nhập",
+    }
+    post_headers = {"Content-Type": "application/x-www-form-urlencoded", "Referer": _EHOADON_LOGIN_URL}
+    resp_post = session.post(_EHOADON_LOGIN_URL, data=payload, headers=post_headers, allow_redirects=True)
+
+    logged_in = (
+        "/QLHD" in resp_post.url
+        or "Đăng xuất" in resp_post.text
+        or username in resp_post.text
+    )
+    if not logged_in:
+        return 400, {"error": "Đăng nhập eHoadon không thành công. Kiểm tra lại tài khoản/mật khẩu."}
+
+    return 200, {"cookies": _ehoadon_dump_cookies(session)}
+
+
+def handle_ehoadon_buyer_search(body):
+    cookies = body.get("cookies") or {}
+    keyword = (body.get("keyword") or "").strip()
+    if not cookies:
+        return 400, {"error": "Thiếu phiên đăng nhập eHoadon (cookies). Vui lòng đăng nhập lại."}
+
+    session = _ehoadon_build_session(cookies)
+    session.get(_EHOADON_CREATE_URL)
+
+    ajax_headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": _EHOADON_CREATE_URL,
+    }
+    res = session.post(_EHOADON_SUGGEST_URL, json={"TextSearch": keyword}, headers=ajax_headers)
+    if res.status_code != 200:
+        return 400, {"error": f"Lỗi HTTP {res.status_code} khi tìm khách hàng"}
+
+    try:
+        raw_suggestions = json.loads(res.json()["d"]["Object"])
+    except (KeyError, ValueError, TypeError):
+        return 400, {"error": "Không đọc được kết quả tìm kiếm khách hàng (có thể phiên đăng nhập đã hết hạn)."}
+
+    valid = []
+    for b in raw_suggestions:
+        name = (b.get("BuyerName") or "").strip()
+        unit_name = (b.get("UnitName") or "").strip()
+        if name or unit_name:
+            valid.append({
+                "BuyerCode": b.get("BuyerCode", ""),
+                "BuyerName": b.get("BuyerName", ""),
+                "UnitName": b.get("UnitName", ""),
+                "TaxCode": b.get("TaxCode", ""),
+                "FullAddress": b.get("FullAddress", ""),
+                "PayMethodID": b.get("PayMethodID", ""),
+                "PayMethodName": _ehoadon_map_pay_method((b.get("PayMethodName") or "").strip()),
+                "CCCD": b.get("CCCD", ""),
+                "QHNS": b.get("QHNS", ""),
+            })
+
+    return 200, {"suggestions": valid, "cookies": _ehoadon_dump_cookies(session)}
+
+
+def handle_ehoadon_invoice_create(body):
+    cookies = body.get("cookies") or {}
+    buyer_info = body.get("buyer_info") or {}
+    note_input = body.get("note") or "Hóa đơn tự động"
+    items = body.get("items") or []
+
+    if not cookies:
+        return 400, {"error": "Thiếu phiên đăng nhập eHoadon (cookies). Vui lòng đăng nhập lại."}
+    if not items:
+        return 400, {"error": "Phải có ít nhất 1 hàng hóa"}
+
+    session = _ehoadon_build_session(cookies)
+    ajax_headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": _EHOADON_CREATE_URL,
+    }
+    session.get(_EHOADON_CREATE_URL)
+
+    current_invoice_guid = "00000000-0000-0000-0000-000000000000"
+    current_date = _datetime.now().strftime("%Y-%m-%d")
+
+    invoice_header = {
+        "InvoiceStatusID": 1,
+        "InvoiceTypeID": "1",
+        "SourceID": "1",
+        "InvoiceTemplateID": "31754",
+        "InvoiceForm": "1-C23TYY",
+        "InvoiceSerial": "C26TYY",
+        "InvoiceDate": current_date,
+        "InvoiceNo": 0,
+        "BuyerCode": buyer_info.get("BuyerCode", ""),
+        "BuyerName": buyer_info.get("BuyerName", ""),
+        "BuyerTaxcode": buyer_info.get("TaxCode", ""),
+        "BuyerUnitName": buyer_info.get("UnitName", ""),
+        "BuyerAddress": buyer_info.get("FullAddress", ""),
+        "PayMethodID": str(buyer_info.get("PayMethodID", "3")),
+        "BuyerBankAccount": "",
+        "ReceiveTypeID": "1",
+        "ReceiverEmail": "",
+        "ReceiverMobile": "",
+        "ReceiverName": "",
+        "ReceiverAddress": "",
+        "Note": note_input,
+        "CurrencyID": "VND",
+        "CurrencyCode": "VND",
+        "ExchangeRate": 1,
+        "TaxRateHeaderID": "1",
+        "TaxRateHeader": 0,
+        "IsCheckMST": False,
+        "IsBTH": False,
+        "CCCD": buyer_info.get("CCCD", ""),
+        "PassportNumber": "",
+        "FiscalCodes": buyer_info.get("QHNS", ""),
+        "UIDefine": "\"\"",
+        "Reason": None,
+        "IsFinanceLease": False,
+        "BusinessLocationCode": None,
+    }
+
+    for index, item in enumerate(items):
+        item_unit = item.get("unit") or "Bộ"
+        item_qty = item.get("qty") or "100"
+        item_price = item.get("price") or "237.150"
+        try:
+            calc_amt = _ehoadon_parse_vn_number(item_qty) * _ehoadon_parse_vn_number(item_price)
+            default_amount = _ehoadon_format_vn_number(calc_amt)
+        except Exception:
+            default_amount = "0"
+        item_amount = item.get("amount") or default_amount
+
+        invoice_header["InvoiceGUID"] = current_invoice_guid
+        invoice_header["OriginalInvoiceGUID"] = current_invoice_guid
+
+        popup_payload = {
+            "Invoice": invoice_header,
+            "InvoiceDetailID": 0,
+            "ItemTypeID": 0,
+            "TypeCreateInvoice": 0,
+            "InvoiceOrgWithOutSystem": None,
+        }
+        res_popup = session.post(_EHOADON_POPUP_URL, json=popup_payload, headers=ajax_headers)
+        if res_popup.status_code != 200:
+            return 400, {"error": f"Lỗi tải popup chi tiết (mặt hàng {index + 1})"}
+
+        popup_soup = BeautifulSoup(res_popup.text, "html.parser")
+        item_form_data = {
+            "__EVENTTARGET": _ehoadon_get_hidden(popup_soup, "__EVENTTARGET"),
+            "__EVENTARGUMENT": _ehoadon_get_hidden(popup_soup, "__EVENTARGUMENT"),
+            "__VIEWSTATE": _ehoadon_get_hidden(popup_soup, "__VIEWSTATE"),
+            "__VIEWSTATEGENERATOR": _ehoadon_get_hidden(popup_soup, "__VIEWSTATEGENERATOR"),
+            "__VIEWSTATEENCRYPTED": _ehoadon_get_hidden(popup_soup, "__VIEWSTATEENCRYPTED"),
+            "ctl00$MasterPlaceHolderBlank$hfItemCode": "",
+            "ctl00$MasterPlaceHolderBlank$hfPreItemCode": "",
+            "ctl00$MasterPlaceHolderBlank$hfPreItemName": "",
+            "ctl00$MasterPlaceHolderBlank$txtItemName": item.get("name", ""),
+            "ctl00$MasterPlaceHolderBlank$txtUnitName": item_unit,
+            "ctl00$MasterPlaceHolderBlank$txtQty": item_qty,
+            "ctl00$MasterPlaceHolderBlank$txtPrice": item_price,
+            "ctl00$MasterPlaceHolderBlank$txtAmount": item_amount,
+            "ctl00$MasterPlaceHolderBlank$ddlTaxRate": "1",
+            "ctl00$MasterPlaceHolderBlank$txtTaxRate": "0",
+            "ctl00$MasterPlaceHolderBlank$txtTaxAmount": "0",
+            "ctl00$MasterPlaceHolderBlank$btnAdd": "Ghi lại",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceDetailID": "0",
+            "ctl00$MasterPlaceHolderBlank$hdfIsChange": "False",
+            "ctl00$MasterPlaceHolderBlank$hdfOriginalInvoiceGUID": current_invoice_guid,
+            "ctl00$MasterPlaceHolderBlank$hdfItemTypeID": "0",
+            "ctl00$MasterPlaceHolderBlank$hdfCurrencyID": "VND",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceTypeID": "1",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceStatusID": "1",
+            "ctl00$MasterPlaceHolderBlank$hdfHasAfterTax": "false",
+            "ctl00$MasterPlaceHolderBlank$hdfQuyetDinhSo": _ehoadon_get_hidden(popup_soup, "hdfQuyetDinhSo", "204/2025/QH15"),
+        }
+        form_headers = {"Content-Type": "application/x-www-form-urlencoded", "Referer": _EHOADON_CREATE_URL}
+        res_save_item = session.post(_EHOADON_POPUP_URL, data=item_form_data, headers=form_headers)
+
+        if index == 0:
+            match = re.search(r"ClosePopDetail\('([a-fA-F0-9\-]{36})'", res_save_item.text)
+            if match:
+                current_invoice_guid = match.group(1)
+            else:
+                return 400, {"error": "Không trích xuất được InvoiceGUID ở mặt hàng đầu tiên (có thể phiên đăng nhập đã hết hạn)."}
+
+    invoice_header["InvoiceGUID"] = current_invoice_guid
+    res_final = session.post(
+        _EHOADON_SAVE_URL,
+        json={"invoice": invoice_header, "typeCreateInvoice": "0", "listBillID": ""},
+        headers=ajax_headers,
+    )
+    if res_final.status_code != 200:
+        return 400, {"error": f"Mã lỗi HTTP: {res_final.status_code}"}
+
+    result_data = res_final.json()
+    if not result_data.get("d", {}).get("isOk", False):
+        return 400, {"error": f"Hệ thống eHoadon từ chối lưu: {result_data.get('d', {}).get('Code')}"}
+
+    return 200, {
+        "invoice_guid": current_invoice_guid,
+        "cookies": _ehoadon_dump_cookies(session),
+    }
+
+
+def handle_ehoadon_invoice_list(body):
+    cookies = body.get("cookies") or {}
+    if not cookies:
+        return 400, {"error": "Thiếu phiên đăng nhập eHoadon (cookies). Vui lòng đăng nhập lại."}
+
+    today_str = _datetime.now().strftime("%Y-%m-%d")
+    from_date = (body.get("from_date") or "").strip() or today_str
+    to_date = (body.get("to_date") or "").strip() or today_str
+
+    session = _ehoadon_build_session(cookies)
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://van.ehoadon.vn/QLHD",
+    }
+    payload = {
+        "invoiceSearch": {
+            "InvoiceTypeID": "1",
+            "InvoiceTemplateID": "0",
+            "InvoiceForm": "Tất cả",
+            "InvoiceNo": "",
+            "BuyerName": "",
+            "UserIDSearch": "0",
+            "InvoiceStatusID": 0,
+            "InvoiceSerial": "0",
+            "FromDate": from_date,
+            "ToDate": to_date,
+            "BuyerTaxcode": "",
+            "FromCreateDate": "2017-01-01",
+            "ToCreateDate": "2027-09-03",
+            "Note": "",
+            "TextSearch": "",
+            "CateID": "0",
+            "SearchOption": "2",
+            "PageGUID": "36d21371-4752-4d02-84fc-999647f62966",
+            "SortType": "-1",
+            "IsMTT": False,
+        },
+        "PageSize": 100,
+        "CurrentPage": 1,
+        "SortCol": "",
+    }
+    res = session.post(_EHOADON_LIST_URL, json=payload, headers=headers)
+    if res.status_code != 200:
+        return 400, {"error": f"Lỗi truy vấn danh sách hóa đơn. Mã HTTP: {res.status_code}"}
+
+    data = res.json()
+    html_content = data.get("d", {}).get("Object", {}).get("Html", "")
+    soup = BeautifulSoup(html_content, "html.parser")
+    tbody = soup.find("tbody")
+    rows = tbody.find_all("tr") if tbody else []
+
+    invoices = []
+    for row in rows:
+        cols = row.find_all("td")
+        if len(cols) > 6:
+            inv_no_elem = cols[2].find("span", class_="InvoiceNo")
+            inv_no = inv_no_elem.text.strip() if inv_no_elem else "[Chưa có]"
+            buyer_elem = cols[3].find("span", class_="BuyerName")
+            buyer = buyer_elem.text.strip() if buyer_elem else "Khách lẻ"
+            amount_elem = cols[6].find("span", class_="SumPaymentAmount")
+            amount = amount_elem.text.strip() if amount_elem else "0"
+            invoices.append({"invoice_no": inv_no, "buyer": buyer, "amount": amount})
+
+    return 200, {"invoices": invoices, "cookies": _ehoadon_dump_cookies(session)}
+
+
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -663,6 +1024,14 @@ class handler(BaseHTTPRequestHandler):
         elif action == "get_bank_accounts":
             res = get_sepay_bank_accounts()
             status, payload = (400 if "error" in res else 200), res
+        elif action == "ehoadon_login":
+            status, payload = handle_ehoadon_login(body)
+        elif action == "ehoadon_buyer_search":
+            status, payload = handle_ehoadon_buyer_search(body)
+        elif action == "ehoadon_invoice_create":
+            status, payload = handle_ehoadon_invoice_create(body)
+        elif action == "ehoadon_invoice_list":
+            status, payload = handle_ehoadon_invoice_list(body)
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
