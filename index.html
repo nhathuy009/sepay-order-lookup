@@ -5290,7 +5290,7 @@ async function buildAirExcelFile() {
   const worksheet = workbook.addWorksheet('Sheet1');
 
   const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
-  worksheet.mergeCells('A1:F1');
+  worksheet.mergeCells('A1:E1');
   const titleCell = worksheet.getCell('A1');
   titleCell.font = { name: 'Arial', size: 14, bold: true };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
@@ -5303,7 +5303,7 @@ async function buildAirExcelFile() {
     right: { style: 'thin', color: { argb: 'FFBE5014' } }
   };
 
-  const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight', 'Phân loại']);
+  const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
   headerRow.height = 49.5;
   headerRow.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
@@ -5317,14 +5317,18 @@ async function buildAirExcelFile() {
   allBagsData.forEach((bag, idx) => {
     totalSets += bag.QTITY;
     totalWeight += (bag.KGS || 0);
-    const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0, bag.CATEGORY || '']);
+    const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
     row.eachCell((cell) => {
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = customBorder;
     });
+    // Ghi phân loại hàng hóa đơn giản vào cột F, không kẻ viền/tô màu, để trống nếu không có
+    if (bag.CATEGORY) {
+      worksheet.getCell(`F${row.number}`).value = bag.CATEGORY;
+    }
   });
 
-  const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight, '']);
+  const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
   totalRow.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
     cell.font = { bold: true };
@@ -5337,7 +5341,7 @@ async function buildAirExcelFile() {
   worksheet.getColumn(3).width = 24.38;
   worksheet.getColumn(4).width = 8.38;
   worksheet.getColumn(5).width = 8.38;
-  worksheet.getColumn(6).width = 16;
+  worksheet.getColumn(6).width = 12;
 
   // Ghi 3 dòng ghi chú thêm vào cột B, cách dòng tổng 2 dòng, bỏ qua ô trống (không tạo dòng cho ô trống)
   const noteValues = [
