@@ -1783,18 +1783,18 @@
                   </tfoot>
                 </table>
               </div>
-              <div style="flex: 1 1 300px; min-width: 220px;">
+              <div style="flex: 1 1 300px; min-width: 220px; display:flex; flex-direction:column;">
                 <label style="display:block; margin-bottom:8px;">Ghi chú thêm (sẽ được ghi vào cột B của file Excel, cách dòng tổng 2 dòng)</label>
                 <div style="display:flex; flex-direction: column; gap: 10px;">
                   <input type="text" class="air-extra-input" id="airNote1" placeholder="Dòng ghi chú 1" />
                   <input type="text" class="air-extra-input" id="airNote2" placeholder="Dòng ghi chú 2" />
                   <input type="text" class="air-extra-input" id="airNote3" placeholder="Dòng ghi chú 3" />
                 </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top: 18px;">
+                  <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
+                  <button id="shareAirBtn" onclick="doShareAirPacking()" style="display:none; background: var(--accent-gradient);">📤 Chia sẻ ngay (Zalo/WhatsApp...)</button>
+                </div>
               </div>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top: 18px;">
-              <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
-              <button id="shareAirBtn" onclick="doShareAirPacking()" style="display:none; background: var(--accent-gradient);">📤 Chia sẻ ngay (Zalo/WhatsApp...)</button>
             </div>
           </div>
         </div>
