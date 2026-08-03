@@ -1731,7 +1731,7 @@
             <button id="exportAirBtn" onclick="doProcessAirPacking()">Xử lý & Xem trước</button>
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
-            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên. Kết quả sẽ hiển thị bên dưới để bạn kiểm tra trước khi tải file Excel.
+            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên, và đọc ô B5 của mỗi sheet để ghi phân loại hàng hóa (bỏ trống nếu là "Kurung"). Kết quả sẽ hiển thị bên dưới để bạn kiểm tra trước khi tải file Excel.
           </div>
           <div id="airResult" class="msg" style="margin-top: 12px;"></div>
         </div>
@@ -1758,6 +1758,7 @@
                       <th>Customer Name</th>
                       <th style="text-align:right;">SET</th>
                       <th style="text-align:right;">Weight (KGS)</th>
+                      <th>Phân loại</th>
                     </tr>
                   </thead>
                   <tbody id="airTbody"></tbody>
@@ -1768,6 +1769,7 @@
                       <td></td>
                       <td id="airTotalSets" style="text-align:right;"></td>
                       <td id="airTotalWeight" style="text-align:right;"></td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -5140,6 +5142,16 @@ async function doProcessAirPacking() {
         firstSheetProcessed = true;
       }
 
+      // Đọc ô B5 (dòng 5, cột B) của sheet để xác định phân loại hàng hóa (VD: BLOUSE).
+      // Nếu giá trị là "Kurung" (không phân biệt hoa/thường) thì để trống ô kết quả.
+      let sheetCategory = "";
+      if (jsonData.length > 4 && jsonData[4] && jsonData[4][1] !== undefined && jsonData[4][1] !== null) {
+        const rawCategory = String(jsonData[4][1]).trim();
+        if (rawCategory.toUpperCase() !== "KURUNG") {
+          sheetCategory = rawCategory;
+        }
+      }
+
       let headerIdx = jsonData.findIndex(row => row && row.some(cell => String(cell).toUpperCase().includes('BAG NO')));
       if (headerIdx === -1) continue;
 
@@ -5171,7 +5183,7 @@ async function doProcessAirPacking() {
 
         if (currentBagNo) {
           if (!sheetBagsMap.has(currentBagNo)) {
-            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs });
+            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs, CATEGORY: sheetCategory });
           }
           sheetBagsMap.get(currentBagNo).QTITY += qtity;
         }
@@ -5216,6 +5228,7 @@ function renderAirPreviewTable(processed) {
       <td>${customerName}</td>
       <td style="text-align:right;">${bag.QTITY}</td>
       <td style="text-align:right;">${(bag.KGS || 0)}</td>
+      <td>${escapeHtml(bag.CATEGORY || "")}</td>
     </tr>`;
   });
   tbody.innerHTML = rowsHtml;
@@ -5243,7 +5256,7 @@ async function buildAirExcelFile() {
   const worksheet = workbook.addWorksheet('Sheet1');
 
   const titleRow = worksheet.addRow([`HÀNG XUẤT AIR - ${dateStr}`]);
-  worksheet.mergeCells('A1:E1');
+  worksheet.mergeCells('A1:F1');
   const titleCell = worksheet.getCell('A1');
   titleCell.font = { name: 'Arial', size: 14, bold: true };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
@@ -5256,7 +5269,7 @@ async function buildAirExcelFile() {
     right: { style: 'thin', color: { argb: 'FFBE5014' } }
   };
 
-  const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight']);
+  const headerRow = worksheet.addRow(['STT', 'Bag\nMARK', 'Customer Name', 'SET', 'Weight', 'Phân loại']);
   headerRow.height = 49.5;
   headerRow.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBE2D5' } };
@@ -5270,14 +5283,14 @@ async function buildAirExcelFile() {
   allBagsData.forEach((bag, idx) => {
     totalSets += bag.QTITY;
     totalWeight += (bag.KGS || 0);
-    const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0]);
+    const row = worksheet.addRow([idx + 1, bag.BAG_NO, customerName, bag.QTITY, bag.KGS || 0, bag.CATEGORY || '']);
     row.eachCell((cell) => {
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = customBorder;
     });
   });
 
-  const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight]);
+  const totalRow = worksheet.addRow(['', allBagsData.length, '', totalSets, totalWeight, '']);
   totalRow.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7C7AC' } };
     cell.font = { bold: true };
@@ -5290,6 +5303,7 @@ async function buildAirExcelFile() {
   worksheet.getColumn(3).width = 24.38;
   worksheet.getColumn(4).width = 8.38;
   worksheet.getColumn(5).width = 8.38;
+  worksheet.getColumn(6).width = 16;
 
   // Ghi 3 dòng ghi chú thêm vào cột B, cách dòng tổng 2 dòng, bỏ qua ô trống (không tạo dòng cho ô trống)
   const noteValues = [
