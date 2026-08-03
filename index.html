@@ -1753,15 +1753,9 @@
 
         <div id="airResultArea" style="display:none;">
           <div class="card" style="margin-top: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div>
-                <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
-                <div class="hint" style="margin:0;">Kiểm tra kỹ số liệu bên dưới. Nếu đúng, bấm "Tải về Excel" để xuất file.</div>
-              </div>
-              <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
-                <button id="shareAirBtn" onclick="doShareAirPacking()" style="display:none; background: var(--accent-gradient);">📤 Chia sẻ ngay (Zalo/WhatsApp...)</button>
-              </div>
+            <div>
+              <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
+              <div class="hint" style="margin:0;">Kiểm tra kỹ số liệu bên dưới. Nếu đúng, bấm "Tải về Excel" để xuất file.</div>
             </div>
             <div style="display:flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px;">
               <div class="table-responsive" style="width: fit-content; max-width: 100%; flex: 0 0 auto;">
@@ -1797,6 +1791,10 @@
                   <input type="text" class="air-extra-input" id="airNote3" placeholder="Dòng ghi chú 3" />
                 </div>
               </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin-top: 18px;">
+              <button id="downloadAirBtn" onclick="doDownloadAirPacking()">⬇️ Tải về Excel</button>
+              <button id="shareAirBtn" onclick="doShareAirPacking()" style="display:none; background: var(--accent-gradient);">📤 Chia sẻ ngay (Zalo/WhatsApp...)</button>
             </div>
           </div>
         </div>
