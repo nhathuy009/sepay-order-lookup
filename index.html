@@ -5104,6 +5104,14 @@ function toTitleCaseVN(str) {
 // Lưu dữ liệu đã xử lý để dùng lại khi bấm "Tải về Excel", không cần đọc lại file
 let airProcessedData = null;
 
+// Bảng định mức & giá tiền theo từng phân loại hàng, dùng để tự động điền gợi ý vào 3 ô ghi chú
+const AIR_CATEGORY_RATES = {
+  "BLOUSE": { label: "Blouse", rate: "2m", price: "4,5$" },
+  "KID": { label: "Kid", rate: "1,8m", price: "5$" },
+  "JUBAH": { label: "Jubah", rate: "3.5m", price: "9$" },
+  "KURUNG": { label: "Kurung", rate: "3,5m", price: "10$" }
+};
+
 async function doProcessAirPacking() {
   const fileInput = document.getElementById("airExcelFile");
   const box = document.getElementById("airResult");
@@ -5143,10 +5151,13 @@ async function doProcessAirPacking() {
       }
 
       // Đọc ô B5 (dòng 5, cột B) của sheet để xác định phân loại hàng hóa (VD: BLOUSE).
-      // Nếu giá trị là "Kurung" (không phân biệt hoa/thường) thì để trống ô kết quả.
+      // Nếu giá trị là "Kurung" (không phân biệt hoa/thường) thì để trống ô kết quả (nhưng vẫn giữ
+      // giá trị gốc ở sheetCategoryRaw để tổng hợp vào ghi chú).
       let sheetCategory = "";
+      let sheetCategoryRaw = "";
       if (jsonData.length > 4 && jsonData[4] && jsonData[4][1] !== undefined && jsonData[4][1] !== null) {
         const rawCategory = String(jsonData[4][1]).trim();
+        sheetCategoryRaw = rawCategory;
         if (rawCategory.toUpperCase() !== "KURUNG") {
           sheetCategory = rawCategory;
         }
@@ -5183,7 +5194,7 @@ async function doProcessAirPacking() {
 
         if (currentBagNo) {
           if (!sheetBagsMap.has(currentBagNo)) {
-            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs, CATEGORY: sheetCategory });
+            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs, CATEGORY: sheetCategory, RAW_CATEGORY: sheetCategoryRaw });
           }
           sheetBagsMap.get(currentBagNo).QTITY += qtity;
         }
@@ -5196,10 +5207,26 @@ async function doProcessAirPacking() {
       return;
     }
 
+    // Tổng hợp số lượng theo từng phân loại hàng (dựa trên RAW_CATEGORY, gồm cả Kurung)
+    // để tự động gợi ý nội dung cho 3 ô ghi chú. Chỉ xét các phân loại có trong bảng định mức.
+    let categoryTotals = new Map();
+    allBagsData.forEach(bag => {
+      const key = (bag.RAW_CATEGORY || "").trim().toUpperCase();
+      if (!key || !AIR_CATEGORY_RATES[key]) return;
+      categoryTotals.set(key, (categoryTotals.get(key) || 0) + bag.QTITY);
+    });
+    const topCategories = Array.from(categoryTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    const categoryNotes = topCategories.map(([key, qty]) => {
+      const info = AIR_CATEGORY_RATES[key];
+      return `${info.label}: ${qty} cái - ĐM ${info.rate} - Giá ${info.price}`;
+    });
+
     // Lưu lại để tải về sau, không tự động tải xuống ngay
     const today = new Date();
     const dateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth()+1).toString().padStart(2, '0')}/${today.getFullYear()}`;
-    airProcessedData = { allBagsData, customerName, dateStr };
+    airProcessedData = { allBagsData, customerName, dateStr, categoryNotes };
 
     renderAirPreviewTable(airProcessedData);
     resultArea.style.display = "block";
@@ -5212,9 +5239,16 @@ async function doProcessAirPacking() {
 }
 
 function renderAirPreviewTable(processed) {
-  const { allBagsData, customerName, dateStr } = processed;
+  const { allBagsData, customerName, dateStr, categoryNotes } = processed;
   const tbody = document.getElementById("airTbody");
   document.getElementById("airPreviewTitle").innerText = `Xem trước dữ liệu - HÀNG XUẤT AIR - ${dateStr}`;
+
+  // Tự động điền gợi ý nội dung ghi chú (SL, định mức, giá) theo tối đa 3 phân loại hàng có số lượng lớn nhất
+  const noteIds = ["airNote1", "airNote2", "airNote3"];
+  noteIds.forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (el) el.value = (categoryNotes && categoryNotes[idx]) ? categoryNotes[idx] : "";
+  });
 
   let totalSets = 0;
   let totalWeight = 0;
