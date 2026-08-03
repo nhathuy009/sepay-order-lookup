@@ -704,6 +704,13 @@
   /* Ẩn ô nhập mật khẩu khi đã có mật khẩu lưu sẵn */
   body.has-token #accessToken { display: none; }
 
+  /* Ẩn hẳn widget lịch tuần trên iPhone (mọi kích thước), kể cả khi đã có has-token
+     (không áp dụng cho Android/Samsung - chỉ nhắm riêng thiết bị iPhone). */
+  html.is-iphone .weekly-calendar-widget,
+  html.is-iphone body.has-token .weekly-calendar-widget {
+    display: none !important;
+  }
+
   /* BODY LAYOUT */
   .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 
@@ -1285,6 +1292,14 @@
     pointer-events: none;
   }
 </style>
+<script>
+  // Phát hiện sớm thiết bị iPhone (không áp dụng cho Android/Samsung) để có thể ẩn
+  // widget lịch tuần trên header chỉ riêng cho iPhone. Chạy trong <head> để gắn class
+  // lên <html> trước khi trang vẽ ra, tránh bị nháy (flash) lịch rồi mới ẩn.
+  if (/iPhone/i.test(navigator.userAgent)) {
+    document.documentElement.classList.add("is-iphone");
+  }
+</script>
 </head>
 <body class="light-mode">
 
