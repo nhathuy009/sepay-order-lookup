@@ -5758,16 +5758,16 @@ function addEhoadonItemRow() {
   row.className = "row ehoadon-item-row";
   row.style.gap = "8px";
   row.innerHTML = `
-    <input placeholder="Tên hàng hóa" class="ehoadon-item-name" style="flex:2; min-width:160px;">
-    <input placeholder="Đơn vị (Bộ)" class="ehoadon-item-unit" style="flex:1; min-width:90px;">
-    <input placeholder="Số lượng (100)" class="ehoadon-item-qty" style="flex:1; min-width:90px;">
-    <input placeholder="Đơn giá (237.150)" class="ehoadon-item-price" style="flex:1; min-width:110px;">
-    <input placeholder="Thành tiền (tự tính nếu trống)" class="ehoadon-item-amount" style="flex:1; min-width:140px;">
+    <input type="text" placeholder="Tên hàng hóa" class="ehoadon-item-name" style="flex:2; min-width:160px;">
+    <input type="text" placeholder="Đơn vị (Bộ)" class="ehoadon-item-unit" style="flex:1; min-width:90px;">
+    <input type="text" placeholder="Số lượng (100)" class="ehoadon-item-qty" style="flex:1; min-width:90px;">
+    <input type="text" placeholder="Đơn giá (237.150)" class="ehoadon-item-price" style="flex:1; min-width:110px;">
+    <input type="text" placeholder="Thành tiền (tự tính nếu trống)" class="ehoadon-item-amount" style="flex:1; min-width:140px;">
     <button type="button" class="btn-outline" onclick="this.parentElement.remove()" style="flex:0 0 auto;">✕</button>
   `;
   container.appendChild(row);
 }
-
+  
 function collectEhoadonItems() {
   return [...document.querySelectorAll("#ehoadonItemsContainer .ehoadon-item-row")].map(row => ({
     name: row.querySelector(".ehoadon-item-name").value,
