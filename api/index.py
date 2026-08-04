@@ -31,6 +31,7 @@ from _payment import search_sepay_transaction, list_sepay_transactions, get_sepa
 from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
 from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list
+from _customsdeclaration import parse_customs_declaration_from_bytes
 
 def handle_fetch_employees_excel(body):
     file_b64 = body.get("file_base64", "")
@@ -646,6 +647,25 @@ def handle_ehoadon_invoice_list(body):
     return (400 if "error" in res else 200), res
 
 
+def handle_parse_customs_declaration(body):
+    """Đọc file Excel tờ khai hải quan (sheet 'TKX') do người dùng tải lên và
+    trả về dữ liệu đã phân tích dạng JSON, để hiển thị lên màn hình (bước
+    ghép nối vào form tạo hóa đơn eHoadon sẽ được bổ sung sau)."""
+    file_b64 = (body.get("file_base64") or "").strip()
+    filename = (body.get("filename") or "").strip()
+    if not file_b64:
+        return 400, {"error": "Thiếu file tờ khai hải quan"}
+    try:
+        if "," in file_b64:
+            file_b64 = file_b64.split(",", 1)[1]
+        file_bytes = base64.b64decode(file_b64)
+    except Exception as e:
+        return 400, {"error": f"File base64 không hợp lệ: {e}"}
+
+    res = parse_customs_declaration_from_bytes(file_bytes, filename)
+    return (400 if "error" in res else 200), res
+
+
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -721,6 +741,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_ehoadon_invoice_create(body)
         elif action == "ehoadon_invoice_list":
             status, payload = handle_ehoadon_invoice_list(body)
+        elif action == "parse_customs_declaration":
+            status, payload = handle_parse_customs_declaration(body)
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
