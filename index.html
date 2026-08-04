@@ -5909,7 +5909,21 @@ function applyCustomsDataToForm(data) {
       currentRow.querySelector(".ehoadon-item-amount").value = formatNumberVN(hang.tri_gia_tinh_thue_vnd);
   });
 }
-  
+// ==========================================
+  // THÊM ĐOẠN NÀY ĐỂ TỰ ĐỘNG CHẠY TÌM KIẾM
+  // ==========================================
+  if (tenCongTy) {
+      // Dùng setTimeout 300ms để đảm bảo trình duyệt đã kịp render các ô input xong
+      // trước khi đẩy lệnh gọi API tìm kiếm
+      setTimeout(() => {
+          const btn = document.getElementById("ehoadonBuyerSearchBtn");
+          // Chỉ tự động tìm nếu nút không bị vô hiệu hóa
+          if (btn && !btn.disabled) {
+              doEhoadonBuyerSearch();
+          }
+      }, 300);
+  }
+}  
 async function doEhoadonFetchInvoiceList() {
   const fromDateRaw = document.getElementById("ehoadonFromDate").value;
   const toDateRaw = document.getElementById("ehoadonToDate").value;
