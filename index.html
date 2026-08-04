@@ -870,14 +870,14 @@
   }
   label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
   
-  input[type=text], input[type=file], textarea, select {
-    width: 100%; padding: 12px 14px; border-radius: 11px; 
-    border: 1px solid var(--input-border); background: var(--input-bg); 
-    color: var(--text-main); font-size: 14px; font-family: inherit; outline: none; transition: 0.2s;
+  input[type=text], input[type=password], input[type=file], textarea, select {
+  width: 100%; padding: 12px 14px; border-radius: 11px; 
+  border: 1px solid var(--input-border); background: var(--input-bg); 
+  color: var(--text-main); font-size: 14px; font-family: inherit; outline: none; transition: 0.2s;
   }
-  input[type=text]:focus, textarea:focus, select:focus { 
-    border-color: var(--accent); 
-    box-shadow: 0 0 0 3px rgba(46,151,224,0.15); 
+  input[type=text]:focus, input[type=password]:focus, textarea:focus, select:focus { 
+  border-color: var(--accent); 
+  box-shadow: 0 0 0 3px rgba(46,151,224,0.15); 
   }
   select option { background: var(--bg-app); color: var(--text-main); }
   textarea { resize: vertical; }
