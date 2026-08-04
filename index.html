@@ -1839,7 +1839,8 @@
           <div class="msg" id="ehoadonLoginStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
-        <div class="card" id="ehoadonBuyerCard" style="display:none; margin-top:16px;">
+        <!-- Đã xóa display:none ở ehoadonBuyerCard -->
+        <div class="card" id="ehoadonBuyerCard" style="margin-top:16px;">
           <label>Tìm khách hàng (mã hoặc tên, vd: AT, AW)</label>
           <div class="row" style="align-items:flex-end;">
             <div style="flex:1; min-width:220px;">
@@ -1852,7 +1853,8 @@
           <div id="ehoadonBuyerResults" style="margin-top: 12px;"></div>
         </div>
 
-        <div class="card" id="ehoadonInvoiceCard" style="display:none; margin-top:16px;">
+        <!-- Đã xóa display:none ở ehoadonInvoiceCard -->
+        <div class="card" id="ehoadonInvoiceCard" style="margin-top:16px;">
           <label>Ghi chú hóa đơn</label>
           <input type="text" id="ehoadonNote" value="Hóa đơn tự động" />
 
@@ -1868,7 +1870,8 @@
           <div class="msg" id="ehoadonInvoiceStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
-        <div class="card" id="ehoadonListCard" style="display:none; margin-top:16px;">
+        <!-- Đã xóa display:none ở ehoadonListCard -->
+        <div class="card" id="ehoadonListCard" style="margin-top:16px;">
           <h3 style="margin:0 0 12px 0;">Danh sách hóa đơn</h3>
           <div class="row" style="align-items:flex-end;">
             <div style="flex:1; min-width:160px;">
@@ -2233,6 +2236,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
+  // Tự động thêm 1 dòng điền hàng hóa trống sẵn cho tab eHoadon
+  addEhoadonItemRow();
 });
 
 function switchTab(which) {
