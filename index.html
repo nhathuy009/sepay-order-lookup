@@ -5861,6 +5861,49 @@ function applyCustomsDataToForm(data) {
   if (soToKhai) {
     document.getElementById("ehoadonNote").value = `Hóa đơn GTGT cho tờ khai xuất khẩu số ${soToKhai} ngày ${ngayDangKy}`;
   }
+
+  // 3. Xử lý danh sách hàng hóa
+  const itemsContainer = document.getElementById("ehoadonItemsContainer");
+  if (!itemsContainer) return;
+  
+  // Xóa sạch các dòng hàng hóa cũ (nếu có) trước khi điền dữ liệu mới
+  itemsContainer.innerHTML = "";
+  
+  const danhSachHangHoa = data.danh_sach_hang_hoa || [];
+  
+  // Nếu tờ khai không có hàng hóa, tạo mặc định 1 dòng trống
+  if (danhSachHangHoa.length === 0) {
+      addEhoadonItemRow();
+      return;
+  }
+
+  // Hàm phụ định dạng số theo chuẩn VN (VD: 261420 -> "261.420")
+  const formatNumberVN = (num) => {
+      if (num === null || num === undefined) return "";
+      return Number(num).toLocaleString("vi-VN"); 
+  };
+
+  // Duyệt qua từng dòng hàng trong tờ khai
+  danhSachHangHoa.forEach(hang => {
+      addEhoadonItemRow(); // Gọi hàm tạo DOM dòng trống trước
+      
+      // Lấy dòng vừa tạo (dòng cuối cùng trong container)
+      const rows = itemsContainer.querySelectorAll(".ehoadon-item-row");
+      const currentRow = rows[rows.length - 1];
+      
+      // Quy đổi Đơn vị tính
+      let donVi = hang.so_luong?.don_vi || "";
+      let donViVN = donVi;
+      if (donVi.toUpperCase() === "SET") donViVN = "Bộ";
+      else if (donVi.toUpperCase() === "PCS") donViVN = "Cái";
+
+      // Điền giá trị vào các ô input tương ứng
+      currentRow.querySelector(".ehoadon-item-name").value = hang.mo_ta_hang_hoa || "";
+      currentRow.querySelector(".ehoadon-item-unit").value = donViVN;
+      currentRow.querySelector(".ehoadon-item-qty").value = formatNumberVN(hang.so_luong?.gia_tri);
+      currentRow.querySelector(".ehoadon-item-price").value = formatNumberVN(hang.don_gia_tinh_thue_vnd);
+      currentRow.querySelector(".ehoadon-item-amount").value = formatNumberVN(hang.tri_gia_tinh_thue_vnd);
+  });
 }
   
 async function doEhoadonFetchInvoiceList() {
