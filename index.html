@@ -5604,6 +5604,8 @@ async function doEhoadonParseCustomsDeclaration() {
     const soDongHang = (data.danh_sach_hang_hoa || []).length;
     statusEl.innerHTML = `<span class="ok">✅ Đã đọc xong (${soDongHang} dòng hàng)</span>`;
     resultEl.innerHTML = `<pre style="white-space:pre-wrap; word-break:break-word; background:var(--input-bg); border:1px solid var(--input-border); border-radius:8px; padding:12px; max-height:520px; overflow:auto; font-size:12.5px; color:var(--text-main);">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+    // Thêm dòng này ngay bên dưới:
+    applyCustomsDataToForm(data);
   } catch (e) {
     statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
   } finally {
@@ -5691,15 +5693,36 @@ async function doEhoadonBuyerSearch() {
       return;
     }
 
+    // Biến để tìm khách hàng giống nhất
+    let bestMatchIdx = -1;
+    let highestSim = 0;
+
     resultsEl.innerHTML = ehoadonBuyerSuggestions.map((b, i) => {
       const name = b.BuyerName || b.UnitName || "(Không tên)";
+      
+      // Tính độ giống nhau
+      const sim = stringSimilarity(keyword, name);
+      if (sim > highestSim) {
+        highestSim = sim;
+        bestMatchIdx = i;
+      }
+
       return `<div style="padding:8px 0; border-bottom: 1px solid var(--border);">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="radio" name="ehoadonBuyerChoice" onclick="selectEhoadonBuyer(${i})" />
+          <input type="radio" name="ehoadonBuyerChoice" id="buyerRadio_${i}" onclick="selectEhoadonBuyer(${i})" />
           <span><b>${escapeHtml(name)}</b> — ${escapeHtml(b.FullAddress || "")} (${escapeHtml(b.PayMethodName || "")})</span>
         </label>
       </div>`;
     }).join("");
+
+    // Nếu tìm thấy khách hàng giống trên 95% (0.95), tự động click chọn
+    if (highestSim >= 0.95 && bestMatchIdx !== -1) {
+      const radioBtn = document.getElementById(`buyerRadio_${bestMatchIdx}`);
+      if (radioBtn) {
+        radioBtn.checked = true;
+        selectEhoadonBuyer(bestMatchIdx);
+      }
+    }
   } catch (e) {
     resultsEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
   } finally {
@@ -5793,7 +5816,53 @@ async function doEhoadonCreateInvoice() {
     btn.disabled = false;
   }
 }
+  
+// Hàm tính khoảng cách Levenshtein để đo độ giống nhau của 2 chuỗi
+function stringSimilarity(s1, s2) {
+  if (!s1 || !s2) return 0;
+  const longer = s1.length > s2.length ? s1.toLowerCase() : s2.toLowerCase();
+  const shorter = s1.length > s2.length ? s2.toLowerCase() : s1.toLowerCase();
+  if (longer.length === 0) return 1.0;
+  
+  const costs = [];
+  for (let i = 0; i <= longer.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) costs[j] = j;
+      else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
+          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) costs[shorter.length] = lastValue;
+  }
+  return (longer.length - costs[shorter.length]) / parseFloat(longer.length);
+}
 
+// Hàm đẩy dữ liệu Hải quan vào form eHoadon
+function applyCustomsDataToForm(data) {
+  if (!data) return;
+
+  // 1. Điền Tên khách hàng vào ô Tìm kiếm
+  const tenCongTy = data.nguoi_nhap_khau?.ten_cong_ty || "";
+  if (tenCongTy) {
+    document.getElementById("ehoadonBuyerKeyword").value = tenCongTy;
+  }
+
+  // 2. Điền số tờ khai & ngày đăng ký vào ô Ghi chú
+  const soToKhai = data.thong_tin_chung?.so_to_khai || "";
+  const ngayDangKyTime = data.thong_tin_chung?.ngay_dang_ky || "";
+  const ngayDangKy = ngayDangKyTime.split(" ")[0]; // Lấy phần ngày DD/MM/YYYY
+  
+  if (soToKhai) {
+    document.getElementById("ehoadonNote").value = `Xuất khẩu theo tờ khai số ${soToKhai} ngày ${ngayDangKy}`;
+  }
+}
+  
 async function doEhoadonFetchInvoiceList() {
   const fromDateRaw = document.getElementById("ehoadonFromDate").value;
   const toDateRaw = document.getElementById("ehoadonToDate").value;
