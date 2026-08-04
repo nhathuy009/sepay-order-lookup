@@ -676,7 +676,11 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        self._send(200, {"auth_required": bool(APP_ACCESS_TOKEN)})
+        self._send(200, {
+            "auth_required": bool(APP_ACCESS_TOKEN),
+            "ehoadon_username": os.environ.get("ehoadon_username", ""),
+            "ehoadon_password": os.environ.get("ehoadon_password", "")
+        })
 
     def do_POST(self):
         try:
