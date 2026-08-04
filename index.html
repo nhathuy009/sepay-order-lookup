@@ -1806,6 +1806,19 @@
       <div id="tabEhoadon" class="hidden tab-panel">
         <h2 style="margin:0 0 16px 0">Tạo hóa đơn eHoadon (van.ehoadon.vn)</h2>
 
+        <div class="card" id="ehoadonCustomsCard" style="margin-bottom:16px;">
+          <h3 style="margin:0 0 4px 0;">Đọc tờ khai hải quan (Excel)</h3>
+          <div class="hint" style="margin-top:0; margin-bottom:10px;">
+            Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích và hiển thị dữ liệu dạng JSON. Bước ghép nối dữ liệu này vào form tạo hóa đơn ở dưới sẽ được bổ sung sau.
+          </div>
+          <div class="row" style="align-items:flex-end;">
+            <div><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
+            <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
+          </div>
+          <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
+          <div id="ehoadonCustomsResult" style="margin-top: 12px;"></div>
+        </div>
+
         <div class="card" id="ehoadonLoginCard">
           <div class="row">
             <div style="flex: 1; min-width: 180px;">
@@ -2363,6 +2376,7 @@ let gdtLastCreds = null;  // { username, password, is_purchase } dùng để g�
 let ehoadonCookies = null;       // Cookie/VIEWSTATE phiên đăng nhập eHoadon (server không giữ state giữa các lần gọi)
 let ehoadonBuyerSuggestions = []; // Kết quả tìm kiếm khách hàng gần nhất
 let ehoadonSelectedBuyer = null;  // Khách hàng đã chọn để tạo hóa đơn
+let ehoadonCustomsData = null;    // Dữ liệu JSON đọc được từ file tờ khai hải quan (dùng để ghép nối vào hóa đơn sau này)
 
 function removeVietnameseDiacritics(str) {
   if (!str) return "";
@@ -5543,6 +5557,55 @@ function toggleAccDetail(accountId) {
 }
 
 // =======================================================
+// EHOADON - ĐỌC TỜ KHAI HẢI QUAN (Excel -> JSON, chỉ hiển thị, chưa ghép vào form)
+async function doEhoadonParseCustomsDeclaration() {
+  const fileInput = document.getElementById("ehoadonCustomsFile");
+  const statusEl = document.getElementById("ehoadonCustomsStatus");
+  const resultEl = document.getElementById("ehoadonCustomsResult");
+  const btn = document.getElementById("ehoadonCustomsBtn");
+
+  if (!fileInput.files.length) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Vui lòng chọn file tờ khai hải quan.</span>';
+    return;
+  }
+
+  const file = fileInput.files[0];
+  btn.disabled = true;
+  statusEl.style.display = "block";
+  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đọc & phân tích file...';
+  resultEl.innerHTML = "";
+
+  try {
+    const b64 = await fileToBase64(file);
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "parse_customs_declaration",
+        file_base64: b64,
+        filename: file.name,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      statusEl.innerHTML = `<span class="err">❌ ${escapeHtml(data.error || "Đọc file thất bại")}</span>`;
+      return;
+    }
+
+    ehoadonCustomsData = data;
+    const soDongHang = (data.danh_sach_hang_hoa || []).length;
+    statusEl.innerHTML = `<span class="ok">✅ Đã đọc xong (${soDongHang} dòng hàng)</span>`;
+    resultEl.innerHTML = `<pre style="white-space:pre-wrap; word-break:break-word; background:var(--input-bg); border:1px solid var(--input-border); border-radius:8px; padding:12px; max-height:520px; overflow:auto; font-size:12.5px; color:var(--text-main);">${escapeHtml(JSON.stringify(data, null, 2))}</pre>`;
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // EHOADON - TẠO HÓA ĐƠN TỰ ĐỘNG (van.ehoadon.vn)
 // =======================================================
 async function doEhoadonLogin() {
