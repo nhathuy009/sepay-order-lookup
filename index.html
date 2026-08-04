@@ -2196,9 +2196,20 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch(e) { setTheme("light"); }
 
   fetch("/api/index").then(r => r.json()).then(d => {
-    if (d && d.auth_required === false) {
-      const authCard = document.getElementById("authCard");
-      if(authCard) authCard.classList.add("hidden");
+    if (d) {
+      // Ẩn authCard nếu không yêu cầu mật khẩu hệ thống
+      if (d.auth_required === false) {
+        const authCard = document.getElementById("authCard");
+        if (authCard) authCard.classList.add("hidden");
+      }
+      
+      // Tự động điền tài khoản eHoadon từ Vercel Environment Variables
+      if (d.ehoadon_username) {
+        document.getElementById("ehoadonUsername").value = d.ehoadon_username;
+      }
+      if (d.ehoadon_password) {
+        document.getElementById("ehoadonPassword").value = d.ehoadon_password;
+      }
     }
   }).catch(() => {});
   
