@@ -1876,16 +1876,14 @@
         <div class="card" id="ehoadonListCard" style="display:none;">
           <h3 style="margin:0 0 12px 0;">Danh sách hóa đơn</h3>
           <div class="row" style="align-items:flex-end;">
-            <div style="flex:1; min-width:160px;">
-              <label>Từ ngày</label>
-              <input type="date" id="ehoadonFromDate" />
-            </div>
-            <div style="flex:1; min-width:160px;">
-              <label>Đến ngày</label>
-              <input type="date" id="ehoadonToDate" />
+            <div style="flex: 1; min-width: 220px;">
+              <label>Khoảng ngày (Từ ngày - Đến ngày)</label>
+              <input type="text" id="ehoadonDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+              <input type="hidden" id="ehoadonFromDate" />
+              <input type="hidden" id="ehoadonToDate" />
             </div>
             <div style="flex:0 0 auto;">
-              <button id="ehoadonListBtn" onclick="doEhoadonFetchInvoiceList()">Lấy danh sách</button>
+              <button id="ehoadonListBtn" onclick="doEhoadonFetchInvoiceList()" style="width: 100%;">Lấy danh sách</button>
             </div>
           </div>
           <div id="ehoadonListResults" style="margin-top: 12px;"></div>
@@ -2246,6 +2244,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initRangeDatePicker('txDateRange', 'txDateFrom', 'txDateTo');
   initRangeDatePicker('gdtDateRange', 'gdtDateFrom', 'gdtDateTo');
   initRangeDatePicker('invDateRange', 'invDateFrom', 'invDateTo');
+  initRangeDatePicker('ehoadonDateRange', 'ehoadonFromDate', 'ehoadonToDate');
 
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
@@ -5664,9 +5663,15 @@ async function doEhoadonLogin() {
     document.getElementById("ehoadonBuyerCard").style.display = "block";
     document.getElementById("ehoadonInvoiceCard").style.display = "block";
     document.getElementById("ehoadonListCard").style.display = "block";
-    const today = new Date().toISOString().slice(0, 10);
-    document.getElementById("ehoadonFromDate").value = today;
-    document.getElementById("ehoadonToDate").value = today;
+    
+    // Gán ngày hôm nay vào lịch Flatpickr của tab eHoadon
+    const ehoadonFp = document.getElementById("ehoadonDateRange")._flatpickr;
+    if (ehoadonFp) {
+      const todayDate = new Date();
+      ehoadonFp.setDate([todayDate, todayDate]);
+      document.getElementById("ehoadonFromDate").value = ehoadonFp.formatDate(todayDate, "d/m/Y");
+      document.getElementById("ehoadonToDate").value = ehoadonFp.formatDate(todayDate, "d/m/Y");
+    }
   } catch (e) {
     statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
   } finally {
