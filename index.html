@@ -1806,20 +1806,8 @@
       <div id="tabEhoadon" class="hidden tab-panel">
         <h2 style="margin:0 0 16px 0">Tạo hóa đơn eHoadon (van.ehoadon.vn)</h2>
 
-        <div class="card" id="ehoadonCustomsCard" style="margin-bottom:16px;">
-          <h3 style="margin:0 0 4px 0;">Đọc tờ khai hải quan (Excel)</h3>
-          <div class="hint" style="margin-top:0; margin-bottom:10px;">
-            Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích và hiển thị dữ liệu dạng JSON. Bước ghép nối dữ liệu này vào form tạo hóa đơn ở dưới sẽ được bổ sung sau.
-          </div>
-          <div class="row" style="align-items:flex-end;">
-            <div><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
-            <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
-          </div>
-          <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
-          <div id="ehoadonCustomsResult" style="margin-top: 12px;"></div>
-        </div>
-
-        <div class="card" id="ehoadonLoginCard">
+        <!-- 1. FORM ĐĂNG NHẬP (Đưa lên trên cùng, luôn hiển thị) -->
+        <div class="card" id="ehoadonLoginCard" style="margin-bottom:16px;">
           <div class="row">
             <div style="flex: 1; min-width: 180px;">
               <label>Tài khoản eHoadon</label>
@@ -1839,8 +1827,22 @@
           <div class="msg" id="ehoadonLoginStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
-        <!-- Đã xóa display:none ở ehoadonBuyerCard -->
-        <div class="card" id="ehoadonBuyerCard" style="margin-top:16px;">
+        <!-- 2. FORM ĐỌC TỜ KHAI (Ẩn ban đầu) -->
+        <div class="card" id="ehoadonCustomsCard" style="display:none; margin-bottom:16px;">
+          <h3 style="margin:0 0 4px 0;">Đọc tờ khai hải quan (Excel)</h3>
+          <div class="hint" style="margin-top:0; margin-bottom:10px;">
+            Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích. Dữ liệu sẽ tự động điền vào form hóa đơn bên dưới.
+          </div>
+          <div class="row" style="align-items:flex-end;">
+            <div><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
+            <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
+          </div>
+          <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
+          <div id="ehoadonCustomsResult" style="margin-top: 12px;"></div>
+        </div>
+
+        <!-- 3. TÌM KHÁCH HÀNG (Ẩn ban đầu) -->
+        <div class="card" id="ehoadonBuyerCard" style="display:none; margin-bottom:16px;">
           <label>Tìm khách hàng (mã hoặc tên, vd: AT, AW)</label>
           <div class="row" style="align-items:flex-end;">
             <div style="flex:1; min-width:220px;">
@@ -1853,8 +1855,8 @@
           <div id="ehoadonBuyerResults" style="margin-top: 12px;"></div>
         </div>
 
-        <!-- Đã xóa display:none ở ehoadonInvoiceCard -->
-        <div class="card" id="ehoadonInvoiceCard" style="margin-top:16px;">
+        <!-- 4. FORM NHẬP HÓA ĐƠN (Ẩn ban đầu) -->
+        <div class="card" id="ehoadonInvoiceCard" style="display:none; margin-bottom:16px;">
           <label>Ghi chú hóa đơn</label>
           <input type="text" id="ehoadonNote" value="Hóa đơn tự động" />
 
@@ -1870,8 +1872,8 @@
           <div class="msg" id="ehoadonInvoiceStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
-        <!-- Đã xóa display:none ở ehoadonListCard -->
-        <div class="card" id="ehoadonListCard" style="margin-top:16px;">
+        <!-- 5. DANH SÁCH HÓA ĐƠN (Ẩn ban đầu) -->
+        <div class="card" id="ehoadonListCard" style="display:none;">
           <h3 style="margin:0 0 12px 0;">Danh sách hóa đơn</h3>
           <div class="row" style="align-items:flex-end;">
             <div style="flex:1; min-width:160px;">
@@ -5646,9 +5648,11 @@ async function doEhoadonLogin() {
 
     ehoadonCookies = data.cookies || null;
     statusEl.innerHTML = '<span class="ok">✅ Đăng nhập eHoadon thành công.</span>';
+    // MỚI THÊM: Hiện toàn bộ các chức năng còn lại sau khi có Cookie
+    document.getElementById("ehoadonCustomsCard").style.display = "block";
     document.getElementById("ehoadonBuyerCard").style.display = "block";
+    document.getElementById("ehoadonInvoiceCard").style.display = "block";
     document.getElementById("ehoadonListCard").style.display = "block";
-
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById("ehoadonFromDate").value = today;
     document.getElementById("ehoadonToDate").value = today;
