@@ -1,6 +1,8 @@
 """
 _customsdeclaration.py — Đọc & phân tích file Excel Tờ khai Hải quan (mẫu
-HQ7X_QDTQ) thành cấu trúc JSON có tổ chức.
+HQ7X_QDTQ) thành cấu trúc JSON có tổ chức. Dùng "xlrd" THUẦN (không qua
+pandas) để đọc dữ liệu — nhẹ hơn nhiều so với việc kéo theo cả pandas chỉ
+để đọc 1 sheet duy nhất.
 
 Module này chỉ chứa LOGIC PHÂN TÍCH thuần (không đọc/ghi file trên đĩa,
 không quyết định HTTP status) — nhận vào bytes của file Excel do người
@@ -9,41 +11,64 @@ dùng tải lên (được index.py giải mã từ base64), trả về dict thu
 giống các module _invoice.py / _gdt_invoice.py / _invoiceBKAV.py khác.
 
 Logic trích xuất bên dưới bám sát 1:1 theo script phân tích gốc do người
-dùng cung cấp (đọc sheet cố định tên "TKX", header=None, dò theo vị trí
-cột/nhãn cố định của mẫu tờ khai HQ7X) — chỉ khác ở chỗ nhận input là
-bytes trong bộ nhớ (từ upload trên web) thay vì đường dẫn file trên đĩa,
-và luôn trả kết quả qua dict thay vì in/ghi ra file.
+dùng cung cấp (dò dữ liệu theo vị trí cột/nhãn cố định của mẫu tờ khai
+HQ7X trên sheet cố định tên "TKX") — chỉ khác ở cách LẤY GIÁ TRỊ 1 Ô
+(_cell_value) là gọi thẳng xlrd thay vì qua DataFrame của pandas.
 
 Ghi chú kỹ thuật quan trọng:
-- File tờ khai hải quan xuất ra từ hệ thống hải quan thường ở định dạng
-  .xls (Excel 97-2003, OLE2) — pandas cần engine "xlrd" để đọc được định
-  dạng này (KHÔNG dùng được openpyxl, vốn chỉ đọc .xlsx/.xlsm). Nếu người
-  dùng lỡ tải lên file .xlsx thì dùng engine "openpyxl".
-  => _detect_engine() tự nhận diện qua magic bytes ở đầu file (đáng tin
-  hơn dựa theo đuôi tên file, vì tên file có thể bị đổi/không chuẩn).
-- Cần đảm bảo "xlrd" và "pandas" đã có trong requirements.txt của dự án
-  (dự án hiện tại mới chỉ dùng openpyxl cho các tác vụ Excel khác, chưa
-  có 2 gói này) — nếu thiếu, việc đọc file .xls sẽ báo lỗi ImportError.
+- xlrd (từ bản 2.0 trở đi) CHỈ đọc được file .xls (Excel 97-2003, định
+  dạng OLE2) - KHÔNG đọc được .xlsx (định dạng zip mới của Excel hiện
+  đại). File tờ khai hải quan do hệ thống hải quan xuất ra vốn luôn ở
+  định dạng .xls nên không cần hỗ trợ .xlsx ở đây; nếu người dùng lỡ tải
+  nhầm file .xlsx, hàm sẽ trả về lỗi rõ ràng thay vì đọc sai dữ liệu.
+- Các cột số tiền/số lượng trong file mẫu này thường được LƯU DƯỚI DẠNG
+  Ô VĂN BẢN (text) theo định dạng VN (chấm phân cách hàng ngàn, phẩy phân
+  cách thập phân) chứ không phải ô số thực sự — _parse_number() xử lý
+  đúng theo giả định này, giữ nguyên hành vi của script gốc.
+- Cần đảm bảo "xlrd" đã có trong requirements.txt của dự án (khuyến nghị
+  ghim phiên bản, ví dụ xlrd==2.0.2).
 """
-import io
 import math
 import re
 
-import pandas as pd
+import xlrd
+from xlrd import xldate_as_datetime
 
 
-def _detect_engine(file_bytes):
-    """Nhận diện engine đọc Excel phù hợp qua magic bytes đầu file."""
-    if file_bytes[:4] == b"PK\x03\x04":
-        return "openpyxl"  # .xlsx/.xlsm (định dạng nén zip)
-    if file_bytes[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
-        return "xlrd"  # .xls (định dạng OLE2 cũ)
-    return None
+def _cell_value(sheet, row_idx, col_idx, datemode):
+    """Lấy giá trị 1 ô theo (row, col), 0-based — trả về None nếu ô rỗng
+    hoặc nằm ngoài phạm vi cột thực tế của dòng, giữ nguyên kiểu dữ liệu
+    gốc (str/int/float/datetime/bool), tương đương cách pandas trả về khi
+    đọc qua engine xlrd."""
+    if col_idx >= sheet.ncols:
+        return None
+    cell = sheet.cell(row_idx, col_idx)
+    ctype = cell.ctype
+    value = cell.value
+
+    if ctype in (xlrd.XL_CELL_EMPTY, xlrd.XL_CELL_BLANK):
+        return None
+    if ctype == xlrd.XL_CELL_TEXT:
+        return value if value != "" else None
+    if ctype == xlrd.XL_CELL_NUMBER:
+        # Số nguyên hiển thị gọn (không có ".0" thừa), giống hành vi
+        # mặc định khi pandas đọc 1 ô số nguyên từ Excel.
+        return int(value) if value == int(value) else value
+    if ctype == xlrd.XL_CELL_DATE:
+        try:
+            return xldate_as_datetime(value, datemode)
+        except Exception:
+            return value
+    if ctype == xlrd.XL_CELL_BOOLEAN:
+        return bool(value)
+    if ctype == xlrd.XL_CELL_ERROR:
+        return None
+    return value
 
 
 def _parse_number(val):
     """Chuyển đổi chuỗi số định dạng VN (chấm phân cách ngàn, phẩy thập
-    phân) thành float/int. Giữ nguyên chuỗi gốc nếu không parse được."""
+    phân) thành float/int. Giữ nguyên giá trị gốc nếu không parse được."""
     if val is None or (isinstance(val, float) and math.isnan(val)):
         return None
     s = str(val).strip()
@@ -59,18 +84,21 @@ def _parse_number(val):
 
 
 def parse_customs_declaration_from_bytes(file_bytes, filename=""):
-    """Đọc + phân tích 1 file Excel tờ khai hải quan (bytes trong bộ nhớ)
-    thành dict JSON có cấu trúc. Trả về {"error": "..."} nếu đọc/phân tích
-    thất bại (sai định dạng, thiếu sheet "TKX", v.v.)."""
-    engine = _detect_engine(file_bytes)
-    if engine is None:
-        ext = (filename or "").lower().rsplit(".", 1)[-1] if "." in (filename or "") else ""
-        engine = "xlrd" if ext == "xls" else "openpyxl" if ext in ("xlsx", "xlsm") else None
+    """Đọc + phân tích 1 file Excel tờ khai hải quan (.xls, bytes trong bộ
+    nhớ) thành dict JSON có cấu trúc, dùng xlrd thuần. Trả về
+    {"error": "..."} nếu đọc/phân tích thất bại (sai định dạng, thiếu
+    sheet "TKX", v.v.)."""
+    try:
+        book = xlrd.open_workbook(file_contents=file_bytes)
+    except Exception as e:
+        return {"error": f"Không đọc được file Excel (chỉ hỗ trợ định dạng .xls): {e}"}
 
     try:
-        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="TKX", header=None, engine=engine)
-    except Exception as e:
-        return {"error": f"Không đọc được sheet 'TKX' trong file Excel tờ khai hải quan: {e}"}
+        sheet = book.sheet_by_name("TKX")
+    except Exception:
+        return {"error": "Không tìm thấy sheet 'TKX' trong file tờ khai hải quan."}
+
+    datemode = book.datemode
 
     data = {
         "thong_tin_chung": {},
@@ -86,11 +114,9 @@ def parse_customs_declaration_from_bytes(file_bytes, filename=""):
     current_item = None
 
     try:
-        for _, row in df.iterrows():
-            r = [v if pd.notna(v) else None for v in row]
-
-            def val(col_idx):
-                return r[col_idx] if col_idx < len(r) else None
+        for row_idx in range(sheet.nrows):
+            def val(col_idx, _row=row_idx):
+                return _cell_value(sheet, _row, col_idx, datemode)
 
             col2 = str(val(2)).strip() if val(2) else ""
             col3 = str(val(3)).strip() if val(3) else ""
