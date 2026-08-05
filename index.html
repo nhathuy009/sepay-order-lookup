@@ -5913,7 +5913,7 @@ function applyCustomsDataToForm(data) {
           let donVi = hang.so_luong?.don_vi || "";
           let donViVN = donVi;
           if (donVi.toUpperCase() === "SET") donViVN = "Bộ";
-          else if (donVi.toUpperCase() === "PCS") donViVN = "Cái";
+          else if (donVi.toUpperCase() === "PCE") donViVN = "Cái";
 
           // Điền giá trị vào các ô input tương ứng
           currentRow.querySelector(".ehoadon-item-name").value = hang.mo_ta_hang_hoa || "";
