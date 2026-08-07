@@ -1,17 +1,13 @@
-name: Run Python
+name: HTTP Request Demo
 
 on:
   workflow_dispatch:
 
 jobs:
-  run-python:
+  test-api:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Kiểm tra Python
-        run: python --version
-
-      - name: Chạy chương trình
-        run: python gopcode.py
+      - name: Gọi API
+        run: |
+          curl https://httpbin.org/get
