@@ -1,2 +1,16 @@
-run: |
-  env
+name: Secret Demo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+
+    env:
+      MY_NAME: ${{ secrets.MY_NAME }}
+
+    steps:
+      - name: Đọc Secret
+        run: |
+          env
