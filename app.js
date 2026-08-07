@@ -566,7 +566,7 @@ async function doFetchEmployeesExcel() {
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
             const trang_phuc = parseFloat(trang_phuc_raw) || 0;
             const com_trua = parseFloat(com_trua_raw) || 0;
-            const trach_nhiem = parseFloat(trach_nhiem_raw) || 0;
+            const trach_nhiem = Math.round(parseFloat(trach_nhiem_raw) || 0);
             const bhxh = parseFloat(bhxh_raw) || 0;
             const hoa_hong = parseFloat(hoa_hong_raw) || 0;
             const thuong_dong_gop = parseFloat(thuong_dong_gop_raw) || 0;
