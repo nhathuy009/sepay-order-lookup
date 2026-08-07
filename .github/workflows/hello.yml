@@ -9,11 +9,19 @@ jobs:
 
     steps:
 
-      - name: Lấy source code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Liệt kê file
-        run: ls -la
+      - name: Python version
+        run: python --version
 
-      - name: Đang ở đâu
-        run: pwd
+      - name: Pip version
+        run: pip --version
+
+      - name: Node version
+        run: node --version
+
+      - name: NPM version
+        run: npm --version
+
+      - name: Git version
+        run: git --version
