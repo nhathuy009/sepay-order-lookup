@@ -8,14 +8,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Tôi đang đứng ở đâu?
-        run: pwd
 
-      - name: Trong thư mục có gì?
+      - name: Lấy source code
+        uses: actions/checkout@v4
+
+      - name: Liệt kê file
         run: ls -la
 
-      - name: Tôi là ai?
-        run: whoami
-
-      - name: Hệ điều hành gì?
-        run: uname -a
+      - name: Đang ở đâu
+        run: pwd
