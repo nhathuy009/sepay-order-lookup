@@ -8,5 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: In lời chào
-        run: echo "Xin chào GitHub Actions!"
+      - name: Tôi đang đứng ở đâu?
+        run: pwd
+
+      - name: Trong thư mục có gì?
+        run: ls -la
+
+      - name: Tôi là ai?
+        run: whoami
+
+      - name: Hệ điều hành gì?
+        run: uname -a
