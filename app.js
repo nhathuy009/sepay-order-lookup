@@ -1402,7 +1402,7 @@ function copyForMisaAmis() {
       const btn = document.getElementById("copyAmisBtn"); 
       const originalText = btn.innerHTML; 
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
-      setTimeout(() => { btn.innerText = originalText; }, 3000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
@@ -1491,7 +1491,7 @@ function copyForMisaAmisBhxh() {
       const btn = document.getElementById("copyAmisBhxhBtn");
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
-      setTimeout(() => { btn.innerText = originalText; }, 3000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
@@ -1567,7 +1567,7 @@ function copyForMisaAmisBhxhNld() {
       const btn = document.getElementById("copyAmisBhxhNldBtn");
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
-      setTimeout(() => { btn.innerText = originalText; }, 3000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
@@ -1647,7 +1647,7 @@ function copyTableToExcel() {
     rows.forEach(row => { const cells = Array.from(row.querySelectorAll('th, td')).map(td => td.innerText.trim()); tsv += cells.join("\t") + "\n"; });
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyExcelBtn"); const originalText = btn.innerHTML; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy vào Khay nhớ tạm!';
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
@@ -1855,7 +1855,7 @@ function copyBankStatementTable() {
       const btn = document.getElementById("copyBankTableBtn");
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy vào Khay nhớ tạm!';
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
   }).catch(err => {
       alert("Không thể copy. Vui lòng kiểm tra quyền trình duyệt.");
   });
@@ -2177,7 +2177,7 @@ function copyBankTransferForBank() {
       const btn = document.getElementById("copyBankTransferBtn");
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file NH';
-      setTimeout(() => { btn.innerText = originalText; }, 2500);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2500);
     }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
     alert("Đã xảy ra lỗi khi copy: " + e.message);
@@ -2200,7 +2200,7 @@ function copyTableToClipboard(tableId, btnId) {
       .join("\n");
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById(btnId); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
 }
@@ -2360,7 +2360,7 @@ function copyTxListTable() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
     alert("Đã xảy ra lỗi khi copy: " + e.message);
@@ -2470,7 +2470,7 @@ function copyTxListForMisa() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyTxListMisaBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
-      setTimeout(() => { btn.innerText = originalText; }, 2000);
+      setTimeout(() => { btn.innerHTML = originalText; }, 2000);
     }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
     alert("Đã xảy ra lỗi khi copy: " + e.message);
