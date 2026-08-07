@@ -193,6 +193,42 @@ function getToken() {
 // Cập nhật giao diện ô mật khẩu / nút theo trạng thái đã lưu hay chưa.
 // showInput = true  -> hiện ô nhập để gõ/đổi mật khẩu
 // showInput = false -> ẩn ô nhập, nhường chỗ cho widget lịch, đổi nút thành "Đổi mật khẩu"
+
+/* ---------------- TOAST (thay alert) ---------------- */
+function showToast(message, type) {
+  if (message == null) return;
+  const msg = String(message);
+  if (type === undefined || type === null) {
+    type = /lỗi|không thể|chưa có|vui lòng|xảy ra/i.test(msg) ? "error" : "info";
+  }
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    container.setAttribute("aria-live", "polite");
+    document.body.appendChild(container);
+  }
+  const el = document.createElement("div");
+  el.className = "toast toast-" + type;
+  el.setAttribute("role", "status");
+  el.textContent = msg;
+  container.appendChild(el);
+  const duration = type === "error" ? 4200 : 2800;
+  setTimeout(() => {
+    el.classList.add("toast-out");
+    setTimeout(() => el.remove(), 220);
+  }, duration);
+}
+
+function emptyStateHtml(message, colspan) {
+  const text = message || "Không có dữ liệu.";
+  if (colspan) {
+    return `<tr><td colspan="${colspan}"><div class="empty-state"><div class="empty-state-icon">📭</div>${escapeHtml(text)}</div></td></tr>`;
+  }
+  return `<div class="empty-state"><div class="empty-state-icon">📭</div>${escapeHtml(text)}</div>`;
+}
+
 function setAuthUIState(showInput) {
   const input = document.getElementById("accessToken");
   const btn = document.getElementById("saveTokenBtn");
@@ -219,7 +255,7 @@ function saveToken() {
   try {
     localStorage.setItem("sepay_access_token", token);
     setAuthUIState(false);
-  } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
+  } catch(e) { showToast("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
 /* ---------------- LOGIC GIAO DIỆN & SIDEBAR ---------------- */
@@ -347,8 +383,17 @@ function switchTab(which) {
     const contentEl = document.getElementById("tab" + idSuffix);
     const btnEl = document.getElementById("tab" + idSuffix + "Btn");
     
-    if (contentEl) contentEl.classList.toggle("hidden", which !== tab);
-    if (btnEl) btnEl.classList.toggle("active", which === tab);
+    if (contentEl) {
+      contentEl.classList.toggle("hidden", which !== tab);
+      contentEl.setAttribute("role", "tabpanel");
+      contentEl.hidden = which !== tab;
+    }
+    if (btnEl) {
+      const active = which === tab;
+      btnEl.classList.toggle("active", active);
+      btnEl.setAttribute("aria-selected", active ? "true" : "false");
+      btnEl.setAttribute("tabindex", active ? "0" : "-1");
+    }
   });
 
   // Bắt sự kiện tải tài khoản ngân hàng khi vào tab transaction
@@ -421,9 +466,9 @@ function copyTxContentByIndex(i) {
         cell.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã copy nội dung!';
         setTimeout(() => { cell.innerHTML = original; }, 1200);
       }
-    }).catch(() => { alert("Không thể copy nội dung. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể copy nội dung. Vui lòng thử lại."); });
   } catch (e) {
-    alert("Đã xảy ra lỗi khi copy: " + e.message);
+    showToast("Đã xảy ra lỗi khi copy: " + e.message);
   }
 }
 
@@ -701,7 +746,7 @@ function displaySheetData() {
   bankTbody.innerHTML = "";
   
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
+    tbody.innerHTML = emptyStateHtml("Không có dữ liệu trong sheet này.", 31);
     accWrapper.style.display = "none";
     bankWrapper.style.display = "none";
     currentBankTransferRows = [];
@@ -1330,14 +1375,14 @@ function renderBankTransferTable() {
       </tr>
     `;
   }
-  bankTbody.innerHTML = bankHTML || `<tr><td colspan="4" style="text-align:center;">Không có dữ liệu.</td></tr>`;
+  bankTbody.innerHTML = bankHTML || emptyStateHtml("Không có dữ liệu.", 4);
 }
 
 function copyForMisaAmis() {
   try {
     const selectedSheet = document.getElementById("sheetSelect").value;
     if (!selectedSheet || !globalSheetsData[selectedSheet]) {
-      alert("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
+      showToast("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
       return;
     }
 
@@ -1392,7 +1437,7 @@ function copyForMisaAmis() {
     });
 
     if (tsvLines.length === 0) {
-      alert("Không có phát sinh hạch toán nào.");
+      showToast("Không có phát sinh hạch toán nào.");
       return;
     }
 
@@ -1403,10 +1448,10 @@ function copyForMisaAmis() {
       const originalText = btn.innerHTML; 
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
-    }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
-    alert("Đã xảy ra lỗi: " + e.message);
+    showToast("Đã xảy ra lỗi: " + e.message);
   }
 }
 
@@ -1414,7 +1459,7 @@ function copyForMisaAmisBhxh() {
   try {
     const selectedSheet = document.getElementById("sheetSelect").value;
     if (!selectedSheet || !globalSheetsData[selectedSheet]) {
-      alert("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
+      showToast("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
       return;
     }
 
@@ -1481,7 +1526,7 @@ function copyForMisaAmisBhxh() {
     });
 
     if (tsvLines.length === 0) {
-      alert("Không có phát sinh hạch toán nào.");
+      showToast("Không có phát sinh hạch toán nào.");
       return;
     }
 
@@ -1492,10 +1537,10 @@ function copyForMisaAmisBhxh() {
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
-    }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
-    alert("Đã xảy ra lỗi: " + e.message);
+    showToast("Đã xảy ra lỗi: " + e.message);
   }
 }
 
@@ -1503,7 +1548,7 @@ function copyForMisaAmisBhxhNld() {
   try {
     const selectedSheet = document.getElementById("sheetSelect").value;
     if (!selectedSheet || !globalSheetsData[selectedSheet]) {
-      alert("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
+      showToast("Vui lòng chọn Sheet (Tháng) để có dữ liệu.");
       return;
     }
 
@@ -1557,7 +1602,7 @@ function copyForMisaAmisBhxhNld() {
     });
 
     if (tsvLines.length === 0) {
-      alert("Không có phát sinh hạch toán nào.");
+      showToast("Không có phát sinh hạch toán nào.");
       return;
     }
 
@@ -1568,10 +1613,10 @@ function copyForMisaAmisBhxhNld() {
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerText = originalText; }, 3000);
-    }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể copy. Vui lòng thử lại."); });
 
   } catch (e) {
-    alert("Đã xảy ra lỗi: " + e.message);
+    showToast("Đã xảy ra lỗi: " + e.message);
   }
 }
   
@@ -1648,8 +1693,8 @@ function copyTableToExcel() {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById("copyExcelBtn"); const originalText = btn.innerHTML; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy vào Khay nhớ tạm!';
       setTimeout(() => { btn.innerText = originalText; }, 2000);
-    }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
-  } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+    }).catch(err => { showToast("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch(e) { showToast("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
 async function loadBankAccounts() {
@@ -1819,7 +1864,7 @@ function downloadBankStatement() {
   if (bankStatementBase64 && bankStatementFileName) {
       downloadBase64(bankStatementBase64, bankStatementFileName);
   } else {
-      alert("Chưa có file để tải về!");
+      showToast("Chưa có file để tải về!");
   }
 }
 
@@ -1848,7 +1893,7 @@ function buildBankStatementTsvFromDOM() {
 function copyBankStatementTable() {
   const tsv = buildBankStatementTsvFromDOM();
   if (!tsv) {
-      alert("Chưa có dữ liệu để copy!");
+      showToast("Chưa có dữ liệu để copy!");
       return;
   }
   navigator.clipboard.writeText(tsv).then(() => {
@@ -1857,7 +1902,7 @@ function copyBankStatementTable() {
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy vào Khay nhớ tạm!';
       setTimeout(() => { btn.innerText = originalText; }, 2000);
   }).catch(err => {
-      alert("Không thể copy. Vui lòng kiểm tra quyền trình duyệt.");
+      showToast("Không thể copy. Vui lòng kiểm tra quyền trình duyệt.");
   });
 }
 
@@ -2162,7 +2207,7 @@ async function lookupCustomerInfoForTxList(txs) {
 function copyBankTransferForBank() {
   try {
     if (!currentBankTransferRows || currentBankTransferRows.length === 0) {
-      alert("Chưa có dữ liệu để copy. Vui lòng chọn Sheet (Tháng) trước.");
+      showToast("Chưa có dữ liệu để copy. Vui lòng chọn Sheet (Tháng) trước.");
       return;
     }
     let tsv = "";
@@ -2178,9 +2223,9 @@ function copyBankTransferForBank() {
       const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file NH';
       setTimeout(() => { btn.innerText = originalText; }, 2500);
-    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
-    alert("Đã xảy ra lỗi khi copy: " + e.message);
+    showToast("Đã xảy ra lỗi khi copy: " + e.message);
   }
 }
 
@@ -2201,8 +2246,8 @@ function copyTableToClipboard(tableId, btnId) {
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById(btnId); const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
-    }).catch(err => { alert("Không thể tự động copy. Vui lòng thử lại."); });
-  } catch(e) { alert("Đã xảy ra lỗi khi copy: " + e.message); }
+    }).catch(err => { showToast("Không thể tự động copy. Vui lòng thử lại."); });
+  } catch(e) { showToast("Đã xảy ra lỗi khi copy: " + e.message); }
 }
 
 // ==== LỌC + SẮP XẾP KIỂU EXCEL cho các bảng tra cứu hóa đơn theo khoảng ngày ====
@@ -2331,7 +2376,7 @@ function sortTableByColumn(table, colIdx, colType, th, allThs) {
 function copyTxListTable() {
   try {
     if (!currentTxListData || currentTxListData.length === 0) {
-      alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
+      showToast("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
       return;
     }
     let tsv = "";
@@ -2361,9 +2406,9 @@ function copyTxListTable() {
       const btn = document.getElementById("copyTxListBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
-    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
-    alert("Đã xảy ra lỗi khi copy: " + e.message);
+    showToast("Đã xảy ra lỗi khi copy: " + e.message);
   }
 }
 
@@ -2383,14 +2428,14 @@ function copyTxListTable() {
 function copyTxListForMisa() {
   try {
     if (!currentTxListData || currentTxListData.length === 0) {
-      alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
+      showToast("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
       return;
     }
     // Bỏ qua các dòng "Tiền ra (-)" (giao dịch tiền ra, VD hoàn tiền) - mẫu DS bán
     // MISA chỉ cần các giao dịch "Tiền vào (+)" (giao dịch bán hàng thực tế).
     const rowsToExport = currentTxListData.filter(tx => Number(tx.amount_in || 0) > 0);
     if (rowsToExport.length === 0) {
-      alert("Không có giao dịch \"Tiền vào (+)\" nào để copy.");
+      showToast("Không có giao dịch \"Tiền vào (+)\" nào để copy.");
       return;
     }
 
@@ -2471,9 +2516,9 @@ function copyTxListForMisa() {
       const btn = document.getElementById("copyTxListMisaBtn");
       const originalText = btn.innerText; btn.innerText = "✅ Đã Copy vào Khay nhớ tạm!";
       setTimeout(() => { btn.innerText = originalText; }, 2000);
-    }).catch(() => { alert("Không thể tự động copy. Vui lòng thử lại."); });
+    }).catch(() => { showToast("Không thể tự động copy. Vui lòng thử lại."); });
   } catch (e) {
-    alert("Đã xảy ra lỗi khi copy: " + e.message);
+    showToast("Đã xảy ra lỗi khi copy: " + e.message);
   }
 }
 
