@@ -1,13 +1,16 @@
-name: HTTP Request Demo
+name: Secret Demo
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-api:
+  demo:
     runs-on: ubuntu-latest
 
+    env:
+      MY_NAME: ${{ secrets.MY_NAME }}
+
     steps:
-      - name: Kiểm tra API
+      - name: Đọc Secret
         run: |
-          curl https://api.ipify.org
+          echo "Xin chào $MY_NAME"
