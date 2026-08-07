@@ -1,27 +1,17 @@
-name: Hello World
+name: Run Python
 
 on:
   workflow_dispatch:
 
 jobs:
-  hello:
+  run-python:
     runs-on: ubuntu-latest
 
     steps:
-
       - uses: actions/checkout@v4
 
-      - name: Python version
+      - name: Kiểm tra Python
         run: python --version
 
-      - name: Pip version
-        run: pip --version
-
-      - name: Node version
-        run: node --version
-
-      - name: NPM version
-        run: npm --version
-
-      - name: Git version
-        run: git --version
+      - name: Chạy chương trình
+        run: python gopcode.py
