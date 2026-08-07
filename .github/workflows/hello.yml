@@ -1,0 +1,12 @@
+name: Hello World
+
+on:
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: In lời chào
+        run: echo "Xin chào GitHub Actions!"
