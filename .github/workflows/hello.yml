@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Gọi API
+      - name: Kiểm tra API
         run: |
-          curl https://httpbin.org/get
+          curl https://api.ipify.org
