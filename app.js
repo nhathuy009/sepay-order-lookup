@@ -1078,63 +1078,66 @@ function displaySheetData() {
     `;
     tbody.appendChild(totalTr);
 
-    // Đổ dữ liệu vào bảng Hạch toán: 5 dòng Nợ riêng biệt, Có 3341 là tổng
+    // Đổ dữ liệu vào bảng Hạch toán: các dòng Nợ sắp xếp số tiền giảm dần, Có 3341 ở cuối
     const sumTong3341 = Math.round(sumHoaHong + sumThuongDongGop + sumLuongTinhToan + sumLuongPhep + sumKhac);
 
-    let accHTML = `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('hoahong')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6421</td>
-        <td></td>
-        <td style="font-weight: 700;">Hoa hồng bán hàng (P)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumHoaHong)}</td>
-        <td style="text-align: center;"><span id="icon-hoahong" style="font-size: 12px; color: var(--accent);">▼</span></td>
-      </tr>
-    `;
-    accHTML += detailRowsHoaHongHTML;
+    const accNoRows = [
+      {
+        amount: sumLuongTinhToan,
+        detailKey: "luongtt",
+        tkNo: "6422",
+        label: "Lương tính toán",
+        amountDisplay: formatMoney(sumLuongTinhToan),
+        details: detailRowsLuongTtHTML
+      },
+      {
+        amount: sumThuongDongGop,
+        detailKey: "thuongdg",
+        tkNo: "6421",
+        label: "Thưởng ghi nhận đóng góp (Q)",
+        amountDisplay: formatMoney(sumThuongDongGop),
+        details: detailRowsThuongDgHTML
+      },
+      {
+        amount: Math.round(sumLuongPhep),
+        detailKey: "luongphep",
+        tkNo: "6422",
+        label: "Lương phép năm (R)",
+        amountDisplay: formatMoney(Math.round(sumLuongPhep)),
+        details: detailRowsLuongPhepHTML
+      },
+      {
+        amount: sumHoaHong,
+        detailKey: "hoahong",
+        tkNo: "6421",
+        label: "Hoa hồng bán hàng (P)",
+        amountDisplay: formatMoney(sumHoaHong),
+        details: detailRowsHoaHongHTML
+      },
+      {
+        amount: sumKhac,
+        detailKey: "khac",
+        tkNo: "6422",
+        label: "Khác (S)",
+        amountDisplay: formatMoney(sumKhac),
+        details: detailRowsKhacHTML
+      }
+    ];
+    accNoRows.sort((a, b) => b.amount - a.amount);
 
-    accHTML += `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('thuongdg')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6421</td>
+    let accHTML = "";
+    accNoRows.forEach(row => {
+      accHTML += `
+      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('${row.detailKey}')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">${row.tkNo}</td>
         <td></td>
-        <td style="font-weight: 700;">Thưởng ghi nhận đóng góp (Q)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumThuongDongGop)}</td>
-        <td style="text-align: center;"><span id="icon-thuongdg" style="font-size: 12px; color: var(--accent);">▼</span></td>
+        <td style="font-weight: 700;">${row.label}</td>
+        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${row.amountDisplay}</td>
+        <td style="text-align: center;"><span id="icon-${row.detailKey}" style="font-size: 12px; color: var(--accent);">▼</span></td>
       </tr>
     `;
-    accHTML += detailRowsThuongDgHTML;
-
-    accHTML += `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('luongtt')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
-        <td></td>
-        <td style="font-weight: 700;">Lương tính toán</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
-        <td style="text-align: center;"><span id="icon-luongtt" style="font-size: 12px; color: var(--accent);">▼</span></td>
-      </tr>
-    `;
-    accHTML += detailRowsLuongTtHTML;
-
-    accHTML += `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('luongphep')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
-        <td></td>
-        <td style="font-weight: 700;">Lương phép năm (R)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(Math.round(sumLuongPhep))}</td>
-        <td style="text-align: center;"><span id="icon-luongphep" style="font-size: 12px; color: var(--accent);">▼</span></td>
-      </tr>
-    `;
-    accHTML += detailRowsLuongPhepHTML;
-
-    accHTML += `
-      <tr style="cursor: pointer; background: var(--badge-ok-bg); transition: 0.2s;" onclick="toggleAccDetail('khac')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
-        <td style="font-weight: 800; color: var(--accent); font-size: 14px;">6422</td>
-        <td></td>
-        <td style="font-weight: 700;">Khác (S)</td>
-        <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumKhac)}</td>
-        <td style="text-align: center;"><span id="icon-khac" style="font-size: 12px; color: var(--accent);">▼</span></td>
-      </tr>
-    `;
-    accHTML += detailRowsKhacHTML;
+      accHTML += row.details;
+    });
 
     accHTML += `
       <tr style="cursor: pointer; background: var(--badge-err-bg); transition: 0.2s;" onclick="toggleAccDetail('3341')" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
