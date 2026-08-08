@@ -3322,19 +3322,55 @@ const AIR_CATEGORY_RATES = {
   "KURUNG": { label: "Kurung", rate: "3,5m", price: "10$" }
 };
 
-async function doProcessAirPacking() {
+function setAirDropZoneState(state, fileName) {
+  const zone = document.getElementById("airDropZone");
+  const inner = document.getElementById("airDropZoneInner");
+  const info = document.getElementById("airDropFileInfo");
+  const nameEl = document.getElementById("airDropFileName");
+  if (!zone || !inner || !info) return;
+
+  zone.classList.remove("has-file", "processing", "drag-over");
+  if (state === "idle") {
+    inner.style.display = "";
+    info.style.display = "none";
+  } else if (state === "processing") {
+    zone.classList.add("processing", "has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName ? `Đang xử lý: ${fileName}` : "Đang xử lý...";
+  } else if (state === "done") {
+    zone.classList.add("has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName || "File đã chọn";
+  }
+}
+
+function isValidAirExcelFile(file) {
+  if (!file) return false;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith(".xlsx") || name.endsWith(".xls");
+}
+
+async function doProcessAirPacking(fileOverride) {
   const fileInput = document.getElementById("airExcelFile");
   const box = document.getElementById("airResult");
-  const btn = document.getElementById("exportAirBtn");
   const resultArea = document.getElementById("airResultArea");
 
-  if (!fileInput.files.length) {
+  const file = fileOverride || (fileInput && fileInput.files && fileInput.files[0]);
+  if (!file) {
     box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>';
+    setAirDropZoneState("idle");
+    return;
+  }
+  if (!isValidAirExcelFile(file)) {
+    box.innerHTML = '<span class="err">Vui lòng chọn file Excel (.xlsx hoặc .xls).</span>';
+    setAirDropZoneState("idle");
+    if (fileInput) fileInput.value = "";
     return;
   }
 
-  const file = fileInput.files[0];
-  btn.disabled = true;
+  setAirDropZoneState("processing", file.name);
   resultArea.style.display = "none";
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang đọc và xử lý dữ liệu...';
 
@@ -3414,6 +3450,7 @@ async function doProcessAirPacking() {
 
     if (allBagsData.length === 0) {
       box.innerHTML = `<span class="err">❌ Không tìm thấy dữ liệu hợp lệ trong file!</span>`;
+      setAirDropZoneState("done", file.name);
       return;
     }
 
@@ -3441,11 +3478,98 @@ async function doProcessAirPacking() {
     renderAirPreviewTable(airProcessedData);
     resultArea.style.display = "block";
     box.innerHTML = `<span class="badge ok">✅ Đã xử lý xong ${allBagsData.length} bao. Vui lòng kiểm tra bảng bên dưới trước khi tải về.</span>`;
+    setAirDropZoneState("done", file.name);
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
-  } finally {
-    btn.disabled = false;
+    setAirDropZoneState("done", file.name);
   }
+}
+
+function initAirDropZone() {
+  const zone = document.getElementById("airDropZone");
+  const fileInput = document.getElementById("airExcelFile");
+  const changeBtn = document.getElementById("airDropChangeBtn");
+  if (!zone || !fileInput) return;
+
+  const openPicker = () => {
+    if (zone.classList.contains("processing")) return;
+    fileInput.value = "";
+    fileInput.click();
+  };
+
+  zone.addEventListener("click", (e) => {
+    if (e.target.closest("#airDropChangeBtn")) return;
+    if (zone.classList.contains("has-file") && !zone.classList.contains("processing")) {
+      // Đã có file: chỉ mở lại khi bấm "Chọn file khác"
+      return;
+    }
+    openPicker();
+  });
+
+  zone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!zone.classList.contains("has-file") || zone.classList.contains("processing")) openPicker();
+    }
+  });
+
+  if (changeBtn) {
+    changeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPicker();
+    });
+  }
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) {
+      doProcessAirPacking(fileInput.files[0]);
+    }
+  });
+
+  zone.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
+  });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove("drag-over");
+    if (zone.classList.contains("processing")) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    const file = files[0];
+    if (!isValidAirExcelFile(file)) {
+      const box = document.getElementById("airResult");
+      if (box) box.innerHTML = '<span class="err">Vui lòng chọn file Excel (.xlsx hoặc .xls).</span>';
+      return;
+    }
+    // Đồng bộ vào input để người dùng có thể thấy (nếu cần)
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+    } catch (_) { /* một số trình duyệt cũ không hỗ trợ gán files */ }
+    doProcessAirPacking(file);
+  });
+}
+
+// Khởi tạo drop zone khi DOM sẵn sàng
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAirDropZone);
+} else {
+  initAirDropZone();
 }
 
 function renderAirPreviewTable(processed) {

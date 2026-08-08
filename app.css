@@ -1280,3 +1280,104 @@
     color: var(--text-muted, #9aa3b2);
     pointer-events: none;
   }
+
+  /* --- AIR PACKING LIST DROP ZONE --- */
+  .air-drop-zone {
+    position: relative;
+    border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--accent) 4%, var(--card-bg-solid));
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .air-drop-zone:hover,
+  .air-drop-zone:focus-visible {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--card-bg-solid));
+    outline: none;
+  }
+  .air-drop-zone.drag-over {
+    border-color: var(--accent);
+    border-style: solid;
+    background: color-mix(in srgb, var(--accent) 16%, var(--card-bg-solid));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  .air-drop-zone.has-file {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--badge-ok-text, #22c55e) 50%, var(--border));
+    background: color-mix(in srgb, var(--badge-ok-text, #22c55e) 6%, var(--card-bg-solid));
+    cursor: default;
+  }
+  .air-drop-zone.processing {
+    pointer-events: none;
+    opacity: 0.85;
+  }
+  .air-drop-zone-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .air-drop-icon {
+    color: var(--accent);
+    opacity: 0.9;
+    line-height: 0;
+  }
+  .air-drop-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--text, inherit);
+    font-size: 15px;
+  }
+  .air-drop-text strong { font-weight: 600; }
+  .air-drop-text span {
+    font-size: 13px;
+    color: var(--text-muted, #9aa3b2);
+    font-weight: 400;
+  }
+  .air-drop-hint {
+    font-size: 12px;
+    color: var(--text-muted, #9aa3b2);
+    margin-top: 4px;
+  }
+  .air-drop-file-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+  }
+  .air-drop-file-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text, inherit);
+    word-break: break-all;
+    max-width: 100%;
+  }
+  .air-drop-change-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg-solid);
+    color: var(--text, inherit);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .air-drop-change-btn:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-solid));
+  }
+  @media (max-width: 480px) {
+    .air-drop-zone { padding: 22px 14px; min-height: 110px; }
+    .air-drop-text { font-size: 14px; }
+  }

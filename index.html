@@ -458,9 +458,22 @@
         <h2>Phần mềm Xuất Air Packing List</h2>
         <div class="card">
           <label>Chọn file Excel gốc (.xlsx, .xls) để xử lý</label>
-          <div class="row">
-            <div><input type="file" id="airExcelFile" accept=".xlsx, .xls" /></div>
-            <button id="exportAirBtn" onclick="doProcessAirPacking()">Xử lý & Xem trước</button>
+          <div id="airDropZone" class="air-drop-zone" role="button" tabindex="0" aria-label="Kéo thả hoặc chọn file Excel">
+            <input type="file" id="airExcelFile" accept=".xlsx,.xls" hidden />
+            <div class="air-drop-zone-inner" id="airDropZoneInner">
+              <div class="air-drop-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+              </div>
+              <div class="air-drop-text">
+                <strong>Kéo thả file Excel vào đây</strong>
+                <span>hoặc chạm / bấm để chọn file</span>
+              </div>
+              <div class="air-drop-hint">Hỗ trợ .xlsx, .xls — xử lý tự động sau khi chọn</div>
+            </div>
+            <div class="air-drop-file-info" id="airDropFileInfo" style="display:none;">
+              <div class="air-drop-file-name" id="airDropFileName"></div>
+              <button type="button" class="air-drop-change-btn" id="airDropChangeBtn">Chọn file khác</button>
+            </div>
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
             Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên, và đọc ô B5 của mỗi sheet để ghi phân loại hàng hóa (bỏ trống nếu là "Kurung"). Kết quả sẽ hiển thị bên dưới để bạn kiểm tra trước khi tải file Excel.
