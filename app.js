@@ -683,220 +683,330 @@ async function doFetchEmployeesExcel(fileOverride) {
       }
 
       // --- Parse sheet Chấm công ---
-      // Tên sheet chứa "CHẤM CÔNG" / "CHAM CONG" hoặc cấu trúc có header MÃ NV + ngày 1..31
-      // Các cột ngày thừa (29/30/31) sẽ được lọc theo số ngày thực của tháng
+      // Mẫu không đồng nhất giữa các tháng:
+      //  T2: STT | MSNV | 1..28 | tổng  (mã NV ở cột 1)
+      //  T3/T4: MÃ NHÂN VIÊN | 1..31 | tổng  (mã ở cột 0)
+      //  T5: (không có nhãn mã) | 1..31  rồi data bắt đầu bằng mã NV
+      //  T6: không có dòng số ngày — chỉ data L/N/P… theo cột
+      //  T7: thứ (T2..CN) + MÃ NV | "1".."31"
       const isAttendanceByName = /ch[aấ]m\s*c[oô]ng/i.test(cleanName);
       if (isAttendanceByName || !pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
-        if (!jsonData || jsonData.length < 4) {
-          // skip
-        } else {
-          // Tìm dòng header chứa "MÃ NV" (cột đầu hoặc gần đầu)
+        if (jsonData && jsonData.length >= 3) {
+          const normCell = (v) => v == null ? "" : String(v).trim().toUpperCase().replace(/\s+/g, " ");
+          const compactCell = (v) => normCell(v).replace(/\s+/g, "").replace(/\n/g, "");
+          const isEmpHeader = (v) => {
+            const c = compactCell(v);
+            const n = normCell(v);
+            return (
+              c === "MSNV" || c === "MÃNV" || c === "MANV" ||
+              c === "MÃNHÂNVIÊN" || c === "MANHANVIEN" || c === "MÃNHANVIEN" ||
+              n === "MÃ NV" || n === "MA NV" ||
+              /^M[ÃA]\s*N[VÂĂ]/.test(n) ||
+              /^MS\s*NV$/.test(n)
+            );
+          };
+          const parseDayNum = (v) => {
+            if (v == null || v === "") return NaN;
+            if (typeof v === "number" && v >= 1 && v <= 31 && Number.isInteger(v)) return v;
+            const s = String(v).trim();
+            if (/^\d{1,2}$/.test(s)) {
+              const n = parseInt(s, 10);
+              if (n >= 1 && n <= 31) return n;
+            }
+            return NaN;
+          };
+          const isAttCode = (v) => {
+            if (v == null || v === "") return false;
+            const s = String(v).trim().toUpperCase();
+            return /^(L|N|P|V|K|H|LE|LỄ)$/.test(s);
+          };
+
+          // --- Suy ra monthKey (ưu tiên tên sheet) ---
+          const defaultYear = (() => {
+            for (const sn of (workbook.SheetNames || [])) {
+              const pm = String(sn).match(/(20\d{2})/);
+              if (pm) return pm[1];
+            }
+            return new Date().getFullYear().toString();
+          })();
+          const tryMonthFromText = (text, allowMonthOnly) => {
+            if (!text) return null;
+            const s = String(text).trim();
+            // Date object from Excel
+            if (text instanceof Date && !isNaN(text.getTime())) {
+              const mm = text.getMonth() + 1;
+              const yy = text.getFullYear();
+              if (mm >= 1 && mm <= 12 && yy >= 2000) {
+                return `T${String(mm).padStart(2, "0")}${yy}`;
+              }
+            }
+            let m = s.match(/(?:^|[^\d])(\d{1,2})\s*[\/\-\.]\s*(20\d{2})(?:[^\d]|$)/);
+            if (m) {
+              const mm = parseInt(m[1], 10);
+              if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+            }
+            m = s.match(/th[aá]ng\s*(\d{1,2})\s*[\/\-\.\s]?\s*(20\d{2})/i);
+            if (m) {
+              const mm = parseInt(m[1], 10);
+              if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+            }
+            m = s.match(/\bT\s*(\d{1,2})\s*[\/\-]?\s*(20\d{2})\b/i);
+            if (m) {
+              const mm = parseInt(m[1], 10);
+              if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+            }
+            if (allowMonthOnly) {
+              m = s.match(/\bT\s*(\d{1,2})\b/i) || s.match(/th[aá]ng\s*(\d{1,2})\b/i);
+              if (m) {
+                const mm = parseInt(m[1], 10);
+                if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${defaultYear}`;
+              }
+            }
+            return null;
+          };
+          let monthKey = tryMonthFromText(cleanName, true);
+          if (!monthKey) {
+            for (let ri = 0; ri < Math.min(4, jsonData.length); ri++) {
+              const row = jsonData[ri] || [];
+              for (let ci = 0; ci < Math.min(6, row.length); ci++) {
+                monthKey = tryMonthFromText(row[ci], false);
+                if (monthKey) break;
+              }
+              if (monthKey) break;
+            }
+          }
+          if (!monthKey) monthKey = cleanName;
+
+          let daysInMonth = 31;
+          const mk = monthKey.match(/^T(\d{2})(\d{4})$/i);
+          if (mk) {
+            const mm = parseInt(mk[1], 10);
+            const yy = parseInt(mk[2], 10);
+            if (mm >= 1 && mm <= 12 && yy >= 2000) {
+              daysInMonth = new Date(yy, mm, 0).getDate();
+            }
+          }
+
+          // --- Tìm dòng header có nhiều số ngày 1..31 liên tiếp ---
           let headerRowIdx = -1;
-          for (let i = 0; i < Math.min(15, jsonData.length); i++) {
+          let dayCols = []; // { colIdx, dayNum }
+          let empColIdx = 0;
+
+          for (let i = 0; i < Math.min(12, jsonData.length); i++) {
             const row = jsonData[i];
             if (!row || !Array.isArray(row)) continue;
-            for (let c = 0; c < Math.min(3, row.length); c++) {
-              const cell = row[c] != null ? String(row[c]).trim().toUpperCase().replace(/\s+/g, " ") : "";
-              const compact = cell.replace(/\s+/g, "");
-              // MÃ NV / MA NV / MÃNV / MÃ NHÂN VIÊN / MANV ...
-              if (
-                cell === "MÃ NV" || cell === "MA NV" ||
-                compact === "MÃNV" || compact === "MANV" ||
-                /^M[ÃA]\s*N[VÂN]/.test(cell) ||
-                compact === "MÃNHÂNVIÊN" || compact === "MANHANVIEN"
-              ) {
+            const found = [];
+            for (let c = 0; c < row.length; c++) {
+              const num = parseDayNum(row[c]);
+              if (!isNaN(num)) found.push({ colIdx: c, dayNum: num });
+            }
+            // Cần ít nhất 20 cột ngày, hoặc ≥ 15 nếu tên sheet là chấm công
+            const minDays = isAttendanceByName ? 15 : 20;
+            if (found.length >= minDays) {
+              // Kiểm tra có dãy gần liên tiếp (1,2,3...)
+              const nums = found.map(f => f.dayNum).sort((a, b) => a - b);
+              if (nums[0] <= 3 && nums[nums.length - 1] >= 20) {
                 headerRowIdx = i;
+                dayCols = found.filter(f => f.dayNum >= 1 && f.dayNum <= 31);
                 break;
               }
             }
-            if (headerRowIdx >= 0) break;
           }
+
+          // Tìm cột mã NV trên dòng header (MSNV / MÃ NV / MÃ NHÂN VIÊN)
           if (headerRowIdx >= 0) {
             const headerRow = jsonData[headerRowIdx];
-            // Xác định cột ngày: các cột có giá trị số 1..31
-            const dayCols = []; // { colIdx, dayNum }
-            for (let c = 1; c < headerRow.length; c++) {
-              const v = headerRow[c];
-              const num = typeof v === "number" ? v : parseInt(String(v || "").trim(), 10);
-              if (!isNaN(num) && num >= 1 && num <= 31) {
-                dayCols.push({ colIdx: c, dayNum: num });
+            let foundEmp = -1;
+            for (let c = 0; c < Math.min(5, headerRow.length); c++) {
+              if (isEmpHeader(headerRow[c])) {
+                foundEmp = c;
+                break;
               }
             }
-            // Chỉ coi là sheet chấm công nếu có ít nhất 20 cột ngày
-            if (dayCols.length >= 20 || isAttendanceByName) {
-              // Weekday row: thường là dòng ngay trên header
-              const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
-              // Suy ra key tháng TMMYYYY
-              // Ưu tiên TÊN SHEET (vd. "CHẤM CÔNG T4") vì A1 thường bị copy nhầm từ tháng khác
-              let monthKey = null;
-              const defaultYear = (() => {
-                // Ưu tiên năm từ tên sheet trong workbook (T042026, CHẤM CÔNG T4/2026...)
-                for (const sn of (workbook.SheetNames || [])) {
-                  const pm = String(sn).match(/(20\d{2})/);
-                  if (pm) return pm[1];
-                }
-                const payKeys = Object.keys(globalSheetsData || {});
-                for (const k of payKeys) {
-                  const pm = k.match(/^T\d{2}(20\d{2})$/i);
-                  if (pm) return pm[1];
-                }
-                return new Date().getFullYear().toString();
-              })();
-              const tryMonthFromText = (text, allowMonthOnly) => {
-                if (!text) return null;
-                const s = String(text).trim();
-                // 07/2026, 7-2026, 07.2026
-                let m = s.match(/(?:^|[^\d])(\d{1,2})\s*[\/\-\.]\s*(20\d{2})(?:[^\d]|$)/);
-                if (m) {
-                  const mm = parseInt(m[1], 10);
-                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
-                }
-                // Tháng 7/2026, Thang 07 2026
-                m = s.match(/th[aá]ng\s*(\d{1,2})\s*[\/\-\.\s]?\s*(20\d{2})/i);
-                if (m) {
-                  const mm = parseInt(m[1], 10);
-                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
-                }
-                // T07/2026, T072026
-                m = s.match(/\bT\s*(\d{1,2})\s*[\/\-]?\s*(20\d{2})\b/i);
-                if (m) {
-                  const mm = parseInt(m[1], 10);
-                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
-                }
-                // Chỉ có tháng, không có năm: "T4", "T04", "tháng 4", "CHẤM CÔNG T4"
-                if (allowMonthOnly) {
-                  m = s.match(/\bT\s*(\d{1,2})\b/i) || s.match(/th[aá]ng\s*(\d{1,2})\b/i);
-                  if (m) {
-                    const mm = parseInt(m[1], 10);
-                    if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${defaultYear}`;
+            if (foundEmp >= 0) {
+              empColIdx = foundEmp;
+            } else {
+              // Không có nhãn → cột ngay trước cột ngày đầu tiên
+              const firstDayCol = Math.min(...dayCols.map(d => d.colIdx));
+              empColIdx = Math.max(0, firstDayCol - 1);
+              // Nếu cột đó là STT (số thứ tự) thì lùi thêm 1 không — data rows sẽ tự lọc
+              // T2: STT=0, MSNV=1, days from 2 → firstDayCol=2 → empColIdx=1 OK nếu MSNV matched
+            }
+          }
+
+          // Fallback T6-style: không có dòng số ngày, nhưng tên sheet là chấm công
+          // Suy cột ngày từ dòng data đầu tiên chứa mã NV + chuỗi L/N/P…
+          if (headerRowIdx < 0 && isAttendanceByName) {
+            for (let i = 0; i < Math.min(8, jsonData.length); i++) {
+              const row = jsonData[i];
+              if (!row || !Array.isArray(row)) continue;
+              // Tìm cột có mã NV dạng chữ (BTANH...) và các cột sau là mã chấm công
+              for (let c = 0; c <= 2; c++) {
+                const ma = row[c] != null ? String(row[c]).trim() : "";
+                if (!ma || ma.length < 2 || ma.length > 20) continue;
+                if (/^\d+$/.test(ma)) continue; // bỏ STT
+                if (isEmpHeader(ma) || /^(STT|MÃ|MA)\b/i.test(ma)) continue;
+                // Đếm mã chấm công ở các cột sau
+                let attCount = 0;
+                const inferred = [];
+                for (let d = c + 1; d < Math.min(c + 1 + 31, row.length); d++) {
+                  if (isAttCode(row[d])) {
+                    attCount++;
+                    inferred.push({ colIdx: d, dayNum: inferred.length + 1 });
+                  } else if (row[d] == null || row[d] === "") {
+                    // cho phép ô trống trong chuỗi ngày
+                    inferred.push({ colIdx: d, dayNum: inferred.length + 1 });
+                  } else {
+                    break; // gặp tổng số / text khác → dừng
                   }
                 }
-                return null;
-              };
-              // 1) Tên sheet trước (đáng tin nhất)
-              monthKey = tryMonthFromText(cleanName, true);
-              // 2) Nếu tên sheet không có tháng → quét vài ô đầu
-              if (!monthKey) {
-                for (let ri = 0; ri <= Math.min(3, headerRowIdx); ri++) {
-                  const row = jsonData[ri] || [];
-                  for (let ci = 0; ci < Math.min(6, row.length); ci++) {
-                    monthKey = tryMonthFromText(row[ci], false);
-                    if (monthKey) break;
+                if (attCount >= 10 && inferred.length >= 20) {
+                  headerRowIdx = i - 1; // data bắt đầu từ i; coi "header" là dòng trước
+                  if (headerRowIdx < 0) headerRowIdx = i; // sẽ skip chính dòng này bằng filter
+                  empColIdx = c;
+                  dayCols = inferred.slice(0, daysInMonth);
+                  // Đánh dấu special: data bắt đầu từ dòng i (không phải headerRowIdx+1)
+                  // Dùng headerRowIdx = i - 1 và bắt đầu đọc từ i
+                  break;
+                }
+              }
+              if (dayCols.length >= 15) break;
+            }
+          }
+
+          if (dayCols.length >= 15 || (isAttendanceByName && dayCols.length >= 10)) {
+            // Lọc ngày hợp lệ theo tháng
+            const validDayCols = dayCols.filter(d => d.dayNum >= 1 && d.dayNum <= daysInMonth);
+            // Weekday: dòng ngay trên header (nếu có T2/CN...)
+            const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
+            const weekdays = validDayCols.map(d => {
+              const w = weekdayRow[d.colIdx];
+              if (w == null || w === "") return "";
+              const s = String(w).trim();
+              // bỏ #NAME? / lỗi công thức
+              if (/^#/.test(s)) return "";
+              return s;
+            });
+            const days = validDayCols.map(d => d.dayNum);
+
+            // Cột tổng: trên dòng header (nếu có), sau cột ngày cuối
+            const headerRow = headerRowIdx >= 0 ? (jsonData[headerRowIdx] || []) : [];
+            const lastDayCol = dayCols.length ? Math.max(...dayCols.map(d => d.colIdx)) : 0;
+            const sumHeaders = [];
+            for (let c = lastDayCol + 1; c < headerRow.length; c++) {
+              const h = headerRow[c] != null ? String(headerRow[c]).trim().replace(/\s+/g, " ") : "";
+              if (h && !/^#/.test(h)) sumHeaders.push({ colIdx: c, label: h });
+            }
+            // T6: tổng header có thể nằm ở dòng weekday / dòng khác
+            if (sumHeaders.length === 0) {
+              for (let ri = 0; ri <= Math.min(headerRowIdx + 1, 3); ri++) {
+                const r = jsonData[ri] || [];
+                for (let c = lastDayCol + 1; c < r.length; c++) {
+                  const h = r[c] != null ? String(r[c]).trim().replace(/\s+/g, " ") : "";
+                  if (h && !/^#/.test(h) && /tổng|ngày công|vắng|phép|lễ/i.test(h)) {
+                    if (!sumHeaders.some(s => s.colIdx === c)) {
+                      sumHeaders.push({ colIdx: c, label: h });
+                    }
                   }
-                  if (monthKey) break;
                 }
               }
-              // 3) Fallback cuối
-              if (!monthKey) monthKey = cleanName;
+            }
 
-              // Số ngày thực của tháng (để ẩn cột 29/30/31 không hợp lệ)
-              let daysInMonth = 31;
-              const mk = monthKey.match(/^T(\d{2})(\d{4})$/i);
-              if (mk) {
-                const mm = parseInt(mk[1], 10);
-                const yy = parseInt(mk[2], 10);
-                if (mm >= 1 && mm <= 12 && yy >= 2000) {
-                  daysInMonth = new Date(yy, mm, 0).getDate();
+            // Dòng bắt đầu data: sau header; với T6-style headerRowIdx có thể trỏ dòng trước data
+            let dataStart = headerRowIdx + 1;
+            // Nếu dòng headerRowIdx+1 không có mã NV hợp lệ nhưng chính headerRowIdx có (T6 edge)
+            // thì đã xử lý bằng cách set headerRowIdx = i-1 ở trên
+
+            const attRows = [];
+            for (let r = dataStart; r < jsonData.length; r++) {
+              const row = jsonData[r];
+              if (!row || !Array.isArray(row)) continue;
+              const ma = row[empColIdx] != null ? String(row[empColIdx]).trim() : "";
+              if (!ma) continue;
+              const maUp = ma.toUpperCase();
+              // Bỏ header lặp / chú thích / STT thuần số / legend
+              if (isEmpHeader(ma) || maUp === "STT" || maUp === "MSNV") continue;
+              if (/^(l|n|v|p|k|h)\s*[=:]/i.test(ma)) continue;
+              if (/làm việc|nghỉ tuần|nghỉ phép|vắng|không lương/i.test(ma)) continue;
+              if (ma.length > 25) continue;
+              // Bỏ dòng chỉ là số STT (khi empCol nhầm sang cột STT)
+              if (/^\d{1,3}$/.test(ma)) {
+                // thử cột kế bên nếu đang ở STT
+                const alt = row[empColIdx + 1] != null ? String(row[empColIdx + 1]).trim() : "";
+                if (alt && !/^\d+$/.test(alt) && alt.length <= 20 && !isEmpHeader(alt)) {
+                  // dùng alt làm mã — nhưng chỉ khi dayCols không trùng cột đó
+                  // an toàn hơn: skip dòng STT
                 }
+                continue;
               }
-              // Chỉ giữ các cột ngày nằm trong tháng (bỏ 29/30/31 thừa của template Excel)
-              const validDayCols = dayCols.filter(d => d.dayNum >= 1 && d.dayNum <= daysInMonth);
 
-              const weekdays = validDayCols.map(d => {
-                const w = weekdayRow[d.colIdx];
-                return w != null ? String(w).trim() : "";
+              const dayCodes = validDayCols.map(d => {
+                const raw = row[d.colIdx];
+                if (raw == null || raw === "") return "";
+                return String(raw).trim().toUpperCase();
               });
-              const days = validDayCols.map(d => d.dayNum);
+              // Bỏ dòng không có mã chấm công nào (có thể là dòng nhóm/team)
+              if (!dayCodes.some(c => c && /^(L|N|P|V|K|H|LE|LỄ)$/.test(c))) continue;
 
-              // Tìm các cột tổng kết (sau cột ngày cuối trên file gốc)
-              const lastDayCol = dayCols.length ? Math.max(...dayCols.map(d => d.colIdx)) : 0;
-              const sumHeaders = [];
-              for (let c = lastDayCol + 1; c < headerRow.length; c++) {
-                const h = headerRow[c] != null ? String(headerRow[c]).trim() : "";
-                if (h) sumHeaders.push({ colIdx: c, label: h });
-              }
+              let tongLam = 0, tongNghi = 0, tongLe = 0, tongPhep = 0, tongK = 0, tongVang = 0;
+              dayCodes.forEach(code => {
+                if (code === "L") tongLam++;
+                else if (code === "N") tongNghi++;
+                else if (code === "P") tongPhep++;
+                else if (code === "V") tongVang++;
+                else if (code === "K") tongK++;
+                else if (code === "LE" || code === "LỄ" || code === "H") tongLe++;
+              });
 
-              const attRows = [];
-              for (let r = headerRowIdx + 1; r < jsonData.length; r++) {
-                const row = jsonData[r];
-                if (!row || !Array.isArray(row)) continue;
-                const ma = row[0] != null ? String(row[0]).trim() : "";
-                if (!ma || ma.toUpperCase() === "MÃ NV") continue;
-                // Bỏ qua dòng trống / dòng chú thích
-                if (/^(l|n|v|p|k)\s*=/i.test(ma) || ma.length > 30) continue;
+              const sums = {};
+              sumHeaders.forEach(sh => {
+                const val = row[sh.colIdx];
+                sums[sh.label] = val != null && val !== "" ? (parseFloat(val) || String(val).trim()) : "";
+              });
 
-                // Chỉ lấy mã chấm công trong các ngày hợp lệ của tháng (bỏ ngày 29/30/31 thừa)
-                const dayCodes = validDayCols.map(d => {
-                  const raw = row[d.colIdx];
-                  if (raw == null || raw === "") return "";
-                  return String(raw).trim().toUpperCase();
-                });
-
-                // Đếm các loại (chỉ trên ngày hợp lệ)
-                let tongLam = 0, tongNghi = 0, tongLe = 0, tongPhep = 0, tongK = 0, tongVang = 0;
-                dayCodes.forEach(code => {
-                  if (code === "L") tongLam++;
-                  else if (code === "N") tongNghi++;
-                  else if (code === "P") tongPhep++;
-                  else if (code === "V") tongVang++;
-                  else if (code === "K") tongK++;
-                  else if (code === "LE" || code === "LỄ" || code === "H") tongLe++;
-                });
-
-                // Đọc các cột tổng từ file (ưu tiên giá trị file nếu có)
-                const sums = {};
-                sumHeaders.forEach(sh => {
-                  const val = row[sh.colIdx];
-                  sums[sh.label] = val != null && val !== "" ? (parseFloat(val) || String(val).trim()) : "";
-                });
-
-                // Ưu tiên số từ file nếu có, không thì dùng đếm
-                const getSum = (keys, fallback) => {
-                  for (const k of keys) {
-                    if (sums[k] !== undefined && sums[k] !== "" && !isNaN(parseFloat(sums[k]))) {
-                      return parseFloat(sums[k]);
-                    }
+              const getSum = (keys, fallback) => {
+                for (const k of keys) {
+                  if (sums[k] !== undefined && sums[k] !== "" && !isNaN(parseFloat(sums[k]))) {
+                    return parseFloat(sums[k]);
                   }
-                  // fuzzy match
-                  for (const label of Object.keys(sums)) {
-                    const low = label.toLowerCase();
-                    if (keys.some(k => low.includes(k.toLowerCase().replace(/tổng\s*/i, "")))) {
-                      const v = parseFloat(sums[label]);
-                      if (!isNaN(v)) return v;
-                    }
-                  }
-                  return fallback;
-                };
-
-                attRows.push({
-                  ma_nv: ma,
-                  days: dayCodes,
-                  tong_lam: getSum(["Tổng Làm", "Tong Lam", "Tổng làm"], tongLam),
-                  tong_nghi: getSum(["Tổng Nghỉ", "Tong Nghi", "Tổng nghỉ"], tongNghi),
-                  tong_le: getSum(["Tổng Lễ", "Tong Le", "Tổng lễ"], tongLe),
-                  tong_phep: getSum(["Tổng Phép Có Lương", "Tong Phep", "Phép Có Lương", "Tổng phép"], tongPhep),
-                  tong_k: getSum(["Tổng K lương", "Tong K", "K lương", "Không lương"], tongK),
-                  tong_vang: getSum(["Vắng Không lý do", "Vang", "Vắng"], tongVang),
-                  ngay_cong_chuan: getSum(["Ngày công chuẩn", "Ngay cong chuan"], ""),
-                  ngay_cong_huong_luong: getSum(["Ngày công hưởng lương", "Ngay cong huong luong", "Ngày công HL"], ""),
-                  raw_sums: sums
-                });
-              }
-
-              if (attRows.length > 0) {
-                const existing = globalAttendanceData[monthKey];
-                // Không ghi đè bằng sheet ít dòng hơn (tránh mất data khi 2 sheet cùng key)
-                if (!existing || (attRows.length >= (existing.rows || []).length)) {
-                  globalAttendanceData[monthKey] = {
-                    days,
-                    weekdays,
-                    rows: attRows,
-                    sourceSheet: cleanName,
-                    sumHeaders: sumHeaders.map(s => s.label)
-                  };
                 }
+                for (const label of Object.keys(sums)) {
+                  const low = label.toLowerCase().replace(/\s+/g, " ");
+                  if (keys.some(k => low.includes(k.toLowerCase().replace(/tổng\s*/i, "").trim()))) {
+                    const v = parseFloat(sums[label]);
+                    if (!isNaN(v)) return v;
+                  }
+                }
+                return fallback;
+              };
+
+              attRows.push({
+                ma_nv: ma,
+                days: dayCodes,
+                tong_lam: getSum(["Tổng Làm", "Tong Lam", "Tổng làm", "Tổng Làm thực tế", "Ngày công thực tế"], tongLam),
+                tong_nghi: getSum(["Tổng Nghỉ", "Tong Nghi", "Tổng nghỉ"], tongNghi),
+                tong_le: getSum(["Tổng Lễ", "Tong Le", "Tổng lễ"], tongLe),
+                tong_phep: getSum(["Tổng Phép Có Lương", "Tong Phep", "Phép Có Lương", "Tổng phép", "Tổng Phép Có Lương"], tongPhep),
+                tong_k: getSum(["Tổng K lương", "Tong K", "K lương", "Không lương", "Tổng Phép K lương"], tongK),
+                tong_vang: getSum(["Vắng Không lý do", "Vang", "Vắng", "Tổng Vắng"], tongVang),
+                ngay_cong_chuan: getSum(["Ngày công chuẩn", "Ngay cong chuan"], ""),
+                ngay_cong_huong_luong: getSum(["Ngày công hưởng lương", "Ngay cong huong luong", "Ngày công HL", "Ngày hưởng lương"], ""),
+                raw_sums: sums
+              });
+            }
+
+            if (attRows.length > 0) {
+              const existing = globalAttendanceData[monthKey];
+              if (!existing || (attRows.length >= (existing.rows || []).length)) {
+                globalAttendanceData[monthKey] = {
+                  days,
+                  weekdays,
+                  rows: attRows,
+                  sourceSheet: cleanName,
+                  sumHeaders: sumHeaders.map(s => s.label)
+                };
               }
             }
           }
