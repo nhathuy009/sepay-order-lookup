@@ -1233,6 +1233,17 @@
     box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
   }
 
+  /* --- Mã chấm công màu sắc --- */
+  #attendanceTable .att-code-l { color: var(--amount-in, #16a34a); }
+  #attendanceTable .att-code-n { color: var(--text-muted, #94a3b8); }
+  #attendanceTable .att-code-p { color: #e67e22; }
+  #attendanceTable .att-code-v { color: var(--badge-err-text, #dc2626); }
+  #attendanceTable .att-code-k { color: #9b59b6; }
+  #attendanceTable .att-code-le { color: #8b5cf6; }
+  #attendanceTable td.att-day { padding: 4px 2px !important; min-width: 28px; }
+  #attendanceTable th { white-space: nowrap; }
+  #attendanceTableScroll { max-height: 70vh; overflow: auto; }
+
   /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
   #txListTable th, 
   #txListTable td {
