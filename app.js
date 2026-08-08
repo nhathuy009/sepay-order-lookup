@@ -467,11 +467,12 @@ function renderBulkTable() {
 }
 
 let globalSheetsData = {};
+let globalAttendanceData = {}; // key: TMMYYYY → { days, weekdays, rows, sourceSheet }
 let currentBankTransferRows = [];
 let currentTxListData = []; // Lưu dữ liệu gốc (đã gộp thông tin KH/hóa đơn) của bảng Kiểm tra giao dịch SePay v2 để phục vụ nút Copy
 let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh' | 'bhxhnld'
-let empMainTab = 'luong'; // 'luong' | 'dinhkhoan' | 'chuyenkhoan'
+let empMainTab = 'luong'; // 'luong' | 'dinhkhoan' | 'chuyenkhoan' | 'chamcong'
 let bankGroupsData = {};
 let bankActiveTab = '';
 let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
@@ -546,6 +547,7 @@ async function doFetchEmployeesExcel(fileOverride) {
     
     const pattern = /^T\d{2}20\d{2}$/;
     globalSheetsData = {};
+    globalAttendanceData = {};
     
     workbook.SheetNames.forEach(sheetName => {
       const cleanName = sheetName.trim();
@@ -560,10 +562,13 @@ async function doFetchEmployeesExcel(fileOverride) {
         }
 
         // Đọc dữ liệu từ dòng 8 (index 7)
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 7 });
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+        // Skip first 7 rows (0-6) → start at index 7
+        const dataRows = jsonData.slice(7);
         
         let sheetData = [];
-        jsonData.forEach(row => {
+        dataRows.forEach(row => {
+          if (!row || !Array.isArray(row)) return;
           const ma_nv = row[1]; 
           const ten_nv = row[2];
           const luong_cb_raw = row[7];
@@ -593,8 +598,8 @@ async function doFetchEmployeesExcel(fileOverride) {
           const bhtn_cty_raw = row[39];           // AN: BHTN
           const cd_cty_raw = row[40];             // AO: CĐ
           
-          const ma_nv_str = ma_nv !== undefined ? String(ma_nv).trim() : "";
-          const ten_nv_str = ten_nv !== undefined ? String(ten_nv).trim() : "";
+          const ma_nv_str = ma_nv !== undefined && ma_nv !== null ? String(ma_nv).trim() : "";
+          const ten_nv_str = ten_nv !== undefined && ten_nv !== null ? String(ten_nv).trim() : "";
           
           if (ma_nv_str !== "" && ten_nv_str !== "") {
             const luong_cb = parseFloat(luong_cb_raw) || 0;
@@ -615,8 +620,8 @@ async function doFetchEmployeesExcel(fileOverride) {
             const cd_tru = parseFloat(cd_tru_raw) || 0;
             const thue_tncn = parseFloat(thue_tncn_raw) || 0;
             const thuc_nhan = parseFloat(thuc_nhan_raw) || 0;
-            const stk = stk_raw !== undefined ? String(stk_raw).trim() : "";
-            const ngan_hang = ngan_hang_raw !== undefined ? String(ngan_hang_raw).trim() : "";
+            const stk = stk_raw !== undefined && stk_raw !== null ? String(stk_raw).trim() : "";
+            const ngan_hang = ngan_hang_raw !== undefined && ngan_hang_raw !== null ? String(ngan_hang_raw).trim() : "";
             const ht_tt = parseFloat(ht_tt_raw) || 0;
             const od_ts = parseFloat(od_ts_raw) || 0;
             const tnld_bnn = parseFloat(tnld_bnn_raw) || 0;
@@ -676,12 +681,162 @@ async function doFetchEmployeesExcel(fileOverride) {
         
         globalSheetsData[cleanName] = sheetData;
       }
+
+      // --- Parse sheet Chấm công ---
+      // Tên sheet chứa "CHẤM CÔNG" / "CHAM CONG" hoặc cấu trúc có header MÃ NV + ngày 1..31
+      const isAttendanceByName = /ch[aấ]m\s*c[oô]ng/i.test(cleanName);
+      if (isAttendanceByName || !pattern.test(cleanName)) {
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+        if (!jsonData || jsonData.length < 4) {
+          // skip
+        } else {
+          // Tìm dòng header chứa "MÃ NV"
+          let headerRowIdx = -1;
+          for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+            const cell0 = jsonData[i] && jsonData[i][0] != null ? String(jsonData[i][0]).trim().toUpperCase() : "";
+            if (cell0 === "MÃ NV" || cell0 === "MA NV" || cell0.replace(/\s+/g, "") === "MÃNV") {
+              headerRowIdx = i;
+              break;
+            }
+          }
+          if (headerRowIdx >= 0) {
+            const headerRow = jsonData[headerRowIdx];
+            // Xác định cột ngày: các cột có giá trị số 1..31
+            const dayCols = []; // { colIdx, dayNum }
+            for (let c = 1; c < headerRow.length; c++) {
+              const v = headerRow[c];
+              const num = typeof v === "number" ? v : parseInt(String(v || "").trim(), 10);
+              if (!isNaN(num) && num >= 1 && num <= 31) {
+                dayCols.push({ colIdx: c, dayNum: num });
+              }
+            }
+            // Chỉ coi là sheet chấm công nếu có ít nhất 20 cột ngày
+            if (dayCols.length >= 20 || isAttendanceByName) {
+              // Weekday row: thường là dòng ngay trên header
+              const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
+              const weekdays = dayCols.map(d => {
+                const w = weekdayRow[d.colIdx];
+                return w != null ? String(w).trim() : "";
+              });
+              const days = dayCols.map(d => d.dayNum);
+
+              // Tìm các cột tổng kết (sau cột ngày cuối)
+              const lastDayCol = dayCols.length ? Math.max(...dayCols.map(d => d.colIdx)) : 0;
+              const sumHeaders = [];
+              for (let c = lastDayCol + 1; c < headerRow.length; c++) {
+                const h = headerRow[c] != null ? String(headerRow[c]).trim() : "";
+                if (h) sumHeaders.push({ colIdx: c, label: h });
+              }
+
+              // Suy ra key tháng TMMYYYY từ A1 hoặc tên sheet
+              let monthKey = null;
+              const a1 = jsonData[0] && jsonData[0][0] != null ? String(jsonData[0][0]).trim() : "";
+              const mA1 = a1.match(/^(\d{1,2})[\/\-](\d{4})$/);
+              if (mA1) {
+                monthKey = `T${String(parseInt(mA1[1], 10)).padStart(2, "0")}${mA1[2]}`;
+              }
+              if (!monthKey) {
+                const mName = cleanName.match(/(?:T|THÁNG\s*)?(\d{1,2})\s*[\/\-]?\s*(20\d{2})/i)
+                  || cleanName.match(/T(\d{2})(20\d{2})/i)
+                  || cleanName.match(/T(\d{1,2})\b/i);
+                if (mName) {
+                  const mm = String(parseInt(mName[1], 10)).padStart(2, "0");
+                  const yy = mName[2] || (new Date().getFullYear().toString());
+                  monthKey = `T${mm}${yy}`;
+                }
+              }
+              // Nếu vẫn không có, dùng tên sheet làm key tạm
+              if (!monthKey) monthKey = cleanName;
+
+              const attRows = [];
+              for (let r = headerRowIdx + 1; r < jsonData.length; r++) {
+                const row = jsonData[r];
+                if (!row || !Array.isArray(row)) continue;
+                const ma = row[0] != null ? String(row[0]).trim() : "";
+                if (!ma || ma.toUpperCase() === "MÃ NV") continue;
+                // Bỏ qua dòng trống / dòng chú thích
+                if (/^(l|n|v|p|k)\s*=/i.test(ma) || ma.length > 30) continue;
+
+                const dayCodes = dayCols.map(d => {
+                  const raw = row[d.colIdx];
+                  if (raw == null || raw === "") return "";
+                  return String(raw).trim().toUpperCase();
+                });
+
+                // Đếm các loại
+                let tongLam = 0, tongNghi = 0, tongLe = 0, tongPhep = 0, tongK = 0, tongVang = 0;
+                dayCodes.forEach(code => {
+                  if (code === "L") tongLam++;
+                  else if (code === "N") tongNghi++;
+                  else if (code === "P") tongPhep++;
+                  else if (code === "V") tongVang++;
+                  else if (code === "K") tongK++;
+                  else if (code === "LE" || code === "LỄ" || code === "H") tongLe++;
+                });
+
+                // Đọc các cột tổng từ file (ưu tiên giá trị file nếu có)
+                const sums = {};
+                sumHeaders.forEach(sh => {
+                  const val = row[sh.colIdx];
+                  sums[sh.label] = val != null && val !== "" ? (parseFloat(val) || String(val).trim()) : "";
+                });
+
+                // Ưu tiên số từ file nếu có, không thì dùng đếm
+                const getSum = (keys, fallback) => {
+                  for (const k of keys) {
+                    if (sums[k] !== undefined && sums[k] !== "" && !isNaN(parseFloat(sums[k]))) {
+                      return parseFloat(sums[k]);
+                    }
+                  }
+                  // fuzzy match
+                  for (const label of Object.keys(sums)) {
+                    const low = label.toLowerCase();
+                    if (keys.some(k => low.includes(k.toLowerCase().replace(/tổng\s*/i, "")))) {
+                      const v = parseFloat(sums[label]);
+                      if (!isNaN(v)) return v;
+                    }
+                  }
+                  return fallback;
+                };
+
+                attRows.push({
+                  ma_nv: ma,
+                  days: dayCodes,
+                  tong_lam: getSum(["Tổng Làm", "Tong Lam", "Tổng làm"], tongLam),
+                  tong_nghi: getSum(["Tổng Nghỉ", "Tong Nghi", "Tổng nghỉ"], tongNghi),
+                  tong_le: getSum(["Tổng Lễ", "Tong Le", "Tổng lễ"], tongLe),
+                  tong_phep: getSum(["Tổng Phép Có Lương", "Tong Phep", "Phép Có Lương", "Tổng phép"], tongPhep),
+                  tong_k: getSum(["Tổng K lương", "Tong K", "K lương", "Không lương"], tongK),
+                  tong_vang: getSum(["Vắng Không lý do", "Vang", "Vắng"], tongVang),
+                  ngay_cong_chuan: getSum(["Ngày công chuẩn", "Ngay cong chuan"], ""),
+                  ngay_cong_huong_luong: getSum(["Ngày công hưởng lương", "Ngay cong huong luong", "Ngày công HL"], ""),
+                  raw_sums: sums
+                });
+              }
+
+              if (attRows.length > 0) {
+                globalAttendanceData[monthKey] = {
+                  days,
+                  weekdays,
+                  rows: attRows,
+                  sourceSheet: cleanName,
+                  sumHeaders: sumHeaders.map(s => s.label)
+                };
+              }
+            }
+          }
+        }
+      }
     });
     
     const sheetNames = Object.keys(globalSheetsData);
-    
-    if (sheetNames.length === 0) {
-      box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026...</span>';
+    const attKeys = Object.keys(globalAttendanceData);
+    // Gộp key tháng từ cả sheet lương và sheet chấm công
+    const allMonthKeys = Array.from(new Set([...sheetNames, ...attKeys]));
+
+    if (allMonthKeys.length === 0) {
+      box.innerHTML = '<span class="err">Không tìm thấy Sheet lương (T012026...) hoặc sheet Chấm công nào.</span>';
       document.getElementById("sheetSelect").innerHTML = '<option value="">-- Chưa có dữ liệu --</option>';
       const resultCard = document.getElementById("employeeResultCard");
       if (resultCard) resultCard.style.display = "none";
@@ -692,7 +847,7 @@ async function doFetchEmployeesExcel(fileOverride) {
     const select = document.getElementById("sheetSelect");
     select.innerHTML = '<option value="">-- Chọn Tháng / Sheet --</option>';
     // Sắp xếp theo năm-tháng tăng dần (T01/2026 trước T02/2026...)
-    const sortedNames = sheetNames.slice().sort((a, b) => {
+    const sortedNames = allMonthKeys.slice().sort((a, b) => {
       const ma = a.match(/^T(\d{2})(\d{4})$/i);
       const mb = b.match(/^T(\d{2})(\d{4})$/i);
       if (ma && mb) {
@@ -704,13 +859,15 @@ async function doFetchEmployeesExcel(fileOverride) {
     });
     sortedNames.forEach(name => {
       const opt = document.createElement("option");
-      opt.value = name; // giữ value gốc để khớp globalSheetsData
+      opt.value = name;
       const m = name.match(/^T(\d{2})(\d{4})$/i);
-      opt.textContent = m ? `T${m[1]}/${m[2]}` : name; // hiển thị T07/2026
+      opt.textContent = m ? `T${m[1]}/${m[2]}` : name;
       select.appendChild(opt);
     });
 
-    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ. Hãy chọn tháng bên dưới.</span>`;
+    const attNote = attKeys.length > 0 ? ` · ${attKeys.length} sheet chấm công` : "";
+    const luongNote = sheetNames.length > 0 ? `${sheetNames.length} sheet lương` : "0 sheet lương";
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${luongNote}${attNote}. Hãy chọn tháng bên dưới.</span>`;
     setEmployeeDropZoneState("done", file.name);
 
   } catch (e) {
@@ -1298,7 +1455,7 @@ function displaySheetData() {
 
   // Hiện card kết quả + mặc định tab Bảng lương (giữ tab đang chọn nếu đã có dữ liệu)
   if (resultCard) resultCard.style.display = "block";
-  if (!empMainTab || !["luong", "dinhkhoan", "chuyenkhoan"].includes(empMainTab)) {
+  if (!empMainTab || !["luong", "dinhkhoan", "chuyenkhoan", "chamcong"].includes(empMainTab)) {
     empMainTab = "luong";
   }
   applyEmpMainTabView();
@@ -1697,22 +1854,132 @@ function switchEmpMainTab(tab) {
   applyEmpMainTabView();
 }
 
+function getAttendanceCodeClass(code) {
+  const c = (code || "").toUpperCase();
+  if (c === "L") return "att-code-l";
+  if (c === "N") return "att-code-n";
+  if (c === "P") return "att-code-p";
+  if (c === "V") return "att-code-v";
+  if (c === "K") return "att-code-k";
+  if (c === "H" || c === "LE" || c === "LỄ") return "att-code-le";
+  return "";
+}
+
+function renderAttendanceTable() {
+  const thead = document.getElementById("attendanceThead");
+  const tbody = document.getElementById("attendanceTbody");
+  const emptyMsg = document.getElementById("attendanceEmptyMsg");
+  if (!thead || !tbody) return;
+
+  const selectedSheet = document.getElementById("sheetSelect")?.value || "";
+  let att = selectedSheet ? globalAttendanceData[selectedSheet] : null;
+
+  // Fallback: nếu key không khớp chính xác, thử map theo tháng
+  if (!att && selectedSheet) {
+    const m = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+    if (m) {
+      // thử các key khác trong globalAttendanceData
+      const keys = Object.keys(globalAttendanceData);
+      const found = keys.find(k => {
+        const km = k.match(/^T(\d{2})(\d{4})$/i);
+        return km && km[1] === m[1] && km[2] === m[2];
+      });
+      if (found) att = globalAttendanceData[found];
+    }
+  }
+  // Nếu chưa chọn sheet lương nhưng có data chấm công, lấy sheet đầu tiên
+  if (!att) {
+    const keys = Object.keys(globalAttendanceData);
+    if (keys.length === 1) att = globalAttendanceData[keys[0]];
+  }
+
+  thead.innerHTML = "";
+  tbody.innerHTML = "";
+
+  if (!att || !att.rows || att.rows.length === 0) {
+    if (emptyMsg) {
+      emptyMsg.style.display = "block";
+      emptyMsg.innerHTML = selectedSheet
+        ? `<span class="err">Không tìm thấy dữ liệu chấm công tương ứng với tháng <b>${escapeHtml(selectedSheet)}</b>. Hãy đảm bảo file Excel có sheet tên dạng "CHẤM CÔNG T7" (hoặc chứa "CHẤM CÔNG") và có cột MÃ NV + ngày 1–31.</span>`
+        : `<span class="err">Chưa có dữ liệu chấm công. Chọn file Excel có sheet chấm công rồi chọn tháng.</span>`;
+    }
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = "none";
+
+  const days = att.days || [];
+  const weekdays = att.weekdays || [];
+
+  // Header 2 dòng: thứ + số ngày
+  let h1 = `<tr><th class="freeze-col-1" rowspan="2" style="vertical-align:middle; min-width:90px;">Mã NV</th>`;
+  weekdays.forEach((w, i) => {
+    const isWeekend = /CN|T7/i.test(w);
+    h1 += `<th style="text-align:center; font-size:11px; padding:4px 2px;${isWeekend ? " color:var(--badge-err-text);" : ""}">${escapeHtml(w || "")}</th>`;
+  });
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; background:var(--badge-ok-bg);">Tổng<br>Làm</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Tổng<br>Nghỉ</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Tổng<br>Lễ</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; color:#e67e22;">Phép<br>có lương</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">K<br>lương</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; color:var(--badge-err-text);">Vắng</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Ngày công<br>chuẩn</th>`;
+  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Ngày công<br>HL</th>`;
+  h1 += `</tr>`;
+
+  let h2 = `<tr>`;
+  days.forEach((d, i) => {
+    const w = weekdays[i] || "";
+    const isWeekend = /CN|T7/i.test(w);
+    h2 += `<th style="text-align:center; font-size:11px; padding:4px 2px; min-width:28px;${isWeekend ? " color:var(--badge-err-text);" : ""}">${d}</th>`;
+  });
+  h2 += `</tr>`;
+  thead.innerHTML = h1 + h2;
+
+  att.rows.forEach(r => {
+    const tr = document.createElement("tr");
+    let tds = `<td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>`;
+    (r.days || []).forEach((code, i) => {
+      const cls = getAttendanceCodeClass(code);
+      const w = weekdays[i] || "";
+      const isWeekend = /CN|T7/i.test(w);
+      tds += `<td class="att-day ${cls}" style="text-align:center; font-weight:600; font-size:12px;${isWeekend && !code ? " background:rgba(0,0,0,0.03);" : ""}">${escapeHtml(code || "")}</td>`;
+    });
+    // pad if days length mismatch
+    for (let i = (r.days || []).length; i < days.length; i++) {
+      tds += `<td class="att-day" style="text-align:center;"></td>`;
+    }
+    tds += `<td style="text-align:center; font-weight:700; color:var(--amount-in);">${r.tong_lam !== "" ? r.tong_lam : ""}</td>`;
+    tds += `<td style="text-align:center;">${r.tong_nghi !== "" ? r.tong_nghi : ""}</td>`;
+    tds += `<td style="text-align:center;">${r.tong_le !== "" ? r.tong_le : ""}</td>`;
+    tds += `<td style="text-align:center; color:#e67e22; font-weight:600;">${r.tong_phep !== "" ? r.tong_phep : ""}</td>`;
+    tds += `<td style="text-align:center;">${r.tong_k !== "" ? r.tong_k : ""}</td>`;
+    tds += `<td style="text-align:center; color:var(--badge-err-text); font-weight:600;">${r.tong_vang !== "" ? r.tong_vang : ""}</td>`;
+    tds += `<td style="text-align:center;">${r.ngay_cong_chuan !== "" ? r.ngay_cong_chuan : ""}</td>`;
+    tds += `<td style="text-align:center; font-weight:700;">${r.ngay_cong_huong_luong !== "" ? r.ngay_cong_huong_luong : ""}</td>`;
+    tr.innerHTML = tds;
+    tbody.appendChild(tr);
+  });
+}
+
 function applyEmpMainTabView() {
   const panels = {
     luong: document.getElementById("employeeTableWrapper"),
     dinhkhoan: document.getElementById("accountingWrapper"),
-    chuyenkhoan: document.getElementById("bankTransferWrapper")
+    chuyenkhoan: document.getElementById("bankTransferWrapper"),
+    chamcong: document.getElementById("attendanceWrapper")
   };
   const btns = {
     luong: document.getElementById("empMainBtn-luong"),
     dinhkhoan: document.getElementById("empMainBtn-dinhkhoan"),
-    chuyenkhoan: document.getElementById("empMainBtn-chuyenkhoan")
+    chuyenkhoan: document.getElementById("empMainBtn-chuyenkhoan"),
+    chamcong: document.getElementById("empMainBtn-chamcong")
   };
   const titleEl = document.getElementById("employeeResultTitle");
   const titles = {
     luong: "Bảng lương chi tiết",
     dinhkhoan: "Định khoản Hạch toán",
-    chuyenkhoan: "Danh sách chuyển khoản lương"
+    chuyenkhoan: "Danh sách chuyển khoản lương",
+    chamcong: "Bảng chấm công"
   };
   Object.keys(panels).forEach(key => {
     if (panels[key]) panels[key].style.display = empMainTab === key ? "block" : "none";
@@ -1722,6 +1989,9 @@ function applyEmpMainTabView() {
   if (empMainTab === "luong") {
     // Cập nhật lại sticky cột sau khi panel hiện lại
     setTimeout(updateFreezeCol1Width, 0);
+  }
+  if (empMainTab === "chamcong") {
+    renderAttendanceTable();
   }
 }
   
