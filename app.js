@@ -1492,12 +1492,17 @@ function copyForMisaAmisBhxh() {
     const rows = globalSheetsData[selectedSheet];
     let tsvLines = [];
 
-    // Định dạng tháng dạng T06/2026 từ tên sheet (VD: T062026)
+    // Ngày cuối tháng + nhãn sheet T06/2026 từ tên sheet (VD: T062026)
+    let dateStr = selectedSheet;
+    let thangStr = selectedSheet;
     const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
-    const thangStr = monthMatch ? `T${monthMatch[1]}/${monthMatch[2]}` : selectedSheet;
-
-    // Bạn có thể tùy biến ngày theo sheet (VD: "30/06/2026")
-    const dateStr = "30/06/2026";
+    if (monthMatch) {
+      const month = parseInt(monthMatch[1], 10);
+      const year = parseInt(monthMatch[2], 10);
+      const lastDay = new Date(year, month, 0).getDate();
+      dateStr = `${String(lastDay).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+      thangStr = `T${monthMatch[1]}/${monthMatch[2]}`;
+    }
     const loaiNV = ""; // Cột E bỏ trống theo yêu cầu
 
     // Diễn giải (cột D) LUÔN CỐ ĐỊNH cho mọi dòng
@@ -1581,11 +1586,17 @@ function copyForMisaAmisBhxhNld() {
     const rows = globalSheetsData[selectedSheet];
     let tsvLines = [];
 
-    // Định dạng tháng dạng T06/2026 từ tên sheet (VD: T062026)
+    // Ngày cuối tháng + nhãn sheet T06/2026 từ tên sheet (VD: T062026)
+    let dateStr = selectedSheet;
+    let thangStr = selectedSheet;
     const monthMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
-    const thangStr = monthMatch ? `T${monthMatch[1]}/${monthMatch[2]}` : selectedSheet;
-
-    const dateStr = "30/06/2026";
+    if (monthMatch) {
+      const month = parseInt(monthMatch[1], 10);
+      const year = parseInt(monthMatch[2], 10);
+      const lastDay = new Date(year, month, 0).getDate();
+      dateStr = `${String(lastDay).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+      thangStr = `T${monthMatch[1]}/${monthMatch[2]}`;
+    }
     const loaiNV = ""; // Cột E bỏ trống theo yêu cầu
 
     // Diễn giải (cột D) LUÔN CỐ ĐỊNH cho mọi dòng
