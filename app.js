@@ -716,12 +716,33 @@ async function doFetchEmployeesExcel(fileOverride) {
             if (dayCols.length >= 20 || isAttendanceByName) {
               // Weekday row: thường là dòng ngay trên header
               const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
-              // Suy ra key tháng TMMYYYY từ A1 hoặc tên sheet (cần trước để biết số ngày trong tháng)
+              // Suy ra key tháng TMMYYYY từ A1/vài ô tiêu đề hoặc tên sheet
               let monthKey = null;
-              const a1 = jsonData[0] && jsonData[0][0] != null ? String(jsonData[0][0]).trim() : "";
-              const mA1 = a1.match(/^(\d{1,2})[\/\-](\d{4})$/);
-              if (mA1) {
-                monthKey = `T${String(parseInt(mA1[1], 10)).padStart(2, "0")}${mA1[2]}`;
+              const tryMonthFromText = (text) => {
+                if (!text) return null;
+                const s = String(text).trim();
+                // 07/2026, 7-2026, 07.2026
+                let m = s.match(/(?:^|[^\d])(\d{1,2})\s*[\/\-\.]\s*(20\d{2})(?:[^\d]|$)/);
+                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                // Tháng 7/2026, Thang 07 2026
+                m = s.match(/th[aá]ng\s*(\d{1,2})\s*[\/\-\.\s]?\s*(20\d{2})/i);
+                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                // T07/2026, T072026
+                m = s.match(/\bT\s*(\d{1,2})\s*[\/\-]?\s*(20\d{2})\b/i);
+                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                return null;
+              };
+              // Quét vài ô đầu sheet (A1, B1, A2...) lấy tháng
+              for (let ri = 0; ri <= Math.min(3, headerRowIdx); ri++) {
+                const row = jsonData[ri] || [];
+                for (let ci = 0; ci < Math.min(6, row.length); ci++) {
+                  monthKey = tryMonthFromText(row[ci]);
+                  if (monthKey) break;
+                }
+                if (monthKey) break;
+              }
+              if (!monthKey) {
+                monthKey = tryMonthFromText(cleanName);
               }
               if (!monthKey) {
                 const mName = cleanName.match(/(?:T|THÁNG\s*)?(\d{1,2})\s*[\/\-]?\s*(20\d{2})/i)
@@ -733,8 +754,10 @@ async function doFetchEmployeesExcel(fileOverride) {
                   monthKey = `T${mm}${yy}`;
                 }
               }
-              // Nếu vẫn không có, dùng tên sheet làm key tạm
+              // Nếu vẫn không có, dùng tên sheet làm key tạm (tránh ghi đè khi nhiều sheet cùng tên)
               if (!monthKey) monthKey = cleanName;
+              // Nếu key đã tồn tại (sheet khác cùng tháng), giữ bản có nhiều dòng hơn
+              // — xử lý bên dưới lúc gán globalAttendanceData
 
               // Số ngày thực của tháng (để ẩn cột 29/30/31 không hợp lệ)
               let daysInMonth = 31;
@@ -831,13 +854,17 @@ async function doFetchEmployeesExcel(fileOverride) {
               }
 
               if (attRows.length > 0) {
-                globalAttendanceData[monthKey] = {
-                  days,
-                  weekdays,
-                  rows: attRows,
-                  sourceSheet: cleanName,
-                  sumHeaders: sumHeaders.map(s => s.label)
-                };
+                const existing = globalAttendanceData[monthKey];
+                // Không ghi đè bằng sheet ít dòng hơn (tránh mất data khi 2 sheet cùng key)
+                if (!existing || (attRows.length >= (existing.rows || []).length)) {
+                  globalAttendanceData[monthKey] = {
+                    days,
+                    weekdays,
+                    rows: attRows,
+                    sourceSheet: cleanName,
+                    sumHeaders: sumHeaders.map(s => s.label)
+                  };
+                }
               }
             }
           }
@@ -1899,21 +1926,37 @@ function renderAttendanceTable() {
   const selectedSheet = document.getElementById("sheetSelect")?.value || "";
   let att = selectedSheet ? globalAttendanceData[selectedSheet] : null;
 
-  // Fallback: nếu key không khớp chính xác, thử map theo tháng
+  // Fallback: nếu key không khớp chính xác, thử map theo tháng TMMYYYY
   if (!att && selectedSheet) {
     const m = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
     if (m) {
-      // thử các key khác trong globalAttendanceData
       const keys = Object.keys(globalAttendanceData);
-      const found = keys.find(k => {
+      // 1) Key dạng TMMYYYY cùng tháng/năm
+      let found = keys.find(k => {
         const km = k.match(/^T(\d{2})(\d{4})$/i);
         return km && km[1] === m[1] && km[2] === m[2];
       });
+      // 2) Key dạng tên sheet chứa tháng (vd. "CHẤM CÔNG T7", "Cham cong 07/2026")
+      if (!found) {
+        const mmNum = parseInt(m[1], 10);
+        const yy = m[2];
+        found = keys.find(k => {
+          const kLow = k.toLowerCase();
+          // T07/2026, T7/2026, 07/2026, tháng 7 2026...
+          if (new RegExp(`(?:^|\\D)0?${mmNum}[\\/\\-\\s]?${yy}\\b`).test(k)) return true;
+          if (kLow.includes(`t${m[1]}${yy}`) || kLow.includes(`t${mmNum}${yy}`)) return true;
+          // Chỉ số tháng nếu tên có "chấm công" và đúng 1 key tháng đó
+          const km2 = k.match(/(?:T|THÁNG\s*)(\d{1,2})\b/i);
+          if (km2 && parseInt(km2[1], 10) === mmNum && kLow.match(/ch[aấ]m\s*c[oô]ng/i)) return true;
+          return false;
+        });
+      }
       if (found) att = globalAttendanceData[found];
     }
   }
-  // Nếu chưa chọn sheet lương nhưng có data chấm công, lấy sheet đầu tiên
-  if (!att) {
+  // Chỉ fallback sang sheet chấm công duy nhất khi CHƯA chọn tháng
+  // (tránh hiện nhầm tháng 07 khi user chọn T06, T08...)
+  if (!att && !selectedSheet) {
     const keys = Object.keys(globalAttendanceData);
     if (keys.length === 1) att = globalAttendanceData[keys[0]];
   }
