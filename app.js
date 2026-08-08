@@ -470,7 +470,8 @@ let globalSheetsData = {};
 let currentBankTransferRows = [];
 let currentTxListData = []; // Lưu dữ liệu gốc (đã gộp thông tin KH/hóa đơn) của bảng Kiểm tra giao dịch SePay v2 để phục vụ nút Copy
 let currentBankTransferContent = "";
-let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh'
+let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh' | 'bhxhnld'
+let empMainTab = 'luong'; // 'luong' | 'dinhkhoan' | 'chuyenkhoan'
 let bankGroupsData = {};
 let bankActiveTab = '';
 let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
@@ -682,7 +683,8 @@ async function doFetchEmployeesExcel(fileOverride) {
     if (sheetNames.length === 0) {
       box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026...</span>';
       document.getElementById("sheetSelect").innerHTML = '<option value="">-- Chưa có dữ liệu --</option>';
-      document.getElementById("employeeTableWrapper").style.display = "none";
+      const resultCard = document.getElementById("employeeResultCard");
+      if (resultCard) resultCard.style.display = "none";
       setEmployeeDropZoneState("done", file.name);
       return;
     }
@@ -706,20 +708,19 @@ async function doFetchEmployeesExcel(fileOverride) {
 }
 function displaySheetData() {
   const selectedSheet = document.getElementById("sheetSelect").value;
+  const resultCard = document.getElementById("employeeResultCard");
   const wrapper = document.getElementById("employeeTableWrapper");
   const tbody = document.getElementById("employeeTbody");
-  
+
   const accWrapper = document.getElementById("accountingWrapper");
   const accTbody = document.getElementById("accountingTbody");
   const accTbody2 = document.getElementById("accountingTbody2");
   const accTbody3 = document.getElementById("accountingTbody3");
   const bankWrapper = document.getElementById("bankTransferWrapper");
   const bankTbody = document.getElementById("bankTransferTbody");
-  
+
   if (!selectedSheet) {
-    wrapper.style.display = "none";
-    accWrapper.style.display = "none";
-    bankWrapper.style.display = "none";
+    if (resultCard) resultCard.style.display = "none";
     currentBankTransferRows = [];
     currentBankTransferContent = "";
     bankGroupsData = {};
@@ -728,24 +729,25 @@ function displaySheetData() {
     if (bankTabsWrapEmpty) bankTabsWrapEmpty.innerHTML = "";
     return;
   }
-  
+
   const rows = globalSheetsData[selectedSheet] || [];
   tbody.innerHTML = "";
   accTbody.innerHTML = "";
   accTbody2.innerHTML = "";
   accTbody3.innerHTML = "";
   bankTbody.innerHTML = "";
-  
+
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="31" style="text-align:center;">Không có dữ liệu trong sheet này.</td></tr>`;
-    accWrapper.style.display = "none";
-    bankWrapper.style.display = "none";
     currentBankTransferRows = [];
     currentBankTransferContent = "";
     bankGroupsData = {};
     bankActiveTab = '';
     const bankTabsWrapEmpty2 = document.getElementById("bankTabsWrap");
     if (bankTabsWrapEmpty2) bankTabsWrapEmpty2.innerHTML = "";
+    if (resultCard) resultCard.style.display = "block";
+    empMainTab = "luong";
+    applyEmpMainTabView();
   } else {
     const formatMoney = (v) => Number(v).toLocaleString('vi-VN');
     
@@ -1146,7 +1148,6 @@ function displaySheetData() {
     accHTML += detailRows3341HTML;
 
     accTbody.innerHTML = accHTML;
-    accWrapper.style.display = "block";
 
     // Bảng con: Trích BHXH và KPCĐ cty đóng
     // Nợ 6422 = tổng 4 khoản Có bên dưới (3383 BHXH + 3384 BHYT + 3385 BHTN + 3382 KPCĐ)
@@ -1268,7 +1269,6 @@ function displaySheetData() {
     currentBankTransferContent = monthMatch ? `CHI LUONG T${monthMatch[1]}/${monthMatch[2]}` : `CHI LUONG ${selectedSheet}`;
 
     if (bankKeys.length === 0) {
-      bankWrapper.style.display = "none";
       currentBankTransferRows = [];
       const bankTabsWrapEmpty3 = document.getElementById("bankTabsWrap");
       if (bankTabsWrapEmpty3) bankTabsWrapEmpty3.innerHTML = "";
@@ -1278,11 +1278,15 @@ function displaySheetData() {
       }
       renderBankTabs(bankKeys);
       renderBankTransferTable();
-      bankWrapper.style.display = "block";
     }
   }
-  
-  wrapper.style.display = "block";
+
+  // Hiện card kết quả + mặc định tab Bảng lương (giữ tab đang chọn nếu đã có dữ liệu)
+  if (resultCard) resultCard.style.display = "block";
+  if (!empMainTab || !["luong", "dinhkhoan", "chuyenkhoan"].includes(empMainTab)) {
+    empMainTab = "luong";
+  }
+  applyEmpMainTabView();
 
   // Cột "Mã NV" co dãn theo độ dài mã dài nhất; cập nhật lại vị trí cố định (sticky)
   // của cột "Tên NV" ngay sau đó cho khớp, tránh bị đè/khuất chữ.
@@ -1630,8 +1634,41 @@ function applyAccTabView() {
   if (!panels.luongthuong || !panels.bhxh || !panels.bhxhnld) return;
   Object.keys(panels).forEach(key => {
     panels[key].style.display = accActiveTab === key ? "block" : "none";
-    btns[key].classList.toggle("active", accActiveTab === key);
+    if (btns[key]) btns[key].classList.toggle("active", accActiveTab === key);
   });
+}
+
+function switchEmpMainTab(tab) {
+  empMainTab = tab;
+  applyEmpMainTabView();
+}
+
+function applyEmpMainTabView() {
+  const panels = {
+    luong: document.getElementById("employeeTableWrapper"),
+    dinhkhoan: document.getElementById("accountingWrapper"),
+    chuyenkhoan: document.getElementById("bankTransferWrapper")
+  };
+  const btns = {
+    luong: document.getElementById("empMainBtn-luong"),
+    dinhkhoan: document.getElementById("empMainBtn-dinhkhoan"),
+    chuyenkhoan: document.getElementById("empMainBtn-chuyenkhoan")
+  };
+  const titleEl = document.getElementById("employeeResultTitle");
+  const titles = {
+    luong: "Bảng lương chi tiết",
+    dinhkhoan: "Định khoản Hạch toán",
+    chuyenkhoan: "Danh sách chuyển khoản lương"
+  };
+  Object.keys(panels).forEach(key => {
+    if (panels[key]) panels[key].style.display = empMainTab === key ? "block" : "none";
+    if (btns[key]) btns[key].classList.toggle("active", empMainTab === key);
+  });
+  if (titleEl) titleEl.textContent = titles[empMainTab] || "Dữ liệu nhân sự";
+  if (empMainTab === "luong") {
+    // Cập nhật lại sticky cột sau khi panel hiện lại
+    setTimeout(updateFreezeCol1Width, 0);
+  }
 }
   
 function appendRowToDOM(rowObj, tbody) {
