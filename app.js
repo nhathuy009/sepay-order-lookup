@@ -1850,8 +1850,18 @@ function applyAccTabView() {
 }
 
 function switchEmpMainTab(tab) {
+  // Giữ vị trí cuộn trang khi chuyển tab (tránh nhảy về đầu trang do thay đổi chiều cao panel)
+  const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
   empMainTab = tab;
   applyEmpMainTabView();
+  // Khôi phục scroll sau khi layout cập nhật (renderAttendanceTable / toggle display)
+  requestAnimationFrame(() => {
+    window.scrollTo(0, scrollY);
+    // Một frame nữa đề phòng layout còn thay đổi (sticky cols, table render)
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
+  });
 }
 
 function getAttendanceCodeClass(code) {
