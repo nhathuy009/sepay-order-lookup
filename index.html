@@ -128,11 +128,24 @@
           <button id="txSearchBtn" onclick="doTxSearch()">Tra cứu 1 mã</button>
         </div>
       </div>
-      <div>
+      <div style="flex: 1; min-width: 260px;">
         <label>Chọn file Excel Sao kê ngân hàng (.xlsx)</label>
-        <div class="row" style="margin-top: 8px;">
-          <div><input type="file" id="bankExcelFile" accept=".xlsx" /></div>
-          <button id="bankBtn" onclick="doBankStatement()">Xử lý & Xem trước</button>
+        <div id="bankDropZone" class="air-drop-zone" role="button" tabindex="0" aria-label="Kéo thả hoặc chọn file Excel sao kê" style="margin-top: 8px; min-height: 100px; padding: 18px 14px;">
+          <input type="file" id="bankExcelFile" accept=".xlsx" hidden />
+          <div class="air-drop-zone-inner" id="bankDropZoneInner">
+            <div class="air-drop-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            </div>
+            <div class="air-drop-text">
+              <strong>Kéo thả file Excel vào đây</strong>
+              <span>hoặc chạm / bấm để chọn file</span>
+            </div>
+            <div class="air-drop-hint">Hỗ trợ .xlsx — xử lý tự động sau khi chọn</div>
+          </div>
+          <div class="air-drop-file-info" id="bankDropFileInfo" style="display:none;">
+            <div class="air-drop-file-name" id="bankDropFileName"></div>
+            <button type="button" class="air-drop-change-btn" id="bankDropChangeBtn">Chọn file khác</button>
+          </div>
         </div>
       </div>
     </div>
@@ -179,18 +192,29 @@
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
-          <div class="row" style="align-items: flex-end;">
-            <div style="flex: 1 1 0%; min-width: 160px;">
-              <input type="file" id="employeeExcelFile" accept=".xlsx" style="width:100%;" />
+          <div id="employeeDropZone" class="air-drop-zone" role="button" tabindex="0" aria-label="Kéo thả hoặc chọn file Excel nhân sự" style="margin-top: 8px;">
+            <input type="file" id="employeeExcelFile" accept=".xlsx" hidden />
+            <div class="air-drop-zone-inner" id="employeeDropZoneInner">
+              <div class="air-drop-icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+              </div>
+              <div class="air-drop-text">
+                <strong>Kéo thả file Excel vào đây</strong>
+                <span>hoặc chạm / bấm để chọn file</span>
+              </div>
+              <div class="air-drop-hint">Hỗ trợ .xlsx — đọc sheet tự động sau khi chọn</div>
             </div>
-            <div style="flex: 0 0 175px; min-width: 175px;">
+            <div class="air-drop-file-info" id="employeeDropFileInfo" style="display:none;">
+              <div class="air-drop-file-name" id="employeeDropFileName"></div>
+              <button type="button" class="air-drop-change-btn" id="employeeDropChangeBtn">Chọn file khác</button>
+            </div>
+          </div>
+          <div class="row" style="align-items: flex-end; margin-top: 14px;">
+            <div style="flex: 1; min-width: 180px; max-width: 280px;">
               <label style="margin-bottom: 8px;">Chọn Sheet (Tháng)</label>
               <select id="sheetSelect" onchange="displaySheetData()" style="width: 100%; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 14px; outline: none; cursor: pointer;">
                 <option value="">-- Chưa có dữ liệu --</option>
               </select>
-            </div>
-            <div style="flex: 0 0 auto; min-width: 0;">
-              <button id="fetchSheetsBtn" onclick="doFetchEmployeesExcel()">Xử lý file</button>
             </div>
           </div>
           <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
