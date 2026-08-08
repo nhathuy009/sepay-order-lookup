@@ -684,6 +684,7 @@ async function doFetchEmployeesExcel(fileOverride) {
 
       // --- Parse sheet Chấm công ---
       // Tên sheet chứa "CHẤM CÔNG" / "CHAM CONG" hoặc cấu trúc có header MÃ NV + ngày 1..31
+      // Các cột ngày thừa (29/30/31) sẽ được lọc theo số ngày thực của tháng
       const isAttendanceByName = /ch[aấ]m\s*c[oô]ng/i.test(cleanName);
       if (isAttendanceByName || !pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
@@ -715,21 +716,7 @@ async function doFetchEmployeesExcel(fileOverride) {
             if (dayCols.length >= 20 || isAttendanceByName) {
               // Weekday row: thường là dòng ngay trên header
               const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
-              const weekdays = dayCols.map(d => {
-                const w = weekdayRow[d.colIdx];
-                return w != null ? String(w).trim() : "";
-              });
-              const days = dayCols.map(d => d.dayNum);
-
-              // Tìm các cột tổng kết (sau cột ngày cuối)
-              const lastDayCol = dayCols.length ? Math.max(...dayCols.map(d => d.colIdx)) : 0;
-              const sumHeaders = [];
-              for (let c = lastDayCol + 1; c < headerRow.length; c++) {
-                const h = headerRow[c] != null ? String(headerRow[c]).trim() : "";
-                if (h) sumHeaders.push({ colIdx: c, label: h });
-              }
-
-              // Suy ra key tháng TMMYYYY từ A1 hoặc tên sheet
+              // Suy ra key tháng TMMYYYY từ A1 hoặc tên sheet (cần trước để biết số ngày trong tháng)
               let monthKey = null;
               const a1 = jsonData[0] && jsonData[0][0] != null ? String(jsonData[0][0]).trim() : "";
               const mA1 = a1.match(/^(\d{1,2})[\/\-](\d{4})$/);
@@ -749,6 +736,33 @@ async function doFetchEmployeesExcel(fileOverride) {
               // Nếu vẫn không có, dùng tên sheet làm key tạm
               if (!monthKey) monthKey = cleanName;
 
+              // Số ngày thực của tháng (để ẩn cột 29/30/31 không hợp lệ)
+              let daysInMonth = 31;
+              const mk = monthKey.match(/^T(\d{2})(\d{4})$/i);
+              if (mk) {
+                const mm = parseInt(mk[1], 10);
+                const yy = parseInt(mk[2], 10);
+                if (mm >= 1 && mm <= 12 && yy >= 2000) {
+                  daysInMonth = new Date(yy, mm, 0).getDate();
+                }
+              }
+              // Chỉ giữ các cột ngày nằm trong tháng (bỏ 29/30/31 thừa của template Excel)
+              const validDayCols = dayCols.filter(d => d.dayNum >= 1 && d.dayNum <= daysInMonth);
+
+              const weekdays = validDayCols.map(d => {
+                const w = weekdayRow[d.colIdx];
+                return w != null ? String(w).trim() : "";
+              });
+              const days = validDayCols.map(d => d.dayNum);
+
+              // Tìm các cột tổng kết (sau cột ngày cuối trên file gốc)
+              const lastDayCol = dayCols.length ? Math.max(...dayCols.map(d => d.colIdx)) : 0;
+              const sumHeaders = [];
+              for (let c = lastDayCol + 1; c < headerRow.length; c++) {
+                const h = headerRow[c] != null ? String(headerRow[c]).trim() : "";
+                if (h) sumHeaders.push({ colIdx: c, label: h });
+              }
+
               const attRows = [];
               for (let r = headerRowIdx + 1; r < jsonData.length; r++) {
                 const row = jsonData[r];
@@ -758,13 +772,14 @@ async function doFetchEmployeesExcel(fileOverride) {
                 // Bỏ qua dòng trống / dòng chú thích
                 if (/^(l|n|v|p|k)\s*=/i.test(ma) || ma.length > 30) continue;
 
-                const dayCodes = dayCols.map(d => {
+                // Chỉ lấy mã chấm công trong các ngày hợp lệ của tháng (bỏ ngày 29/30/31 thừa)
+                const dayCodes = validDayCols.map(d => {
                   const raw = row[d.colIdx];
                   if (raw == null || raw === "") return "";
                   return String(raw).trim().toUpperCase();
                 });
 
-                // Đếm các loại
+                // Đếm các loại (chỉ trên ngày hợp lệ)
                 let tongLam = 0, tongNghi = 0, tongLe = 0, tongPhep = 0, tongK = 0, tongVang = 0;
                 dayCodes.forEach(code => {
                   if (code === "L") tongLam++;
@@ -1910,7 +1925,7 @@ function renderAttendanceTable() {
     if (emptyMsg) {
       emptyMsg.style.display = "block";
       emptyMsg.innerHTML = selectedSheet
-        ? `<span class="err">Không tìm thấy dữ liệu chấm công tương ứng với tháng <b>${escapeHtml(selectedSheet)}</b>. Hãy đảm bảo file Excel có sheet tên dạng "CHẤM CÔNG T7" (hoặc chứa "CHẤM CÔNG") và có cột MÃ NV + ngày 1–31.</span>`
+        ? `<span class="err">Không tìm thấy dữ liệu chấm công tương ứng với tháng <b>${escapeHtml(selectedSheet)}</b>. Hãy đảm bảo file Excel có sheet tên dạng "CHẤM CÔNG T7" (hoặc chứa "CHẤM CÔNG") và có cột MÃ NV + các ngày trong tháng.</span>`
         : `<span class="err">Chưa có dữ liệu chấm công. Chọn file Excel có sheet chấm công rồi chọn tháng.</span>`;
     }
     return;
