@@ -220,61 +220,71 @@
           <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
         </div>
 
-        <div class="card" id="employeeTableWrapper" style="display:none;">
-          <h3 style="margin-top:0; font-size:16px;">Bảng lương chi tiết (Từ dòng 8)</h3>
-          <div class="table-responsive">
-            <table class="sepay-table" id="employeeTable">
-              <thead>
-                <tr>
-                  <th class="freeze-col-1" rowspan="2" style="vertical-align: middle;">Mã NV<br>(B)</th>
-                  <th class="freeze-col-2" rowspan="2" style="vertical-align: middle;">Tên NV<br>(C)</th>
-                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương<br>cơ bản (H)</th>
-                  <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công<br>TT (J)</th>
-                  <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công<br>HL (K)</th>
-                  <th colspan="4" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Các khoản chế độ và phúc lợi</th>
-                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương<br>tính toán</th>
-                  <th colspan="5" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thu nhập bổ sung</th>
-                  <th colspan="5" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">Các khoản khấu trừ</th>
-                  <th rowspan="2" style="text-align: right; vertical-align: middle;">Thực<br>nhận (AD)</th>
-                  <th colspan="2" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thông tin nhận lương</th>
-                  <th colspan="8" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">BHXH Công ty đóng</th>
-                  <th rowspan="2" style="text-align: right; vertical-align: middle;">CĐ<br>(AO)</th>
-                </tr>
-                <tr>
-                  <th style="text-align: right;">Trang<br>Phục (L)</th>
-                  <th style="text-align: right;">Cơm<br>Trưa (M)</th>
-                  <th style="text-align: right;">Trách<br>nhiệm (N)</th>
-                  <th style="text-align: right;">Chi phí HT-<br>BHXH (O)</th>
-                  <th style="text-align: right;">Hoa hồng<br>bán hàng (P)</th>
-                  <th style="text-align: right;">Thưởng ghi nhận<br>đóng góp (Q)</th>
-                  <th style="text-align: right;">Lương phép<br>năm (R)</th>
-                  <th style="text-align: right;">Khác<br>(S)</th>
-                  <th style="text-align: right;">Tổng thu nhập<br>trong tháng (T)</th>
-                  <th style="text-align: right;">BHXH<br>(U)</th>
-                  <th style="text-align: right;">BHYT<br>(V)</th>
-                  <th style="text-align: right;">BHTN<br>(W)</th>
-                  <th style="text-align: right;">CĐ<br>(X)</th>
-                  <th style="text-align: right;">Tiền thuế<br>TNCN (AB)</th>
-                  <th style="text-align: center;">STK<br>(AE)</th>
-                  <th style="text-align: center;">Ngân hàng<br>(AF)</th>
-                  <th style="text-align: right;">HT-TT<br>(AJ)</th>
-                  <th style="text-align: right;">ÔĐ-TS<br>(AK)</th>
-                  <th style="text-align: right;">TNLĐ-BNN<br>(AL)</th>
-                  <th style="text-align: right;">Tổng<br>BHXH</th>
-                  <th style="text-align: right;">BHYT<br>(AM)</th>
-                  <th style="text-align: right;">BHTN<br>(AN)</th>
-                  <th style="text-align: right;">Tổng BHXH<br>NLĐ Đóng</th>
-                  <th style="text-align: right;">Tổng BHXH<br>CTY Đóng</th>
-                </tr>
-              </thead>
-              <tbody id="employeeTbody"></tbody>
-            </table>
+        <div class="card" id="employeeResultCard" style="display:none;">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
+            <h3 style="margin:0; font-size:16px;" id="employeeResultTitle">Bảng lương chi tiết</h3>
+            <div class="acc-seg-wrap" id="empMainTabs">
+              <button type="button" class="acc-seg-btn active" id="empMainBtn-luong" onclick="switchEmpMainTab('luong')">Bảng lương</button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-dinhkhoan" onclick="switchEmpMainTab('dinhkhoan')">Định khoản</button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-chuyenkhoan" onclick="switchEmpMainTab('chuyenkhoan')">Chuyển khoản</button>
+            </div>
           </div>
-        </div>
-        <div id="accountingRow" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;">
-          <div class="card" id="accountingWrapper" style="display:none; margin-top: 0; flex: 0 0 auto; min-width: 0;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
-              <h3 style="margin:0; font-size:16px;">Định khoản Hạch toán</h3>
+
+          <!-- Panel 1: Bảng lương -->
+          <div id="employeeTableWrapper">
+            <div class="table-responsive">
+              <table class="sepay-table" id="employeeTable">
+                <thead>
+                  <tr>
+                    <th class="freeze-col-1" rowspan="2" style="vertical-align: middle;">Mã NV<br>(B)</th>
+                    <th class="freeze-col-2" rowspan="2" style="vertical-align: middle;">Tên NV<br>(C)</th>
+                    <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương<br>cơ bản (H)</th>
+                    <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công<br>TT (J)</th>
+                    <th rowspan="2" style="text-align: center; vertical-align: middle;">Ngày công<br>HL (K)</th>
+                    <th colspan="4" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Các khoản chế độ và phúc lợi</th>
+                    <th rowspan="2" style="text-align: right; vertical-align: middle;">Lương<br>tính toán</th>
+                    <th colspan="5" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thu nhập bổ sung</th>
+                    <th colspan="5" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">Các khoản khấu trừ</th>
+                    <th rowspan="2" style="text-align: right; vertical-align: middle;">Thực<br>nhận (AD)</th>
+                    <th colspan="2" style="text-align: center; background: var(--badge-ok-bg); color: var(--heading-color);">Thông tin nhận lương</th>
+                    <th colspan="8" style="text-align: center; background: var(--badge-err-bg); color: var(--heading-color);">BHXH Công ty đóng</th>
+                    <th rowspan="2" style="text-align: right; vertical-align: middle;">CĐ<br>(AO)</th>
+                  </tr>
+                  <tr>
+                    <th style="text-align: right;">Trang<br>Phục (L)</th>
+                    <th style="text-align: right;">Cơm<br>Trưa (M)</th>
+                    <th style="text-align: right;">Trách<br>nhiệm (N)</th>
+                    <th style="text-align: right;">Chi phí HT-<br>BHXH (O)</th>
+                    <th style="text-align: right;">Hoa hồng<br>bán hàng (P)</th>
+                    <th style="text-align: right;">Thưởng ghi nhận<br>đóng góp (Q)</th>
+                    <th style="text-align: right;">Lương phép<br>năm (R)</th>
+                    <th style="text-align: right;">Khác<br>(S)</th>
+                    <th style="text-align: right;">Tổng thu nhập<br>trong tháng (T)</th>
+                    <th style="text-align: right;">BHXH<br>(U)</th>
+                    <th style="text-align: right;">BHYT<br>(V)</th>
+                    <th style="text-align: right;">BHTN<br>(W)</th>
+                    <th style="text-align: right;">CĐ<br>(X)</th>
+                    <th style="text-align: right;">Tiền thuế<br>TNCN (AB)</th>
+                    <th style="text-align: center;">STK<br>(AE)</th>
+                    <th style="text-align: center;">Ngân hàng<br>(AF)</th>
+                    <th style="text-align: right;">HT-TT<br>(AJ)</th>
+                    <th style="text-align: right;">ÔĐ-TS<br>(AK)</th>
+                    <th style="text-align: right;">TNLĐ-BNN<br>(AL)</th>
+                    <th style="text-align: right;">Tổng<br>BHXH</th>
+                    <th style="text-align: right;">BHYT<br>(AM)</th>
+                    <th style="text-align: right;">BHTN<br>(AN)</th>
+                    <th style="text-align: right;">Tổng BHXH<br>NLĐ Đóng</th>
+                    <th style="text-align: right;">Tổng BHXH<br>CTY Đóng</th>
+                  </tr>
+                </thead>
+                <tbody id="employeeTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panel 2: Định khoản (có 3 sub-tab) -->
+          <div id="accountingWrapper" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:12px; margin-bottom: 14px;">
               <div class="acc-seg-wrap">
                 <button type="button" class="acc-seg-btn active" id="accTabBtn-luongthuong" onclick="switchAccTab('luongthuong')">Lương thưởng</button>
                 <button type="button" class="acc-seg-btn" id="accTabBtn-bhxh" onclick="switchAccTab('bhxh')">BHXH cty đóng</button>
@@ -342,9 +352,10 @@
               </div>
             </div>
           </div>
-          <div class="card" id="bankTransferWrapper" style="display:none; margin-top: 0; flex: 1 1 340px; min-width: 340px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
-              <h3 style="margin:0; font-size:16px;">Danh sách chuyển khoản lương</h3>
+
+          <!-- Panel 3: Chuyển khoản -->
+          <div id="bankTransferWrapper" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:12px; margin-bottom: 12px;">
               <div class="acc-seg-wrap" id="bankTabsWrap"></div>
             </div>
             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: wrap;">
