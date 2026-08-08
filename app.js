@@ -1385,53 +1385,81 @@ function copyForMisaAmis() {
     }
 
     const rows = globalSheetsData[selectedSheet];
-    let tsvLines = [];
-    
-    // Bạn có thể tùy biến ngày theo sheet (VD: "30/06/2026")
-    const dateStr = "30/06/2026"; 
     const loaiNV = "Khác";
 
-    // GOM NHÓM 1: HOA HỒNG BÁN HÀNG (Nợ 6421 / Có 3341)
-    rows.forEach(r => {
-      if (r.hoa_hong > 0) {
-        let dienGiai = "Hoa hồng bán hàng " + selectedSheet;
-        tsvLines.push([
-          dateStr,                // Cột A: Ngày CT
-          dateStr,                // Cột B: Ngày HT
-          "",                     // Cột C: Số CT
-          dienGiai,               // Cột D: Diễn giải
-          loaiNV,                 // Cột E: Loại nghiệp vụ
-          "",                     // Cột F: BỊ ẨN TRONG EXCEL (để rỗng để không lấn cột)
-          dienGiai,               // Cột G: Diễn giải hạch toán
-          "6421",                 // Cột H: TK Nợ
-          "3341",                 // Cột I: TK Có
-          Math.round(r.hoa_hong), // Cột J: Số tiền
-          "",                     // Cột K: Mã ĐT Nợ
-          r.ma_nv                 // Cột L: Mã ĐT Có
-        ].join("\t"));
-      }
-    });
+    // Ngày cuối tháng từ sheet TMMYYYY → dd/MM/yyyy (vd. T062026 → 30/06/2026)
+    // Nhãn sheet trong diễn giải: T06/2026
+    let dateStr = selectedSheet;
+    let sheetLabel = selectedSheet;
+    const sheetMatch = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+    if (sheetMatch) {
+      const month = parseInt(sheetMatch[1], 10);
+      const year = parseInt(sheetMatch[2], 10);
+      const lastDay = new Date(year, month, 0).getDate();
+      dateStr = `${String(lastDay).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+      sheetLabel = `T${sheetMatch[1]}/${sheetMatch[2]}`;
+    }
 
-    // GOM NHÓM 2: THƯỞNG GHI NHẬN ĐÓNG GÓP (Nợ 6421 / Có 3341)
-    rows.forEach(r => {
-      if (r.thuong_dong_gop > 0) {
-        let dienGiai = "Chi phí thưởng ghi nhận đóng góp " + selectedSheet;
-        tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai, 
-          "6421", "3341", Math.round(r.thuong_dong_gop), "", r.ma_nv
-        ].join("\t"));
+    // Các nhóm Nợ — thứ tự sort theo tổng số tiền giảm dần (giống bảng định khoản)
+    const groups = [
+      {
+        key: "luongtt",
+        tkNo: "6422",
+        dienGiai: "Chi phí lương tháng " + sheetLabel,
+        getAmount: (r) => r.luong_tinh_toan
+      },
+      {
+        key: "thuongdg",
+        tkNo: "6421",
+        dienGiai: "Chi phí thưởng ghi nhận đóng góp " + sheetLabel,
+        getAmount: (r) => r.thuong_dong_gop
+      },
+      {
+        key: "luongphep",
+        tkNo: "6422",
+        dienGiai: "Chi phí lương phép năm " + sheetLabel,
+        getAmount: (r) => r.luong_phep
+      },
+      {
+        key: "hoahong",
+        tkNo: "6421",
+        dienGiai: "Hoa hồng bán hàng " + sheetLabel,
+        getAmount: (r) => r.hoa_hong
+      },
+      {
+        key: "khac",
+        tkNo: "6422",
+        dienGiai: "Chi phí khác " + sheetLabel,
+        getAmount: (r) => r.khac
       }
-    });
+    ];
 
-    // GOM NHÓM 3: CHI PHÍ LƯƠNG THÁNG (Nợ 6422 / Có 3341)
-    rows.forEach(r => {
-      if (r.luong_tinh_toan > 0) {
-        let dienGiai = "Chi phí lương tháng " + selectedSheet;
-        tsvLines.push([
-          dateStr, dateStr, "", dienGiai, loaiNV, "", dienGiai, 
-          "6422", "3341", Math.round(r.luong_tinh_toan), "", r.ma_nv
-        ].join("\t"));
-      }
+    groups.forEach(g => {
+      g.total = rows.reduce((s, r) => s + (Number(g.getAmount(r)) || 0), 0);
+    });
+    groups.sort((a, b) => b.total - a.total);
+
+    const tsvLines = [];
+    groups.forEach(g => {
+      rows.forEach(r => {
+        const amount = Number(g.getAmount(r)) || 0;
+        if (amount > 0) {
+          tsvLines.push([
+            dateStr,                  // A: Ngày CT
+            dateStr,                  // B: Ngày HT
+            "",                       // C: Số CT
+            g.dienGiai,               // D: Diễn giải
+            loaiNV,                   // E: Loại nghiệp vụ
+            "",                       // F: cột ẩn
+            g.dienGiai,               // G: Diễn giải hạch toán
+            g.tkNo,                   // H: TK Nợ
+            "3341",                   // I: TK Có
+            Math.round(amount),       // J: Số tiền
+            "",                       // K: Mã ĐT Nợ
+            r.ma_nv                   // L: Mã ĐT Có
+          ].join("\t"));
+        }
+      });
     });
 
     if (tsvLines.length === 0) {
@@ -1442,8 +1470,8 @@ function copyForMisaAmis() {
     const tsv = tsvLines.join("\n") + "\n";
 
     navigator.clipboard.writeText(tsv).then(() => {
-      const btn = document.getElementById("copyAmisBtn"); 
-      const originalText = btn.innerHTML; 
+      const btn = document.getElementById("copyAmisBtn");
+      const originalText = btn.innerHTML;
       btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-check-icon lucide-check-check"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg> Đã Copy! Dán vào file MISA';
       setTimeout(() => { btn.innerHTML = originalText; }, 3000);
     }).catch(() => { alert("Không thể copy. Vui lòng thử lại."); });
