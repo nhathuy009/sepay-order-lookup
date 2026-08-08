@@ -691,10 +691,22 @@ async function doFetchEmployeesExcel(fileOverride) {
 
     const select = document.getElementById("sheetSelect");
     select.innerHTML = '<option value="">-- Chọn Tháng / Sheet --</option>';
-    sheetNames.forEach(name => {
+    // Sắp xếp theo năm-tháng tăng dần (T01/2026 trước T02/2026...)
+    const sortedNames = sheetNames.slice().sort((a, b) => {
+      const ma = a.match(/^T(\d{2})(\d{4})$/i);
+      const mb = b.match(/^T(\d{2})(\d{4})$/i);
+      if (ma && mb) {
+        const ya = parseInt(ma[2], 10), yb = parseInt(mb[2], 10);
+        if (ya !== yb) return ya - yb;
+        return parseInt(ma[1], 10) - parseInt(mb[1], 10);
+      }
+      return a.localeCompare(b, "vi");
+    });
+    sortedNames.forEach(name => {
       const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
+      opt.value = name; // giữ value gốc để khớp globalSheetsData
+      const m = name.match(/^T(\d{2})(\d{4})$/i);
+      opt.textContent = m ? `T${m[1]}/${m[2]}` : name; // hiển thị T07/2026
       select.appendChild(opt);
     });
 
