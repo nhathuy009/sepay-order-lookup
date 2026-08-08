@@ -692,14 +692,26 @@ async function doFetchEmployeesExcel(fileOverride) {
         if (!jsonData || jsonData.length < 4) {
           // skip
         } else {
-          // Tìm dòng header chứa "MÃ NV"
+          // Tìm dòng header chứa "MÃ NV" (cột đầu hoặc gần đầu)
           let headerRowIdx = -1;
-          for (let i = 0; i < Math.min(10, jsonData.length); i++) {
-            const cell0 = jsonData[i] && jsonData[i][0] != null ? String(jsonData[i][0]).trim().toUpperCase() : "";
-            if (cell0 === "MÃ NV" || cell0 === "MA NV" || cell0.replace(/\s+/g, "") === "MÃNV") {
-              headerRowIdx = i;
-              break;
+          for (let i = 0; i < Math.min(15, jsonData.length); i++) {
+            const row = jsonData[i];
+            if (!row || !Array.isArray(row)) continue;
+            for (let c = 0; c < Math.min(3, row.length); c++) {
+              const cell = row[c] != null ? String(row[c]).trim().toUpperCase().replace(/\s+/g, " ") : "";
+              const compact = cell.replace(/\s+/g, "");
+              // MÃ NV / MA NV / MÃNV / MÃ NHÂN VIÊN / MANV ...
+              if (
+                cell === "MÃ NV" || cell === "MA NV" ||
+                compact === "MÃNV" || compact === "MANV" ||
+                /^M[ÃA]\s*N[VÂN]/.test(cell) ||
+                compact === "MÃNHÂNVIÊN" || compact === "MANHANVIEN"
+              ) {
+                headerRowIdx = i;
+                break;
+              }
             }
+            if (headerRowIdx >= 0) break;
           }
           if (headerRowIdx >= 0) {
             const headerRow = jsonData[headerRowIdx];
@@ -716,48 +728,68 @@ async function doFetchEmployeesExcel(fileOverride) {
             if (dayCols.length >= 20 || isAttendanceByName) {
               // Weekday row: thường là dòng ngay trên header
               const weekdayRow = headerRowIdx > 0 ? (jsonData[headerRowIdx - 1] || []) : [];
-              // Suy ra key tháng TMMYYYY từ A1/vài ô tiêu đề hoặc tên sheet
+              // Suy ra key tháng TMMYYYY
+              // Ưu tiên TÊN SHEET (vd. "CHẤM CÔNG T4") vì A1 thường bị copy nhầm từ tháng khác
               let monthKey = null;
-              const tryMonthFromText = (text) => {
+              const defaultYear = (() => {
+                // Ưu tiên năm từ tên sheet trong workbook (T042026, CHẤM CÔNG T4/2026...)
+                for (const sn of (workbook.SheetNames || [])) {
+                  const pm = String(sn).match(/(20\d{2})/);
+                  if (pm) return pm[1];
+                }
+                const payKeys = Object.keys(globalSheetsData || {});
+                for (const k of payKeys) {
+                  const pm = k.match(/^T\d{2}(20\d{2})$/i);
+                  if (pm) return pm[1];
+                }
+                return new Date().getFullYear().toString();
+              })();
+              const tryMonthFromText = (text, allowMonthOnly) => {
                 if (!text) return null;
                 const s = String(text).trim();
                 // 07/2026, 7-2026, 07.2026
                 let m = s.match(/(?:^|[^\d])(\d{1,2})\s*[\/\-\.]\s*(20\d{2})(?:[^\d]|$)/);
-                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                if (m) {
+                  const mm = parseInt(m[1], 10);
+                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+                }
                 // Tháng 7/2026, Thang 07 2026
                 m = s.match(/th[aá]ng\s*(\d{1,2})\s*[\/\-\.\s]?\s*(20\d{2})/i);
-                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                if (m) {
+                  const mm = parseInt(m[1], 10);
+                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+                }
                 // T07/2026, T072026
                 m = s.match(/\bT\s*(\d{1,2})\s*[\/\-]?\s*(20\d{2})\b/i);
-                if (m) return `T${String(parseInt(m[1], 10)).padStart(2, "0")}${m[2]}`;
+                if (m) {
+                  const mm = parseInt(m[1], 10);
+                  if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${m[2]}`;
+                }
+                // Chỉ có tháng, không có năm: "T4", "T04", "tháng 4", "CHẤM CÔNG T4"
+                if (allowMonthOnly) {
+                  m = s.match(/\bT\s*(\d{1,2})\b/i) || s.match(/th[aá]ng\s*(\d{1,2})\b/i);
+                  if (m) {
+                    const mm = parseInt(m[1], 10);
+                    if (mm >= 1 && mm <= 12) return `T${String(mm).padStart(2, "0")}${defaultYear}`;
+                  }
+                }
                 return null;
               };
-              // Quét vài ô đầu sheet (A1, B1, A2...) lấy tháng
-              for (let ri = 0; ri <= Math.min(3, headerRowIdx); ri++) {
-                const row = jsonData[ri] || [];
-                for (let ci = 0; ci < Math.min(6, row.length); ci++) {
-                  monthKey = tryMonthFromText(row[ci]);
+              // 1) Tên sheet trước (đáng tin nhất)
+              monthKey = tryMonthFromText(cleanName, true);
+              // 2) Nếu tên sheet không có tháng → quét vài ô đầu
+              if (!monthKey) {
+                for (let ri = 0; ri <= Math.min(3, headerRowIdx); ri++) {
+                  const row = jsonData[ri] || [];
+                  for (let ci = 0; ci < Math.min(6, row.length); ci++) {
+                    monthKey = tryMonthFromText(row[ci], false);
+                    if (monthKey) break;
+                  }
                   if (monthKey) break;
                 }
-                if (monthKey) break;
               }
-              if (!monthKey) {
-                monthKey = tryMonthFromText(cleanName);
-              }
-              if (!monthKey) {
-                const mName = cleanName.match(/(?:T|THÁNG\s*)?(\d{1,2})\s*[\/\-]?\s*(20\d{2})/i)
-                  || cleanName.match(/T(\d{2})(20\d{2})/i)
-                  || cleanName.match(/T(\d{1,2})\b/i);
-                if (mName) {
-                  const mm = String(parseInt(mName[1], 10)).padStart(2, "0");
-                  const yy = mName[2] || (new Date().getFullYear().toString());
-                  monthKey = `T${mm}${yy}`;
-                }
-              }
-              // Nếu vẫn không có, dùng tên sheet làm key tạm (tránh ghi đè khi nhiều sheet cùng tên)
+              // 3) Fallback cuối
               if (!monthKey) monthKey = cleanName;
-              // Nếu key đã tồn tại (sheet khác cùng tháng), giữ bản có nhiều dòng hơn
-              // — xử lý bên dưới lúc gán globalAttendanceData
 
               // Số ngày thực của tháng (để ẩn cột 29/30/31 không hợp lệ)
               let daysInMonth = 31;
@@ -907,9 +939,14 @@ async function doFetchEmployeesExcel(fileOverride) {
       select.appendChild(opt);
     });
 
-    const attNote = attKeys.length > 0 ? ` · ${attKeys.length} sheet chấm công` : "";
+    const attLabel = attKeys.length > 0
+      ? ` · ${attKeys.length} sheet chấm công (${attKeys.map(k => {
+          const m = k.match(/^T(\d{2})(\d{4})$/i);
+          return m ? `T${m[1]}/${m[2]}` : k;
+        }).join(", ")})`
+      : "";
     const luongNote = sheetNames.length > 0 ? `${sheetNames.length} sheet lương` : "0 sheet lương";
-    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${luongNote}${attNote}. Hãy chọn tháng bên dưới.</span>`;
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${luongNote}${attLabel}. Hãy chọn tháng bên dưới.</span>`;
     setEmployeeDropZoneState("done", file.name);
 
   } catch (e) {
@@ -1967,8 +2004,15 @@ function renderAttendanceTable() {
   if (!att || !att.rows || att.rows.length === 0) {
     if (emptyMsg) {
       emptyMsg.style.display = "block";
+      const available = Object.keys(globalAttendanceData || {});
+      const availNote = available.length > 0
+        ? ` Sheet chấm công đã đọc được: <b>${available.map(k => {
+            const m = k.match(/^T(\d{2})(\d{4})$/i);
+            return m ? `T${m[1]}/${m[2]}` : escapeHtml(k);
+          }).join(", ")}</b>.`
+        : " Chưa đọc được sheet chấm công nào từ file.";
       emptyMsg.innerHTML = selectedSheet
-        ? `<span class="err">Không tìm thấy dữ liệu chấm công tương ứng với tháng <b>${escapeHtml(selectedSheet)}</b>. Hãy đảm bảo file Excel có sheet tên dạng "CHẤM CÔNG T7" (hoặc chứa "CHẤM CÔNG") và có cột MÃ NV + các ngày trong tháng.</span>`
+        ? `<span class="err">Không tìm thấy dữ liệu chấm công tương ứng với tháng <b>${escapeHtml(selectedSheet)}</b>.${availNote} Sheet cần tên dạng "CHẤM CÔNG T4" (hoặc chứa "CHẤM CÔNG") và có cột MÃ NV + các ngày trong tháng.</span>`
         : `<span class="err">Chưa có dữ liệu chấm công. Chọn file Excel có sheet chấm công rồi chọn tháng.</span>`;
     }
     return;
