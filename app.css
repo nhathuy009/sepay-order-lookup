@@ -1175,9 +1175,9 @@
     .menu-text { display: inline !important; }
     .main-content { padding: 16px; padding-bottom: 80px; overflow: visible; -webkit-overflow-scrolling: touch; }
     #toggleSidebarBtn { display: none !important; }
-    #accountingRow { flex-direction: column; }
-    #accountingRow #accountingWrapper, #accountingRow #bankTransferWrapper { max-width: 100%; width: 100%; flex: 1 1 auto; }
     #accountingTable, #accountingTable2, #accountingTable3 { width: 100%; }
+    #empMainTabs { width: 100%; justify-content: stretch; }
+    #empMainTabs .acc-seg-btn { flex: 1 1 0; text-align: center; }
 
     /* --- HEADER GỌN LẠI TRÊN ĐIỆN THOẠI --- */
     .top-header {
