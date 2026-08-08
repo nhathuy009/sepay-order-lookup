@@ -227,6 +227,7 @@
               <button type="button" class="acc-seg-btn active" id="empMainBtn-luong" onclick="switchEmpMainTab('luong')">Bảng lương</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-dinhkhoan" onclick="switchEmpMainTab('dinhkhoan')">Định khoản</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-chuyenkhoan" onclick="switchEmpMainTab('chuyenkhoan')">Chuyển khoản</button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-chamcong" onclick="switchEmpMainTab('chamcong')">Chấm công</button>
             </div>
           </div>
 
@@ -375,6 +376,26 @@
                 <tbody id="bankTransferTbody"></tbody>
               </table>
             </div>
+          </div>
+
+          <!-- Panel 4: Chấm công -->
+          <div id="attendanceWrapper" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: wrap;">
+              <div class="text-muted-small" style="margin:0;" id="attendanceLegend">
+                <span style="margin-right:10px;"><b style="color:var(--amount-in);">L</b> Làm việc</span>
+                <span style="margin-right:10px;"><b style="color:var(--text-muted);">N</b> Nghỉ tuần</span>
+                <span style="margin-right:10px;"><b style="color:#e67e22;">P</b> Phép có lương</span>
+                <span style="margin-right:10px;"><b style="color:var(--badge-err-text);">V</b> Vắng không lý do</span>
+                <span><b style="color:#9b59b6;">K</b> Không lương</span>
+              </div>
+            </div>
+            <div class="table-responsive" id="attendanceTableScroll">
+              <table class="sepay-table" id="attendanceTable">
+                <thead id="attendanceThead"></thead>
+                <tbody id="attendanceTbody"></tbody>
+              </table>
+            </div>
+            <div id="attendanceEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
           </div>
         </div>
       </div>
