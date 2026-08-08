@@ -490,20 +490,55 @@ function removeVietnameseDiacritics(str) {
   return s;
 }
 
-async function doFetchEmployeesExcel() {
+function setEmployeeDropZoneState(state, fileName) {
+  const zone = document.getElementById("employeeDropZone");
+  const inner = document.getElementById("employeeDropZoneInner");
+  const info = document.getElementById("employeeDropFileInfo");
+  const nameEl = document.getElementById("employeeDropFileName");
+  if (!zone || !inner || !info) return;
+  zone.classList.remove("has-file", "processing", "drag-over");
+  if (state === "idle") {
+    inner.style.display = "";
+    info.style.display = "none";
+  } else if (state === "processing") {
+    zone.classList.add("processing", "has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName ? `Đang xử lý: ${fileName}` : "Đang xử lý...";
+  } else if (state === "done") {
+    zone.classList.add("has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName || "File đã chọn";
+  }
+}
+
+function isValidEmployeeExcelFile(file) {
+  if (!file) return false;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith(".xlsx");
+}
+
+async function doFetchEmployeesExcel(fileOverride) {
   const fileInput = document.getElementById("employeeExcelFile");
   const box = document.getElementById("sheetsResult");
-  const btn = document.getElementById("fetchSheetsBtn");
-  
-  if (!fileInput.files.length) { 
-    box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>'; 
-    return; 
+
+  const file = fileOverride || (fileInput && fileInput.files && fileInput.files[0]);
+  if (!file) {
+    box.innerHTML = '<span class="err">Vui lòng chọn file Excel.</span>';
+    setEmployeeDropZoneState("idle");
+    return;
   }
-  
-  const file = fileInput.files[0];
-  btn.disabled = true;
+  if (!isValidEmployeeExcelFile(file)) {
+    box.innerHTML = '<span class="err">Vui lòng chọn file Excel (.xlsx).</span>';
+    setEmployeeDropZoneState("idle");
+    if (fileInput) fileInput.value = "";
+    return;
+  }
+
+  setEmployeeDropZoneState("processing", file.name);
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file...';
-  
+
   try {
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data, { type: 'array' });
@@ -648,9 +683,10 @@ async function doFetchEmployeesExcel() {
       box.innerHTML = '<span class="err">Không tìm thấy Sheet nào có định dạng tên T012026, T022026...</span>';
       document.getElementById("sheetSelect").innerHTML = '<option value="">-- Chưa có dữ liệu --</option>';
       document.getElementById("employeeTableWrapper").style.display = "none";
+      setEmployeeDropZoneState("done", file.name);
       return;
     }
-    
+
     const select = document.getElementById("sheetSelect");
     select.innerHTML = '<option value="">-- Chọn Tháng / Sheet --</option>';
     sheetNames.forEach(name => {
@@ -659,13 +695,13 @@ async function doFetchEmployeesExcel() {
       opt.textContent = name;
       select.appendChild(opt);
     });
-    
-    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ.</span>`;
-    
+
+    box.innerHTML = `<span class="badge ok">🎉 Đã đọc xong! Tìm thấy ${sheetNames.length} sheet hợp lệ. Hãy chọn tháng bên dưới.</span>`;
+    setEmployeeDropZoneState("done", file.name);
+
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
-  } finally {
-    btn.disabled = false;
+    setEmployeeDropZoneState("done", file.name);
   }
 }
 function displaySheetData() {
@@ -1718,34 +1754,70 @@ document.addEventListener('click', function(e) {
 let bankStatementBase64 = "";
 let bankStatementFileName = "";
 
-async function doBankStatement() {
-  const fileInput = document.getElementById("bankExcelFile"); 
-  const box = document.getElementById("bankResult"); 
-  const btn = document.getElementById("bankBtn");
-  const tableWrap = document.getElementById("bankTableWrap");
-  
-  if (!fileInput.files.length) { 
-    box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>'; 
-    return; 
+function setBankDropZoneState(state, fileName) {
+  const zone = document.getElementById("bankDropZone");
+  const inner = document.getElementById("bankDropZoneInner");
+  const info = document.getElementById("bankDropFileInfo");
+  const nameEl = document.getElementById("bankDropFileName");
+  if (!zone || !inner || !info) return;
+  zone.classList.remove("has-file", "processing", "drag-over");
+  if (state === "idle") {
+    inner.style.display = "";
+    info.style.display = "none";
+  } else if (state === "processing") {
+    zone.classList.add("processing", "has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName ? `Đang xử lý: ${fileName}` : "Đang xử lý...";
+  } else if (state === "done") {
+    zone.classList.add("has-file");
+    inner.style.display = "none";
+    info.style.display = "flex";
+    if (nameEl) nameEl.textContent = fileName || "File đã chọn";
   }
-  
-  const file = fileInput.files[0]; 
-  btn.disabled = true; 
+}
+
+function isValidBankExcelFile(file) {
+  if (!file) return false;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith(".xlsx");
+}
+
+async function doBankStatement(fileOverride) {
+  const fileInput = document.getElementById("bankExcelFile");
+  const box = document.getElementById("bankResult");
+  const tableWrap = document.getElementById("bankTableWrap");
+
+  const file = fileOverride || (fileInput && fileInput.files && fileInput.files[0]);
+  if (!file) {
+    box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file sao kê.</span>';
+    setBankDropZoneState("idle");
+    return;
+  }
+  if (!isValidBankExcelFile(file)) {
+    box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file Excel (.xlsx).</span>';
+    setBankDropZoneState("idle");
+    if (fileInput) fileInput.value = "";
+    return;
+  }
+
+  setBankDropZoneState("processing", file.name);
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý tổng hợp sao kê, vui lòng đợi…';
   if (tableWrap) tableWrap.style.display = 'none';
 
   try {
     const b64 = await fileToBase64(file);
-    const resp = await fetch("/api/index", { 
-      method: "POST", 
-      headers: { "Content-Type": "application/json" }, 
-      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() }) 
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "bank_statement", file_base64: b64, access_token: getToken() })
     });
     const data = await resp.json();
-    
-    if (!resp.ok) { 
-      box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`; 
-      return; 
+
+    if (!resp.ok) {
+      box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ ${data.error || "Lỗi"}</span>`;
+      setBankDropZoneState("done", file.name);
+      return;
     }
     
     // Lưu lại dữ liệu Base64 để dùng cho nút tải về
@@ -1806,11 +1878,11 @@ async function doBankStatement() {
        tableWrap.innerHTML = tableHTML;
        tableWrap.style.display = 'block';
     }
+    setBankDropZoneState("done", file.name);
 
-  } catch (e) { 
-    box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`; 
-  } finally { 
-    btn.disabled = false; 
+  } catch (e) {
+    box.innerHTML = `<span class="err" style="color:var(--badge-err-text)">❌ Lỗi: ${e.message}</span>`;
+    setBankDropZoneState("done", file.name);
   }
 }
 
@@ -3565,11 +3637,169 @@ function initAirDropZone() {
   });
 }
 
+function initBankDropZone() {
+  const zone = document.getElementById("bankDropZone");
+  const fileInput = document.getElementById("bankExcelFile");
+  const changeBtn = document.getElementById("bankDropChangeBtn");
+  if (!zone || !fileInput) return;
+
+  const openPicker = () => {
+    if (zone.classList.contains("processing")) return;
+    fileInput.value = "";
+    fileInput.click();
+  };
+
+  zone.addEventListener("click", (e) => {
+    if (e.target.closest("#bankDropChangeBtn")) return;
+    if (zone.classList.contains("has-file") && !zone.classList.contains("processing")) return;
+    openPicker();
+  });
+
+  zone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!zone.classList.contains("has-file") || zone.classList.contains("processing")) openPicker();
+    }
+  });
+
+  if (changeBtn) {
+    changeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPicker();
+    });
+  }
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) {
+      doBankStatement(fileInput.files[0]);
+    }
+  });
+
+  zone.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
+  });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove("drag-over");
+    if (zone.classList.contains("processing")) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    const file = files[0];
+    if (!isValidBankExcelFile(file)) {
+      const box = document.getElementById("bankResult");
+      if (box) box.innerHTML = '<span class="err" style="color:var(--badge-err-text)">Vui lòng chọn file Excel (.xlsx).</span>';
+      return;
+    }
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+    } catch (_) { /* ignore */ }
+    doBankStatement(file);
+  });
+}
+
+function initEmployeeDropZone() {
+  const zone = document.getElementById("employeeDropZone");
+  const fileInput = document.getElementById("employeeExcelFile");
+  const changeBtn = document.getElementById("employeeDropChangeBtn");
+  if (!zone || !fileInput) return;
+
+  const openPicker = () => {
+    if (zone.classList.contains("processing")) return;
+    fileInput.value = "";
+    fileInput.click();
+  };
+
+  zone.addEventListener("click", (e) => {
+    if (e.target.closest("#employeeDropChangeBtn")) return;
+    if (zone.classList.contains("has-file") && !zone.classList.contains("processing")) return;
+    openPicker();
+  });
+
+  zone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!zone.classList.contains("has-file") || zone.classList.contains("processing")) openPicker();
+    }
+  });
+
+  if (changeBtn) {
+    changeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openPicker();
+    });
+  }
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files && fileInput.files[0]) {
+      doFetchEmployeesExcel(fileInput.files[0]);
+    }
+  });
+
+  zone.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    if (!zone.classList.contains("processing")) zone.classList.add("drag-over");
+  });
+  zone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
+  });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove("drag-over");
+    if (zone.classList.contains("processing")) return;
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    const file = files[0];
+    if (!isValidEmployeeExcelFile(file)) {
+      const box = document.getElementById("sheetsResult");
+      if (box) box.innerHTML = '<span class="err">Vui lòng chọn file Excel (.xlsx).</span>';
+      return;
+    }
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+    } catch (_) { /* ignore */ }
+    doFetchEmployeesExcel(file);
+  });
+}
+
+function initAllDropZones() {
+  initAirDropZone();
+  initBankDropZone();
+  initEmployeeDropZone();
+}
+
 // Khởi tạo drop zone khi DOM sẵn sàng
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initAirDropZone);
+  document.addEventListener("DOMContentLoaded", initAllDropZones);
 } else {
-  initAirDropZone();
+  initAllDropZones();
 }
 
 function renderAirPreviewTable(processed) {
