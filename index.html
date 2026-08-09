@@ -228,9 +228,11 @@
               <button type="button" class="acc-seg-btn active" id="empMainBtn-luong" onclick="switchEmpMainTab('luong')">Bảng lương</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-dinhkhoan" onclick="switchEmpMainTab('dinhkhoan')">Định khoản</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-chuyenkhoan" onclick="switchEmpMainTab('chuyenkhoan')">Chuyển khoản</button>
-              <button type="button" class="acc-seg-btn" id="empMainBtn-kiemtra" onclick="switchEmpMainTab('kiemtra')">Kiểm tra lỗi</button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-kiemtra" onclick="switchEmpMainTab('kiemtra')">Kiểm tra lỗi <span id="empAuditBadge" class="emp-audit-badge" style="display:none;"></span></button>
             </div>
           </div>
+          <!-- Banner cảnh báo lỗi CC ↔ Lương (P1) — hiện mọi tab khi tháng có lệch/cảnh báo -->
+          <div id="empAuditBanner" class="emp-audit-banner" style="display:none;" role="status"></div>
 
           <!-- Panel 1: Bảng lương -->
           <div id="employeeTableWrapper">
