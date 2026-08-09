@@ -1085,6 +1085,7 @@ function displaySheetData() {
     bankActiveTab = '';
     const bankTabsWrapEmpty = document.getElementById("bankTabsWrap");
     if (bankTabsWrapEmpty) bankTabsWrapEmpty.innerHTML = "";
+    updateAuditAlerts();
     return;
   }
 
@@ -2214,10 +2215,157 @@ function resolveAttendanceForSheet(selectedSheet) {
 }
 
 /**
- * Kiểm tra chéo Chấm công ↔ Bảng lương
- * Quy tắc (từ file chuẩn 2026):
- *  - Công thực tế (lương) ≈ số ô L trên chấm công
- *  - Công hưởng lương (ước) ≈ L + H + P
+ * Tính kết quả đối soát CC ↔ Lương cho 1 tháng.
+ * Quy tắc: nctt ≈ count(L); nchl ≈ L+H+P
+ * @returns {{ sheet, ok, err, warn, rows, attCount, payCount, hasData }}
+ */
+function computeAuditStats(selectedSheet) {
+  const empty = { sheet: selectedSheet || "", ok: 0, err: 0, warn: 0, rows: [], attCount: 0, payCount: 0, hasData: false };
+  if (!selectedSheet) return empty;
+
+  const payRows = globalSheetsData[selectedSheet] || [];
+  const att = resolveAttendanceForSheet(selectedSheet);
+
+  const attMap = {};
+  (att && att.rows ? att.rows : []).forEach(r => {
+    const ma = (r.ma_nv || "").trim().toUpperCase();
+    if (!ma) return;
+    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0;
+    (r.days || []).forEach(code => {
+      const c = (code || "").toUpperCase();
+      if (c === "L") L++;
+      else if (c === "N") N++;
+      else if (c === "P") P++;
+      else if (c === "V") V++;
+      else if (c === "K") K++;
+      else if (c === "H" || c === "LE" || c === "LỄ") H++;
+    });
+    attMap[ma] = {
+      L_count: L, N, P, V, K, H,
+      cong_tt_cc: L,
+      cong_hl_uoc: L + H + P
+    };
+  });
+
+  const payMap = {};
+  payRows.forEach(r => {
+    const ma = (r.ma_nv || "").trim().toUpperCase();
+    if (!ma) return;
+    payMap[ma] = {
+      ten: r.ten_nv || "",
+      nctt: r.ngay_cong_tt,
+      nchl: r.ngay_cong_hl
+    };
+  });
+
+  const allMa = Array.from(new Set([...Object.keys(attMap), ...Object.keys(payMap)])).sort((a, b) => a.localeCompare(b, "vi"));
+  let ok = 0, err = 0, warn = 0;
+  const rows = [];
+
+  allMa.forEach(ma => {
+    const a = attMap[ma];
+    const p = payMap[ma];
+    const issues = [];
+    let status = "ok";
+
+    if (a && !p) {
+      status = "warn";
+      issues.push("Có chấm công, không có dòng lương");
+    } else if (!a && p) {
+      status = "warn";
+      issues.push("Có bảng lương, không có chấm công");
+    } else if (a && p) {
+      const nctt = parseFloat(p.nctt);
+      const nchl = parseFloat(p.nchl);
+      if (!isNaN(nctt) && nctt !== a.cong_tt_cc) {
+        status = "err";
+        issues.push(`Công TT: CC=${a.cong_tt_cc} ≠ Lương=${nctt}`);
+      }
+      if (!isNaN(nchl) && nchl !== a.cong_hl_uoc) {
+        status = "err";
+        issues.push(`Công HL: ước L+H+P=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
+      }
+      if (issues.length === 0) {
+        status = "ok";
+        issues.push("Khớp công TT & HL");
+      }
+    }
+
+    if (status === "ok") ok++;
+    else if (status === "err") err++;
+    else warn++;
+
+    rows.push({ ma, a, p, status, issues });
+  });
+
+  return {
+    sheet: selectedSheet,
+    ok, err, warn,
+    rows,
+    attCount: Object.keys(attMap).length,
+    payCount: Object.keys(payMap).length,
+    hasData: allMa.length > 0
+  };
+}
+
+/** Cập nhật badge trên tab + banner cảnh báo (P1) */
+function updateAuditAlerts() {
+  const selectedSheet = document.getElementById("sheetSelect")?.value || "";
+  const badge = document.getElementById("empAuditBadge");
+  const banner = document.getElementById("empAuditBanner");
+  const card = document.getElementById("employeeResultCard");
+
+  // Ẩn khi chưa có card / chưa chọn tháng
+  if (!selectedSheet || (card && card.style.display === "none")) {
+    if (badge) { badge.style.display = "none"; badge.textContent = ""; }
+    if (banner) { banner.style.display = "none"; banner.innerHTML = ""; }
+    return;
+  }
+
+  const stats = computeAuditStats(selectedSheet);
+  const problem = stats.err + stats.warn;
+
+  if (badge) {
+    if (problem > 0) {
+      badge.style.display = "inline-flex";
+      badge.textContent = String(problem);
+      badge.classList.remove("is-err", "is-warn");
+      badge.classList.add(stats.err > 0 ? "is-err" : "is-warn");
+      badge.title = stats.err > 0
+        ? `${stats.err} lệch, ${stats.warn} cảnh báo`
+        : `${stats.warn} cảnh báo`;
+    } else {
+      badge.style.display = "none";
+      badge.textContent = "";
+    }
+  }
+
+  if (banner) {
+    // Ẩn banner khi đang đứng ngay tab Kiểm tra lỗi (tránh trùng thông tin)
+    if (problem > 0 && empMainTab !== "kiemtra") {
+      banner.style.display = "flex";
+      banner.classList.remove("is-err", "is-warn");
+      banner.classList.add(stats.err > 0 ? "is-err" : "is-warn");
+      const sheetLabel = (() => {
+        const m = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+        return m ? `T${m[1]}/${m[2]}` : selectedSheet;
+      })();
+      const parts = [];
+      if (stats.err > 0) parts.push(`<b>${stats.err} lệch công</b>`);
+      if (stats.warn > 0) parts.push(`<b>${stats.warn} cảnh báo</b>`);
+      banner.innerHTML = `
+        <span>⚠ Tháng ${escapeHtml(sheetLabel)}: ${parts.join(", ")} (đối soát chấm công ↔ bảng lương).</span>
+        <button type="button" class="emp-audit-link" onclick="switchEmpMainTab('kiemtra')">Xem chi tiết →</button>
+      `;
+    } else {
+      banner.style.display = "none";
+      banner.innerHTML = "";
+    }
+  }
+}
+
+/**
+ * Kiểm tra chéo Chấm công ↔ Bảng lương — render bảng chi tiết
  */
 function renderAuditTable() {
   const tbody = document.getElementById("auditTbody");
@@ -2234,99 +2382,25 @@ function renderAuditTable() {
       emptyMsg.innerHTML = `<span class="err">Chưa chọn tháng. Hãy chọn tháng trên dropdown rồi mở tab Kiểm tra lỗi.</span>`;
     }
     if (summaryEl) summaryEl.textContent = "Chưa chọn tháng.";
+    updateAuditAlerts();
     return;
   }
 
-  const payRows = globalSheetsData[selectedSheet] || [];
-  const att = resolveAttendanceForSheet(selectedSheet);
+  const stats = computeAuditStats(selectedSheet);
 
-  if ((!payRows || payRows.length === 0) && (!att || !att.rows || att.rows.length === 0)) {
+  if (!stats.hasData) {
     if (emptyMsg) {
       emptyMsg.style.display = "block";
       emptyMsg.innerHTML = `<span class="err">Tháng <b>${escapeHtml(selectedSheet)}</b> không có dữ liệu bảng lương lẫn chấm công để đối soát.</span>`;
     }
     if (summaryEl) summaryEl.textContent = "Không có dữ liệu.";
+    updateAuditAlerts();
     return;
   }
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  // Map chấm công theo mã NV
-  const attMap = {};
-  (att && att.rows ? att.rows : []).forEach(r => {
-    const ma = (r.ma_nv || "").trim().toUpperCase();
-    if (!ma) return;
-    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0;
-    (r.days || []).forEach(code => {
-      const c = (code || "").toUpperCase();
-      if (c === "L") L++;
-      else if (c === "N") N++;
-      else if (c === "P") P++;
-      else if (c === "V") V++;
-      else if (c === "K") K++;
-      else if (c === "H" || c === "LE" || c === "LỄ") H++;
-    });
-    // Ưu tiên tổng từ file nếu có
-    attMap[ma] = {
-      L_count: L,
-      N, P, V, K, H,
-      // Công TT từ CC = số L đếm trên lưới ngày; HL ước = L+H+P
-      cong_tt_cc: L,
-      cong_hl_uoc: L + H + P
-    };
-  });
-
-  // Map lương theo mã NV
-  const payMap = {};
-  payRows.forEach(r => {
-    const ma = (r.ma_nv || "").trim().toUpperCase();
-    if (!ma) return;
-    payMap[ma] = {
-      ten: r.ten_nv || "",
-      nctt: r.ngay_cong_tt,
-      nchl: r.ngay_cong_hl
-    };
-  });
-
-  const allMa = Array.from(new Set([...Object.keys(attMap), ...Object.keys(payMap)])).sort((a, b) => a.localeCompare(b, "vi"));
-
-  let okCount = 0, errCount = 0, warnCount = 0;
-  let stt = 0;
-
-  allMa.forEach(ma => {
-    const a = attMap[ma];
-    const p = payMap[ma];
-    const issues = [];
-    let status = "ok"; // ok | err | warn
-
-    if (a && !p) {
-      status = "warn";
-      issues.push("Có chấm công, không có dòng lương");
-    } else if (!a && p) {
-      status = "warn";
-      issues.push("Có bảng lương, không có chấm công");
-    } else if (a && p) {
-      const nctt = parseFloat(p.nctt);
-      const nchl = parseFloat(p.nchl);
-      if (!isNaN(nctt) && nctt !== a.cong_tt_cc) {
-        status = "err";
-        issues.push(`Công TT: CC=${a.cong_tt_cc} ≠ Lương=${nctt}`);
-      }
-      if (!isNaN(nchl) && nchl !== a.cong_hl_uoc) {
-        // lệch HL: có thể do K/V hoặc quy chế khác — đánh dấu err nếu lệch rõ
-        status = "err";
-        issues.push(`Công HL: ước L+H+P=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
-      }
-      if (issues.length === 0) {
-        status = "ok";
-        issues.push("Khớp công TT & HL");
-      }
-    }
-
-    if (status === "ok") okCount++;
-    else if (status === "err") errCount++;
-    else warnCount++;
-
-    stt++;
+  stats.rows.forEach((row, idx) => {
+    const { ma, a, p, status, issues } = row;
     const tr = document.createElement("tr");
     if (status === "err") tr.style.background = "rgba(220, 53, 69, 0.06)";
     else if (status === "warn") tr.style.background = "rgba(230, 126, 34, 0.06)";
@@ -2337,11 +2411,11 @@ function renderAuditTable() {
         ? `<span class="badge err">Lệch</span>`
         : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
 
-    const cell = (v, center = true) =>
-      `<td style="text-align:${center ? "center" : "left"};">${v !== undefined && v !== null && v !== "" ? escapeHtml(String(v)) : "—"}</td>`;
+    const cell = (v) =>
+      `<td style="text-align:center;">${v !== undefined && v !== null && v !== "" ? escapeHtml(String(v)) : "—"}</td>`;
 
     tr.innerHTML = `
-      <td style="text-align:center;">${stt}</td>
+      <td style="text-align:center;">${idx + 1}</td>
       <td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(ma)}</td>
       ${cell(a ? a.L_count : "")}
       ${cell(a ? a.H : "")}
@@ -2360,18 +2434,15 @@ function renderAuditTable() {
   });
 
   if (summaryEl) {
-    const attNote = att ? `CC: ${Object.keys(attMap).length} NV` : "CC: không có";
-    const payNote = `Lương: ${Object.keys(payMap).length} NV`;
+    const attNote = stats.attCount > 0 ? `CC: ${stats.attCount} NV` : "CC: không có";
+    const payNote = `Lương: ${stats.payCount} NV`;
     summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · ${attNote} · ${payNote} · ` +
-      `<span style="color:var(--amount-in);">OK ${okCount}</span> · ` +
-      `<span style="color:var(--badge-err-text);">Lệch ${errCount}</span> · ` +
-      `<span style="color:#e67e22;">Cảnh báo ${warnCount}</span>`;
+      `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
+      `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
+      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
   }
 
-  if (allMa.length === 0 && emptyMsg) {
-    emptyMsg.style.display = "block";
-    emptyMsg.innerHTML = `<span class="err">Không có mã NV để đối soát.</span>`;
-  }
+  updateAuditAlerts();
 }
 
 function applyEmpMainTabView() {
@@ -2411,6 +2482,9 @@ function applyEmpMainTabView() {
   }
   if (empMainTab === "kiemtra") {
     renderAuditTable();
+  } else {
+    // Cập nhật badge + banner khi đang ở tab khác (banner ẩn khi đang ở kiemtra)
+    updateAuditAlerts();
   }
 }
   
