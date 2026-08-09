@@ -228,6 +228,7 @@
               <button type="button" class="acc-seg-btn active" id="empMainBtn-luong" onclick="switchEmpMainTab('luong')">Bảng lương</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-dinhkhoan" onclick="switchEmpMainTab('dinhkhoan')">Định khoản</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-chuyenkhoan" onclick="switchEmpMainTab('chuyenkhoan')">Chuyển khoản</button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-kiemtra" onclick="switchEmpMainTab('kiemtra')">Kiểm tra lỗi</button>
             </div>
           </div>
 
@@ -396,6 +397,44 @@
               </table>
             </div>
             <div id="attendanceEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
+          </div>
+
+          <!-- Panel 5: Kiểm tra lỗi (đối soát chấm công ↔ bảng lương) -->
+          <div id="auditWrapper" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: wrap;">
+              <div class="text-muted-small" style="margin:0;" id="auditSummary">
+                Đối soát MSNV + ngày công giữa sheet Chấm công và Bảng lương của tháng đang chọn.
+              </div>
+              <div class="text-muted-small" style="margin:0;">
+                <span style="margin-right:10px;"><b style="color:var(--amount-in);">OK</b> Khớp</span>
+                <span style="margin-right:10px;"><b style="color:var(--badge-err-text);">Lệch</b> Sai số / thiếu</span>
+                <span><b style="color:#e67e22;">Cảnh báo</b> Chỉ có 1 bên</span>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="sepay-table" id="auditTable">
+                <thead>
+                  <tr>
+                    <th style="width:48px; text-align:center;">STT</th>
+                    <th class="freeze-col-1">Mã NV</th>
+                    <th style="text-align:center;">L</th>
+                    <th style="text-align:center;">H</th>
+                    <th style="text-align:center;">P</th>
+                    <th style="text-align:center;">V</th>
+                    <th style="text-align:center;">K</th>
+                    <th style="text-align:center;">N</th>
+                    <th style="text-align:center;">Công TT<br><span class="text-muted-small">(CC)</span></th>
+                    <th style="text-align:center;">Công TT<br><span class="text-muted-small">(Lương)</span></th>
+                    <th style="text-align:center;">Công HL<br><span class="text-muted-small">(ước L+H+P)</span></th>
+                    <th style="text-align:center;">Công HL<br><span class="text-muted-small">(Lương)</span></th>
+                    <th style="text-align:center;">Trạng thái</th>
+                    <th>Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTbody"></tbody>
+              </table>
+            </div>
+            <div id="auditEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
           </div>
         </div>
       </div>
