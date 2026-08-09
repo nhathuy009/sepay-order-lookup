@@ -1244,6 +1244,46 @@
   #attendanceTable th { white-space: nowrap; }
   #attendanceTableScroll { max-height: 70vh; overflow: auto; }
 
+  /* --- Badge lỗi trên tab Kiểm tra lỗi + banner cảnh báo --- */
+  .emp-audit-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 6px; margin-left: 6px;
+    border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1;
+    vertical-align: middle;
+  }
+  .emp-audit-badge.is-err {
+    background: var(--badge-err-text, #dc2626); color: #fff;
+  }
+  .emp-audit-badge.is-warn {
+    background: #e67e22; color: #fff;
+  }
+  .acc-seg-btn.active .emp-audit-badge.is-err,
+  .acc-seg-btn.active .emp-audit-badge.is-warn {
+    background: rgba(255,255,255,0.95); color: var(--badge-err-text, #dc2626);
+  }
+  .acc-seg-btn.active .emp-audit-badge.is-warn {
+    color: #c0392b;
+  }
+  .emp-audit-banner {
+    margin: 0 0 14px 0; padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; line-height: 1.45;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .emp-audit-banner.is-err {
+    background: var(--badge-err-bg, #fef2f2); color: var(--badge-err-text, #dc2626);
+    border: 1px solid rgba(220, 38, 38, 0.25);
+  }
+  .emp-audit-banner.is-warn {
+    background: #fff7ed; color: #c2410c;
+    border: 1px solid rgba(234, 88, 12, 0.25);
+  }
+  .emp-audit-banner a, .emp-audit-banner button.emp-audit-link {
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; font-weight: 800; cursor: pointer;
+    color: inherit; text-decoration: underline;
+  }
+
   /* --- GIAO DIỆN BẢNG GIAO DỊCH NHỎ GỌN --- */
   #txListTable th, 
   #txListTable td {
