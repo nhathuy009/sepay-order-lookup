@@ -2054,6 +2054,55 @@ function switchEmpMainTab(tab) {
   });
 }
 
+/**
+ * Từ tab Kiểm tra lỗi: chuyển sang Bảng chấm công và nháy dòng nhân viên tương ứng.
+ * Gọi khi click MÃ NV bị Lệch / Cảnh báo (có dữ liệu chấm công).
+ */
+function jumpToAttendanceRow(maNv) {
+  const ma = (maNv || "").trim().toUpperCase();
+  if (!ma) return;
+
+  // Chuyển tab (không giữ scroll cũ — sẽ cuộn tới dòng NV)
+  empMainTab = "chamcong";
+  applyEmpMainTabView();
+
+  const tryHighlight = () => {
+    const tbody = document.getElementById("attendanceTbody");
+    if (!tbody) return false;
+    // Xóa highlight cũ
+    tbody.querySelectorAll("tr.att-row-flash").forEach(tr => tr.classList.remove("att-row-flash"));
+    const row = tbody.querySelector(`tr[data-ma-nv="${CSS.escape(ma)}"]`);
+    if (!row) return false;
+
+    row.classList.add("att-row-flash");
+    // Cuộn trong container bảng (nếu có) + đưa dòng vào giữa viewport
+    const scrollBox = document.getElementById("attendanceTableScroll");
+    if (scrollBox) {
+      const rowTop = row.offsetTop;
+      const target = Math.max(0, rowTop - scrollBox.clientHeight / 3);
+      scrollBox.scrollTo({ top: target, behavior: "smooth" });
+    }
+    row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
+    // Tự gỡ class sau khi animation kết thúc (để có thể nháy lại lần sau)
+    window.clearTimeout(jumpToAttendanceRow._timer);
+    jumpToAttendanceRow._timer = window.setTimeout(() => {
+      row.classList.remove("att-row-flash");
+    }, 3200);
+    return true;
+  };
+
+  // Đợi bảng chấm công render xong (2 frame)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (!tryHighlight()) {
+        // Thử lại sau một nhịp ngắn nếu DOM chưa kịp
+        setTimeout(tryHighlight, 80);
+      }
+    });
+  });
+}
+
 function getAttendanceCodeClass(code) {
   const c = (code || "").toUpperCase();
   if (c === "L") return "att-code-l";
@@ -2160,6 +2209,8 @@ function renderAttendanceTable() {
 
   att.rows.forEach(r => {
     const tr = document.createElement("tr");
+    const maNorm = (r.ma_nv || "").trim().toUpperCase();
+    if (maNorm) tr.setAttribute("data-ma-nv", maNorm);
     let tds = `<td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>`;
     (r.days || []).forEach((code, i) => {
       const cls = getAttendanceCodeClass(code);
@@ -2414,9 +2465,21 @@ function renderAuditTable() {
     const cell = (v) =>
       `<td style="text-align:center;">${v !== undefined && v !== null && v !== "" ? escapeHtml(String(v)) : "—"}</td>`;
 
+    // Lệch / Cảnh báo / có CC: click MÃ NV (hoặc cả dòng) → tab Chấm công + nháy dòng
+    const canJump = (status === "err" || status === "warn" || !!a);
+    if (canJump) {
+      tr.classList.add("audit-row-clickable");
+      tr.setAttribute("data-jump-ma", ma);
+      tr.title = `Bấm để xem chấm công của ${ma}`;
+    }
+
+    const maCell = canJump
+      ? `<td class="freeze-col-1"><a href="javascript:void(0)" class="audit-ma-link" data-jump-ma="${escapeHtml(ma)}" role="button">${escapeHtml(ma)}</a></td>`
+      : `<td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(ma)}</td>`;
+
     tr.innerHTML = `
       <td style="text-align:center;">${idx + 1}</td>
-      <td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(ma)}</td>
+      ${maCell}
       ${cell(a ? a.L_count : "")}
       ${cell(a ? a.H : "")}
       ${cell(a ? a.P : "")}
@@ -2432,6 +2495,18 @@ function renderAuditTable() {
     `;
     tbody.appendChild(tr);
   });
+
+  // Event delegation: click MÃ NV hoặc cả dòng → nhảy sang chấm công
+  if (!tbody._auditJumpBound) {
+    tbody._auditJumpBound = true;
+    tbody.addEventListener("click", (e) => {
+      const link = e.target.closest("[data-jump-ma]");
+      if (!link) return;
+      e.preventDefault();
+      const ma = link.getAttribute("data-jump-ma");
+      if (ma) jumpToAttendanceRow(ma);
+    });
+  }
 
   if (summaryEl) {
     const attNote = stats.attCount > 0 ? `CC: ${stats.attCount} NV` : "CC: không có";
