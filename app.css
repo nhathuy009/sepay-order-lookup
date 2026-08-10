@@ -1285,6 +1285,7 @@
   }
 
   /* Link MÃ NV trên bảng Kiểm tra lỗi → nhảy sang Chấm công */
+  a.audit-ma-link,
   button.audit-ma-link {
     background: none; border: none; padding: 0; margin: 0;
     font: inherit; font-weight: 700; cursor: pointer;
@@ -1292,8 +1293,15 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+  a.audit-ma-link:hover,
   button.audit-ma-link:hover {
     color: var(--badge-err-text, #dc2626);
+  }
+  #auditTable tbody tr.audit-row-clickable {
+    cursor: pointer;
+  }
+  #auditTable tbody tr.audit-row-clickable:hover {
+    filter: brightness(0.97);
   }
 
   /* Nháy dòng nhân viên trên bảng chấm công khi nhảy từ Kiểm tra lỗi */
