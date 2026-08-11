@@ -1468,3 +1468,69 @@
     .air-drop-zone { padding: 22px 14px; min-height: 110px; }
     .air-drop-text { font-size: 14px; }
   }
+
+/* ===== HOÀN TIỀN – Giai đoạn 1 skeleton ===== */
+.refund-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+@media (max-width: 900px) {
+  .refund-status-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .refund-status-grid { grid-template-columns: 1fr; }
+}
+.refund-status-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--card-shadow);
+  transition: border-color 0.15s, transform 0.15s;
+  cursor: default;
+}
+.refund-status-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.refund-status-dot {
+  font-size: 14px;
+  line-height: 1;
+}
+.refund-status-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.refund-status-count {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.refund-status-need .refund-status-count { color: #ef4444; }
+.refund-status-waiting .refund-status-count { color: #eab308; }
+.refund-status-processing .refund-status-count { color: var(--accent); }
+.refund-status-done .refund-status-count { color: #22c55e; }
+
+/* Badge trạng thái trong bảng (dùng sau) */
+.refund-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.refund-badge-need { background: color-mix(in srgb, #ef4444 16%, transparent); color: #fca5a5; }
+.refund-badge-waiting { background: color-mix(in srgb, #eab308 16%, transparent); color: #fde047; }
+.refund-badge-processing { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--sky-200, #9FD4F8); }
+.refund-badge-done { background: color-mix(in srgb, #22c55e 16%, transparent); color: #86efac; }
+.refund-badge-error { background: color-mix(in srgb, #f97316 16%, transparent); color: #fdba74; }
