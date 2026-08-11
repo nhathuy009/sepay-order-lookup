@@ -797,8 +797,78 @@
           </div>
         </div>
 
-        <!-- Placeholder: form tạo / chi tiết sẽ thêm ở giai đoạn sau -->
-        <div id="refundCreatePanel" class="hidden" style="margin-top: 16px;"></div>
+        <!-- Form tạo hồ sơ -->
+        <div id="refundCreatePanel" class="hidden" style="margin-top: 16px;">
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <h3 style="margin:0;">Tạo hồ sơ hoàn tiền</h3>
+              <button type="button" class="btn-outline" onclick="closeRefundCreateForm()" style="font-size:12px;">Đóng</button>
+            </div>
+
+            <label>Dán nội dung email (tuỳ chọn)</label>
+            <textarea id="refundEmailPaste" rows="3" placeholder="Dán nội dung email yêu cầu hoàn tiền vào đây..."></textarea>
+            <div style="margin-top:8px; margin-bottom:14px;">
+              <button type="button" class="btn-outline" onclick="doRefundParseEmail()" style="font-size:12px;">Phân tích thông tin</button>
+            </div>
+
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <div style="flex:1; min-width:160px;">
+                <label>Mã đơn hàng *</label>
+                <input type="text" id="refundOrderCode" placeholder="DH00125" />
+              </div>
+              <div style="flex:1; min-width:160px;">
+                <label>Tên khóa học</label>
+                <input type="text" id="refundCourseName" placeholder="Excel nâng cao" />
+              </div>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap; margin-top:10px;">
+              <div style="flex:1; min-width:180px;">
+                <label>Họ và tên khách hàng *</label>
+                <input type="text" id="refundCustomerName" placeholder="Nguyễn Văn A" />
+              </div>
+              <div style="flex:1; min-width:140px;">
+                <label>Số tiền hoàn (đ)</label>
+                <input type="number" id="refundAmount" placeholder="2000000" min="0" step="1000" />
+              </div>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap; margin-top:10px;">
+              <div style="flex:1; min-width:160px;">
+                <label>Số tài khoản nhận *</label>
+                <input type="text" id="refundReceiveAccount" placeholder="0123456789" />
+              </div>
+              <div style="flex:1; min-width:140px;">
+                <label>Ngân hàng nhận *</label>
+                <input type="text" id="refundReceiveBank" placeholder="ACB" list="refundBankList" />
+                <datalist id="refundBankList">
+                  <option value="ACB"></option><option value="Vietcombank"></option><option value="Techcombank"></option>
+                  <option value="MB"></option><option value="VPBank"></option><option value="TPBank"></option>
+                  <option value="BIDV"></option><option value="Vietinbank"></option><option value="Sacombank"></option><option value="MSB"></option>
+                </datalist>
+              </div>
+            </div>
+            <div class="row" style="gap:12px; flex-wrap:wrap; margin-top:10px;">
+              <div style="flex:1; min-width:160px;">
+                <label>STK nguồn (từ slip, tuỳ chọn)</label>
+                <input type="text" id="refundSourceAccount" placeholder="1903xxxxxxxx" />
+              </div>
+              <div style="flex:1; min-width:160px;">
+                <label>Nội dung CK (tự sinh nếu để trống)</label>
+                <input type="text" id="refundTransferContent" placeholder="HOAN TIEN DH00125 - Excel nâng cao" />
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <label>Ghi chú</label>
+              <input type="text" id="refundNote" placeholder="Ghi chú thêm (nếu có)" />
+            </div>
+
+            <div id="refundCreateMsg" class="msg" style="display:none; margin-top:12px;"></div>
+            <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
+              <button type="button" class="btn-outline" onclick="closeRefundCreateForm()">Hủy</button>
+              <button type="button" id="refundSubmitBtn" onclick="doRefundCreate()">Tạo hồ sơ</button>
+            </div>
+          </div>
+        </div>
+
         <div id="refundDetailPanel" class="hidden" style="margin-top: 16px;"></div>
       </div>
     </main>
