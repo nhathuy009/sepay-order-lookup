@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon"];
+  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon", "refund"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -359,6 +359,21 @@ function switchTab(which) {
       loadBankAccounts();
     }
   }
+
+  // Tab hoàn tiền (giai đoạn 1: chỉ skeleton, giai đoạn sau sẽ load list)
+  if (which === "refund") {
+    // placeholder — sẽ gọi loadRefundDashboard() ở giai đoạn 2
+  }
+}
+
+// ===== HOÀN TIỀN (Giai đoạn 1: skeleton) =====
+function openRefundCreateForm() {
+  // Giai đoạn 1: chỉ báo sẽ làm ở bước sau
+  alert("Form tạo hồ sơ sẽ được bổ sung ở giai đoạn 2 (kết nối Redis + lưu case).");
+}
+
+function filterRefundList() {
+  // Giai đoạn 1: chưa có dữ liệu — giữ placeholder
 }
 
 // Chuyển đổi Thời gian
