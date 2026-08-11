@@ -360,20 +360,285 @@ function switchTab(which) {
     }
   }
 
-  // Tab hoàn tiền (giai đoạn 1: chỉ skeleton, giai đoạn sau sẽ load list)
+  // Tab hoàn tiền
   if (which === "refund") {
-    // placeholder — sẽ gọi loadRefundDashboard() ở giai đoạn 2
+    loadRefundDashboard();
   }
 }
 
-// ===== HOÀN TIỀN (Giai đoạn 1: skeleton) =====
+// ===== HOÀN TIỀN (Giai đoạn 2: Redis CRUD + form tạo) =====
+let _refundCasesCache = [];
+
+function formatRefundMoney(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString("vi-VN") + "đ";
+}
+
+function formatRefundTime(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const pad = (x) => String(x).padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch (e) {
+    return iso;
+  }
+}
+
+function refundStatusBadgeHtml(status) {
+  const map = {
+    NEED_PHASE_2: ["refund-badge-need", "🔴 Cần tiếp tục"],
+    PAYMENT_CONFIRMED: ["refund-badge-need", "🔴 Đã có tiền ra"],
+    ACB_PAYMENT_PENDING: ["refund-badge-waiting", "🟡 Chờ duyệt"],
+    ACB_PENDING_APPROVAL: ["refund-badge-waiting", "🟡 Chờ duyệt ACB"],
+    NEW: ["refund-badge-processing", "🔵 Mới"],
+    PREPARING: ["refund-badge-processing", "🔵 Đang xử lý"],
+    DONE: ["refund-badge-done", "✓ Hoàn tất"],
+    ERROR: ["refund-badge-error", "⚠ Có lỗi"],
+  };
+  const [cls, label] = map[status] || ["refund-badge-processing", status || "—"];
+  return `<span class="refund-badge ${cls}">${label}</span>`;
+}
+
 function openRefundCreateForm() {
-  // Giai đoạn 1: chỉ báo sẽ làm ở bước sau
-  alert("Form tạo hồ sơ sẽ được bổ sung ở giai đoạn 2 (kết nối Redis + lưu case).");
+  const panel = document.getElementById("refundCreatePanel");
+  if (!panel) return;
+  panel.classList.remove("hidden");
+  const msg = document.getElementById("refundCreateMsg");
+  if (msg) { msg.style.display = "none"; msg.textContent = ""; }
+  ["refundEmailPaste","refundOrderCode","refundCourseName","refundCustomerName",
+   "refundAmount","refundReceiveAccount","refundReceiveBank","refundSourceAccount",
+   "refundTransferContent","refundNote"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeRefundCreateForm() {
+  const panel = document.getElementById("refundCreatePanel");
+  if (panel) panel.classList.add("hidden");
+}
+
+async function doRefundParseEmail() {
+  const text = (document.getElementById("refundEmailPaste")?.value || "").trim();
+  if (!text) {
+    alert("Hãy dán nội dung email trước.");
+    return;
+  }
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "refund_parse_email", text, access_token: getToken() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      alert(data.error || "Không phân tích được");
+      return;
+    }
+    const f = data.fields || {};
+    if (f.order_code) document.getElementById("refundOrderCode").value = f.order_code;
+    if (f.customer_name) document.getElementById("refundCustomerName").value = f.customer_name;
+    if (f.course_name) document.getElementById("refundCourseName").value = f.course_name;
+    if (f.receive_account) document.getElementById("refundReceiveAccount").value = f.receive_account;
+    if (f.receive_bank) document.getElementById("refundReceiveBank").value = f.receive_bank;
+    if (f.refund_amount != null) document.getElementById("refundAmount").value = f.refund_amount;
+  } catch (e) {
+    alert("Lỗi: " + e.message);
+  }
+}
+
+async function doRefundCreate() {
+  const msg = document.getElementById("refundCreateMsg");
+  const btn = document.getElementById("refundSubmitBtn");
+  const payload = {
+    action: "refund_create",
+    access_token: getToken(),
+    order_code: (document.getElementById("refundOrderCode")?.value || "").trim(),
+    customer_name: (document.getElementById("refundCustomerName")?.value || "").trim(),
+    course_name: (document.getElementById("refundCourseName")?.value || "").trim(),
+    receive_account: (document.getElementById("refundReceiveAccount")?.value || "").trim(),
+    receive_bank: (document.getElementById("refundReceiveBank")?.value || "").trim(),
+    source_account: (document.getElementById("refundSourceAccount")?.value || "").trim(),
+    transfer_content: (document.getElementById("refundTransferContent")?.value || "").trim(),
+    refund_amount: document.getElementById("refundAmount")?.value || "",
+    note: (document.getElementById("refundNote")?.value || "").trim(),
+  };
+  if (!payload.order_code || !payload.customer_name || !payload.receive_account || !payload.receive_bank) {
+    if (msg) {
+      msg.style.display = "block";
+      msg.className = "msg error";
+      msg.textContent = "Vui lòng nhập đủ: Mã đơn, Tên khách, STK nhận, Ngân hàng.";
+    }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      if (msg) {
+        msg.style.display = "block";
+        msg.className = "msg error";
+        msg.textContent = data.error || "Tạo hồ sơ thất bại";
+      }
+      return;
+    }
+    if (msg) {
+      msg.style.display = "block";
+      msg.className = "msg success";
+      msg.textContent = "Đã tạo hồ sơ " + (data.case?.order_code || "") + " thành công.";
+    }
+    setTimeout(() => {
+      closeRefundCreateForm();
+      loadRefundDashboard();
+    }, 600);
+  } catch (e) {
+    if (msg) {
+      msg.style.display = "block";
+      msg.className = "msg error";
+      msg.textContent = "Lỗi: " + e.message;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadRefundDashboard() {
+  const tbody = document.getElementById("refundTableBody");
+  const statusFilter = (document.getElementById("refundStatusFilter")?.value || "").trim();
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "refund_list",
+        status: statusFilter,
+        limit: 100,
+        access_token: getToken(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted);">${escapeHtml(data.error || "Không tải được danh sách")}</td></tr>`;
+      }
+      return;
+    }
+    const counts = data.counts || {};
+    const setCount = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v ?? 0); };
+    setCount("refundCountNeed", counts.NEED_PHASE_2);
+    setCount("refundCountWaiting", counts.ACB_PAYMENT_PENDING);
+    setCount("refundCountProcessing", counts.PREPARING);
+    setCount("refundCountDone", counts.DONE);
+
+    _refundCasesCache = data.cases || [];
+    renderRefundTable(_refundCasesCache);
+  } catch (e) {
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-muted);">Lỗi: ${escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+}
+
+function renderRefundTable(cases) {
+  const tbody = document.getElementById("refundTableBody");
+  if (!tbody) return;
+  const q = (document.getElementById("refundSearchInput")?.value || "").trim().toLowerCase();
+  let list = cases || [];
+  if (q) {
+    list = list.filter(c =>
+      (c.order_code || "").toLowerCase().includes(q) ||
+      (c.customer_name || "").toLowerCase().includes(q) ||
+      (c.course_name || "").toLowerCase().includes(q)
+    );
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px 16px;color:var(--text-muted);">
+      Chưa có hồ sơ hoàn tiền.<br>
+      <span style="font-size:13px;">Bấm “+ Tạo hồ sơ” để bắt đầu.</span>
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(c => `
+    <tr style="cursor:pointer;" onclick="openRefundDetail('${escapeHtml(c.id)}')">
+      <td><strong>${escapeHtml(c.order_code || "")}</strong></td>
+      <td>${escapeHtml(c.customer_name || "")}</td>
+      <td>${escapeHtml(c.course_name || "")}</td>
+      <td style="text-align:right;">${formatRefundMoney(c.refund_amount)}</td>
+      <td>${refundStatusBadgeHtml(c.status)}</td>
+      <td style="white-space:nowrap;color:var(--text-muted);font-size:12.5px;">${formatRefundTime(c.updated_at)}</td>
+    </tr>
+  `).join("");
 }
 
 function filterRefundList() {
-  // Giai đoạn 1: chưa có dữ liệu — giữ placeholder
+  // Status filter cần reload API; search chỉ lọc client-side trên cache
+  const statusEl = document.getElementById("refundStatusFilter");
+  const searchEl = document.getElementById("refundSearchInput");
+  // Nếu đang gõ search và đã có cache → chỉ render lại
+  if (searchEl && document.activeElement === searchEl && _refundCasesCache.length >= 0) {
+    renderRefundTable(_refundCasesCache);
+    return;
+  }
+  loadRefundDashboard();
+}
+
+function openRefundDetail(caseId) {
+  if (!caseId) return;
+  fetch("/api/index", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "refund_get", case_id: caseId, access_token: getToken() }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error || !data.case) {
+        alert(data.error || "Không tải được hồ sơ");
+        return;
+      }
+      const c = data.case;
+      const panel = document.getElementById("refundDetailPanel");
+      if (!panel) return;
+      const tl = (c.timeline || []).map(t =>
+        `<div style="font-size:13px;margin:4px 0;"><span style="color:var(--text-muted);">${formatRefundTime(t.at)}</span> — ${escapeHtml(t.note || t.action || "")}</div>`
+      ).join("") || "<div style='color:var(--text-muted);font-size:13px;'>Chưa có hoạt động</div>";
+      panel.classList.remove("hidden");
+      panel.innerHTML = `
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h3 style="margin:0;">${escapeHtml(c.order_code || "")} — ${escapeHtml(c.customer_name || "")}</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${refundStatusBadgeHtml(c.status)}
+              <button type="button" class="btn-outline" style="font-size:12px;" onclick="document.getElementById('refundDetailPanel').classList.add('hidden')">Đóng</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px;gap:24px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <div style="font-size:12.5px;color:var(--text-muted);">Khóa học</div>
+              <div style="font-weight:600;">${escapeHtml(c.course_name || "—")}</div>
+              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Số tiền</div>
+              <div style="font-weight:600;">${formatRefundMoney(c.refund_amount)}</div>
+              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">STK nhận</div>
+              <div>${escapeHtml(c.receive_account || "")} — ${escapeHtml(c.receive_bank || "")}</div>
+              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Nội dung CK</div>
+              <div style="font-family:monospace;font-size:13px;">${escapeHtml(c.transfer_content || "")}</div>
+            </div>
+            <div style="flex:1;min-width:220px;">
+              <div style="font-weight:600;margin-bottom:8px;">Timeline</div>
+              ${tl}
+            </div>
+          </div>
+        </div>`;
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    })
+    .catch(e => alert("Lỗi: " + e.message));
 }
 
 // Chuyển đổi Thời gian
