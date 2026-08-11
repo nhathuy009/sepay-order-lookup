@@ -32,6 +32,13 @@ from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
 from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list
 from _customsdeclaration import parse_customs_declaration_from_bytes
+from _refund import (  # noqa: E402
+    create_case as refund_create_case,
+    list_cases as refund_list_cases,
+    get_case as refund_get_case,
+    update_case_status as refund_update_case_status,
+    parse_email_text as refund_parse_email_text,
+)
 
 def handle_fetch_employees_excel(body):
     file_b64 = body.get("file_base64", "")
@@ -747,6 +754,42 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_ehoadon_invoice_list(body)
         elif action == "parse_customs_declaration":
             status, payload = handle_parse_customs_declaration(body)
+        elif action == "refund_create":
+            try:
+                res = refund_create_case(body)
+                status, payload = (400 if "error" in res else 200), res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_list":
+            try:
+                limit = int(body.get("limit") or 100)
+                status_filter = (body.get("status") or "").strip()
+                res = refund_list_cases(limit=limit, status_filter=status_filter)
+                status, payload = (400 if "error" in res else 200), res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_get":
+            try:
+                res = refund_get_case((body.get("case_id") or "").strip())
+                status, payload = (400 if "error" in res else 200), res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_update_status":
+            try:
+                res = refund_update_case_status(
+                    (body.get("case_id") or "").strip(),
+                    (body.get("status") or "").strip(),
+                    (body.get("note") or "").strip(),
+                )
+                status, payload = (400 if "error" in res else 200), res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_parse_email":
+            try:
+                res = refund_parse_email_text(body.get("text") or "")
+                status, payload = 200, res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
