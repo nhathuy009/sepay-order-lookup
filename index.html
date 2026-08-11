@@ -73,6 +73,9 @@
         <div class="menu-item" id="tabEhoadonBtn" onclick="switchTab('ehoadon')">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-plus-icon lucide-file-plus"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg><span class="menu-text">Tạo hóa đơn eHoadon</span>
         </div>
+        <div class="menu-item" id="tabRefundBtn" onclick="switchTab('refund')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-banknote"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span class="menu-text">Hoàn tiền</span>
+        </div>
       </div>
 
       <div class="sidebar-bottom">
@@ -712,6 +715,91 @@
           </div>
           <div id="ehoadonListResults" style="margin-top: 12px;"></div>
         </div>
+      </div>
+
+      <!-- ========== TAB HOÀN TIỀN (Giai đoạn 1: Skeleton UI) ========== -->
+      <div id="tabRefund" class="hidden tab-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <h2 style="margin:0">Hoàn tiền khách hàng</h2>
+          <button type="button" id="refundCreateBtn" onclick="openRefundCreateForm()" style="font-size: 13px;">
+            + Tạo hồ sơ
+          </button>
+        </div>
+
+        <!-- Status summary cards -->
+        <div class="refund-status-grid" id="refundStatusGrid">
+          <div class="refund-status-card refund-status-need" data-status="NEED_PHASE_2">
+            <div class="refund-status-dot">🔴</div>
+            <div class="refund-status-label">Cần tiếp tục</div>
+            <div class="refund-status-count" id="refundCountNeed">0</div>
+          </div>
+          <div class="refund-status-card refund-status-waiting" data-status="ACB_PAYMENT_PENDING">
+            <div class="refund-status-dot">🟡</div>
+            <div class="refund-status-label">Chờ duyệt / Chờ tiền</div>
+            <div class="refund-status-count" id="refundCountWaiting">0</div>
+          </div>
+          <div class="refund-status-card refund-status-processing" data-status="PREPARING">
+            <div class="refund-status-dot">🔵</div>
+            <div class="refund-status-label">Đang xử lý</div>
+            <div class="refund-status-count" id="refundCountProcessing">0</div>
+          </div>
+          <div class="refund-status-card refund-status-done" data-status="DONE">
+            <div class="refund-status-dot">✓</div>
+            <div class="refund-status-label">Hoàn tất</div>
+            <div class="refund-status-count" id="refundCountDone">0</div>
+          </div>
+        </div>
+
+        <!-- Search + filter -->
+        <div class="card" style="margin-top: 16px; margin-bottom: 12px;">
+          <div class="row" style="align-items: flex-end; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <label>Tìm mã đơn / khách hàng</label>
+              <input type="text" id="refundSearchInput" placeholder="DH00125 hoặc tên khách..." oninput="filterRefundList()" />
+            </div>
+            <div style="flex: 0 0 180px;">
+              <label>Trạng thái</label>
+              <select id="refundStatusFilter" onchange="filterRefundList()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="NEED_PHASE_2">🔴 Cần tiếp tục</option>
+                <option value="ACB_PAYMENT_PENDING">🟡 Chờ duyệt</option>
+                <option value="PREPARING">🔵 Đang xử lý</option>
+                <option value="DONE">✓ Hoàn tất</option>
+                <option value="ERROR">⚠ Có lỗi</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Case list table -->
+        <div class="card" style="padding: 0; overflow: hidden;">
+          <div class="table-responsive">
+            <table class="sepay-table" id="refundTable">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Khách hàng</th>
+                  <th>Khóa học</th>
+                  <th style="text-align:right">Số tiền</th>
+                  <th>Trạng thái</th>
+                  <th>Cập nhật</th>
+                </tr>
+              </thead>
+              <tbody id="refundTableBody">
+                <tr>
+                  <td colspan="6" style="text-align:center; padding: 36px 16px; color: var(--text-muted);">
+                    Chưa có hồ sơ hoàn tiền.<br>
+                    <span style="font-size: 13px;">Bấm “+ Tạo hồ sơ” để bắt đầu (sẽ kết nối Redis ở giai đoạn tiếp theo).</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Placeholder: form tạo / chi tiết sẽ thêm ở giai đoạn sau -->
+        <div id="refundCreatePanel" class="hidden" style="margin-top: 16px;"></div>
+        <div id="refundDetailPanel" class="hidden" style="margin-top: 16px;"></div>
       </div>
     </main>
   </div>
