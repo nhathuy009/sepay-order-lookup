@@ -4,7 +4,7 @@
     { "src": "api/telegram.py", "use": "@vercel/python@4.8.0" },
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "ebook.html", "use": "@vercel/static" },
-    { "src": "player2.html", "use": "@vercel/static" },
+    { "src": "jotun.html", "use": "@vercel/static" },
     { "src": "app.css", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" }
   ],
@@ -13,7 +13,7 @@
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/app.css", "dest": "/app.css" },
     { "src": "/app.js", "dest": "/app.js" },
-    { "src": "/jav", "dest": "/player2.html" },
+    { "src": "/jotun", "dest": "/jotun.html" },
     { "src": "/ebook", "dest": "/ebook.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
