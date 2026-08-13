@@ -50,11 +50,11 @@
     gap: 12px;
   }
   .swatch {
-    width: 160px;
-    height: 160px;
-    border-radius: 12px;
+    width: 320px;
+    height: 320px;
+    border-radius: 16px;
     border: 1px solid #ccc;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   }
   .codes {
     display: flex;
@@ -106,14 +106,19 @@
   .match {
     width: 100%;
     max-width: 700px;
-    margin-top: 8px;
+    margin-top: 12px;
   }
   .match-title {
     font-size: 13px;
     font-weight: 600;
     color: #555;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     text-align: center;
+  }
+  .match-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .match-card {
     display: flex;
@@ -122,18 +127,27 @@
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 10px;
-    padding: 12px 16px;
+    padding: 10px 14px;
   }
+  .match-card.rank-1 { border-color: #4a8; box-shadow: 0 1px 4px rgba(0,120,60,0.12); }
   .match-swatch {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 8px;
     border: 1px solid #ccc;
     flex-shrink: 0;
   }
-  .match-name { font-size: 15px; font-weight: 600; }
+  .match-rank {
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .match-name { font-size: 14px; font-weight: 600; }
   .match-code { font-size: 12px; color: #666; margin-top: 2px; }
-  .match-delta { font-size: 11px; color: #999; margin-top: 4px; }
+  .match-delta { font-size: 11px; color: #999; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -192,14 +206,9 @@
   </div>
 
   <div class="match">
-    <div class="match-title">Màu Jotun gần nhất</div>
-    <div class="match-card">
-      <div class="match-swatch" id="match-swatch"></div>
-      <div class="match-info">
-        <div class="match-name" id="match-name">—</div>
-        <div class="match-code" id="match-code">—</div>
-        <div class="match-delta" id="match-delta"></div>
-      </div>
+    <div class="match-title">3 màu Jotun gần nhất (theo ΔE)</div>
+    <div class="match-list" id="match-list">
+      <!-- filled by JS -->
     </div>
   </div>
 </div>
@@ -439,34 +448,56 @@ const JOTUN_COLORS = [{n:"0 2520 - Exterior",c:"2520",h:"#A9826F"},{n:"2365 Choc
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
 
-  function findNearestJotun(r, g, b) {
+  function findTopJotun(r, g, b, topN = 3) {
     const [L1, a1, b1] = rgbToLab(r, g, b);
-    let best = null, bestDist = Infinity;
+    const scored = [];
     for (const c of JOTUN_COLORS) {
       const [cr, cg, cb] = hexToRgb(c.h);
       const [L2, a2, b2] = rgbToLab(cr, cg, cb);
       const dist = Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
-      if (dist < bestDist) { bestDist = dist; best = c; }
+      scored.push({ color: c, delta: dist });
     }
-    return { color: best, delta: bestDist };
+    scored.sort((a, b) => a.delta - b.delta);
+    return scored.slice(0, topN);
   }
 
-  const matchSwatch = document.getElementById('match-swatch');
-  const matchName = document.getElementById('match-name');
-  const matchCode = document.getElementById('match-code');
-  const matchDelta = document.getElementById('match-delta');
+  const matchList = document.getElementById('match-list');
 
   function updateMatch(r, g, b) {
-    const { color, delta } = findNearestJotun(r, g, b);
-    matchSwatch.style.background = color.h;
-    matchName.textContent = color.n;
-    matchCode.textContent = 'Mã Jotun ' + color.c + ' · ' + color.h;
-    let note;
-    if (delta < 3) note = 'Gần như trùng khớp';
-    else if (delta < 10) note = 'Rất giống';
-    else if (delta < 20) note = 'Khá giống';
-    else note = 'Chỉ tương đối gần';
-    matchDelta.textContent = note + ' (ΔE ≈ ' + delta.toFixed(1) + ')';
+    const top = findTopJotun(r, g, b, 3);
+    matchList.innerHTML = '';
+    top.forEach((item, idx) => {
+      const { color, delta } = item;
+      let note;
+      if (delta < 3) note = 'Gần như trùng khớp';
+      else if (delta < 10) note = 'Rất giống';
+      else if (delta < 20) note = 'Khá giống';
+      else note = 'Chỉ tương đối gần';
+
+      const card = document.createElement('div');
+      card.className = 'match-card' + (idx === 0 ? ' rank-1' : '');
+      card.innerHTML = `
+        <div class="match-rank">${idx + 1}</div>
+        <div class="match-swatch" style="background:${color.h}"></div>
+        <div class="match-info">
+          <div class="match-name">${color.n}</div>
+          <div class="match-code">Mã Jotun ${color.c} · ${color.h}</div>
+          <div class="match-delta">${note} (ΔE ≈ ${delta.toFixed(1)})</div>
+        </div>`;
+      // Click card → apply that Jotun color
+      card.style.cursor = 'pointer';
+      card.title = 'Click để áp dụng màu này';
+      card.addEventListener('click', () => {
+        const jotunInput = document.getElementById('jotun-code');
+        if (jotunInput) {
+          jotunInput.value = color.c;
+          // trigger apply
+          const btn = document.getElementById('btn-jotun');
+          if (btn) btn.click();
+        }
+      });
+      matchList.appendChild(card);
+    });
   }
 
   function update() {
