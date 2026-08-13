@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Trộn màu sơn</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f4f4f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    color: #222;
+  }
+  h1 { font-size: 20px; margin-bottom: 24px; }
+  .wrap {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(4, 100px);
+    gap: 20px;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .col label { font-size: 13px; font-weight: 600; text-align: center; }
+  .col input[type=range] {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 24px;
+    height: 160px;
+    cursor: pointer;
+  }
+  .col .val { font-size: 12px; color: #555; }
+  .preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .swatch {
+    width: 160px;
+    height: 160px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .codes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .code-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .code-row input {
+    font-family: monospace;
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    width: 130px;
+  }
+  .code-row button {
+    font-size: 12px;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .code-row button:hover { background: #eee; }
+  .reset-btn {
+    margin-top: 8px;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .reset-btn:hover { background: #eee; }
+  .match {
+    width: 100%;
+    max-width: 700px;
+    margin-top: 8px;
+  }
+  .match-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .match-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+  .match-swatch {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    flex-shrink: 0;
+  }
+  .match-name { font-size: 15px; font-weight: 600; }
+  .match-code { font-size: 12px; color: #666; margin-top: 2px; }
+  .match-delta { font-size: 11px; color: #999; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Trộn màu sơn</h1>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="col">
+      <label>Trắng &rarr; Xám</label>
+      <input type="range" id="s-gray" min="0" max="100" value="0">
+      <span class="val" id="v-gray">0%</span>
+    </div>
+    <div class="col">
+      <label>Vàng</label>
+      <input type="range" id="s-yellow" min="0" max="100" value="0">
+      <span class="val" id="v-yellow">0%</span>
+    </div>
+    <div class="col">
+      <label>Xanh lá</label>
+      <input type="range" id="s-green" min="0" max="100" value="0">
+      <span class="val" id="v-green">0%</span>
+    </div>
+    <div class="col">
+      <label>Xanh dương</label>
+      <input type="range" id="s-blue" min="0" max="100" value="0">
+      <span class="val" id="v-blue">0%</span>
+    </div>
+  </div>
+
+  <div class="preview">
+    <div class="swatch" id="swatch"></div>
+    <div class="codes">
+      <div class="code-row">
+        <input type="text" id="hex-code" placeholder="#RRGGBB">
+        <button data-copy="hex-code">Copy</button>
+      </div>
+      <div class="hex-hint" id="hex-hint"></div>
+      <div class="code-row">
+        <input type="text" id="rgb-code" readonly>
+        <button data-copy="rgb-code">Copy</button>
+      </div>
+    </div>
+    <button class="reset-btn" id="reset">Đặt lại</button>
+  </div>
+
+  <div class="match">
+    <div class="match-title">Màu Jotun gần nhất</div>
+    <div class="match-card">
+      <div class="match-swatch" id="match-swatch"></div>
+      <div class="match-info">
+        <div class="match-name" id="match-name">—</div>
+        <div class="match-code" id="match-code">—</div>
+        <div class="match-delta" id="match-delta"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const sliders = {
+    gray: document.getElementById('s-gray'),
+    yellow: document.getElementById('s-yellow'),
+    green: document.getElementById('s-green'),
+    blue: document.getElementById('s-blue'),
+  };
+  const labels = {
+    gray: document.getElementById('v-gray'),
+    yellow: document.getElementById('v-yellow'),
+    green: document.getElementById('v-green'),
+    blue: document.getElementById('v-blue'),
+  };
+  const swatch = document.getElementById('swatch');
+  const hexInput = document.getElementById('hex-code');
+  const rgbInput = document.getElementById('rgb-code');
+
+  // Mức hấp thụ (subtractive) của từng sắc tố trên kênh R,G,B
+  const ABSORPTION = {
+    yellow: { r: 0,   g: 0,   b: 0.9 }, // vàng hấp thụ ánh xanh dương
+    green:  { r: 0.6, g: 0,   b: 0.6 }, // xanh lá hấp thụ đỏ + xanh dương
+    blue:   { r: 0.7, g: 0.4, b: 0   }, // xanh dương hấp thụ đỏ + xanh lá
+  };
+
+  function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+  function compute() {
+    const gray = sliders.gray.value / 100;
+    const y = sliders.yellow.value / 100;
+    const gr = sliders.green.value / 100;
+    const bl = sliders.blue.value / 100;
+
+    // Nền: trắng (255) trộn dần sang xám (120)
+    let r = 255 - gray * (255 - 120);
+    let g = 255 - gray * (255 - 120);
+    let b = 255 - gray * (255 - 120);
+
+    // Trộn trừ màu tuần tự cho từng sắc tố
+    const pigments = [
+      { amt: y,  a: ABSORPTION.yellow },
+      { amt: gr, a: ABSORPTION.green },
+      { amt: bl, a: ABSORPTION.blue },
+    ];
+    pigments.forEach(p => {
+      r *= (1 - p.amt * p.a.r);
+      g *= (1 - p.amt * p.a.g);
+      b *= (1 - p.amt * p.a.b);
+    });
+
+    r = clamp(r); g = clamp(g); b = clamp(b);
+    return { r, g, b };
+  }
+
+  function toHex(n) { return n.toString(16).padStart(2, '0'); }
+
+  // ---- Dữ liệu màu Jotun (tên, mã, hex) để tìm màu gần nhất ----
+  const JOTUN_COLORS = [{n:"0 2520 - Exterior",c:"2520",h:"#A9826F"},{n:"2365 Chocolate - Interior",c:"2365",h:"#5D4240"},{n:"Active Green",c:"7709",h:"#A1A534"},{n:"Adele",c:"7249",h:"#595D5A"},{n:"Adventure",c:"11175",h:"#A38269"},{n:"Airy Green",c:"7626",h:"#D8DBCF"},{n:"Akita",c:"8059",h:"#E8D591"},{n:"Alabaster White",c:"10978",h:"#EDE9E0"},{n:"Ale Tangy",c:"2249",h:"#F4E6D4"},{n:"Alladin",c:"4468",h:"#C1CDD4"},{n:"Almashite",c:"6034",h:"#8DCCA8"},{n:"Almond Beige",c:"10966",h:"#A69A88"},{n:"Almond Yellow",c:"11212",h:"#BFA980"},{n:"Almost Spring",c:"7308",h:"#BFCEB7"},{n:"Amazon Teal",c:"4159",h:"#5E73AA"},{n:"Amber Red",c:"20118",h:"#9B6C5C"},{n:"Amethyne",c:"4497",h:"#B4A2C0"},{n:"Aneeqa",c:"1432",h:"#E6E0CB"},{n:"Anonymous",c:"1864",h:"#A68D6B"},{n:"Antique Beige",c:"10410",h:"#DFCAAF"},{n:"Antique Brass",c:"2011",h:"#BD9683"},{n:"Antique Green",c:"7629",h:"#8A8F81"},{n:"Antique White",c:"0471",h:"#EAE5DA"},{n:"Antique White",c:"1016",h:"#CDC5B5"},{n:"Antique Yellow",c:"1392",h:"#D4B58B"},{n:"Antwerp Beige",c:"12290",h:"#B9AF9F"},{n:"Apatite",c:"4153",h:"#89959D"},{n:"Apple Frost",c:"7270",h:"#E5EDD6"},{n:"Apple White",c:"8190",h:"#F0F1DF"},{n:"April Green",c:"8109",h:"#A4A178"},{n:"Aqua Green",c:"6273",h:"#27907F"},{n:"Arabian Tahr",c:"12184",h:"#DDC4B1"},{n:"Arctic Blue",c:"4445",h:"#8FC8E8"},{n:"Arctic Grey",c:"5249",h:"#919DA0"},{n:"Army Boots",c:"7116",h:"#92A892"},{n:"Army Grey",c:"1860",h:"#AA9B83"},{n:"Aroma",c:"2169",h:"#C5B1A8"},{n:"Aroma Garden",c:"6263",h:"#C0E8DC"},{n:"Artist Clay",c:"2588",h:"#CBC0B9"},{n:"Asdaf",c:"8358",h:"#CCB87C"},{n:"Ash Violet",c:"3445",h:"#7B7275"},{n:"Ashes",c:"9937",h:"#60605F"},{n:"Athenian Blue",c:"6128",h:"#8B9B99"},{n:"Atlantic Pool",c:"5206",h:"#45BDD1"},{n:"Autumn Brown",c:"1548",h:"#94745B"},{n:"Autumn Leaf",c:"8044",h:"#6D6C5B"},{n:"Avocado",c:"7009",h:"#ACD1AC"},{n:"Avocado Green",c:"0470",h:"#B8BF9B"},{n:"Azur Blue",c:"4957",h:"#006795"},{n:"Bafa",c:"4016",h:"#C9D9DE"},{n:"Baher",c:"5091",h:"#0099BF"},{n:"Bahr",c:"6033",h:"#33A9A0"},{n:"Balance",c:"6325",h:"#717E79"},{n:"Balmy Mustard",c:"11208",h:"#DBC393"},{n:"Balmy Pink",c:"20256",h:"#B98D82"},{n:"Balmy Yellow",c:"11218",h:"#E3B488"},{n:"Balor",c:"5269",h:"#5E7D86"},{n:"Bamboo",c:"0274",h:"#D7C088"},{n:"Band Stone",c:"1145",h:"#807972"},{n:"Bare",c:"1391",h:"#D4D3C9"},{n:"Basil",c:"7425",h:"#708457"},{n:"Beaming Beige",c:"8299",h:"#EAE6D5"},{n:"Beat",c:"2587",h:"#C46854"},{n:"Beauty",c:"20251",h:"#C77E77"},{n:"Beaver",c:"1138",h:"#79695D"},{n:"Bed Spread",c:"1633",h:"#FFD998"},{n:"Beige Sheen",c:"12299",h:"#C9BCA9"},{n:"Belgian Brown",c:"10385",h:"#7F7160"},{n:"Bella",c:"2489",h:"#D9926D"},{n:"Berg",c:"2271",h:"#6D635C"},{n:"Bergflette",c:"7293",h:"#A9B29F"},{n:"Bermuda Pink",c:"3243",h:"#EFAAB3"},{n:"Berry Crush",c:"3226",h:"#C6838D"},{n:"Beryl Charm",c:"6191",h:"#A5E3DC"},{n:"Best Friend",c:"6130",h:"#97BDB8"},{n:"Betel",c:"7550",h:"#ACC05D"},{n:"Betonggrå",c:"1294",h:"#B6B5AF"},{n:"Bevegelse",c:"2845",h:"#D4BEB5"},{n:"Billiard Table",c:"7314",h:"#5B6E46"},{n:"Bismarck",c:"2108",h:"#ABA19B"},{n:"Black Pearl",c:"3022",h:"#85807F"},{n:"Blackened Black",c:"9938",h:"#494948"},{n:"Blådis",c:"4067",h:"#B8BEC2"},{n:"Blåklokke",c:"4469",h:"#949A9F"},{n:"Bleached Yellow",c:"11211",h:"#EFECDC"},{n:"Blek Syrin",c:"0511",h:"#CBBAB9"},{n:"Bliss",c:"2374",h:"#F8DFD3"},{n:"Blooming Pink",c:"2597",h:"#CFA89C"},{n:"Blooming Violet",c:"4976",h:"#8D7D9C"},{n:"Blue Canvas",c:"4248",h:"#748C9D"},{n:"Blue Cynthia",c:"6264",h:"#A8E3D3"},{n:"Blue Harmony",c:"4594",h:"#6B717C"},{n:"Blue Lake",c:"0942",h:"#37687E"},{n:"Blue Sky",c:"0710",h:"#BBD0DC"},{n:"Blue Velvet",c:"4954",h:"#4F5F75"},{n:"Blue View",c:"4691",h:"#939BAF"},{n:"Blue Whale",c:"5517",h:"#7598A1"},{n:"Blueberry Heaven",c:"4956",h:"#45517C"},{n:"Blueberry Pink",c:"3118",h:"#C69DB0"},{n:"Blury Blue",c:"5276",h:"#D4DEDF"},{n:"Blushing Peach",c:"20047",h:"#C4A591"},{n:"Bold Green",c:"6399",h:"#349A73"},{n:"Bologna",c:"2115",h:"#9C4B49"},{n:"Bondeblå",c:"0263",h:"#5A7377"},{n:"Bordeaux",c:"2846",h:"#755252"},{n:"Bouquet",c:"3444",h:"#B6AAAE"},{n:"Breeze",c:"0552",h:"#E1DBD1"},{n:"Brick Red",c:"2059",h:"#A4534E"},{n:"Bright Sienna",c:"10408",h:"#E89E5F"},{n:"Bright Skies",c:"4955",h:"#195B7E"},{n:"Brilliant Yellow",c:"11215",h:"#F8CB7A"},{n:"Brisk Blue",c:"4964",h:"#90BEE2"},{n:"Brown Script",c:"2630",h:"#8E6A66"},{n:"Brown Sugar",c:"2799",h:"#DAC2B4"},{n:"Brun Jord",c:"10254",h:"#93897C"},{n:"Brushed Granite",c:"3230",h:"#A9A6A4"},{n:"Bubbly Green",c:"6221",h:"#3CAD9B"},{n:"Burdan",c:"2495",h:"#EB895C"},{n:"Buried Treasure",c:"8357",h:"#CDC2A6"},{n:"Burned Terracotta",c:"2111",h:"#9E6E63"},{n:"Giza Gold",c:"1230",h:"#DEA879"},{n:"Glacier",c:"6011",h:"#D9EDE5"},{n:"Gladiola",c:"4178",h:"#BFCEE1"},{n:"Glass Blue",c:"6247",h:"#D6DFD9"},{n:"Gleam",c:"12079",h:"#E4DBC5"},{n:"Golden Apricot",c:"20237",h:"#FCD7BD"},{n:"Golden Breeze",c:"1273",h:"#E8E4D9"},{n:"Golden Bronze",c:"10963",h:"#887760"},{n:"Golden Lily",c:"10406",h:"#F3BF53"},{n:"Golden Nut",c:"11207",h:"#B8A486"},{n:"Golden Sand",c:"1113",h:"#C09562"},{n:"Golden Shadow",c:"12311",h:"#676157"},{n:"Golden Walnut",c:"1974",h:"#927A5C"},{n:"Grand Shadow",c:"1288",h:"#B9AF9B"},{n:"Granite Stone",c:"7214",h:"#909591"},{n:"Grape",c:"3440",h:"#958293"},{n:"Grass Leaf",c:"7112",h:"#6BAA77"},{n:"Green Cre'Me",c:"6213",h:"#44776E"},{n:"Green Glimpse",c:"8600",h:"#E0DCC3"},{n:"Green Harmony",c:"8252",h:"#9E9B86"},{n:"Green Hornbeam",c:"6014",h:"#B7D9C7"},{n:"Green Latte",c:"7065",h:"#C2C885"},{n:"Green Leaf",c:"8469",h:"#8A8774"},{n:"Green Marble",c:"8422",h:"#68665C"},{n:"Green Melody",c:"7402",h:"#558E62"},{n:"Green Odyssey",c:"6241",h:"#246B5F"},{n:"Green Rays",c:"8601",h:"#DEDDC2"},{n:"Green Shadow",c:"6270",h:"#84A9A1"},{n:"Green Smoke",c:"7052",h:"#7B7E69"},{n:"Green Stone",c:"8106",h:"#B6B4A4"},{n:"Green Tea",c:"8493",h:"#A09B7C"},{n:"Green Turtle",c:"7666",h:"#778175"},{n:"Green Whisper",c:"7689",h:"#E4E8E2"},{n:"Greenery",c:"7120",h:"#566B58"},{n:"Greenish Black",c:"7571",h:"#444745"},{n:"Greenish Brown",c:"8586",h:"#7A766C"},{n:"Greenish Ocean",c:"6394",h:"#83A395"},{n:"Greenish Pebblestone",c:"8590",h:"#93948E"},{n:"Greish Blue",c:"5547",h:"#6F767A"},{n:"Greish Lavender",c:"12038",h:"#DFDDD8"},{n:"Grey Event",c:"9912",h:"#9E9F9D"},{n:"Grey Frost",c:"5090",h:"#B6BBBC"},{n:"Grey Light",c:"2106",h:"#CCC7C2"},{n:"Grey Matter",c:"7391",h:"#C3C6C2"},{n:"Grey Moonstone",c:"2806",h:"#92867D"},{n:"Grey Smoke",c:"8591",h:"#81827C"},{n:"Grey Touch",c:"12314",h:"#D8D4CB"},{n:"Grey Tree",c:"7377",h:"#DAE2D4"},{n:"Greyish Lavender",c:"2601",h:"#A49893"},{n:"Grotto",c:"8047",h:"#A49574"},{n:"Grounded Red",c:"20144",h:"#92695A"},{n:"Guacamole Mix",c:"8248",h:"#CEC094"},{n:"Gulvik",c:"1007",h:"#BE7D4C"},{n:"Gustavian Blue",c:"4109",h:"#9DA9B2"},{n:"Hammered Iron",c:"2205",h:"#B6A99D"},{n:"Harvest Yellow",c:"11210",h:"#BA9875"},{n:"Haze",c:"8279",h:"#C7C9C2"},{n:"Hazelnut Beige",c:"12300",h:"#BEB19C"},{n:"Hazy Green",c:"7698",h:"#6F7769"},{n:"Hazy Grey",c:"20229",h:"#86817C"},{n:"Hazy Lavender",c:"4950",h:"#838287"},{n:"Hazy Yellow",c:"12326",h:"#E0CBA5"},{n:"Heat",c:"2994",h:"#995F4D"},{n:"Heather Beige",c:"1878",h:"#A29385"},{n:"Herb Garden",c:"8183",h:"#B2A87F"},{n:"Hibiscus",c:"2731",h:"#9C5353"},{n:"High Touch",c:"1917",h:"#BAA991"},{n:"Highlights",c:"2221",h:"#B6807B"},{n:"Hillside",c:"7385",h:"#D6DBBD"},{n:"Hint Of Cream",c:"0384",h:"#F5EBD8"},{n:"Hipster Brown",c:"10965",h:"#857C6E"},{n:"Hollywood Hill",c:"8243",h:"#95864B"},{n:"Hope",c:"8565",h:"#AFAD88"},{n:"Humble Yellow",c:"11173",h:"#D3C5AB"},{n:"Hummus",c:"12118",h:"#DACBB3"},{n:"Ice Blue",c:"0596",h:"#D3E7E3"},{n:"Ice Turquoise",c:"5136",h:"#BAE2E6"},{n:"Iconic",c:"6378",h:"#A1ABA6"},{n:"Icy Blue",c:"5044",h:"#808D92"},{n:"Identity",c:"1859",h:"#CFC0A5"},{n:"Illuminating",c:"10440",h:"#CEAA56"},{n:"Imperial Garnet",c:"2789",h:"#E8B6A5"},{n:"Imperial Jade",c:"6032",h:"#73CCC4"},{n:"Industrial Blue",c:"5455",h:"#4D616C"},{n:"Industrial Grey",c:"5343",h:"#8D908F"},{n:"Inglot",c:"4508",h:"#C4D4EB"},{n:"Iron Blue",c:"5516",h:"#6F7777"},{n:"Iron Grey",c:"1032",h:"#AAA79F"},{n:"Ivory",c:"0567",h:"#F2EAD6"},{n:"Ivy Dirt",c:"8362",h:"#9B834B"},{n:"Jade",c:"6315",h:"#B0BAB6"},{n:"Jasmine",c:"3178",h:"#E0D7D3"},{n:"Jazz Grey",c:"9930",h:"#B6B5B2"},{n:"Jazz White",c:"7236",h:"#F3F4EE"},{n:"Jazz Yellow",c:"8353",h:"#E7D07C"},{n:"Jet Black",c:"3310",h:"#4A4544"},{n:"Joyful Mint",c:"6245",h:"#487565"},{n:"Joyful Pink",c:"3449",h:"#D88591"},{n:"Water Spring",c:"7042",h:"#DCE0DA"},{n:"Welcoming Red",c:"20167",h:"#A06C5E"},{n:"Wheat",c:"8306",h:"#B39C59"},{n:"Whispering Red",c:"2859",h:"#985F56"},{n:"White Clay",c:"5272",h:"#8F9394"},{n:"White Comfort",c:"8395",h:"#EBE9DE"},{n:"White Malva",c:"3144",h:"#F0ECE6"},{n:"White Satin",c:"0201",h:"#E0E0D4"},{n:"White Tea",c:"10003",h:"#F1EADD"},{n:"Wicker Beige",c:"1642",h:"#E6DACA"},{n:"Wild Dahlia",c:"1867",h:"#FCD6AD"},{n:"Wild Ivy",c:"6194",h:"#5F817E"},{n:"Wiltshire Cream",c:"1648",h:"#FAE4C8"},{n:"Wink Taffy",c:"2572",h:"#F8CBB8"},{n:"Winter Willow",c:"8200",h:"#E2D9A5"},{n:"Wisdom",c:"20145",h:"#615957"},{n:"Wizard'S Cape",c:"4395",h:"#2266A1"},{n:"Wondergrass",c:"8325",h:"#C3C86D"},{n:"Wood Smoke",c:"0568",h:"#DBCAB5"},{n:"Yellow Jasmine",c:"1151",h:"#EACC7C"},{n:"Yellow Lime",c:"8605",h:"#EBEEBA"},{n:"Yellow River",c:"1158",h:"#D7A456"},{n:"Yellow Stone",c:"2206",h:"#F6BE79"},{n:"Zest",c:"1626",h:"#FBEABE"},{n:"Zippy Green",c:"7710",h:"#B4BA59"},{n:"Zircon",c:"3014",h:"#C9C0C0"},{n:"Burnt Ochre",c:"1536",h:"#C99765"},{n:"Burnt Orange",c:"20241",h:"#A9674A"},{n:"Bustan",c:"8155",h:"#94934E"},{n:"Butterfly",c:"2602",h:"#F3A296"},{n:"Buttery Cream",c:"1155",h:"#FAE2B0"},{n:"Byblos Bronze",c:"1114",h:"#D1AB79"},{n:"Cadet Steel",c:"5351",h:"#85A1AE"},{n:"Cairo",c:"10573",h:"#BAA08A"},{n:"Callie Purple",c:"4149",h:"#B8AFC4"},{n:"Calm",c:"10342",h:"#C9C0B2"},{n:"Camel Skin",c:"1112",h:"#AF8453"},{n:"Candle Light",c:"1052",h:"#EBD8A5"},{n:"Cantay",c:"3241",h:"#F1CECF"},{n:"Caramel",c:"2307",h:"#BE7D5C"},{n:"Caramel Brown",c:"12292",h:"#A59885"},{n:"Caravan",c:"0280",h:"#CCB394"},{n:"Carbon Black",c:"9920",h:"#545351"},{n:"Carnival",c:"5271",h:"#236574"},{n:"Caroline",c:"6089",h:"#6BB499"},{n:"Carrot Corn",c:"1886",h:"#FEE199"},{n:"Casablanca Clay",c:"0565",h:"#D5C9AD"},{n:"Cashew",c:"1931",h:"#E3DDCD"},{n:"Cashew Fruit",c:"1128",h:"#E6D9BD"},{n:"Cashmere",c:"10683",h:"#B19C80"},{n:"Celeber",c:"4197",h:"#8D8FB0"},{n:"Celery Stick",c:"8240",h:"#D7DC8D"},{n:"Celine",c:"20249",h:"#E3C0B8"},{n:"Cerulean",c:"0576",h:"#5D8B86"},{n:"Chalk Ochre",c:"1909",h:"#C49F71"},{n:"Chalk White",c:"8401",h:"#E7E6DD"},{n:"Chalky Pink",c:"3442",h:"#C9B8B8"},{n:"Champagne White",c:"12302",h:"#F1EEE0"},{n:"Chateau",c:"1246",h:"#D9B389"},{n:"Cheeky Red",c:"20252",h:"#B0534F"},{n:"Cheerful Lavender",c:"3456",h:"#B89CB7"},{n:"Cheerful Peach",c:"1520",h:"#F0CFA6"},{n:"Cherry Swift",c:"4492",h:"#EBEBEA"},{n:"Chiffon Grey",c:"12310",h:"#D5CFC5"},{n:"Chiffon Pink",c:"3220",h:"#E1D1CF"},{n:"Chiffon White",c:"12036",h:"#EEEAE0"},{n:"Chino",c:"0553",h:"#C8C3B8"},{n:"Cinnamon Orange",c:"1959",h:"#A56D4C"},{n:"Citrine",c:"1866",h:"#FFD396"},{n:"Citrus Green",c:"8615",h:"#E8E8B6"},{n:"Cityscape",c:"6379",h:"#8C9893"},{n:"Classic Blue",c:"4062",h:"#B8C0CA"},{n:"Classic Green",c:"6243",h:"#38564F"},{n:"Classic White",c:"9918",h:"#F0EFEA"},{n:"Classy Green",c:"6294",h:"#4D6B60"},{n:"Claudio",c:"2571",h:"#DCC5B5"},{n:"Claywood",c:"10051",h:"#968773"},{n:"Clear",c:"1442",h:"#F4EEDF"},{n:"Clear Jade",c:"6012",h:"#E4EBE4"},{n:"Cloudy Lavender",c:"3441",h:"#ACA3AB"},{n:"Cloudy White",c:"6152",h:"#DFE4DF"},{n:"Clove Brown",c:"10353",h:"#96795B"},{n:"Clover Lane",c:"8323",h:"#CED396"},{n:"Coastal Blue",c:"5504",h:"#6D7D83"},{n:"Coastal Wave",c:"5041",h:"#548895"},{n:"Cobalt",c:"6198",h:"#4F6B6A"},{n:"Coco Berry",c:"2133",h:"#D39689"},{n:"Cocoa Brown",c:"2548",h:"#6B4C3F"},{n:"Coffee",c:"2149",h:"#524240"},{n:"Coffee Butter",c:"1757",h:"#BCA490"},{n:"Collected Blue",c:"5530",h:"#99A6A5"},{n:"Colosseo",c:"1802",h:"#BD987E"},{n:"Comfort Grey",c:"12078",h:"#BEB9AF"},{n:"Complexion",c:"10579",h:"#D7CEC0"},{n:"Concrete",c:"1142",h:"#CAC4BA"},{n:"Contemporary White",c:"12123",h:"#E1DACA"},{n:"Cool Ash",c:"3037",h:"#C6C3C5"},{n:"Cool Blue",c:"4948",h:"#CED3D5"},{n:"Cool Breeze",c:"6083",h:"#5F807A"},{n:"Coral",c:"2031",h:"#E7BFB6"},{n:"Coral Reef Blue",c:"6385",h:"#8C9E9C"},{n:"Coral Sand",c:"11206",h:"#DDCBB2"},{n:"Corn Yellow",c:"11216",h:"#F3C080"},{n:"Cornelian",c:"2030",h:"#F2C3A6"},{n:"Cornflower",c:"4234",h:"#2B98CA"},{n:"Cornsilk",c:"1356",h:"#F4EFDA"},{n:"Corvus Black",c:"4116",h:"#3E3E3D"},{n:"Cosmic Mocha",c:"12202",h:"#B6A286"},{n:"Cotton Ball",c:"1453",h:"#F0EFE2"},{n:"Cotton Blue",c:"4959",h:"#7090A1"},{n:"Cotton Candy",c:"2453",h:"#F5E0D7"},{n:"Cotton Lace",c:"2594",h:"#E3D7CF"},{n:"Cottonwood",c:"2500",h:"#8A7E74"},{n:"Cove Blue",c:"5086",h:"#56B7D2"},{n:"Cream",c:"0981",h:"#EAE3D5"},{n:"Creamy Beige",c:"10412",h:"#DAD2C0"},{n:"Creamy Pink",c:"2598",h:"#B99388"},{n:"Creamy Sea Green",c:"7059",h:"#CBEAD1"},{n:"Creek",c:"6309",h:"#889A92"},{n:"Creme",c:"1234",h:"#EAD2B2"},{n:"Crisp",c:"8118",h:"#C5C6B8"},{n:"Crisp Blue",c:"4093",h:"#D9E6EB"},{n:"Crystal Shade",c:"6265",h:"#79CEBD"},{n:"Cupcake Green",c:"6267",h:"#96C0B6"},{n:"Curious Mind",c:"11174",h:"#B7A992"},{n:"Cute",c:"3438",h:"#DFD0D3"},{n:"Cypress",c:"7040",h:"#929D82"},{n:"Damascus Dusk",c:"2086",h:"#CCA790"},{n:"Darjeeling",c:"6236",h:"#9BADAB"},{n:"Dark Chimney",c:"4056",h:"#5B5C5C"},{n:"Dark Clay",c:"2037",h:"#81604F"},{n:"Dark Indigo",c:"4623",h:"#5D5A63"},{n:"Dark Magnolia",c:"0254",h:"#ECE5D2"},{n:"Dark Pine",c:"1337",h:"#E8BE7A"},{n:"Dark Stone",c:"7687",h:"#565753"},{n:"Dark Teal",c:"5454",h:"#506364"},{n:"Dark Velvet",c:"3207",h:"#70666C"},{n:"Dawn",c:"1269",h:"#C0BEB6"},{n:"Day Break",c:"1194",h:"#FAE0C6"},{n:"Daydream",c:"20142",h:"#806A62"},{n:"Dazzeling Violet",c:"3457",h:"#755971"},{n:"Deco Blue",c:"4477",h:"#525C64"},{n:"Deep Forest",c:"20193",h:"#735256"},{n:"Deep Secret",c:"8205",h:"#8B794D"},{n:"Deep Soil",c:"2300",h:"#7E6A62"},{n:"Delicate Pink",c:"3311",h:"#E0DADB"},{n:"Delicate Yellow",c:"11213",h:"#F0DFC1"},{n:"Delightful Green",c:"8602",h:"#CFCFAC"},{n:"Delightful Pink",c:"2992",h:"#CBAB9D"},{n:"Demi-Rosa",c:"0763",h:"#B8A39B"},{n:"Denim Blue",c:"4619",h:"#677E8E"},{n:"Desert Dunes",c:"12200",h:"#DBC9B6"},{n:"Desert Pink",c:"12120",h:"#BF9F86"},{n:"Desert Rose",c:"1046",h:"#E6C1A0"},{n:"Desert Sand",c:"1037",h:"#E5DAC6"},{n:"Devine",c:"12083",h:"#D2BEA9"},{n:"Dew Beads",c:"6190",h:"#C1DDD1"},{n:"Dew Blue",c:"4710",h:"#909799"},{n:"Dewy Green",c:"8426",h:"#989B89"},{n:"Dewy Moss",c:"8594",h:"#858776"},{n:"Dijon Yellow",c:"10001",h:"#A98259"},{n:"Dim Blue",c:"4221",h:"#666D73"},{n:"Dim Green",c:"7701",h:"#CFD5C2"},{n:"Dirty Dusk",c:"2458",h:"#B8928C"},{n:"Discrete",c:"10429",h:"#8C867E"},{n:"Dove Grey",c:"0117",h:"#B2B1AE"},{n:"Dragon Red",c:"0587",h:"#883E3C"},{n:"Dream",c:"3154",h:"#ECEAEE"},{n:"Dreamy Pink",c:"3447",h:"#EFC9CA"},{n:"Drift",c:"3325",h:"#B2A3A6"},{n:"Dry Leaf",c:"8063",h:"#B5A788"},{n:"Dugg",c:"4176",h:"#D2D1D2"},{n:"Dusk Green",c:"7038",h:"#C4C7B1"},{n:"Dusk Sky",c:"5548",h:"#CAD3D4"},{n:"Dusky Blue",c:"5200",h:"#9EADB2"},{n:"Dusky Grey",c:"11137",h:"#817D75"},{n:"Dusky Peach",c:"12084",h:"#C0A78D"},{n:"Dusky Pink",c:"2526",h:"#CEB9AE"},{n:"Dusty Green",c:"7543",h:"#8D9B8D"},{n:"Dusty Light",c:"10398",h:"#ECD9B4"},{n:"Dusty Plum",c:"11224",h:"#DFD1C1"},{n:"Dusty Purple",c:"3343",h:"#7D6668"},{n:"Dusty Red",c:"2995",h:"#806159"},{n:"Dusty Rose",c:"20055",h:"#A0847A"},{n:"Dynamic",c:"6398",h:"#5BB8AE"},{n:"Dyp Mocca",c:"2732",h:"#5C5853"},{n:"Early Rain",c:"0486",h:"#EAE7DB"},{n:"Early Spring",c:"8624",h:"#EDE0AD"},{n:"Earth Brown",c:"1417",h:"#7D6554"},{n:"Earthscape",c:"1053",h:"#A69587"},{n:"Earthy",c:"12198",h:"#9F7D6B"},{n:"Earthy Brown",c:"12127",h:"#6F5846"},{n:"Earthy Sand",c:"12199",h:"#B7A694"},{n:"Earthy Yellow",c:"8583",h:"#CDBC94"},{n:"Ebony",c:"9905",h:"#ABA9A6"},{n:"Egg White",c:"1001",h:"#EFEDE3"},{n:"Eleganse",c:"8263",h:"#E3E0D3"},{n:"Elegant",c:"1434",h:"#605D58"},{n:"Elegant Beige",c:"1289",h:"#D6D0C5"},{n:"Elegant Blue",c:"4638",h:"#657078"},{n:"Embrace",c:"12179",h:"#B58D6F"},{n:"Emerald Blue",c:"5546",h:"#4B666F"},{n:"Empire",c:"0520",h:"#CBCBC9"},{n:"Enchanted Garden",c:"8241",h:"#BFC357"},{n:"Energetic Blue",c:"5554",h:"#99CFE1"},{n:"Energetic Yellow",c:"11221",h:"#9C7C3D"},{n:"English Rose",c:"3183",h:"#F2E1DF"},{n:"Eternal Blue",c:"4108",h:"#A7D2E7"},{n:"Eternal Marine",c:"6051",h:"#CFDFD3"},{n:"Etoile",c:"2107",h:"#BBB4AF"},{n:"Eucalyptus Grey",c:"7691",h:"#A1A29C"},{n:"Evening Green",c:"6352",h:"#7F8985"},{n:"Evening Light",c:"4618",h:"#77838C"},{n:"Evening Sky",c:"1462",h:"#84817A"},{n:"Evening Stone",c:"1564",h:"#686159"},{n:"Evergreen",c:"8479",h:"#787664"},{n:"Exhale",c:"7637",h:"#B7BDB3"},{n:"Exotic Green",c:"6295",h:"#345F50"},{n:"Exotix",c:"2490",h:"#AA765D"},{n:"Fahm",c:"9925",h:"#696967"},{n:"Fair Lady",c:"2534",h:"#E3D8D2"},{n:"Fern Leaf",c:"8618",h:"#888639"},{n:"Festive Purple",c:"3451",h:"#91708D"},{n:"Fiery Crush",c:"3247",h:"#D77386"},{n:"Fig Fruit",c:"3443",h:"#BAA7A8"},{n:"Fig Green",c:"7700",h:"#656847"},{n:"Fjærlett",c:"2524",h:"#DFD7CD"},{n:"Flint",c:"3003",h:"#D3D0CD"},{n:"Flora White",c:"3208",h:"#EEE9E9"},{n:"Flow",c:"6235",h:"#B1C3C1"},{n:"Flowering Pink",c:"20255",h:"#FABBB4"},{n:"Fluid Lily",c:"3201",h:"#EFE4E4"},{n:"Forest",c:"7006",h:"#B8C6B7"},{n:"Forest Brown",c:"10291",h:"#575149"},{n:"Forest Light",c:"11228",h:"#D8C8A2"},{n:"Free Spirit",c:"5489",h:"#6B7E7E"},{n:"Freedom",c:"5167",h:"#DADFDF"},{n:"French Manicure",c:"2451",h:"#DDBDB1"},{n:"Fresh",c:"4963",h:"#97B8CB"},{n:"Fresh Autumn",c:"1993",h:"#BE9459"},{n:"Fresh Day",c:"8239",h:"#DEE4A2"},{n:"Fresh Feel",c:"4518",h:"#C5DCEB"},{n:"Fresh Green",c:"8607",h:"#A29D61"},{n:"Fresh Hay",c:"8042",h:"#D6D7C5"},{n:"Fresh Pasta",c:"1775",h:"#E9DAB1"},{n:"Friendly Pink",c:"20185",h:"#C5B5A7"},{n:"Frisk Rosa",c:"0261",h:"#E7AA9C"},{n:"Frodig Oase",c:"10343",h:"#C9B492"},{n:"Front",c:"1899",h:"#716F6A"},{n:"Frosted Glass",c:"5342",h:"#BEC2C0"},{n:"Frosty White",c:"8588",h:"#EDEDE3"},{n:"Frøya",c:"1216",h:"#DFAC78"},{n:"Fruity Green",c:"8612",h:"#AA9E71"},{n:"Fruity Orange",c:"20236",h:"#E6B193"},{n:"Fusion",c:"5362",h:"#4C6B6E"},{n:"Garda Blå",c:"4081",h:"#3D4E86"},{n:"Gemstone",c:"6395",h:"#5F7E74"},{n:"Gentile",c:"2048",h:"#C28B6E"},{n:"Gentle Beige",c:"8272",h:"#CCC8B8"},{n:"Gentle Whisper",c:"12182",h:"#D2CBBF"},{n:"Geranium",c:"4168",h:"#7185B1"},{n:"Ginger Brown",c:"1445",h:"#97755E"},{n:"Ginger Mist",c:"1731",h:"#EDE0CF"},{n:"Ginger Tea",c:"1965",h:"#DDCEA5"},{n:"Ginseng",c:"10245",h:"#DDCEB0"},{n:"Juicy Orange",c:"11226",h:"#F8BF8B"},{n:"Kaki",c:"8264",h:"#A19579"},{n:"Kamelon",c:"4424",h:"#9D9BA2"},{n:"Kamuflasje",c:"8091",h:"#756B52"},{n:"Khaki Beige",c:"0314",h:"#B8B4A4"},{n:"Khaki Yellow",c:"8625",h:"#AF9E7A"},{n:"Kilim",c:"2993",h:"#714F44"},{n:"Koksgrå",c:"4111",h:"#717373"},{n:"Laguna Blue",c:"5552",h:"#6CA3A5"},{n:"Lake Green",c:"6210",h:"#A2B2A9"},{n:"Latte",c:"1393",h:"#D8C2A9"},{n:"Lavender Blue",c:"4951",h:"#A0A0A6"},{n:"Leaf Touch",c:"6313",h:"#65746D"},{n:"Lemon Juice",c:"1516",h:"#F4ECD7"},{n:"Lemon Sorbet",c:"8245",h:"#FCE99E"},{n:"Lemongrass",c:"8247",h:"#E2BD33"},{n:"Library Seat",c:"7312",h:"#446A4C"},{n:"Light",c:"1349",h:"#F3E5C0"},{n:"Light Denim",c:"4958",h:"#89A6B6"},{n:"Light Grey",c:"0967",h:"#C9CBC7"},{n:"Light Moss",c:"7039",h:"#B5BAA2"},{n:"Light Peach",c:"10009",h:"#F7E6D0"},{n:"Lilac Scent",c:"4952",h:"#C0C0C6"},{n:"Lime Mint",c:"8246",h:"#E7CB63"},{n:"Limestone",c:"10341",h:"#D9D3C7"},{n:"Lively Red",c:"20143",h:"#A87362"},{n:"Lotus",c:"1108",h:"#E4DDCA"},{n:"Lovely Coral",c:"20254",h:"#E98B7D"},{n:"Luna",c:"0526",h:"#F4D3AC"},{n:"Lunar Plum",c:"4150",h:"#9FB5E0"},{n:"Magnolia",c:"0566",h:"#F4E9D7"},{n:"Majestic Blue",c:"4055",h:"#37566B"},{n:"Marine Blue",c:"4489",h:"#1F526D"},{n:"Mars Dust",c:"10012",h:"#AA795A"},{n:"Matt Silver",c:"4629",h:"#82878B"},{n:"Melon Seeds",c:"1776",h:"#FEE4B2"},{n:"Metal Blue",c:"5553",h:"#0084A7"},{n:"Midnight",c:"3165",h:"#615B5B"},{n:"Midnight Blue",c:"4403",h:"#3D464E"},{n:"Midnight Forest",c:"6242",h:"#007969"},{n:"Mild",c:"1275",h:"#E6E0D1"},{n:"Mindful Green",c:"7686",h:"#7C877C"},{n:"Mint Julep",c:"7010",h:"#D9E0D3"},{n:"Mist",c:"1376",h:"#E5E0D4"},{n:"Misty Grey",c:"1143",h:"#BAB3AA"},{n:"Modern White",c:"8018",h:"#E7E5D0"},{n:"Moheet",c:"4217",h:"#0C597C"},{n:"Molten Copper",c:"2791",h:"#855852"},{n:"Monroe",c:"2625",h:"#AC4546"},{n:"Morning Glory",c:"4960",h:"#0076AC"},{n:"Mosley",c:"7418",h:"#89B24C"},{n:"Moss Green",c:"7354",h:"#696A66"},{n:"Muddy Grey",c:"11138",h:"#7D786F"},{n:"Mustard Brown",c:"11205",h:"#A69277"},{n:"Natural Blue",c:"5503",h:"#88959A"},{n:"Natural Energy",c:"4164",h:"#6CA4D5"},{n:"Natural White",c:"12303",h:"#F3EFE6"},{n:"Naughty Pink",c:"3185",h:"#B35668"},{n:"Nautica",c:"4514",h:"#64B3DD"},{n:"New York",c:"2336",h:"#908681"},{n:"Night Shaddow",c:"4686",h:"#3B4760"},{n:"Nobile",c:"1177",h:"#E8C099"},{n:"Nordic Brown",c:"2091",h:"#C09988"},{n:"Norwegian Wood",c:"10981",h:"#7F5C47"},{n:"Oak Sand",c:"1987",h:"#CD965B"},{n:"Ocean Air",c:"4894",h:"#9DAAAF"},{n:"Ocean Green",c:"6010",h:"#9FD6C8"},{n:"Old Cream",c:"1154",h:"#FAEAC5"},{n:"Olive",c:"8284",h:"#B8A87F"},{n:"Olive Brown",c:"1362",h:"#7F644C"},{n:"Olive Dip",c:"1782",h:"#D49D45"},{n:"Olive Oil",c:"8609",h:"#A79052"},{n:"Orangery",c:"2306",h:"#FBCDAF"},{n:"Organic Red",c:"20120",h:"#987A6A"},{n:"Oslo",c:"5180",h:"#526064"},{n:"Pacifica",c:"5039",h:"#C9DADB"},{n:"Pale Green",c:"8478",h:"#BABAA5"},{n:"Pale Pearl",c:"4046",h:"#CCD8DE"},{n:"Palm Green",c:"6244",h:"#275450"},{n:"Paradise Sea",c:"6397",h:"#4B8F83"},{n:"Parrot Blue",c:"4202",h:"#4486C4"},{n:"Pastel Blue",c:"4519",h:"#AECFEA"},{n:"Peach",c:"1017",h:"#EDCDA1"},{n:"Peachy Orange",c:"11222",h:"#F4BA8E"},{n:"Pear Sensation",c:"8238",h:"#DBDFC4"},{n:"Pearl",c:"0121",h:"#D6D5CD"},{n:"Persian Grey",c:"5002",h:"#7E8183"},{n:"Petal Pink",c:"3021",h:"#EDCDCD"},{n:"Petroli",c:"4625",h:"#4D6475"},{n:"Pink Ambience",c:"20362",h:"#CFAF9C"},{n:"Pink Crush",c:"20250",h:"#E3A39C"},{n:"Pirat",c:"5306",h:"#8EC0C2"},{n:"Pistachio",c:"7386",h:"#C8CDAF"},{n:"Platinum",c:"9911",h:"#BDBDBA"},{n:"Plum Lips",c:"2459",h:"#B2706A"},{n:"Plumage",c:"4670",h:"#707F8D"},{n:"Poetry Red",c:"20208",h:"#9B6156"},{n:"Pool Side",c:"4162",h:"#87BBDA"},{n:"Popup Green",c:"6292",h:"#42846E"},{n:"Powerful Green",c:"7706",h:"#7CA341"},{n:"Punch",c:"2456",h:"#DE7569"},{n:"Pure",c:"9931",h:"#F6F5EF"},{n:"Purple Candy",c:"4498",h:"#9C8BA9"},{n:"Purple Royale",c:"3298",h:"#A795A5"},{n:"Purple Shade",c:"4523",h:"#738DC4"},{n:"Rain Forest",c:"7705",h:"#2C7552"},{n:"Ramli",c:"1226",h:"#D2B890"},{n:"Rasberry Pink",c:"3452",h:"#C27174"},{n:"Raw Mustard",c:"1960",h:"#D6B37C"},{n:"Red Brick",c:"2762",h:"#A67E75"},{n:"Red Leather",c:"0572",h:"#7C4A46"},{n:"Red Rose",c:"20253",h:"#80403E"},{n:"Refined Green",c:"7704",h:"#7D957F"},{n:"Retro",c:"1627",h:"#CFB47A"},{n:"Retro Blue",c:"5159",h:"#6F8D9A"},{n:"Rhythm",c:"2609",h:"#C26057"},{n:"Rich Burgandy",c:"2805",h:"#6D4643"},{n:"Ripe Peach",c:"20259",h:"#F1B792"},{n:"Roast Coffee",c:"2549",h:"#574840"},{n:"Roma",c:"2087",h:"#B48368"},{n:"Royal Blue",c:"4224",h:"#23507B"},{n:"Royal Violet",c:"4977",h:"#6B6490"},{n:"Rustic",c:"1048",h:"#CA8446"},{n:"Rusty",c:"1259",h:"#A57252"},{n:"Rusty Red",c:"3324",h:"#895355"},{n:"Sage Beige",c:"8584",h:"#A19C8D"},{n:"Sage Green",c:"6013",h:"#B6CEC8"},{n:"Sahara Sand",c:"1132",h:"#C5A88A"},{n:"Sahl",c:"8277",h:"#F4D550"},{n:"Salsa",c:"2452",h:"#B54E45"},{n:"Sand",c:"1140",h:"#CFC5B4"},{n:"Sandy",c:"10962",h:"#A29179"},{n:"Scooter",c:"5397",h:"#618B8C"},{n:"Sea Turtle",c:"5208",h:"#008296"},{n:"Seaweed Green",c:"8597",h:"#968A66"},{n:"Serene Blue",c:"5490",h:"#798484"},{n:"Shadow Black",c:"4143",h:"#575B67"},{n:"Silky Greige",c:"12307",h:"#A19B92"},{n:"Silver Moon",c:"5081",h:"#BBC0C0"},{n:"Sky",c:"1350",h:"#BCB7AC"},{n:"Sky Safari",c:"4098",h:"#66899C"},{n:"Slidre",c:"6249",h:"#55625C"},{n:"Smoked Oak",c:"10964",h:"#6C6358"},{n:"Snow-White",c:"5001",h:"#E8EEEB"},{n:"Soft Blue",c:"4953",h:"#8A969F"},{n:"Soft Chorcoal",c:"12296",h:"#67635C"},{n:"Soft Masculinity",c:"4515",h:"#7399B2"},{n:"Soft Lilac",c:"4448",h:"#DCD5E6"},{n:"Sophisticated Blue",c:"4744",h:"#454A4D"},{n:"Space Grey",c:"5255",h:"#6B6F70"},{n:"Spekter",c:"4184",h:"#829ED4"},{n:"Sporty Green",c:"7239",h:"#1D8458"},{n:"Spring Leaf",c:"7003",h:"#A4B88B"},{n:"Spruce",c:"7041",h:"#677867"},{n:"Statement Blue",c:"4863",h:"#395068"},{n:"Statement Red",c:"20207",h:"#A6544A"},{n:"Steel Grey",c:"9929",h:"#8C8C8B"},{n:"Stone",c:"1927",h:"#D1CEC6"},{n:"Storm Blue",c:"5545",h:"#7F8B8F"},{n:"Summer Joy",c:"11214",h:"#F2D19D"},{n:"Summer Meadow",c:"8249",h:"#CEB769"},{n:"Sunset",c:"1508",h:"#DA9769"},{n:"Surfer Blue",c:"5280",h:"#009CB1"},{n:"Swamp Green",c:"8614",h:"#90864F"},{n:"Sweet Peacock",c:"4161",h:"#0083BB"},{n:"Tangerine Blast",c:"1628",h:"#E58040"},{n:"Tar",c:"5366",h:"#46494A"},{n:"Tea Leaves",c:"1938",h:"#BBAB92"},{n:"Tender Blue",c:"4345",h:"#778A9E"},{n:"The Abyss",c:"4400",h:"#384B5A"},{n:"The Seventies",c:"10407",h:"#EDAF63"},{n:"Thunder",c:"4687",h:"#565E75"},{n:"Timeless",c:"1024",h:"#E0DDD3"},{n:"Toast",c:"1351",h:"#BEA892"},{n:"Tree Leaf",c:"6262",h:"#305C5A"},{n:"Tropic",c:"6052",h:"#008D84"},{n:"Tropical Green",c:"7131",h:"#386A46"},{n:"True Blue",c:"4947",h:"#426884"},{n:"Turquesa Sueños",c:"6169",h:"#61B2A3"},{n:"Twig Brown",c:"8046",h:"#766D5B"},{n:"Ultra Violet",c:"4148",h:"#889CC9"},{n:"Underwater Blue",c:"5549",h:"#006987"},{n:"Ursula",c:"3331",h:"#936D80"},{n:"Vandyke Brown",c:"10249",h:"#79736D"},{n:"Vibrant Blue",c:"4962",h:"#3E9DCE"},{n:"Vibrant Ochre",c:"10007",h:"#D89258"},{n:"Vika",c:"0546",h:"#7D7468"},{n:"Violet",c:"4392",h:"#957AA1"},{n:"Violet Dahlia",c:"3455",h:"#7E596C"}];
+
+  // Chuyển RGB (0-255) sang Lab để so sánh màu theo cảm nhận thị giác
+  function rgbToLab(r, g, b) {
+    let [rl, gl, bl] = [r, g, b].map(v => {
+      v /= 255;
+      return v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
+    });
+    let x = (rl * 0.4124 + gl * 0.3576 + bl * 0.1805) / 0.95047;
+    let y = (rl * 0.2126 + gl * 0.7152 + bl * 0.0722) / 1.0;
+    let z = (rl * 0.0193 + gl * 0.1192 + bl * 0.9505) / 1.08883;
+    [x, y, z] = [x, y, z].map(v => v > 0.008856 ? Math.cbrt(v) : (7.787 * v + 16 / 116));
+    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  }
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  function findNearestJotun(r, g, b) {
+    const [L1, a1, b1] = rgbToLab(r, g, b);
+    let best = null, bestDist = Infinity;
+    for (const c of JOTUN_COLORS) {
+      const [cr, cg, cb] = hexToRgb(c.h);
+      const [L2, a2, b2] = rgbToLab(cr, cg, cb);
+      const dist = Math.sqrt((L1 - L2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2);
+      if (dist < bestDist) { bestDist = dist; best = c; }
+    }
+    return { color: best, delta: bestDist };
+  }
+
+  const matchSwatch = document.getElementById('match-swatch');
+  const matchName = document.getElementById('match-name');
+  const matchCode = document.getElementById('match-code');
+  const matchDelta = document.getElementById('match-delta');
+
+  function updateMatch(r, g, b) {
+    const { color, delta } = findNearestJotun(r, g, b);
+    matchSwatch.style.background = color.h;
+    matchName.textContent = color.n;
+    matchCode.textContent = 'Mã Jotun ' + color.c + ' · ' + color.h;
+    let note;
+    if (delta < 3) note = 'Gần như trùng khớp';
+    else if (delta < 10) note = 'Rất giống';
+    else if (delta < 20) note = 'Khá giống';
+    else note = 'Chỉ tương đối gần';
+    matchDelta.textContent = note + ' (ΔE ≈ ' + delta.toFixed(1) + ')';
+  }
+
+  function update() {
+    for (const key in sliders) {
+      labels[key].textContent = sliders[key].value + '%';
+    }
+    const { r, g, b } = compute();
+    const hex = '#' + toHex(r) + toHex(g) + toHex(b);
+    swatch.style.background = hex;
+    hexInput.value = hex.toUpperCase();
+    rgbInput.value = `rgb(${r}, ${g}, ${b})`;
+    updateMatch(r, g, b);
+  }
+
+  Object.values(sliders).forEach(s => s.addEventListener('input', update));
+
+  document.querySelectorAll('button[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.copy);
+      navigator.clipboard.writeText(input.value).then(() => {
+        const old = btn.textContent;
+        btn.textContent = 'Đã copy';
+        setTimeout(() => btn.textContent = old, 1000);
+      });
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    Object.values(sliders).forEach(s => s.value = 0);
+    update();
+  });
+
+  update();
+</script>
+
+</body>
+</html>
