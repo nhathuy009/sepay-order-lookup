@@ -179,6 +179,11 @@
       </div>
       <div class="hex-hint" id="hex-hint"></div>
       <div class="code-row">
+        <input type="text" id="jotun-code" placeholder="Mã Jotun (vd: 5002)">
+        <button id="btn-jotun">Áp dụng</button>
+      </div>
+      <div class="hex-hint" id="jotun-hint"></div>
+      <div class="code-row">
         <input type="text" id="rgb-code" readonly>
         <button data-copy="rgb-code">Copy</button>
       </div>
@@ -300,13 +305,29 @@
     return parseRgbResult(mixed);
   }
 
+  // ===== Đường cong độ nhạy =====
+  // Thanh trượt 0→100 nhưng thực tế lượng sắc tố tăng chậm ở đầu (vùng sáng)
+  // để dễ chỉnh màu nhã. Power ≈ 1.85 → khoảng 60% hành trình thanh ≈ 40% sắc tố
+  const SLIDER_POWER = 1.85;
+
+  function sliderToAmount(v) {
+    // v: 0..100  →  amount 0..1 (phi tuyến)
+    return Math.pow(Math.max(0, Math.min(100, v)) / 100, SLIDER_POWER);
+  }
+
+  function amountToSlider(a) {
+    // đảo hàm: amount 0..1 → giá trị thanh 0..100
+    a = Math.max(0, Math.min(1, a));
+    return Math.round(Math.pow(a, 1 / SLIDER_POWER) * 100);
+  }
+
   function compute() {
     return computeFrom({
-      black:  sliders.black.value / 100,
-      yellow: sliders.yellow.value / 100,
-      red:    sliders.red.value / 100,
-      blue:   sliders.blue.value / 100,
-      green:  sliders.green.value / 100,
+      black:  sliderToAmount(sliders.black.value),
+      yellow: sliderToAmount(sliders.yellow.value),
+      red:    sliderToAmount(sliders.red.value),
+      blue:   sliderToAmount(sliders.blue.value),
+      green:  sliderToAmount(sliders.green.value),
     });
   }
 
@@ -379,11 +400,11 @@
       return;
     }
     const best = reverseToSliders(rgb[0], rgb[1], rgb[2]);
-    sliders.black.value  = best.black;
-    sliders.yellow.value = best.yellow;
-    sliders.red.value    = best.red;
-    sliders.blue.value   = best.blue;
-    sliders.green.value  = best.green;
+    sliders.black.value  = amountToSlider(best.black / 100);
+    sliders.yellow.value = amountToSlider(best.yellow / 100);
+    sliders.red.value    = amountToSlider(best.red / 100);
+    sliders.blue.value   = amountToSlider(best.blue / 100);
+    sliders.green.value  = amountToSlider(best.green / 100);
     update();
 
     if (best.dist < 4) {
@@ -458,6 +479,75 @@ const JOTUN_COLORS = [{n:"0 2520 - Exterior",c:"2520",h:"#A9826F"},{n:"2365 Choc
     hexInput.value = hex.toUpperCase();
     rgbInput.value = `rgb(${r}, ${g}, ${b})`;
     updateMatch(r, g, b);
+  }
+
+
+  // ===== Tra cứu mã Jotun → áp dụng màu =====
+  const jotunInput = document.getElementById('jotun-code');
+  const jotunHint  = document.getElementById('jotun-hint');
+  const btnJotun   = document.getElementById('btn-jotun');
+
+  function findJotunByCode(query) {
+    if (!query) return null;
+    query = query.trim().toLowerCase().replace(/\s+/g, '');
+    // Ưu tiên khớp chính xác mã
+    let found = JOTUN_COLORS.find(c => c.c.toLowerCase() === query);
+    if (found) return found;
+    // Khớp một phần mã
+    found = JOTUN_COLORS.find(c => c.c.toLowerCase().includes(query));
+    if (found) return found;
+    // Khớp tên
+    found = JOTUN_COLORS.find(c => c.n.toLowerCase().includes(query));
+    return found || null;
+  }
+
+  function applyJotunCode() {
+    const q = jotunInput.value;
+    const color = findJotunByCode(q);
+    if (!color) {
+      jotunHint.textContent = 'Không tìm thấy mã Jotun này';
+      jotunHint.className = 'hex-hint err';
+      return;
+    }
+    // Đưa hex vào ô hex rồi chạy reverse
+    hexInput.value = color.h;
+    const rgb = parseHex(color.h);
+    if (!rgb) {
+      jotunHint.textContent = 'Mã hex của màu này không hợp lệ';
+      jotunHint.className = 'hex-hint err';
+      return;
+    }
+    const best = reverseToSliders(rgb[0], rgb[1], rgb[2]);
+    sliders.black.value  = amountToSlider(best.black / 100);
+    sliders.yellow.value = amountToSlider(best.yellow / 100);
+    sliders.red.value    = amountToSlider(best.red / 100);
+    sliders.blue.value   = amountToSlider(best.blue / 100);
+    sliders.green.value  = amountToSlider(best.green / 100);
+    update();
+
+    jotunHint.textContent = color.n + ' · ' + color.h;
+    jotunHint.className = 'hex-hint ok';
+    // Cũng cập nhật hint hex
+    if (best.dist < 4) {
+      hexHint.textContent = 'Đã khớp gần đúng từ Jotun';
+      hexHint.className = 'hex-hint ok';
+    } else if (best.dist < 18) {
+      hexHint.textContent = 'Gần đúng từ Jotun (sai lệch ≈ ' + best.dist.toFixed(1) + ')';
+      hexHint.className = 'hex-hint ok';
+    } else {
+      hexHint.textContent = 'Khó khớp chính xác (sai lệch ≈ ' + best.dist.toFixed(1) + ')';
+      hexHint.className = 'hex-hint err';
+    }
+  }
+
+  if (btnJotun) btnJotun.addEventListener('click', applyJotunCode);
+  if (jotunInput) {
+    jotunInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyJotunCode();
+      }
+    });
   }
 
   Object.values(sliders).forEach(s => s.addEventListener('input', () => {
