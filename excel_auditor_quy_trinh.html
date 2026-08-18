@@ -18,9 +18,9 @@
   </div>
 
   <section class="panel upload">
-    <label class="drop" id="dropZone" for="fileInput"><strong>Chọn hoặc thả 1 file Excel vào đây</strong><small>.xlsx / .xls — Có thể gửi lần lượt nhiều file; kết quả sẽ được cộng dồn bên dưới.</small><div class="privacy">File được xử lý ngay trong trình duyệt, không gửi lên máy chủ.</div></label>
-    <div class="actions"><button class="btn primary" id="chooseBtn">Chọn file</button><button class="btn" id="exportBtn" disabled>Xuất CSV cảnh báo</button><button class="btn" id="resetBtn" disabled>Xóa kết quả</button></div>
-    <input id="fileInput" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
+    <label class="drop" id="dropZone" for="fileInput"><strong>Chọn hoặc thả nhiều file Excel vào đây</strong><small>.xlsx / .xls — Có thể chọn hoặc kéo-thả nhiều file cùng lúc; kết quả sẽ được cộng dồn bên dưới.</small><div class="privacy">File được xử lý ngay trong trình duyệt, không gửi lên máy chủ.</div></label>
+    <div class="actions"><button class="btn primary" id="chooseBtn">Chọn nhiều file</button><button class="btn" id="exportBtn" disabled>Xuất CSV cảnh báo</button><button class="btn" id="resetBtn" disabled>Xóa kết quả</button></div>
+    <input id="fileInput" type="file" multiple accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
   </section>
 
   <div class="stats" id="stats">
@@ -312,11 +312,19 @@
     a.href=URL.createObjectURL(blob); a.download='excel-auditor-canh-bao.csv'; a.click(); URL.revokeObjectURL(a.href);
   }
 
-  $('#chooseBtn').onclick=()=>input.click(); input.onchange=e=>e.target.files[0]&&loadFile(e.target.files[0]);
+  async function loadFiles(fileList){
+    const files=Array.from(fileList||[]).filter(f=>/\.(xlsx|xls)$/i.test(f.name));
+    if(!files.length) return;
+    // Xử lý tuần tự để thứ tự báo cáo giống thứ tự người dùng chọn/thả.
+    for(const file of files) await loadFile(file);
+  }
+
+  $('#chooseBtn').onclick=()=>input.click();
+  input.onchange=e=>loadFiles(e.target.files);
   $('#exportBtn').onclick=exportCSV; $('#resetBtn').onclick=()=>{state.files=[];render();};
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
-  drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f)loadFile(f);});
+  drop.addEventListener('drop',e=>loadFiles(e.dataTransfer.files));
 })();
 </script>
 </body>
