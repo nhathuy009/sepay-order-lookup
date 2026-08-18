@@ -67,17 +67,70 @@
     return {ok:true, value:sign*Number(s), fromText:true};
   }
 
-  function parseHeaderText(a1, d1) {
-    const a = String(a1 ?? ''), d = String(d1 ?? '');
-    let code = a.replace(/^\s*M[ÃA]\s*H[ÀA]NG\s*:\s*/i,'').trim();
-    if (norm(a).includes('MA HANG')) code = a.split(':').slice(1).join(':').trim();
-    let qty = null, price = null;
-    const nd = strip(d).replace(/\s+/g,' ');
-    const mQty = nd.match(/SO LUONG\s*:\s*([\d\s.,]+?)(?=\s+GIA\b|$)/i);
-    const mPrice = nd.match(/GIA\s*:?[\s]*([\d\s.,]+)/i);
-    if (mQty) { const p=parseBusinessNumber(mQty[1]); if(p.ok) qty=p.value; }
-    if (mPrice) { const p=parseBusinessNumber(mPrice[1]); if(p.ok) price=p.value; }
-    return {code, qty, price};
+  function parseProcessHeader(ws, arr) {
+    // Không giả định MÃ HÀNG / SỐ LƯỢNG / GIÁ nằm ở cột cố định.
+    // Quét vài dòng đầu, hỗ trợ cả:
+    //   "MÃ HÀNG: ABC" / "SỐ LƯỢNG: 40  GIÁ: 21441"
+    // và dạng tách ô: MÃ HÀNG | ... ; SỐ LƯỢNG | 246 ; GIÁ | 20431.
+    const maxRows=Math.min(arr.length,8);
+    const maxCols=Math.min(30, Math.max(0,...arr.slice(0,maxRows).map(r=>(r||[]).length)));
+    let code='', qty=null, price=null;
+    let codeCell=null, qtyCell=null, priceCell=null;
+
+    const isLabel = v => {
+      const n=norm(v);
+      return n.includes('MA HANG') || n.includes('SO LUONG') || n==='GIA' || n.startsWith('GIA ');
+    };
+
+    function firstRightValue(r,c,kind){
+      for(let cc=c+1; cc<Math.min(maxCols,c+7); cc++){
+        const v=arr[r]?.[cc];
+        if(v===null || v===undefined || String(v).trim()==='') continue;
+        const n=norm(v);
+        // Nếu gặp một nhãn nghiệp vụ khác trước khi gặp giá trị thì dừng,
+        // tránh SỐ LƯỢNG nhảy sang lấy nhầm GIÁ.
+        if(isLabel(v)) break;
+        if(kind==='code') return {value:String(v).trim(), cell:colLetter(cc)+(r+1)};
+        const p=parseBusinessNumber(v);
+        if(p.ok) return {value:p.value, cell:colLetter(cc)+(r+1)};
+      }
+      return null;
+    }
+
+    for(let r=0;r<maxRows;r++){
+      for(let c=0;c<maxCols;c++){
+        const raw=arr[r]?.[c];
+        if(raw===null || raw===undefined) continue;
+        const txt=String(raw).trim(); if(!txt) continue;
+        const n=norm(txt);
+        const addr=colLetter(c)+(r+1);
+
+        if(!code && n.includes('MA HANG')){
+          // Ưu tiên nội dung ngay sau dấu : trong cùng ô.
+          const idx=txt.indexOf(':');
+          if(idx>=0 && txt.slice(idx+1).trim()){
+            code=txt.slice(idx+1).trim(); codeCell=addr;
+          } else {
+            const rr=firstRightValue(r,c,'code');
+            if(rr){code=rr.value; codeCell=rr.cell;}
+          }
+        }
+
+        // Dạng gộp cùng ô: "SỐ LƯỢNG: 40   GIÁ: 21441"
+        const flat=strip(txt).replace(/\s+/g,' ');
+        if(qty===null && n.includes('SO LUONG')){
+          const m=flat.match(/SO LUONG\s*:?\s*([\d\s.,]+?)(?=\s+GIA\b|$)/i);
+          if(m){ const p=parseBusinessNumber(m[1]); if(p.ok){qty=p.value; qtyCell=addr;} }
+          if(qty===null){ const rr=firstRightValue(r,c,'qty'); if(rr){qty=rr.value; qtyCell=rr.cell;} }
+        }
+        if(price===null && (n==='GIA' || n.startsWith('GIA ') || n.includes(' GIA'))){
+          const m=flat.match(/(?:^|\s)GIA\s*:?\s*([\d\s.,]+)/i);
+          if(m){ const p=parseBusinessNumber(m[1]); if(p.ok){price=p.value; priceCell=addr;} }
+          if(price===null){ const rr=firstRightValue(r,c,'price'); if(rr){price=rr.value; priceCell=rr.cell;} }
+        }
+      }
+    }
+    return {code,qty,price,codeCell,qtyCell,priceCell};
   }
 
   function sheetMatrix(ws) {
@@ -137,7 +190,7 @@
     const ws=wb.Sheets[sheetName], L=findProcessLayout(ws);
     const issues=[];
     if(!L) return {sheetName, key:norm(sheetName), status:'ERROR', issues:[mk('ERROR',sheetName,'—','Không nhận diện được bảng công đoạn','Không tìm thấy các cột STT / Tên công đoạn / Đơn giá.')], auditTotal:0};
-    const h=parseHeaderText(L.arr[0]?.[0], L.arr[0]?.[3]);
+    const h=parseProcessHeader(ws, L.arr);
     let auditTotal=0, numericRows=0, textNumeric=0;
     let expectedStt=1;
     for(let r=L.startRow;r<L.totalRow;r++){
@@ -178,7 +231,7 @@
       issues.push(mk('WARNING',sheetName,totalAddr,'TOTAL Excel khác TOTAL kiểm toán',`Excel: ${fmt(excelTotal)} • Kiểm toán: ${fmt(auditTotal)} • Chênh lệch: ${fmt(auditTotal-excelTotal)}.`));
     }
     if(h.price!==null && h.price!==auditTotal){
-      issues.push(mk('WARNING',sheetName,'D1','Giá header khác TOTAL kiểm toán',`Header: ${fmt(h.price)} • Kiểm toán: ${fmt(auditTotal)} • Chênh lệch: ${fmt(auditTotal-h.price)}.`));
+      issues.push(mk('WARNING',sheetName,h.priceCell||'HEADER','Giá header khác TOTAL kiểm toán',`Header: ${fmt(h.price)} • Kiểm toán: ${fmt(auditTotal)} • Chênh lệch: ${fmt(auditTotal-h.price)}.`));
     }
     const status = issues.some(x=>x.level==='ERROR') ? 'ERROR' : issues.some(x=>x.level==='WARNING') ? 'WARNING' : 'PASS';
     return {sheetName,key:norm(sheetName),code:h.code,qty:h.qty,headerPrice:h.price,auditTotal,excelTotal,formula:f,textNumeric,numericRows,status,issues};
