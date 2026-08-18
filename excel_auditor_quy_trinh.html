@@ -96,10 +96,32 @@
     }
     if(headerRow<0) return null;
     let totalRow=-1;
+
+    // Ưu tiên 1: nhận diện dòng tổng bằng nhãn TOTAL / TỔNG / TỔNG CỘNG.
     for(let r=headerRow+1;r<arr.length;r++){
       const row=arr[r]||[];
       if(row.some(v=>['TOTAL','TONG','TONG CONG'].includes(norm(v)))) { totalRow=r; break; }
     }
+
+    // Ưu tiên 2: một số file không ghi chữ TOTAL mà chỉ đặt công thức tổng
+    // ở cột ĐƠN GIÁ (ví dụ C44 = SUM(C3:C43)). Khi đó phải coi chính
+    // dòng công thức là dòng tổng, nếu không Auditor sẽ cộng ô tổng thêm lần nữa.
+    if(totalRow<0){
+      for(let r=headerRow+1;r<arr.length;r++){
+        const f=formula(ws,r,priceCol);
+        if(!f) continue;
+        const stt=arr[r]?.[sttCol], name=String(arr[r]?.[nameCol]??'').trim();
+        const compact=f.toUpperCase().replace(/\s+/g,'');
+        const thisCol=colLetter(priceCol);
+        const looksLikeTotal =
+          !parseBusinessNumber(stt).ok &&
+          !name &&
+          (compact.startsWith('SUM(') || compact.startsWith('SUMPRODUCT(')) &&
+          compact.includes(thisCol);
+        if(looksLikeTotal){ totalRow=r; break; }
+      }
+    }
+
     if(totalRow<0) totalRow=arr.length;
     return {arr,headerRow,sttCol,nameCol,priceCol,totalRow,startRow:headerRow+1};
   }
