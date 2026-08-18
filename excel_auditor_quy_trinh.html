@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Excel Auditor - Quy trình công đoạn</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#667085;--line:#e4e7ec;--ok:#067647;--okbg:#ecfdf3;--warn:#b54708;--warnbg:#fffaeb;--err:#b42318;--errbg:#fef3f2;--brand:#3157d5;--soft:#eef2ff}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:24px}.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.hero h1{font-size:28px;line-height:1.2;margin:0 0 6px}.hero p{margin:0;color:var(--muted);max-width:760px}.pill{background:var(--soft);color:var(--brand);padding:8px 12px;border-radius:999px;font-weight:700;white-space:nowrap}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px #1018280a}.upload{padding:18px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.drop{border:1.5px dashed #98a2b3;border-radius:12px;padding:18px;background:#fafafa;cursor:pointer}.drop.drag{border-color:var(--brand);background:var(--soft)}.drop strong{display:block;font-size:16px;margin-bottom:4px}.drop small{color:var(--muted)}input[type=file]{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 13px;border-radius:10px;font-weight:700;cursor:pointer}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.privacy{margin-top:9px;color:var(--muted);font-size:12px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 0}.stat{padding:14px 16px}.stat .n{font-size:24px;font-weight:800}.stat .t{color:var(--muted);font-size:12px}.stat.ok .n{color:var(--ok)}.stat.warn .n{color:var(--warn)}.stat.err .n{color:var(--err)}.empty{padding:42px;text-align:center;color:var(--muted)}.file{margin-top:14px;overflow:hidden}.fileHead{padding:15px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)}.fileTitle{min-width:0}.fileTitle h2{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fileTitle div{color:var(--muted);font-size:12px;margin-top:2px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px}.badge.ok{background:var(--okbg);color:var(--ok)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.err{background:var(--errbg);color:var(--err)}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}.summary>div{background:#fff;padding:11px 14px}.summary b{display:block;font-size:16px}.summary span{font-size:11px;color:var(--muted)}.tableWrap{overflow:auto}.audit{width:100%;border-collapse:collapse;min-width:940px}.audit th,.audit td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.audit th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fcfcfd;position:sticky;top:0}.audit td.num{text-align:right;font-variant-numeric:tabular-nums}.issues{padding:12px 16px 16px}.issues h3{font-size:13px;margin:0 0 8px}.issue{display:grid;grid-template-columns:84px 120px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.issue:first-of-type{border-top:0}.issue .where{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#344054}.issue .msg{min-width:0}.issue .detail{color:var(--muted);font-size:12px;margin-top:2px}.good{color:var(--ok);font-weight:700}.bad{color:var(--err);font-weight:700}.caution{color:var(--warn);font-weight:700}.footer{color:var(--muted);font-size:12px;text-align:center;padding:22px}.hidden{display:none}@media(max-width:800px){.wrap{padding:14px}.hero{display:block}.pill{display:inline-block;margin-top:10px}.upload{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.summary{grid-template-columns:repeat(2,1fr)}.issue{grid-template-columns:72px 1fr}.issue .msg{grid-column:2}.issue .where{grid-column:2}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>Excel Auditor — Quy trình công đoạn</h1><p>Đọc từng file Excel, tính lại đơn giá công đoạn (kể cả số đang lưu dạng text), kiểm tra công thức tổng, đối chiếu với giá/số lượng ở đầu sheet và sheet TOTAL.</p></div>
+    <div class="pill">Không sửa file gốc</div>
+  </div>
+
+  <section class="panel upload">
+    <label class="drop" id="dropZone" for="fileInput"><strong>Chọn hoặc thả 1 file Excel vào đây</strong><small>.xlsx / .xls — Có thể gửi lần lượt nhiều file; kết quả sẽ được cộng dồn bên dưới.</small><div class="privacy">File được xử lý ngay trong trình duyệt, không gửi lên máy chủ.</div></label>
+    <div class="actions"><button class="btn primary" id="chooseBtn">Chọn file</button><button class="btn" id="exportBtn" disabled>Xuất CSV cảnh báo</button><button class="btn" id="resetBtn" disabled>Xóa kết quả</button></div>
+    <input id="fileInput" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
+  </section>
+
+  <div class="stats" id="stats">
+    <section class="panel stat"><div class="n" id="sFiles">0</div><div class="t">FILE ĐÃ KIỂM</div></section>
+    <section class="panel stat"><div class="n" id="sSheets">0</div><div class="t">QUY TRÌNH</div></section>
+    <section class="panel stat ok"><div class="n" id="sPass">0</div><div class="t">PASS</div></section>
+    <section class="panel stat warn"><div class="n" id="sWarn">0</div><div class="t">WARNING</div></section>
+    <section class="panel stat err"><div class="n" id="sErr">0</div><div class="t">ERROR</div></section>
+  </div>
+
+  <div id="results"><section class="panel empty" id="empty">Chưa có file nào được kiểm tra.</section></div>
+  <div class="footer">Quy tắc: số dạng text hợp lệ được chuyển thành số để tính TOTAL kiểm toán; file gốc không bị thay đổi.</div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const input = $('#fileInput'), drop = $('#dropZone'), results = $('#results');
+  const state = { files: [] };
+  const nf = new Intl.NumberFormat('vi-VN');
+  const fmt = v => Number.isFinite(v) ? nf.format(v) : '—';
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const strip = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D');
+  const norm = s => strip(s).toUpperCase().replace(/[.]+$/g,'').replace(/\s+/g,' ').trim();
+  const normCode = s => norm(s).replace(/[^A-Z0-9]+/g,'');
+  const colLetter = n => { let s=''; for(++n;n;n=Math.floor((n-1)/26)) s=String.fromCharCode(65+(n-1)%26)+s; return s; };
+
+  function parseBusinessNumber(v) {
+    if (typeof v === 'number' && Number.isFinite(v)) return {ok:true, value:v, fromText:false};
+    if (typeof v !== 'string') return {ok:false};
+    let s = v.trim(); if (!s) return {ok:false};
+    // Nghiệp vụ đơn giá/số lượng là số nguyên: chấp nhận dấu . , khoảng trắng làm phân cách hàng nghìn.
+    if (!/^[+-]?[\d\s.,]+$/.test(s)) return {ok:false};
+    const sign = s.startsWith('-') ? -1 : 1;
+    s = s.replace(/^[+-]/,'').replace(/[\s.,]/g,'');
+    if (!/^\d+$/.test(s)) return {ok:false};
+    return {ok:true, value:sign*Number(s), fromText:true};
+  }
+
+  function parseHeaderText(a1, d1) {
+    const a = String(a1 ?? ''), d = String(d1 ?? '');
+    let code = a.replace(/^\s*M[ÃA]\s*H[ÀA]NG\s*:\s*/i,'').trim();
+    if (norm(a).includes('MA HANG')) code = a.split(':').slice(1).join(':').trim();
+    let qty = null, price = null;
+    const nd = strip(d).replace(/\s+/g,' ');
+    const mQty = nd.match(/SO LUONG\s*:\s*([\d\s.,]+?)(?=\s+GIA\b|$)/i);
+    const mPrice = nd.match(/GIA\s*:?[\s]*([\d\s.,]+)/i);
+    if (mQty) { const p=parseBusinessNumber(mQty[1]); if(p.ok) qty=p.value; }
+    if (mPrice) { const p=parseBusinessNumber(mPrice[1]); if(p.ok) price=p.value; }
+    return {code, qty, price};
+  }
+
+  function sheetMatrix(ws) {
+    return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null, blankrows:false});
+  }
+
+  function cell(ws, r, c) { return ws[XLSX.utils.encode_cell({r,c})]; }
+  function cachedNumber(ws,r,c){ const x=cell(ws,r,c); return x && typeof x.v==='number' && Number.isFinite(x.v) ? x.v : null; }
+  function formula(ws,r,c){ const x=cell(ws,r,c); return x && x.f ? String(x.f) : ''; }
+
+  function findProcessLayout(ws) {
+    const arr = sheetMatrix(ws);
+    let headerRow=-1, sttCol=-1, nameCol=-1, priceCol=-1;
+    for (let r=0;r<Math.min(arr.length,20);r++) {
+      const row=arr[r]||[];
+      row.forEach((v,c)=>{
+        const n=norm(v);
+        if(n==='STT'||n==='TT') sttCol=c;
+        if(n.includes('TEN CONG DOAN')) nameCol=c;
+        if(n.includes('DON GIA')) priceCol=c;
+      });
+      if(sttCol>=0 && nameCol>=0 && priceCol>=0){headerRow=r;break;}
+    }
+    if(headerRow<0) return null;
+    let totalRow=-1;
+    for(let r=headerRow+1;r<arr.length;r++){
+      const row=arr[r]||[];
+      if(row.some(v=>['TOTAL','TONG','TONG CONG'].includes(norm(v)))) { totalRow=r; break; }
+    }
+    if(totalRow<0) totalRow=arr.length;
+    return {arr,headerRow,sttCol,nameCol,priceCol,totalRow,startRow:headerRow+1};
+  }
+
+  function auditProcess(wb, sheetName) {
+    const ws=wb.Sheets[sheetName], L=findProcessLayout(ws);
+    const issues=[];
+    if(!L) return {sheetName, key:norm(sheetName), status:'ERROR', issues:[mk('ERROR',sheetName,'—','Không nhận diện được bảng công đoạn','Không tìm thấy các cột STT / Tên công đoạn / Đơn giá.')], auditTotal:0};
+    const h=parseHeaderText(L.arr[0]?.[0], L.arr[0]?.[3]);
+    let auditTotal=0, numericRows=0, textNumeric=0;
+    let expectedStt=1;
+    for(let r=L.startRow;r<L.totalRow;r++){
+      const stt=L.arr[r]?.[L.sttCol], name=L.arr[r]?.[L.nameCol], raw=L.arr[r]?.[L.priceCol];
+      const hasAny = stt!==null || name!==null || raw!==null;
+      if(!hasAny) continue;
+      const sttP=parseBusinessNumber(stt);
+      const p=parseBusinessNumber(raw);
+      const nameText=String(name??'').trim();
+      const addr=colLetter(L.priceCol)+(r+1);
+      if(sttP.ok){
+        if(sttP.value!==expectedStt) issues.push(mk('WARNING',sheetName,colLetter(L.sttCol)+(r+1),'STT không liên tục',`Mong đợi ${expectedStt}, đang là ${sttP.value}.`));
+        expectedStt=sttP.value+1;
+      }
+      if(sttP.ok && !nameText) issues.push(mk('WARNING',sheetName,colLetter(L.nameCol)+(r+1),'Có STT nhưng thiếu tên công đoạn',`STT ${sttP.value} đang có ô tên công đoạn trống.`));
+      if(nameText && (raw===null || String(raw).trim()==='')) issues.push(mk('ERROR',sheetName,addr,'Có tên công đoạn nhưng thiếu đơn giá',nameText));
+      if(raw!==null && String(raw).trim()!==''){
+        if(p.ok){
+          auditTotal += p.value; numericRows++;
+          if(p.fromText){ textNumeric++; issues.push(mk('WARNING',sheetName,addr,'Số đang lưu dạng text — đã cộng khi kiểm toán',`Giá trị “${raw}” được tính là ${fmt(p.value)}.`)); }
+        } else {
+          issues.push(mk('ERROR',sheetName,addr,'Đơn giá không thể chuyển thành số',`Giá trị hiện tại: “${raw}”.`));
+        }
+      }
+    }
+    const totalCellRow=L.totalRow, totalAddr=colLetter(L.priceCol)+(totalCellRow+1);
+    const excelTotal=cachedNumber(ws,totalCellRow,L.priceCol);
+    const f=formula(ws,totalCellRow,L.priceCol);
+    const expectedRange=`${colLetter(L.priceCol)}${L.startRow+1}:${colLetter(L.priceCol)}${L.totalRow}`;
+    if(!f){
+      issues.push(mk('WARNING',sheetName,totalAddr,'Ô TOTAL không có công thức',excelTotal===null?'Không có giá trị số để đối chiếu.':`Giá trị đang lưu: ${fmt(excelTotal)}.`));
+    }else{
+      const compact=f.toUpperCase().replace(/\s+/g,'');
+      const expected=`SUM(${expectedRange})`.toUpperCase();
+      if(compact!==expected) issues.push(mk('WARNING',sheetName,totalAddr,'Công thức TOTAL khác phạm vi chuẩn',`Hiện tại: =${f} • Mong đợi: =SUM(${expectedRange})`));
+    }
+    if(excelTotal!==null && excelTotal!==auditTotal){
+      issues.push(mk('WARNING',sheetName,totalAddr,'TOTAL Excel khác TOTAL kiểm toán',`Excel: ${fmt(excelTotal)} • Kiểm toán: ${fmt(auditTotal)} • Chênh lệch: ${fmt(auditTotal-excelTotal)}.`));
+    }
+    if(h.price!==null && h.price!==auditTotal){
+      issues.push(mk('WARNING',sheetName,'D1','Giá header khác TOTAL kiểm toán',`Header: ${fmt(h.price)} • Kiểm toán: ${fmt(auditTotal)} • Chênh lệch: ${fmt(auditTotal-h.price)}.`));
+    }
+    const status = issues.some(x=>x.level==='ERROR') ? 'ERROR' : issues.some(x=>x.level==='WARNING') ? 'WARNING' : 'PASS';
+    return {sheetName,key:norm(sheetName),code:h.code,qty:h.qty,headerPrice:h.price,auditTotal,excelTotal,formula:f,textNumeric,numericRows,status,issues};
+  }
+
+  function mk(level,sheet,cell,message,detail=''){return{level,sheet,cell,message,detail};}
+
+  function auditTotalSheet(wb, processes) {
+    const name=wb.SheetNames.find(n=>norm(n)==='TOTAL' || norm(n).startsWith('TOTAL '));
+    if(!name) return {name:null,issues:[mk('ERROR','TOTAL','—','Không tìm thấy sheet TOTAL','Không thể đối chiếu tổng hợp.')], rows:[], qtySum:null, amountSum:null};
+    const ws=wb.Sheets[name], arr=sheetMatrix(ws), issues=[], rows=[];
+    let headerRow=-1, cProc=0,cCode=1,cQty=2,cPrice=3,cAmount=4;
+    for(let r=0;r<Math.min(arr.length,20);r++){
+      const nr=(arr[r]||[]).map(norm);
+      if(nr.includes('MA HANG') && nr.some(x=>x.includes('SO LUONG'))){ headerRow=r; cCode=nr.indexOf('MA HANG'); cQty=nr.findIndex(x=>x.includes('SO LUONG')); cPrice=nr.findIndex(x=>x==='GIA'); cAmount=nr.findIndex(x=>x.includes('THANH TIEN')); cProc=nr.findIndex(x=>x==='TT'); if(cProc<0)cProc=0; break; }
+    }
+    if(headerRow<0){issues.push(mk('ERROR',name,'—','Không nhận diện được bảng TOTAL','Không tìm thấy hàng tiêu đề MÃ HÀNG / SỐ LƯỢNG / GIÁ / THÀNH TIỀN.')); return {name,issues,rows};}
+    let detailEnd=headerRow+1;
+    for(let r=headerRow+1;r<arr.length;r++){
+      const proc=norm(arr[r]?.[cProc]);
+      if(proc.startsWith('QUY TRINH')) detailEnd=r+1; else if(r>headerRow+1) break;
+    }
+    for(let r=headerRow+1;r<detailEnd;r++){
+      const procLabel=String(arr[r]?.[cProc]??''), pkey=norm(procLabel);
+      const code=String(arr[r]?.[cCode]??'').trim();
+      const q=parseBusinessNumber(arr[r]?.[cQty]); const pr=parseBusinessNumber(arr[r]?.[cPrice]);
+      const qty=q.ok?q.value:null, price=pr.ok?pr.value:null;
+      const amountExpected=(qty!==null&&price!==null)?qty*price:null;
+      const amountCached=cachedNumber(ws,r,cAmount);
+      const f=formula(ws,r,cAmount);
+      const p=processes.find(x=>x.key===pkey) || processes.find(x=>normCode(x.code) && normCode(x.code)===normCode(code));
+      if(!p) issues.push(mk('ERROR',name,colLetter(cProc)+(r+1),'Không tìm thấy sheet quy trình tương ứng',procLabel||code));
+      else {
+        if(normCode(code)!==normCode(p.code)) issues.push(mk('WARNING',name,colLetter(cCode)+(r+1),'Mã hàng không khớp với sheet quy trình',`TOTAL: “${code}” • ${p.sheetName}: “${p.code}”.`));
+        if(qty!==p.qty) issues.push(mk('ERROR',name,colLetter(cQty)+(r+1),'Số lượng không khớp',`TOTAL: ${fmt(qty)} • ${p.sheetName}: ${fmt(p.qty)}.`));
+        if(price!==p.headerPrice) issues.push(mk('WARNING',name,colLetter(cPrice)+(r+1),'Giá TOTAL không khớp giá header',`TOTAL: ${fmt(price)} • ${p.sheetName}: ${fmt(p.headerPrice)}.`));
+        if(price!==p.auditTotal) issues.push(mk('WARNING',name,colLetter(cPrice)+(r+1),'Giá TOTAL không khớp TOTAL kiểm toán công đoạn',`TOTAL: ${fmt(price)} • Kiểm toán ${p.sheetName}: ${fmt(p.auditTotal)} • Chênh lệch: ${fmt(p.auditTotal-price)}.`));
+      }
+      if(amountExpected!==null && amountCached!==null && amountCached!==amountExpected) issues.push(mk('ERROR',name,colLetter(cAmount)+(r+1),'Thành tiền lưu trong Excel không khớp SL × Giá',`Excel: ${fmt(amountCached)} • Tính lại: ${fmt(amountExpected)}.`));
+      if(!f) issues.push(mk('WARNING',name,colLetter(cAmount)+(r+1),'Ô thành tiền không có công thức',amountExpected===null?'Không đủ dữ liệu để tính lại.':`Kỳ vọng ${colLetter(cQty)}${r+1}*${colLetter(cPrice)}${r+1}.`));
+      else {
+        const cp=`${colLetter(cQty)}${r+1}`, pp=`${colLetter(cPrice)}${r+1}`;
+        const compact=f.toUpperCase().replace(/\s+/g,'');
+        const accepted=[`${cp}*${pp}`,`SUM(${cp}*${pp})`].map(x=>x.toUpperCase());
+        if(!accepted.includes(compact)) issues.push(mk('WARNING',name,colLetter(cAmount)+(r+1),'Công thức thành tiền khác logic SL × Giá',`Hiện tại: =${f} • Kỳ vọng: =${cp}*${pp}`));
+      }
+      rows.push({procLabel,code,qty,price,amountExpected,amountCached,p});
+    }
+    const qtySum=rows.reduce((s,x)=>s+(x.qty||0),0), amountSum=rows.reduce((s,x)=>s+(x.amountExpected||0),0);
+    // Dòng tổng ngay sau các quy trình (nếu có)
+    const tr=detailEnd;
+    if(tr<arr.length){
+      const qc=cachedNumber(ws,tr,cQty), ac=cachedNumber(ws,tr,cAmount), qf=formula(ws,tr,cQty), af=formula(ws,tr,cAmount);
+      if(qc!==null && qc!==qtySum) issues.push(mk('ERROR',name,colLetter(cQty)+(tr+1),'Tổng số lượng cuối bảng sai',`Excel: ${fmt(qc)} • Tính lại: ${fmt(qtySum)}.`));
+      if(ac!==null && ac!==amountSum) issues.push(mk('ERROR',name,colLetter(cAmount)+(tr+1),'Tổng thành tiền cuối bảng sai',`Excel: ${fmt(ac)} • Tính lại: ${fmt(amountSum)}.`));
+      const first=headerRow+2,last=detailEnd;
+      if(qf && qf.toUpperCase().replace(/\s+/g,'')!==`SUM(${colLetter(cQty)}${first}:${colLetter(cQty)}${last})`) issues.push(mk('WARNING',name,colLetter(cQty)+(tr+1),'Công thức tổng số lượng khác phạm vi chuẩn',`Hiện tại: =${qf}`));
+      if(af && af.toUpperCase().replace(/\s+/g,'')!==`SUM(${colLetter(cAmount)}${first}:${colLetter(cAmount)}${last})`) issues.push(mk('WARNING',name,colLetter(cAmount)+(tr+1),'Công thức tổng thành tiền khác phạm vi chuẩn',`Hiện tại: =${af}`));
+    }
+    return {name,issues,rows,qtySum,amountSum};
+  }
+
+  function auditWorkbook(wb, fileName) {
+    const pnames=wb.SheetNames.filter(n=>/^QUY TRINH\s*\d+/i.test(norm(n)));
+    const processes=pnames.map(n=>auditProcess(wb,n)).sort((a,b)=>a.key.localeCompare(b.key,undefined,{numeric:true}));
+    const total=auditTotalSheet(wb,processes);
+    const issues=[...processes.flatMap(p=>p.issues),...total.issues];
+    const status=issues.some(x=>x.level==='ERROR')?'ERROR':issues.some(x=>x.level==='WARNING')?'WARNING':'PASS';
+    return {fileName,processes,total,issues,status,ts:new Date()};
+  }
+
+  async function loadFile(file){
+    if(typeof XLSX==='undefined'){alert('Không tải được thư viện đọc Excel. Hãy kiểm tra kết nối Internet rồi mở lại file HTML.');return;}
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array',cellFormula:true,cellText:true,cellDates:true});
+      state.files.push(auditWorkbook(wb,file.name)); render();
+    }catch(e){alert('Không đọc được file: '+e.message);}
+    input.value='';
+  }
+
+  function statusBadge(s){return `<span class="badge ${s==='PASS'?'ok':s==='WARNING'?'warn':'err'}">${s}</span>`;}
+  function issueHtml(x){return `<div class="issue"><div>${statusBadge(x.level==='WARNING'?'WARNING':'ERROR')}</div><div class="where">${esc(x.sheet)}!${esc(x.cell)}</div><div class="msg"><b>${esc(x.message)}</b>${x.detail?`<div class="detail">${esc(x.detail)}</div>`:''}</div></div>`;}
+
+  function render(){
+    $('#empty')?.remove();
+    let sheets=0,pass=0,warn=0,err=0;
+    state.files.forEach(f=>f.processes.forEach(p=>{sheets++; if(p.status==='PASS')pass++; else if(p.status==='WARNING')warn++; else err++;}));
+    $('#sFiles').textContent=state.files.length; $('#sSheets').textContent=sheets; $('#sPass').textContent=pass; $('#sWarn').textContent=warn; $('#sErr').textContent=err;
+    $('#exportBtn').disabled=!state.files.length; $('#resetBtn').disabled=!state.files.length;
+    results.innerHTML=state.files.map((f,idx)=>{
+      const wi=f.issues.filter(x=>x.level==='WARNING').length, er=f.issues.filter(x=>x.level==='ERROR').length;
+      const rows=f.processes.map(p=>`<tr><td>${esc(p.sheetName)}</td><td>${esc(p.code)}</td><td class="num">${fmt(p.qty)}</td><td class="num">${fmt(p.headerPrice)}</td><td class="num"><b>${fmt(p.auditTotal)}</b></td><td class="num">${fmt(p.excelTotal)}</td><td class="num">${p.headerPrice===null?'—':fmt(p.auditTotal-p.headerPrice)}</td><td>${statusBadge(p.status)}</td></tr>`).join('');
+      const issueBlock=f.issues.length?f.issues.map(issueHtml).join(''):'<div class="good">Không phát hiện lỗi hoặc cảnh báo.</div>';
+      return `<section class="panel file"><div class="fileHead"><div class="fileTitle"><h2>${idx+1}. ${esc(f.fileName)}</h2><div>${f.processes.length} sheet quy trình • ${wi} cảnh báo • ${er} lỗi</div></div>${statusBadge(f.status)}</div>
+      <div class="summary"><div><b>${f.processes.length}</b><span>QUY TRÌNH</span></div><div><b>${fmt(f.total.qtySum)}</b><span>TỔNG SỐ LƯỢNG TÍNH LẠI</span></div><div><b>${fmt(f.total.amountSum)}</b><span>TỔNG THÀNH TIỀN TÍNH LẠI</span></div><div><b>${wi}</b><span>WARNING</span></div><div><b>${er}</b><span>ERROR</span></div></div>
+      <div class="tableWrap"><table class="audit"><thead><tr><th>Sheet</th><th>Mã hàng</th><th>SL</th><th>Giá header</th><th>Total kiểm toán</th><th>Total Excel</th><th>Chênh header</th><th>Kết quả</th></tr></thead><tbody>${rows||'<tr><td colspan="8">Không tìm thấy sheet QUY TRÌNH.</td></tr>'}</tbody></table></div>
+      <div class="issues"><h3>Chi tiết cần kiểm tra</h3>${issueBlock}</div></section>`;
+    }).join('') || '<section class="panel empty" id="empty">Chưa có file nào được kiểm tra.</section>';
+  }
+
+  function csvCell(v){v=String(v??'');return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+  function exportCSV(){
+    const data=[['File','Mức','Sheet','Ô','Nội dung','Chi tiết']];
+    state.files.forEach(f=>f.issues.forEach(x=>data.push([f.fileName,x.level,x.sheet,x.cell,x.message,x.detail])));
+    if(data.length===1)data.push(['','','','','Không có cảnh báo/lỗi','']);
+    const csv='\ufeff'+data.map(r=>r.map(csvCell).join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}), a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download='excel-auditor-canh-bao.csv'; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  $('#chooseBtn').onclick=()=>input.click(); input.onchange=e=>e.target.files[0]&&loadFile(e.target.files[0]);
+  $('#exportBtn').onclick=exportCSV; $('#resetBtn').onclick=()=>{state.files=[];render();};
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
+  drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f)loadFile(f);});
+})();
+</script>
+</body>
+</html>
