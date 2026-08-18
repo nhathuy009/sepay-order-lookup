@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#667085;--line:#e4e7ec;--ok:#067647;--okbg:#ecfdf3;--warn:#b54708;--warnbg:#fffaeb;--err:#b42318;--errbg:#fef3f2;--brand:#3157d5;--soft:#eef2ff}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:24px}.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.hero h1{font-size:28px;line-height:1.2;margin:0 0 6px}.hero p{margin:0;color:var(--muted);max-width:760px}.pill{background:var(--soft);color:var(--brand);padding:8px 12px;border-radius:999px;font-weight:700;white-space:nowrap}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px #1018280a}.upload{padding:18px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.drop{border:1.5px dashed #98a2b3;border-radius:12px;padding:18px;background:#fafafa;cursor:pointer}.drop.drag{border-color:var(--brand);background:var(--soft)}.drop strong{display:block;font-size:16px;margin-bottom:4px}.drop small{color:var(--muted)}input[type=file]{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 13px;border-radius:10px;font-weight:700;cursor:pointer}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.privacy{margin-top:9px;color:var(--muted);font-size:12px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 0}.stats.secondary{grid-template-columns:repeat(3,1fr);margin-top:-4px}.stat{padding:14px 16px}.stat.metric .n{font-size:22px}.stat.metric .t{font-weight:700}.stat .n{font-size:24px;font-weight:800}.stat .t{color:var(--muted);font-size:12px}.stat.ok .n{color:var(--ok)}.stat.warn .n{color:var(--warn)}.stat.err .n{color:var(--err)}.empty{padding:42px;text-align:center;color:var(--muted)}.file{margin-top:14px;overflow:hidden}.fileHead{padding:15px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)}.fileTitle{min-width:0}.fileTitle h2{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fileTitle div{color:var(--muted);font-size:12px;margin-top:2px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px}.badge.ok{background:var(--okbg);color:var(--ok)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.err{background:var(--errbg);color:var(--err)}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}.summary>div{background:#fff;padding:11px 14px}.summary b{display:block;font-size:16px}.summary span{font-size:11px;color:var(--muted)}.tableWrap{overflow:auto}.audit{width:100%;border-collapse:collapse;min-width:940px}.audit th,.audit td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.audit th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fcfcfd;position:sticky;top:0}.audit td.num{text-align:right;font-variant-numeric:tabular-nums}.issues{padding:12px 16px 16px}.issues h3{font-size:13px;margin:0 0 8px}.issue{display:grid;grid-template-columns:84px 120px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.issue:first-of-type{border-top:0}.issue .where{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#344054}.issue .msg{min-width:0}.issue .detail{color:var(--muted);font-size:12px;margin-top:2px}.good{color:var(--ok);font-weight:700}.bad{color:var(--err);font-weight:700}.caution{color:var(--warn);font-weight:700}.footer{color:var(--muted);font-size:12px;text-align:center;padding:22px}.hidden{display:none}@media(max-width:800px){.wrap{padding:14px}.hero{display:block}.pill{display:inline-block;margin-top:10px}.upload{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.stats.secondary{grid-template-columns:1fr}.summary{grid-template-columns:repeat(2,1fr)}.issue{grid-template-columns:72px 1fr}.issue .msg{grid-column:2}.issue .where{grid-column:2}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:24px}.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}.hero h1{font-size:28px;line-height:1.2;margin:0 0 6px}.hero p{margin:0;color:var(--muted);max-width:760px}.pill{background:var(--soft);color:var(--brand);padding:8px 12px;border-radius:999px;font-weight:700;white-space:nowrap}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px #1018280a}.upload{padding:18px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.drop{border:1.5px dashed #98a2b3;border-radius:12px;padding:18px;background:#fafafa;cursor:pointer}.drop.drag{border-color:var(--brand);background:var(--soft)}.drop strong{display:block;font-size:16px;margin-bottom:4px}.drop small{color:var(--muted)}input[type=file]{display:none}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 13px;border-radius:10px;font-weight:700;cursor:pointer}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}.privacy{margin-top:9px;color:var(--muted);font-size:12px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 0}.stats.secondary{grid-template-columns:repeat(4,1fr);margin-top:-4px}.stat{padding:14px 16px}.stat.metric .n{font-size:22px}.stat.metric .t{font-weight:700}.stat .n{font-size:24px;font-weight:800}.stat .t{color:var(--muted);font-size:12px}.stat.ok .n{color:var(--ok)}.stat.warn .n{color:var(--warn)}.stat.err .n{color:var(--err)}.empty{padding:42px;text-align:center;color:var(--muted)}.file{margin-top:14px;overflow:hidden}.fileHead{padding:15px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line)}.fileTitle{min-width:0}.fileTitle h2{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fileTitle div{color:var(--muted);font-size:12px;margin-top:2px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px}.badge.ok{background:var(--okbg);color:var(--ok)}.badge.warn{background:var(--warnbg);color:var(--warn)}.badge.err{background:var(--errbg);color:var(--err)}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}.summary>div{background:#fff;padding:11px 14px}.summary b{display:block;font-size:16px}.summary span{font-size:11px;color:var(--muted)}.tableWrap{overflow:auto}.audit{width:100%;border-collapse:collapse;min-width:940px}.audit th,.audit td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.audit th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:#fcfcfd;position:sticky;top:0}.audit td.num{text-align:right;font-variant-numeric:tabular-nums}.issues{padding:12px 16px 16px}.issues h3{font-size:13px;margin:0 0 8px}.issue{display:grid;grid-template-columns:84px 120px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.issue:first-of-type{border-top:0}.issue .where{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#344054}.issue .msg{min-width:0}.issue .detail{color:var(--muted);font-size:12px;margin-top:2px}.good{color:var(--ok);font-weight:700}.bad{color:var(--err);font-weight:700}.caution{color:var(--warn);font-weight:700}.footer{color:var(--muted);font-size:12px;text-align:center;padding:22px}.hidden{display:none}@media(max-width:800px){.wrap{padding:14px}.hero{display:block}.pill{display:inline-block;margin-top:10px}.upload{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.stats.secondary{grid-template-columns:1fr}.summary{grid-template-columns:repeat(2,1fr)}.issue{grid-template-columns:72px 1fr}.issue .msg{grid-column:2}.issue .where{grid-column:2}}
   </style>
 </head>
 <body>
@@ -34,7 +34,8 @@
   <div class="stats secondary" id="businessStats">
     <section class="panel stat metric"><div class="n" id="sProducts">0</div><div class="t">TỔNG MÃ HÀNG</div></section>
     <section class="panel stat metric"><div class="n" id="sProduction">0</div><div class="t">TỔNG SẢN LƯỢNG</div></section>
-    <section class="panel stat metric"><div class="n" id="sMoney">0 đ</div><div class="t">TỔNG SỐ TIỀN</div></section>
+    <section class="panel stat metric"><div class="n" id="sMoney">0 đ</div><div class="t">TỔNG SỐ TIỀN TÍNH LẠI</div></section>
+    <section class="panel stat metric"><div class="n" id="sExcelMoney">0 đ</div><div class="t">TỔNG SỐ TIỀN EXCEL</div></section>
   </div>
 
   <div id="results"><section class="panel empty" id="empty">Chưa có file nào được kiểm tra.</section></div>
@@ -227,17 +228,21 @@
       rows.push({procLabel,code,qty,price,amountExpected,amountCached,p});
     }
     const qtySum=rows.reduce((s,x)=>s+(x.qty||0),0), amountSum=rows.reduce((s,x)=>s+(x.amountExpected||0),0);
+    const excelRowsAmountSum=rows.reduce((s,x)=>s+(Number.isFinite(x.amountCached)?x.amountCached:0),0);
+    let excelGrandTotal=null;
     // Dòng tổng ngay sau các quy trình (nếu có)
     const tr=detailEnd;
     if(tr<arr.length){
       const qc=cachedNumber(ws,tr,cQty), ac=cachedNumber(ws,tr,cAmount), qf=formula(ws,tr,cQty), af=formula(ws,tr,cAmount);
+      if(Number.isFinite(ac)) excelGrandTotal=ac;
       if(qc!==null && qc!==qtySum) issues.push(mk('ERROR',name,colLetter(cQty)+(tr+1),'Tổng số lượng cuối bảng sai',`Excel: ${fmt(qc)} • Tính lại: ${fmt(qtySum)}.`));
       if(ac!==null && ac!==amountSum) issues.push(mk('ERROR',name,colLetter(cAmount)+(tr+1),'Tổng thành tiền cuối bảng sai',`Excel: ${fmt(ac)} • Tính lại: ${fmt(amountSum)}.`));
       const first=headerRow+2,last=detailEnd;
       if(qf && qf.toUpperCase().replace(/\s+/g,'')!==`SUM(${colLetter(cQty)}${first}:${colLetter(cQty)}${last})`) issues.push(mk('WARNING',name,colLetter(cQty)+(tr+1),'Công thức tổng số lượng khác phạm vi chuẩn',`Hiện tại: =${qf}`));
       if(af && af.toUpperCase().replace(/\s+/g,'')!==`SUM(${colLetter(cAmount)}${first}:${colLetter(cAmount)}${last})`) issues.push(mk('WARNING',name,colLetter(cAmount)+(tr+1),'Công thức tổng thành tiền khác phạm vi chuẩn',`Hiện tại: =${af}`));
     }
-    return {name,issues,rows,qtySum,amountSum};
+    const excelAmountSum=Number.isFinite(excelGrandTotal)?excelGrandTotal:excelRowsAmountSum;
+    return {name,issues,rows,qtySum,amountSum,excelAmountSum};
   }
 
   function auditWorkbook(wb, fileName) {
@@ -265,7 +270,7 @@
   function render(){
     $('#empty')?.remove();
     let sheets=0,pass=0,warn=0,err=0;
-    let totalProducts=0,totalProduction=0,totalMoney=0;
+    let totalProducts=0,totalProduction=0,totalMoney=0,totalExcelMoney=0;
     state.files.forEach(f=>{
       f.processes.forEach(p=>{
         sheets++;
@@ -277,11 +282,14 @@
         // Thành tiền kiểm toán = Số lượng × TOTAL công đoạn đã tính lại.
         if(Number.isFinite(p.qty) && Number.isFinite(p.auditTotal)) totalMoney += p.qty * p.auditTotal;
       });
+      // Tổng số tiền Excel = tổng các giá trị thành tiền đang lưu trong sheet TOTAL.
+      if(f.total && Number.isFinite(f.total.excelAmountSum)) totalExcelMoney += f.total.excelAmountSum;
     });
     $('#sFiles').textContent=state.files.length; $('#sSheets').textContent=sheets; $('#sPass').textContent=pass; $('#sWarn').textContent=warn; $('#sErr').textContent=err;
     $('#sProducts').textContent=fmt(totalProducts);
     $('#sProduction').textContent=fmt(totalProduction);
     $('#sMoney').textContent=fmt(totalMoney)+' đ';
+    $('#sExcelMoney').textContent=fmt(totalExcelMoney)+' đ';
     $('#exportBtn').disabled=!state.files.length; $('#resetBtn').disabled=!state.files.length;
     results.innerHTML=state.files.map((f,idx)=>{
       const wi=f.issues.filter(x=>x.level==='WARNING').length, er=f.issues.filter(x=>x.level==='ERROR').length;
