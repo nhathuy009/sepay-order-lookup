@@ -5202,6 +5202,36 @@ function formatAirTotal(n) {
   return Math.round(v * 100) / 100;
 }
 
+function toggleAirSheetGroup(row, forceCollapsed) {
+  if (!row) return;
+  const idx = row.getAttribute("data-sheet-idx");
+  if (idx === null) return;
+  const willCollapse = (forceCollapsed !== undefined) ? !!forceCollapsed : !row.classList.contains("collapsed");
+  row.classList.toggle("collapsed", willCollapse);
+  row.setAttribute("aria-expanded", willCollapse ? "false" : "true");
+  const icon = row.querySelector(".sheet-toggle");
+  if (icon) icon.textContent = willCollapse ? "▶" : "▼";
+  document.querySelectorAll('#airTbody tr.air-bag-row[data-sheet-idx="' + idx + '"]').forEach((tr) => {
+    tr.classList.toggle("is-hidden", willCollapse);
+  });
+  updateAirCollapseAllBtn();
+}
+
+function toggleAllAirSheets() {
+  const rows = document.querySelectorAll("#airTbody tr.sheet-total-row");
+  if (!rows.length) return;
+  const anyExpanded = Array.from(rows).some((r) => !r.classList.contains("collapsed"));
+  rows.forEach((r) => toggleAirSheetGroup(r, anyExpanded));
+}
+
+function updateAirCollapseAllBtn() {
+  const btn = document.getElementById("airCollapseAllBtn");
+  if (!btn) return;
+  const rows = document.querySelectorAll("#airTbody tr.sheet-total-row");
+  const allCollapsed = rows.length > 0 && Array.from(rows).every((r) => r.classList.contains("collapsed"));
+  btn.textContent = allCollapsed ? "Mở tất cả" : "Thu gọn tất cả";
+}
+
 function renderAirPreviewTable(processed) {
   const { allBagsData, customerName, dateStr, categoryNotes } = processed;
   const tbody = document.getElementById("airTbody");
@@ -5219,6 +5249,7 @@ function renderAirPreviewTable(processed) {
   let rowsHtml = "";
   let stt = 0;
   let i = 0;
+  let sheetIdx = 0;
   while (i < allBagsData.length) {
     const sheetName = allBagsData[i].SHEET_NAME || "";
     let sheetSets = 0;
@@ -5232,7 +5263,7 @@ function renderAirPreviewTable(processed) {
       sheetWeight += (bag.KGS || 0);
       totalSets += bag.QTITY;
       totalWeight += (bag.KGS || 0);
-      rowsHtml += `<tr>
+      rowsHtml += `<tr class="air-bag-row" data-sheet-idx="${sheetIdx}">
       <td style="text-align:center;">${stt}</td>
       <td style="text-align:center;">${escapeHtml(String(bag.BAG_NO))}</td>
       <td>${escapeHtml(customerName)}</td>
@@ -5243,14 +5274,15 @@ function renderAirPreviewTable(processed) {
       i += 1;
     }
     const sheetLabel = sheetName ? `Tổng ${sheetName}` : "Tổng sheet";
-    rowsHtml += `<tr class="sheet-total-row">
-      <td></td>
+    rowsHtml += `<tr class="sheet-total-row" data-sheet-idx="${sheetIdx}" role="button" tabindex="0" aria-expanded="true" title="Bấm để thu gọn / mở bag của sheet" onclick="toggleAirSheetGroup(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleAirSheetGroup(this);}">
+      <td style="text-align:center;"><span class="sheet-toggle" aria-hidden="true">▼</span></td>
       <td style="text-align:center;">${sheetBagCount}</td>
       <td>${escapeHtml(sheetLabel)}</td>
       <td style="text-align:right;">${formatAirTotal(sheetSets)}</td>
       <td style="text-align:right;">${formatAirTotal(sheetWeight)}</td>
       <td></td>
     </tr>`;
+    sheetIdx += 1;
   }
   tbody.innerHTML = rowsHtml;
 
@@ -5259,6 +5291,7 @@ function renderAirPreviewTable(processed) {
   if (totalLabelEl) totalLabelEl.innerText = "TỔNG CỘNG";
   document.getElementById("airTotalSets").innerText = formatAirTotal(totalSets);
   document.getElementById("airTotalWeight").innerText = formatAirTotal(totalWeight);
+  updateAirCollapseAllBtn();
 
   // Chỉ hiện nút "Chia sẻ ngay" trên thiết bị/trình duyệt hỗ trợ Web Share API (đa số điện thoại)
   const shareBtn = document.getElementById("shareAirBtn");

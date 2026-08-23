@@ -1136,6 +1136,26 @@
     font-weight: 700;
     border-top: 1px solid var(--border);
   }
+  #airTable .sheet-total-row {
+    cursor: pointer;
+    user-select: none;
+  }
+  #airTable .sheet-total-row:hover td {
+    filter: brightness(0.97);
+  }
+  #airTable .sheet-total-row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  #airTable .sheet-toggle {
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.75;
+  }
+  #airTable .air-bag-row.is-hidden {
+    display: none;
+  }
 
   /* --- BẢNG LƯƠNG: thu gọn tiêu đề 2 dòng + cố định 2 cột đầu --- */
   #employeeTable { table-layout: auto; }

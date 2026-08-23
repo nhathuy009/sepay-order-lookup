@@ -585,7 +585,10 @@
           <div class="card" style="margin-top: 16px;">
             <div>
               <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
-              <div class="hint" style="margin:0;">Cuối mỗi sheet có dòng tổng (số bao / SET / KGS) để đối chiếu file gốc. File Excel tải về vẫn chỉ có 1 dòng tổng cuối.</div>
+              <div class="hint" style="margin:0; display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+                <span>Bấm dòng tổng sheet để thu gọn bag. File Excel tải về vẫn chỉ có 1 dòng tổng cuối.</span>
+                <button type="button" class="btn-outline" id="airCollapseAllBtn" onclick="toggleAllAirSheets()" style="font-size:12px; padding:4px 10px;">Thu gọn tất cả</button>
+              </div>
             </div>
             <div style="display:flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px;">
               <div class="table-responsive" style="width: fit-content; max-width: 100%; flex: 0 0 auto;">
