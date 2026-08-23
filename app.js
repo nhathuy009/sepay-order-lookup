@@ -5209,8 +5209,6 @@ function toggleAirSheetGroup(row, forceCollapsed) {
   const willCollapse = (forceCollapsed !== undefined) ? !!forceCollapsed : !row.classList.contains("collapsed");
   row.classList.toggle("collapsed", willCollapse);
   row.setAttribute("aria-expanded", willCollapse ? "false" : "true");
-  const icon = row.querySelector(".sheet-toggle");
-  if (icon) icon.textContent = willCollapse ? "▶" : "▼";
   document.querySelectorAll('#airTbody tr.air-bag-row[data-sheet-idx="' + idx + '"]').forEach((tr) => {
     tr.classList.toggle("is-hidden", willCollapse);
   });

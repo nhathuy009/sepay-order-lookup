@@ -1152,9 +1152,32 @@
     font-size: 11px;
     line-height: 1;
     opacity: 0.75;
+    transform-origin: 50% 55%;
+    transition: transform 1s ease;
+  }
+  #airTable .sheet-total-row.collapsed .sheet-toggle {
+    transform: rotate(-90deg);
+  }
+  #airTable .air-bag-row td {
+    overflow: hidden;
+    max-height: 52px;
+    transition: max-height 1s ease, padding 1s ease, opacity 1s ease, border-color 1s ease;
   }
   #airTable .air-bag-row.is-hidden {
-    display: none;
+    pointer-events: none;
+  }
+  #airTable .air-bag-row.is-hidden td {
+    max-height: 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    opacity: 0;
+    border-bottom-color: transparent;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #airTable .sheet-toggle,
+    #airTable .air-bag-row td {
+      transition: none;
+    }
   }
 
   /* --- BẢNG LƯƠNG: thu gọn tiêu đề 2 dòng + cố định 2 cột đầu --- */
