@@ -5202,6 +5202,37 @@ function formatAirTotal(n) {
   return Math.round(v * 100) / 100;
 }
 
+function airCollapseDurationMs() {
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return 0;
+  } catch (e) {}
+  return 500;
+}
+
+function hideAirBagRow(tr) {
+  clearTimeout(tr._airHideTimer);
+  tr.classList.add("is-hidden");
+  const ms = airCollapseDurationMs();
+  if (ms === 0) {
+    tr.classList.add("is-removed");
+    return;
+  }
+  tr._airHideTimer = setTimeout(() => {
+    if (tr.classList.contains("is-hidden")) tr.classList.add("is-removed");
+  }, ms);
+}
+
+function showAirBagRow(tr) {
+  clearTimeout(tr._airHideTimer);
+  const wasRemoved = tr.classList.contains("is-removed");
+  tr.classList.remove("is-removed");
+  if (!tr.classList.contains("is-hidden")) return;
+  if (wasRemoved) void tr.offsetHeight;
+  requestAnimationFrame(() => {
+    tr.classList.remove("is-hidden");
+  });
+}
+
 function toggleAirSheetGroup(row, forceCollapsed) {
   if (!row) return;
   const idx = row.getAttribute("data-sheet-idx");
@@ -5210,7 +5241,8 @@ function toggleAirSheetGroup(row, forceCollapsed) {
   row.classList.toggle("collapsed", willCollapse);
   row.setAttribute("aria-expanded", willCollapse ? "false" : "true");
   document.querySelectorAll('#airTbody tr.air-bag-row[data-sheet-idx="' + idx + '"]').forEach((tr) => {
-    tr.classList.toggle("is-hidden", willCollapse);
+    if (willCollapse) hideAirBagRow(tr);
+    else showAirBagRow(tr);
   });
   updateAirCollapseAllBtn();
 }
