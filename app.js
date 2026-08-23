@@ -590,8 +590,58 @@ function filterRefundList() {
   loadRefundDashboard();
 }
 
+let _refundCurrentCaseId = null;
+
+function refundChecklistHtml(cl) {
+  if (!cl || !cl.items) return "";
+  const rows = cl.items.map(i =>
+    `<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin:3px 0;">
+      <span>${i.ok ? "✓" : "○"}</span>
+      <span style="color:${i.ok ? "var(--text-main)" : "var(--text-muted)"}">${escapeHtml(i.label)}</span>
+    </div>`
+  ).join("");
+  const head = cl.all_ok
+    ? `<div style="font-size:12.5px;color:#22c55e;margin-bottom:6px;">Checklist đủ — có thể chuyển chờ duyệt</div>`
+    : `<div style="font-size:12.5px;color:#eab308;margin-bottom:6px;">Còn thiếu: ${(cl.missing || []).join(", ")}</div>`;
+  return `<div style="margin-top:4px;">${head}${rows}</div>`;
+}
+
+function refundDocsHtml(docs) {
+  if (!docs || !docs.length) return `<div style="font-size:13px;color:var(--text-muted);">Chưa có tài liệu</div>`;
+  return docs.map(d =>
+    `<div style="font-size:13px;margin:4px 0;">📎 ${escapeHtml(d.type || "")}: <span style="font-weight:600;">${escapeHtml(d.name || d.pathname || "")}</span>
+      ${d.url ? ` <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener" style="font-size:12px;">mở</a>` : ""}
+    </div>`
+  ).join("");
+}
+
+function refundActionButtonsHtml(status) {
+  const st = status || "";
+  const btns = [];
+  if (st === "NEW" || st === "PREPARING") {
+    btns.push(`<button type="button" onclick="doRefundUpdateStatus('ACB_PAYMENT_PENDING')">Chuyển → Chờ duyệt / Chờ tiền</button>`);
+    if (st === "NEW") btns.push(`<button type="button" class="btn-outline" onclick="doRefundUpdateStatus('PREPARING')">Đang chuẩn bị</button>`);
+  }
+  if (st === "ACB_PAYMENT_PENDING" || st === "ACB_PENDING_APPROVAL") {
+    btns.push(`<button type="button" onclick="doRefundUpdateStatus('PAYMENT_CONFIRMED')">Đã ghi nhận tiền ra (thủ công)</button>`);
+  }
+  if (st === "PAYMENT_CONFIRMED" || st === "NEED_PHASE_2") {
+    if (st === "PAYMENT_CONFIRMED") btns.push(`<button type="button" onclick="doRefundUpdateStatus('NEED_PHASE_2')">Cần tiếp tục Phase 2</button>`);
+    btns.push(`<button type="button" class="btn-outline" onclick="doRefundUpdateStatus('DONE')">Đánh dấu hoàn tất</button>`);
+  }
+  if (st === "NEED_PHASE_2") {
+    btns.push(`<button type="button" class="btn-outline" onclick="doRefundUpdateStatus('INVOICE_PENDING_SIGNATURE')">Chờ ký HĐ</button>`);
+  }
+  if (st && st !== "DONE" && st !== "ERROR") {
+    btns.push(`<button type="button" class="btn-outline" style="color:#ef4444;" onclick="doRefundUpdateStatus('ERROR')">Đánh dấu lỗi</button>`);
+  }
+  if (!btns.length) return "";
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">${btns.join("")}</div>`;
+}
+
 function openRefundDetail(caseId) {
   if (!caseId) return;
+  _refundCurrentCaseId = caseId;
   fetch("/api/index", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -603,42 +653,177 @@ function openRefundDetail(caseId) {
         alert(data.error || "Không tải được hồ sơ");
         return;
       }
-      const c = data.case;
-      const panel = document.getElementById("refundDetailPanel");
-      if (!panel) return;
-      const tl = (c.timeline || []).map(t =>
-        `<div style="font-size:13px;margin:4px 0;"><span style="color:var(--text-muted);">${formatRefundTime(t.at)}</span> — ${escapeHtml(t.note || t.action || "")}</div>`
-      ).join("") || "<div style='color:var(--text-muted);font-size:13px;'>Chưa có hoạt động</div>";
-      panel.classList.remove("hidden");
-      panel.innerHTML = `
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-            <h3 style="margin:0;">${escapeHtml(c.order_code || "")} — ${escapeHtml(c.customer_name || "")}</h3>
-            <div style="display:flex;gap:8px;align-items:center;">
-              ${refundStatusBadgeHtml(c.status)}
-              <button type="button" class="btn-outline" style="font-size:12px;" onclick="document.getElementById('refundDetailPanel').classList.add('hidden')">Đóng</button>
-            </div>
-          </div>
-          <div class="row" style="margin-top:14px;gap:24px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:200px;">
-              <div style="font-size:12.5px;color:var(--text-muted);">Khóa học</div>
-              <div style="font-weight:600;">${escapeHtml(c.course_name || "—")}</div>
-              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Số tiền</div>
-              <div style="font-weight:600;">${formatRefundMoney(c.refund_amount)}</div>
-              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">STK nhận</div>
-              <div>${escapeHtml(c.receive_account || "")} — ${escapeHtml(c.receive_bank || "")}</div>
-              <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Nội dung CK</div>
-              <div style="font-family:monospace;font-size:13px;">${escapeHtml(c.transfer_content || "")}</div>
-            </div>
-            <div style="flex:1;min-width:220px;">
-              <div style="font-weight:600;margin-bottom:8px;">Timeline</div>
-              ${tl}
-            </div>
-          </div>
-        </div>`;
-      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      renderRefundDetailPanel(data.case, data.checklist);
     })
     .catch(e => alert("Lỗi: " + e.message));
+}
+
+function renderRefundDetailPanel(c, checklist) {
+  const panel = document.getElementById("refundDetailPanel");
+  if (!panel) return;
+  _refundCurrentCaseId = c.id;
+  const tl = (c.timeline || []).slice().reverse().map(t =>
+    `<div style="font-size:13px;margin:4px 0;"><span style="color:var(--text-muted);">${formatRefundTime(t.at)}</span> — ${escapeHtml(t.note || t.action || "")}</div>`
+  ).join("") || "<div style='color:var(--text-muted);font-size:13px;'>Chưa có hoạt động</div>";
+
+  panel.classList.remove("hidden");
+  panel.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h3 style="margin:0;">${escapeHtml(c.order_code || "")} — ${escapeHtml(c.customer_name || "")}</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+          ${refundStatusBadgeHtml(c.status)}
+          <button type="button" class="btn-outline" style="font-size:12px;" onclick="document.getElementById('refundDetailPanel').classList.add('hidden')">Đóng</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="font-size:12.5px;color:var(--text-muted);">Khóa học</div>
+          <div style="font-weight:600;">${escapeHtml(c.course_name || "—")}</div>
+          <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Số tiền</div>
+          <div style="font-weight:600;">${formatRefundMoney(c.refund_amount)}</div>
+          <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">STK nhận</div>
+          <div>${escapeHtml(c.receive_account || "")} — ${escapeHtml(c.receive_bank || "")}</div>
+          <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">STK nguồn</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="refundDetailSourceAccount" value="${escapeHtml(c.source_account || "")}" placeholder="1903xxxxxxxx" style="flex:1;min-width:140px;" />
+            <button type="button" class="btn-outline" style="font-size:12px;" onclick="doRefundSaveSourceAccount()">Lưu STK nguồn</button>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-muted);margin-top:10px;">Nội dung CK</div>
+          <div style="font-family:monospace;font-size:13px;">${escapeHtml(c.transfer_content || "")}
+            ${c.transfer_content ? ` <button type="button" class="btn-outline" style="font-size:11px;padding:2px 8px;" onclick="navigator.clipboard.writeText(${JSON.stringify(c.transfer_content)})">Copy</button>` : ""}
+          </div>
+
+          <div style="font-weight:600;margin-top:16px;margin-bottom:6px;">Tài liệu</div>
+          <div id="refundDocsList">${refundDocsHtml(c.documents)}</div>
+          <div style="margin-top:10px;">
+            <label style="font-size:12.5px;">Upload slip / HĐ (ảnh hoặc PDF, &lt;4MB)</label>
+            <input type="file" id="refundUploadFile" accept="image/*,.pdf,application/pdf" />
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn-outline" style="font-size:12px;" onclick="doRefundUpload('customer_slip')">Upload slip khách</button>
+              <button type="button" class="btn-outline" style="font-size:12px;" onclick="doRefundUpload('other')">Upload tài liệu khác</button>
+            </div>
+            <div id="refundUploadMsg" class="msg" style="display:none;margin-top:8px;"></div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <div style="font-weight:600;margin-bottom:8px;">Checklist</div>
+          <div id="refundChecklistBox">${refundChecklistHtml(checklist)}</div>
+          <div style="font-weight:600;margin:16px 0 8px;">Timeline</div>
+          <div style="max-height:220px;overflow:auto;">${tl}</div>
+          ${refundActionButtonsHtml(c.status)}
+          <div id="refundActionMsg" class="msg" style="display:none;margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>`;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function doRefundUpdateStatus(newStatus) {
+  if (!_refundCurrentCaseId || !newStatus) return;
+  const msg = document.getElementById("refundActionMsg");
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "refund_update_status",
+        case_id: _refundCurrentCaseId,
+        status: newStatus,
+        access_token: getToken(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      const missing = (data.missing || []).join(", ");
+      if (msg) {
+        msg.style.display = "block";
+        msg.className = "msg error";
+        msg.textContent = data.error + (missing ? " — Thiếu: " + missing : "");
+      } else {
+        alert(data.error + (missing ? "\nThiếu: " + missing : ""));
+      }
+      if (data.checklist) {
+        const box = document.getElementById("refundChecklistBox");
+        if (box) box.innerHTML = refundChecklistHtml(data.checklist);
+      }
+      return;
+    }
+    if (data.case) renderRefundDetailPanel(data.case, data.checklist);
+    loadRefundDashboard();
+  } catch (e) {
+    alert("Lỗi: " + e.message);
+  }
+}
+
+async function doRefundSaveSourceAccount() {
+  if (!_refundCurrentCaseId) return;
+  const val = (document.getElementById("refundDetailSourceAccount")?.value || "").trim();
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "refund_patch",
+        case_id: _refundCurrentCaseId,
+        fields: { source_account: val },
+        access_token: getToken(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      alert(data.error || "Lưu thất bại");
+      return;
+    }
+    if (data.case) renderRefundDetailPanel(data.case, data.checklist);
+  } catch (e) {
+    alert("Lỗi: " + e.message);
+  }
+}
+
+async function doRefundUpload(docType) {
+  if (!_refundCurrentCaseId) return;
+  const input = document.getElementById("refundUploadFile");
+  const msg = document.getElementById("refundUploadMsg");
+  if (!input || !input.files || !input.files[0]) {
+    if (msg) { msg.style.display = "block"; msg.className = "msg error"; msg.textContent = "Chọn file trước."; }
+    return;
+  }
+  const file = input.files[0];
+  if (file.size > 4 * 1024 * 1024) {
+    if (msg) { msg.style.display = "block"; msg.className = "msg error"; msg.textContent = "File > 4MB. Hãy nén nhỏ hơn."; }
+    return;
+  }
+  if (msg) { msg.style.display = "block"; msg.className = "msg"; msg.textContent = "Đang upload…"; }
+  try {
+    const b64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "refund_upload",
+        case_id: _refundCurrentCaseId,
+        file_base64: b64,
+        filename: file.name,
+        doc_type: docType || "customer_slip",
+        access_token: getToken(),
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      if (msg) { msg.style.display = "block"; msg.className = "msg error"; msg.textContent = data.error || "Upload thất bại"; }
+      return;
+    }
+    if (msg) { msg.style.display = "block"; msg.className = "msg success"; msg.textContent = "Đã upload."; }
+    if (data.case) renderRefundDetailPanel(data.case, data.checklist);
+  } catch (e) {
+    if (msg) { msg.style.display = "block"; msg.className = "msg error"; msg.textContent = "Lỗi: " + e.message; }
+  }
 }
 
 // Chuyển đổi Thời gian
@@ -4721,7 +4906,7 @@ async function doProcessAirPacking(fileOverride) {
 
         if (currentBagNo) {
           if (!sheetBagsMap.has(currentBagNo)) {
-            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs, CATEGORY: sheetCategory, RAW_CATEGORY: sheetCategoryRaw });
+            sheetBagsMap.set(currentBagNo, { BAG_NO: currentBagNo, QTITY: 0, KGS: currentKgs, CATEGORY: sheetCategory, RAW_CATEGORY: sheetCategoryRaw, SHEET_NAME: sheetName });
           }
           sheetBagsMap.get(currentBagNo).QTITY += qtity;
         }
@@ -4758,7 +4943,8 @@ async function doProcessAirPacking(fileOverride) {
 
     renderAirPreviewTable(airProcessedData);
     resultArea.style.display = "block";
-    box.innerHTML = `<span class="badge ok">✅ Đã xử lý xong ${allBagsData.length} bao. Vui lòng kiểm tra bảng bên dưới trước khi tải về.</span>`;
+    const sheetCount = new Set(allBagsData.map(b => b.SHEET_NAME).filter(Boolean)).size;
+    box.innerHTML = `<span class="badge ok">✅ Đã xử lý xong ${allBagsData.length} bao${sheetCount ? ` từ ${sheetCount} sheet` : ""}. Cuối mỗi sheet có dòng tổng để đối chiếu file gốc.</span>`;
     setAirDropZoneState("done", file.name);
   } catch (e) {
     box.innerHTML = `<span class="err">❌ Lỗi: ${e.message}</span>`;
@@ -5011,6 +5197,11 @@ if (document.readyState === "loading") {
   initAllDropZones();
 }
 
+function formatAirTotal(n) {
+  const v = Number(n) || 0;
+  return Math.round(v * 100) / 100;
+}
+
 function renderAirPreviewTable(processed) {
   const { allBagsData, customerName, dateStr, categoryNotes } = processed;
   const tbody = document.getElementById("airTbody");
@@ -5026,23 +5217,48 @@ function renderAirPreviewTable(processed) {
   let totalSets = 0;
   let totalWeight = 0;
   let rowsHtml = "";
-  allBagsData.forEach((bag, idx) => {
-    totalSets += bag.QTITY;
-    totalWeight += (bag.KGS || 0);
-    rowsHtml += `<tr>
-      <td style="text-align:center;">${idx + 1}</td>
-      <td style="text-align:center;">${bag.BAG_NO}</td>
-      <td>${customerName}</td>
+  let stt = 0;
+  let i = 0;
+  while (i < allBagsData.length) {
+    const sheetName = allBagsData[i].SHEET_NAME || "";
+    let sheetSets = 0;
+    let sheetWeight = 0;
+    let sheetBagCount = 0;
+    while (i < allBagsData.length && (allBagsData[i].SHEET_NAME || "") === sheetName) {
+      const bag = allBagsData[i];
+      stt += 1;
+      sheetBagCount += 1;
+      sheetSets += bag.QTITY;
+      sheetWeight += (bag.KGS || 0);
+      totalSets += bag.QTITY;
+      totalWeight += (bag.KGS || 0);
+      rowsHtml += `<tr>
+      <td style="text-align:center;">${stt}</td>
+      <td style="text-align:center;">${escapeHtml(String(bag.BAG_NO))}</td>
+      <td>${escapeHtml(customerName)}</td>
       <td style="text-align:right;">${bag.QTITY}</td>
       <td style="text-align:right;">${(bag.KGS || 0)}</td>
       <td>${escapeHtml(bag.CATEGORY || "")}</td>
     </tr>`;
-  });
+      i += 1;
+    }
+    const sheetLabel = sheetName ? `Tổng ${sheetName}` : "Tổng sheet";
+    rowsHtml += `<tr class="sheet-total-row">
+      <td></td>
+      <td style="text-align:center;">${sheetBagCount}</td>
+      <td>${escapeHtml(sheetLabel)}</td>
+      <td style="text-align:right;">${formatAirTotal(sheetSets)}</td>
+      <td style="text-align:right;">${formatAirTotal(sheetWeight)}</td>
+      <td></td>
+    </tr>`;
+  }
   tbody.innerHTML = rowsHtml;
 
   document.getElementById("airTotalBags").innerText = allBagsData.length;
-  document.getElementById("airTotalSets").innerText = totalSets;
-  document.getElementById("airTotalWeight").innerText = totalWeight.toFixed ? (Math.round(totalWeight * 100) / 100) : totalWeight;
+  const totalLabelEl = document.getElementById("airTotalLabel");
+  if (totalLabelEl) totalLabelEl.innerText = "TỔNG CỘNG";
+  document.getElementById("airTotalSets").innerText = formatAirTotal(totalSets);
+  document.getElementById("airTotalWeight").innerText = formatAirTotal(totalWeight);
 
   // Chỉ hiện nút "Chia sẻ ngay" trên thiết bị/trình duyệt hỗ trợ Web Share API (đa số điện thoại)
   const shareBtn = document.getElementById("shareAirBtn");

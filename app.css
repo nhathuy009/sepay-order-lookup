@@ -1130,6 +1130,12 @@
     background-color: var(--total-row-bg) !important;
     color: var(--text-main) !important;
   }
+  #airTable .sheet-total-row td {
+    background-color: color-mix(in srgb, var(--total-row-bg) 80%, var(--card-bg-solid, transparent)) !important;
+    color: var(--text-main) !important;
+    font-weight: 700;
+    border-top: 1px solid var(--border);
+  }
 
   /* --- BẢNG LƯƠNG: thu gọn tiêu đề 2 dòng + cố định 2 cột đầu --- */
   #employeeTable { table-layout: auto; }

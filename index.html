@@ -576,7 +576,7 @@
             </div>
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--badge-ok-text); font-weight:500;">
-            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên, và đọc ô B5 của mỗi sheet để ghi phân loại hàng hóa (bỏ trống nếu là "Kurung"). Kết quả sẽ hiển thị bên dưới để bạn kiểm tra trước khi tải file Excel.
+            Hệ thống sẽ tự động lọc BAG NO, cộng dồn QTITY, lấy KGS đầu tiên, và đọc ô B5 của mỗi sheet để ghi phân loại hàng hóa (bỏ trống nếu là "Kurung"). Bảng xem trước có dòng tổng cuối mỗi sheet để đối chiếu file gốc. File Excel tải về không chèn dòng này.
           </div>
           <div id="airResult" class="msg" style="margin-top: 12px;"></div>
         </div>
@@ -585,7 +585,7 @@
           <div class="card" style="margin-top: 16px;">
             <div>
               <h3 style="margin:0 0 4px 0;" id="airPreviewTitle">Xem trước dữ liệu</h3>
-              <div class="hint" style="margin:0;">Kiểm tra kỹ số liệu bên dưới. Nếu đúng, bấm "Tải về Excel" để xuất file.</div>
+              <div class="hint" style="margin:0;">Cuối mỗi sheet có dòng tổng (số bao / SET / KGS) để đối chiếu file gốc. File Excel tải về vẫn chỉ có 1 dòng tổng cuối.</div>
             </div>
             <div style="display:flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px;">
               <div class="table-responsive" style="width: fit-content; max-width: 100%; flex: 0 0 auto;">
@@ -605,7 +605,7 @@
                     <tr id="airTotalRow" class="total-row" style="font-weight:700;">
                       <td></td>
                       <td id="airTotalBags"></td>
-                      <td></td>
+                      <td id="airTotalLabel"></td>
                       <td id="airTotalSets" style="text-align:right;"></td>
                       <td id="airTotalWeight" style="text-align:right;"></td>
                       <td></td>
