@@ -6,6 +6,7 @@
     { "src": "ebook.html", "use": "@vercel/static" },
     { "src": "jotun.html", "use": "@vercel/static" },
     { "src": "excel_auditor_quy_trinh.html", "use": "@vercel/static" },
+    { "src": "C12_TS_editable.html", "use": "@vercel/static" },
     { "src": "app.css", "use": "@vercel/static" },
     { "src": "app.js", "use": "@vercel/static" }
   ],
@@ -16,6 +17,7 @@
     { "src": "/app.js", "dest": "/app.js" },
     { "src": "/jotun", "dest": "/jotun.html" },
     { "src": "/quytrinh", "dest": "/excel_auditor_quy_trinh.html" },
+    { "src": "/c12", "dest": "/C12_TS_editable.html" },
     { "src": "/ebook", "dest": "/ebook.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ],
