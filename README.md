@@ -6,13 +6,14 @@ Backend là serverless function Python trên Vercel.
 ## Cấu trúc
 
 ```
-api/_core.py     Logic tra cứu dùng chung (đăng nhập, gọi API, cache token in-memory)
-api/_invoice.py  Logic tra cứu hóa đơn điện tử (đăng nhập ASP.NET WebForms, cache cookie in-memory)
-api/index.py     Serverless function duy nhất; phân nhánh theo body.action ("lookup"/"excel"/"invoice"/...)
-index.html       Giao diện web (các tab: tra cứu / Excel / sao kê / SePay / hóa đơn), gọi POST /api/index
-vercel.json      Legacy builds: build api/index.py (@vercel/python) + index.html (static),
-                 route /api/* -> api/index.py, còn lại -> index.html
-requirements.txt requests, openpyxl
+api/_core.py          Logic tra cứu dùng chung (đăng nhập, gọi API, cache token in-memory)
+api/_invoice.py       Logic tra cứu hóa đơn điện tử (đăng nhập ASP.NET WebForms, cache cookie in-memory)
+api/_gdt_invoice.py   Tra cứu HĐĐT Tổng cục Thuế (danh sách / chi tiết / tải invoice.xml)
+api/index.py          Serverless function duy nhất; phân nhánh theo body.action ("lookup"/"excel"/"invoice"/"gdt_invoice_export_xml"/...)
+index.html            Giao diện web (các tab: tra cứu / Excel / sao kê / SePay / hóa đơn / HĐĐT GDT), gọi POST /api/index
+vercel.json           Legacy builds: build api/index.py (@vercel/python) + index.html (static),
+                      route /api/* -> api/index.py, còn lại -> index.html
+requirements.txt      requests, openpyxl
 ```
 
 > Ghi chú: gộp thành 1 function `api/index.py` và dùng `@vercel/python@4.8.0` (mô hình
@@ -63,6 +64,20 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 - Mật khẩu tài khoản hóa đơn điện tử (`EINVOICE_PASSWORD`) từng bị dán thẳng dạng
   plaintext trong 1 đoạn script cũ khi trao đổi — coi như đã lộ và **đổi lại ngay**
   trên hệ thống hóa đơn điện tử trước khi đưa app này lên production.
+
+## Tải file XML hóa đơn (tab Tra cứu HĐĐT / GDT)
+
+Sau khi tra cứu danh sách hóa đơn từ `hoadondientu.gdt.gov.vn`:
+
+- Nút **XML** trên từng dòng (và nút **Tải XML** trong popup chi tiết) gọi
+  `GET /api/query/invoices/export-xml` (hóa đơn máy tính tiền dùng `sco-query`),
+  giải nén ZIP mà cổng Thuế trả về, rồi tải đúng file `invoice.xml` gốc
+  (có chữ ký số người bán + CQT).
+- Tick chọn nhiều dòng rồi bấm **Tải XML đã chọn**: 1 hóa đơn → file `.xml`;
+  nhiều hóa đơn → 1 file `.zip` chứa các XML, đặt tên `{MST}_{ký hiệu}_{số HĐ}.xml`.
+
+Action backend: `gdt_invoice_export_xml` (body gồm `username`, `password`, `invoice`,
+`token` tùy chọn để khỏi đăng nhập lại).
 
 ## Chạy thử local
 

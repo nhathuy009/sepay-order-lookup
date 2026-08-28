@@ -942,6 +942,8 @@ let bankGroupsData = {};
 let bankActiveTab = '';
 let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
 let gdtLastCreds = null;  // { username, password, is_purchase } dùng để gọi lại API lấy chi tiết hóa đơn
+let gdtLastToken = null;  // Token đăng nhập GDT, dùng lại khi tải XML / chi tiết
+let gdtDetailIdx = null;  // Index hóa đơn đang mở trong popup chi tiết
 
 // --- eHoadon (tạo hóa đơn tự động) ---
 let ehoadonCookies = null;       // Cookie/VIEWSTATE phiên đăng nhập eHoadon (server không giữ state giữa các lần gọi)
@@ -4437,6 +4439,48 @@ function toggleGdtRowMark(checkboxEl) {
   const tr = checkboxEl.closest("tr");
   if (!tr) return;
   tr.classList.toggle("gdt-row-marked", checkboxEl.checked);
+  updateGdtBulkBar();
+}
+
+function toggleGdtSelectAll(headerCb) {
+  const table = headerCb.closest("table");
+  if (!table) return;
+  table.querySelectorAll("tbody .gdt-row-check").forEach(cb => {
+    cb.checked = headerCb.checked;
+    const tr = cb.closest("tr");
+    if (tr) tr.classList.toggle("gdt-row-marked", cb.checked);
+  });
+  updateGdtBulkBar();
+}
+
+function getSelectedGdtRows() {
+  const selected = [];
+  document.querySelectorAll("#gdtResultsContainer tbody .gdt-row-check:checked").forEach(cb => {
+    const tr = cb.closest("tr");
+    const idx = Number(tr && tr.dataset.gdtIdx);
+    if (Number.isInteger(idx) && gdtLastInvoices[idx]) {
+      selected.push({ idx, inv: gdtLastInvoices[idx] });
+    }
+  });
+  return selected;
+}
+
+function updateGdtBulkBar() {
+  const bar = document.getElementById("gdtBulkBar");
+  const countEl = document.getElementById("gdtBulkCount");
+  if (!bar || !countEl) return;
+  const n = getSelectedGdtRows().length;
+  countEl.textContent = n === 1 ? "Đã chọn 1 hóa đơn" : `Đã chọn ${n} hóa đơn`;
+  bar.classList.toggle("hidden", n === 0);
+
+  document.querySelectorAll("#gdtResultsContainer table").forEach(table => {
+    const headerCb = table.querySelector("thead .gdt-select-all");
+    if (!headerCb) return;
+    const boxes = [...table.querySelectorAll("tbody .gdt-row-check")];
+    const checked = boxes.filter(cb => cb.checked).length;
+    headerCb.checked = boxes.length > 0 && checked === boxes.length;
+    headerCb.indeterminate = checked > 0 && checked < boxes.length;
+  });
 }
 
 function selectChoiceGroup(hiddenInputId, value, btnEl) {
@@ -4473,6 +4517,8 @@ async function doGdtInvoiceLookup() {
   resultsContainer.innerHTML = "";
   gdtLastInvoices = [];
   gdtLastCreds = { username, password, is_purchase: isPurchase };
+  gdtLastToken = null;
+  updateGdtBulkBar();
 
   let sharedToken = null;   // Dùng lại token đăng nhập lần đầu cho 2 lần gọi sau, khỏi phải giải captcha lại
   let totalFound = 0;
@@ -4505,7 +4551,10 @@ async function doGdtInvoiceLookup() {
         continue;
       }
 
-      if (data.token) sharedToken = data.token;
+      if (data.token) {
+        sharedToken = data.token;
+        gdtLastToken = data.token;
+      }
       const invoices = data.invoices || [];
       totalFound += invoices.length;
       renderGdtTypeTable(title, invoices);
@@ -4576,9 +4625,12 @@ function renderGdtTypeTable(title, invoices) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:40px;"></th>
+        <th style="width:40px;">
+          <input type="checkbox" class="gdt-row-check gdt-select-all" title="Chọn tất cả" onchange="toggleGdtSelectAll(this)" />
+        </th>
         <th>#</th><th>Ký hiệu</th><th>Số HĐ</th><th>Ngày lập</th>
         <th>MST đối tác</th><th>Tên đối tác</th><th style="text-align:right;">Tổng tiền</th>
+        <th>XML</th>
       </tr>
     </thead>
     <tbody></tbody>`;
@@ -4589,6 +4641,7 @@ function renderGdtTypeTable(title, invoices) {
     gdtLastInvoices.push(inv);
 
     const tr = document.createElement("tr");
+    tr.dataset.gdtIdx = String(globalIdx);
     tr.title = "Bấm để xem chi tiết hóa đơn";
     tr.onclick = () => openGdtInvoiceDetail(globalIdx);
     tr.innerHTML = `
@@ -4601,7 +4654,10 @@ function renderGdtTypeTable(title, invoices) {
       <td>${dateFmt(inv.tdlap)}</td>
       <td>${escapeHtml(inv.nbmst)}</td>
       <td>${escapeHtml(inv.nbten)}</td>
-      <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>`;
+      <td style="text-align:right;">${amountFmt(inv.tgtttbso)}</td>
+      <td style="text-align:center;" onclick="event.stopPropagation();">
+        <button type="button" class="gdt-xml-btn" title="Tải file invoice.xml gốc" onclick="downloadGdtInvoiceXml(${globalIdx}, this)">XML</button>
+      </td>`;
     tbody.appendChild(tr);
   });
 
@@ -4710,6 +4766,7 @@ async function openGdtInvoiceDetail(idx) {
   const inv = gdtLastInvoices[idx];
   if (!inv || !gdtLastCreds) return;
 
+  gdtDetailIdx = idx;
   const overlay = document.getElementById("gdtDetailOverlay");
   const body = document.getElementById("gdtDetailBody");
   overlay.classList.remove("hidden");
@@ -4745,6 +4802,218 @@ async function openGdtInvoiceDetail(idx) {
 
 function closeGdtInvoiceDetail() {
   document.getElementById("gdtDetailOverlay").classList.add("hidden");
+  gdtDetailIdx = null;
+}
+
+function gdtXmlFilename(inv) {
+  const mst = String(inv && inv.nbmst || "unknown").replace(/[^\w.\-]+/g, "_");
+  const khh = String(inv && inv.khhdon || "").replace(/[^\w.\-]+/g, "_");
+  const sh = String(inv && inv.shdon || "").replace(/[^\w.\-]+/g, "_");
+  return `${mst}_${khh}_${sh}.xml`.replace(/_+/g, "_");
+}
+
+function downloadBlobFile(blob, filename) {
+  if (typeof saveAs === "function") {
+    saveAs(blob, filename);
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function downloadTextFile(text, filename, mime) {
+  const blob = new Blob([text], { type: mime || "application/xml;charset=utf-8" });
+  downloadBlobFile(blob, filename);
+}
+
+function crc32Bytes(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) {
+    c ^= data[i];
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStoreFiles(files) {
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+  const chunks = [];
+  const centrals = [];
+  let offset = 0;
+
+  files.forEach(f => {
+    const nameBytes = enc.encode(f.name);
+    const data = typeof f.content === "string" ? enc.encode(f.content) : f.content;
+    const crc = crc32Bytes(data);
+    const local = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0x0800, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint16(10, dosTime, true);
+    lv.setUint16(12, dosDate, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, data.length, true);
+    lv.setUint32(22, data.length, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    local.set(nameBytes, 30);
+    chunks.push(local, data);
+
+    const central = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, dosTime, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true);
+    cv.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    centrals.push(central);
+    offset += local.length + data.length;
+  });
+
+  const centralSize = centrals.reduce((s, c) => s + c.length, 0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...chunks, ...centrals, end], { type: "application/zip" });
+}
+
+async function fetchGdtInvoiceXml(inv) {
+  if (!gdtLastCreds) throw new Error("Vui lòng tra cứu hóa đơn trước khi tải XML.");
+  const resp = await fetch("/api/index", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "gdt_invoice_export_xml",
+      username: gdtLastCreds.username,
+      password: gdtLastCreds.password,
+      invoice: inv,
+      token: gdtLastToken,
+      access_token: getToken()
+    })
+  });
+  const data = await resp.json();
+  if (data.token) gdtLastToken = data.token;
+  if (!resp.ok) throw new Error(data.error || "Không tải được file XML.");
+  if (!data.xml) throw new Error("Máy chủ không trả về nội dung invoice.xml.");
+  return data;
+}
+
+async function downloadGdtInvoiceXml(idx, btnEl) {
+  const inv = gdtLastInvoices[idx];
+  if (!inv) return;
+  const original = btnEl ? btnEl.textContent : "";
+  const progress = document.getElementById("gdtProgress");
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = "..."; }
+  try {
+    const data = await fetchGdtInvoiceXml(inv);
+    downloadTextFile(data.xml, data.filename || gdtXmlFilename(inv));
+    if (btnEl) btnEl.textContent = "OK";
+    if (progress) {
+      progress.style.display = "block";
+      progress.innerHTML = `Đã tải <strong>${escapeHtml(data.filename || gdtXmlFilename(inv))}</strong>`;
+    }
+  } catch (e) {
+    if (btnEl) btnEl.textContent = "Lỗi";
+    if (progress) {
+      progress.style.display = "block";
+      progress.innerHTML = `<span class="err">❌ ${escapeHtml(e.message)}</span>`;
+    }
+  } finally {
+    if (btnEl) {
+      btnEl.disabled = false;
+      setTimeout(() => { if (btnEl.textContent === "OK" || btnEl.textContent === "Lỗi") btnEl.textContent = original || "XML"; }, 1400);
+    }
+  }
+}
+
+async function downloadSelectedGdtXml() {
+  const selected = getSelectedGdtRows();
+  const progress = document.getElementById("gdtProgress");
+  const bulkBtn = document.getElementById("gdtBulkXmlBtn");
+  if (selected.length === 0) return;
+  if (!gdtLastCreds) {
+    if (progress) {
+      progress.style.display = "block";
+      progress.innerHTML = '<span class="err">Vui lòng tra cứu hóa đơn trước khi tải XML.</span>';
+    }
+    return;
+  }
+
+  if (bulkBtn) bulkBtn.disabled = true;
+  const files = [];
+  const errors = [];
+
+  for (let i = 0; i < selected.length; i++) {
+    const { inv } = selected[i];
+    if (progress) {
+      progress.style.display = "block";
+      progress.innerHTML = `<span class="spinner" style="color:var(--accent)"></span> Đang tải XML ${i + 1}/${selected.length} (số ${escapeHtml(inv.shdon)} — ${escapeHtml(inv.khhdon)})...`;
+    }
+    try {
+      const data = await fetchGdtInvoiceXml(inv);
+      let name = data.filename || gdtXmlFilename(inv);
+      const used = files.map(f => f.name);
+      if (used.includes(name)) {
+        const stem = name.replace(/\.xml$/i, "");
+        let n = 2;
+        while (used.includes(`${stem}_${n}.xml`)) n++;
+        name = `${stem}_${n}.xml`;
+      }
+      files.push({ name, content: data.xml });
+    } catch (e) {
+      errors.push(`${inv.khhdon || ""}-${inv.shdon || ""}: ${e.message}`);
+    }
+    if (i < selected.length - 1) await new Promise(r => setTimeout(r, 280));
+  }
+
+  if (files.length === 1 && errors.length === 0) {
+    downloadTextFile(files[0].content, files[0].name);
+  } else if (files.length > 0) {
+    const blob = zipStoreFiles(files);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlobFile(blob, `hoa-don-xml_${stamp}.zip`);
+  }
+
+  if (progress) {
+    progress.style.display = "block";
+    if (files.length && errors.length === 0) {
+      progress.innerHTML = `🎉 Đã tải ${files.length} file XML.`;
+    } else if (files.length) {
+      progress.innerHTML = `⚠️ Đã tải ${files.length}/${selected.length} file XML.<div style="margin-top:8px; color: var(--amount-out);">${errors.map(escapeHtml).join("<br>")}</div>`;
+    } else {
+      progress.innerHTML = `<span class="err">❌ Không tải được XML nào.</span><div style="margin-top:8px; color: var(--amount-out);">${errors.map(escapeHtml).join("<br>")}</div>`;
+    }
+  }
+  if (bulkBtn) bulkBtn.disabled = false;
 }
 
 document.addEventListener("keydown", (e) => {

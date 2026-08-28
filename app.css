@@ -1014,8 +1014,10 @@
   .gdt-modal-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    gap: 12px;
   }
   .gdt-modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; }
+  .gdt-modal-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .gdt-modal-close {
     background: transparent; box-shadow: none; color: var(--text-muted);
     padding: 4px 10px; font-size: 18px; line-height: 1; border-radius: 8px;
@@ -1067,6 +1069,60 @@
   }
   #gdtResultsContainer .bulk-table tbody tr.gdt-row-marked:hover td {
     background: color-mix(in srgb, var(--accent) 14%, var(--card-bg-solid));
+  }
+
+  /* NÚT TẢI XML — gọn, không đè style nút chính */
+  .gdt-xml-btn {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    padding: 6px 10px;
+    min-height: 36px;
+    min-width: 44px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .4px;
+    border-radius: 8px;
+    box-shadow: none;
+    line-height: 1.2;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .gdt-xml-btn:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent-hover);
+    transform: none;
+    box-shadow: none;
+    filter: none;
+  }
+  .gdt-xml-btn:disabled { opacity: 0.55; }
+  .gdt-xml-btn-lg {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  /* THANH TẢI XML HÀNG LOẠT (hiện khi tick chọn hóa đơn) */
+  .gdt-bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--card-bg-solid));
+    border-radius: 12px;
+  }
+  .gdt-bulk-bar-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .gdt-bulk-bar-info #gdtBulkCount {
+    font-weight: 800; font-size: 14px; color: var(--text-main);
+  }
+  .gdt-bulk-bar-hint { font-size: 12px; color: var(--text-muted); }
+  .gdt-bulk-bar button {
+    padding: 10px 16px;
+    white-space: nowrap;
   }
 
   /* --- GIAO DIỆN BẢNG CHUẨN SEPAY V2 --- */
@@ -1232,6 +1288,8 @@
     #accountingTable, #accountingTable2, #accountingTable3 { width: 100%; }
     #empMainTabs { width: 100%; justify-content: stretch; }
     #empMainTabs .acc-seg-btn { flex: 1 1 0; text-align: center; }
+    .gdt-xml-btn { min-height: 40px; min-width: 44px; padding: 8px 12px; }
+    .gdt-bulk-bar button { width: 100%; }
 
     /* --- HEADER GỌN LẠI TRÊN ĐIỆN THOẠI --- */
     .top-header {

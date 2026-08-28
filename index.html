@@ -546,11 +546,19 @@
           </div>
           <div class="hint" style="margin-top: 12px; color: var(--text-muted); font-size: 12.5px;">
             🔒 Mã số thuế/mật khẩu chỉ được gửi trực tiếp tới máy chủ Thuế để đăng nhập, không lưu lại ở đâu cả.
+            Bấm vào dòng để xem chi tiết. Nút <strong>XML</strong> (hoặc tick chọn rồi tải hàng loạt) lấy file <strong>invoice.xml</strong> gốc từ Tổng cục Thuế.
           </div>
         </div>
 
         <div id="gdtResultArea">
           <div class="msg" id="gdtProgress" style="display:none; margin-bottom: 12px;"></div>
+          <div id="gdtBulkBar" class="gdt-bulk-bar hidden">
+            <div class="gdt-bulk-bar-info">
+              <span id="gdtBulkCount">Đã chọn 0 hóa đơn</span>
+              <span class="gdt-bulk-bar-hint">File XML gốc (chữ ký số CQT) để nộp/đối chiếu thuế</span>
+            </div>
+            <button type="button" id="gdtBulkXmlBtn" onclick="downloadSelectedGdtXml()">Tải XML đã chọn</button>
+          </div>
           <div id="gdtResultsContainer"></div>
         </div>
       </div>
@@ -880,8 +888,11 @@
 <div id="gdtDetailOverlay" class="gdt-modal-overlay hidden" onclick="if(event.target===this) closeGdtInvoiceDetail()">
   <div class="gdt-modal-box">
     <div class="gdt-modal-header">
-      <h3>📄 Chi tiết hóa đơn</h3>
-      <button type="button" class="gdt-modal-close" onclick="closeGdtInvoiceDetail()">✕</button>
+      <h3>Chi tiết hóa đơn</h3>
+      <div class="gdt-modal-header-actions">
+        <button type="button" class="gdt-xml-btn gdt-xml-btn-lg" id="gdtDetailXmlBtn" onclick="downloadGdtInvoiceXml(gdtDetailIdx, this)">Tải XML</button>
+        <button type="button" class="gdt-modal-close" onclick="closeGdtInvoiceDetail()">✕</button>
+      </div>
     </div>
     <div class="gdt-modal-body" id="gdtDetailBody">
       <span class="spinner" style="color:var(--accent)"></span> Đang tải chi tiết hóa đơn...
