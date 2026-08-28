@@ -29,15 +29,17 @@ from collections import defaultdict
 # Thêm dòng này vào cụm import từ file nội bộ
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 from _invoice import lookup_invoice, fetch_invoices_by_date
-from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail
+from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail, gdt_export_invoice_xml
 from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list
 from _customsdeclaration import parse_customs_declaration_from_bytes
 from _refund import (  # noqa: E402
     create_case as refund_create_case,
     list_cases as refund_list_cases,
-    get_case as refund_get_case,
+    get_case_with_checklist as refund_get_case_with_checklist,
     update_case_status as refund_update_case_status,
     parse_email_text as refund_parse_email_text,
+    attach_document as refund_attach_document,
+    patch_case_fields as refund_patch_case_fields,
 )
 
 def handle_fetch_employees_excel(body):
@@ -413,6 +415,21 @@ def handle_gdt_invoice_detail(body):
     status = 400 if "error" in res else 200
     return status, res
 
+def handle_gdt_invoice_export_xml(body):
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    invoice = body.get("invoice") or {}
+    token = (body.get("token") or "").strip() or None
+
+    if not username or not password:
+        return 400, {"error": "Vui lòng nhập Mã số thuế và Mật khẩu."}
+    if not isinstance(invoice, dict) or not invoice:
+        return 400, {"error": "Thiếu thông tin hóa đơn cần tải XML."}
+
+    res = gdt_export_invoice_xml(username, password, invoice, token=token)
+    status = 400 if "error" in res else 200
+    return status, res
+
 def handle_lookup(body):
     code = (body.get("code") or "").strip()
     if not code:
@@ -721,6 +738,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_gdt_invoice_by_type(body)
         elif action == "gdt_invoice_detail":
             status, payload = handle_gdt_invoice_detail(body)
+        elif action == "gdt_invoice_export_xml":
+            status, payload = handle_gdt_invoice_export_xml(body)
         elif action == "fetch_employees_excel":
             status, payload = handle_fetch_employees_excel(body)
         elif action == "search_transaction":
@@ -770,7 +789,7 @@ class handler(BaseHTTPRequestHandler):
                 status, payload = 500, {"error": str(e)}
         elif action == "refund_get":
             try:
-                res = refund_get_case((body.get("case_id") or "").strip())
+                res = refund_get_case_with_checklist((body.get("case_id") or "").strip())
                 status, payload = (400 if "error" in res else 200), res
             except Exception as e:
                 status, payload = 500, {"error": str(e)}
@@ -780,6 +799,7 @@ class handler(BaseHTTPRequestHandler):
                     (body.get("case_id") or "").strip(),
                     (body.get("status") or "").strip(),
                     (body.get("note") or "").strip(),
+                    force=bool(body.get("force")),
                 )
                 status, payload = (400 if "error" in res else 200), res
             except Exception as e:
@@ -788,6 +808,26 @@ class handler(BaseHTTPRequestHandler):
             try:
                 res = refund_parse_email_text(body.get("text") or "")
                 status, payload = 200, res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_upload":
+            try:
+                res = refund_attach_document(
+                    (body.get("case_id") or "").strip(),
+                    body.get("file_base64") or "",
+                    (body.get("filename") or "file.bin").strip(),
+                    (body.get("doc_type") or "customer_slip").strip(),
+                )
+                status, payload = (400 if "error" in res else 200), res
+            except Exception as e:
+                status, payload = 500, {"error": str(e)}
+        elif action == "refund_patch":
+            try:
+                res = refund_patch_case_fields(
+                    (body.get("case_id") or "").strip(),
+                    body.get("fields") or {},
+                )
+                status, payload = (400 if "error" in res else 200), res
             except Exception as e:
                 status, payload = 500, {"error": str(e)}
         else:
