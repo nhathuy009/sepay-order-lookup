@@ -1,7 +1,8 @@
 """
 Module tra cứu Hóa đơn điện tử (hoadondientu.gdt.gov.vn).
-Dùng bởi action "gdt_invoice" (lấy DANH SÁCH) và action "gdt_invoice_detail"
-(lấy CHI TIẾT một hóa đơn cụ thể) trong index.py.
+Dùng bởi action "gdt_invoice" (lấy DANH SÁCH), action "gdt_invoice_detail"
+(lấy CHI TIẾT một hóa đơn cụ thể) và action "gdt_invoice_export_xml"
+(tải file invoice.xml gốc) trong index.py.
 
 Hàm chính:
   - lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
@@ -9,17 +10,23 @@ Hàm chính:
   - gdt_fetch_invoice_detail(username, password, invoice)
       -> lấy chi tiết đầy đủ (người mua/bán, hàng hóa dịch vụ, thuế suất...)
          của MỘT hóa đơn, dựa trên object hóa đơn đã có từ danh sách ở trên.
+  - gdt_export_invoice_xml(username, password, invoice, token=None)
+      -> gọi API export-xml, giải nén ZIP, trả về nội dung invoice.xml.
 
 Trả về dict:
   - Thành công: {"count": N, "invoices": [...], "warnings": [...], "chunks_processed": M}
                 hoặc {"detail": {...}} (đối với gdt_fetch_invoice_detail)
+                hoặc {"xml": "...", "filename": "...", "token": "..."} (export XML)
   - Thất bại:   {"error": "..."}
 
 LƯU Ý BẢO MẬT: username/password của GDT chỉ tồn tại trong biến cục bộ của lần gọi này,
 KHÔNG được log, KHÔNG được lưu vào bất kỳ đâu (file, DB, biến toàn cục...).
 """
 import re
+import io
+import json
 import time
+import zipfile
 import calendar
 from datetime import datetime, timedelta
 from urllib.parse import quote
@@ -186,6 +193,39 @@ def api_get(session: requests.Session, url: str, token: str, max_retries: int = 
                 return None, "Không tìm thấy hóa đơn này trên hệ thống Thuế (HTTP 404)."
             resp.raise_for_status()
             return resp.json(), None
+        except requests.exceptions.Timeout:
+            time.sleep(2)
+        except requests.exceptions.ConnectionError:
+            time.sleep(2)
+        except Exception as e:
+            return None, str(e)
+    return None, f"Không tải được dữ liệu sau {max_retries} lần thử: {url}"
+
+
+def api_get_bytes(session: requests.Session, url: str, token: str, max_retries: int = 3):
+    """GET trả về bytes thô (dùng cho export-xml, phản hồi là ZIP chứ không phải JSON).
+    Trả về (content_bytes, error_message). error_message=None nếu thành công."""
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/zip, application/octet-stream, application/xml, application/json, */*",
+    }
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = session.get(url, headers=headers, timeout=(10, 40))
+            if resp.status_code in (401, 403):
+                return None, f"Token hết hạn hoặc bị từ chối (HTTP {resp.status_code})."
+            if resp.status_code == 429:
+                time.sleep(3)
+                continue
+            if resp.status_code in (500, 504):
+                time.sleep(2)
+                continue
+            if resp.status_code == 404:
+                return None, "Không tìm thấy hóa đơn này trên hệ thống Thuế (HTTP 404)."
+            if resp.status_code >= 400:
+                snippet = (resp.text or "")[:200]
+                return None, f"Máy chủ Thuế trả lỗi HTTP {resp.status_code}: {snippet}"
+            return resp.content or b"", None
         except requests.exceptions.Timeout:
             time.sleep(2)
         except requests.exceptions.ConnectionError:
@@ -474,6 +514,182 @@ def gdt_fetch_invoice_detail(username: str, password: str, invoice: dict) -> dic
         return {"error": "Máy chủ Thuế không trả về dữ liệu chi tiết cho hóa đơn này."}
 
     return {"detail": data}
+
+
+# ==========================================
+# TẢI FILE invoice.xml GỐC - action "gdt_invoice_export_xml"
+# API: GET /api/query/invoices/export-xml?nbmst=&khhdon=&shdon=&khmshdon=
+# (hóa đơn máy tính tiền dùng /api/sco-query/invoices/export-xml)
+# Phản hồi là file ZIP (invoice.xml + invoice.html + ảnh chữ ký/nền).
+# ==========================================
+def _invoice_xml_filename(invoice: dict) -> str:
+    nbmst = str(invoice.get("nbmst") or "unknown")
+    khhdon = str(invoice.get("khhdon") or "")
+    shdon = str(invoice.get("shdon") or "")
+    safe = re.sub(r"[^\w.\-]+", "_", f"{nbmst}_{khhdon}_{shdon}").strip("_")
+    return f"{safe or 'invoice'}.xml"
+
+
+def _is_blank(val) -> bool:
+    return val is None or (isinstance(val, str) and not val.strip())
+
+
+def _looks_like_invoice_xml(text: str) -> bool:
+    """Hóa đơn điện tử VN (QĐ 1209) dùng root <HDon>. Không nhận HTML lỗi của cổng Thuế."""
+    if not text:
+        return False
+    return "<hdon" in text.lstrip()[:8000].lower()
+
+
+def extract_invoice_xml_from_zip(zip_bytes: bytes):
+    """Lấy nội dung invoice.xml từ ZIP mà API export-xml trả về.
+    ZIP mẫu của GDT gồm: invoice.xml, invoice.html, details.js, ảnh nền/chữ ký.
+    Trả về (xml_text, error_message)."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            names = zf.namelist()
+            xml_name = None
+            for n in names:
+                base = n.replace("\\", "/").split("/")[-1].lower()
+                if base == "invoice.xml":
+                    xml_name = n
+                    break
+            if xml_name is None:
+                xmls = [n for n in names if n.lower().endswith(".xml")]
+                if xmls:
+                    xml_name = xmls[0]
+            if not xml_name:
+                return None, "File ZIP không chứa invoice.xml."
+            raw = zf.read(xml_name)
+    except zipfile.BadZipFile:
+        return None, "Phản hồi từ máy chủ Thuế không phải file ZIP hợp lệ."
+    except Exception as e:
+        return None, f"Không giải nén được file ZIP: {e}"
+
+    for enc in ("utf-8-sig", "utf-8"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            text = None
+    else:
+        text = raw.decode("utf-8", errors="replace")
+
+    if not _looks_like_invoice_xml(text):
+        return None, "File ZIP không chứa hóa đơn XML hợp lệ (thiếu thẻ HDon)."
+    return text, None
+
+
+def parse_export_xml_response(content: bytes):
+    """Nhận bytes từ API export-xml: ZIP, XML thuần, hoặc JSON lỗi.
+    Trả về (xml_text, error_message)."""
+    if not content:
+        return None, "Máy chủ Thuế không trả về dữ liệu XML."
+
+    stripped = content.lstrip()
+    if stripped.startswith(b"{") or stripped.startswith(b"["):
+        try:
+            data = json.loads(content.decode("utf-8", errors="replace"))
+        except Exception:
+            return None, "Máy chủ Thuế trả về JSON không hợp lệ."
+        if isinstance(data, dict):
+            msg = data.get("message") or data.get("error") or str(data)[:200]
+        else:
+            msg = str(data)[:200]
+        return None, f"Máy chủ Thuế từ chối xuất XML: {msg}"
+
+    if stripped.startswith(b"PK") or b"PK\x03\x04" in content[:16]:
+        pk = content.find(b"PK\x03\x04")
+        return extract_invoice_xml_from_zip(content if pk <= 0 else content[pk:])
+
+    if stripped.startswith(b"<") or stripped.startswith(b"\xef\xbb\xbf<"):
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("utf-8", errors="replace")
+        if _looks_like_invoice_xml(text):
+            return text, None
+        return None, "Máy chủ Thuế trả về HTML/dữ liệu khác, không phải hóa đơn XML."
+
+    pk = content.find(b"PK\x03\x04")
+    if pk >= 0:
+        return extract_invoice_xml_from_zip(content[pk:])
+
+    return None, "Định dạng phản hồi không phải XML/ZIP."
+
+
+def gdt_export_invoice_xml(username: str, password: str, invoice: dict, token: str = None) -> dict:
+    """
+    Tải file invoice.xml gốc của MỘT hóa đơn từ cổng hoadondientu.gdt.gov.vn.
+
+    `invoice` là object hóa đơn từ danh sách (cần nbmst, khhdon, shdon;
+    khmshdon tùy chọn; loai dùng để chọn endpoint sco-query vs query).
+
+    Nếu đã có `token` hợp lệ thì dùng lại, khỏi đăng nhập/captcha.
+    Token hết hạn sẽ tự đăng nhập lại 1 lần.
+
+    Trả về:
+      - Thành công: {"xml": "...", "filename": "...", "token": "..."}
+      - Thất bại:   {"error": "..."}
+    """
+    if not isinstance(invoice, dict):
+        return {"error": "Thiếu thông tin hóa đơn cần tải XML."}
+
+    nbmst = invoice.get("nbmst")
+    khhdon = invoice.get("khhdon")
+    shdon = invoice.get("shdon")
+    khmshdon = invoice.get("khmshdon")
+    loai = invoice.get("loai", "")
+
+    missing = [name for name, val in [("nbmst", nbmst), ("khhdon", khhdon), ("shdon", shdon)] if _is_blank(val)]
+    if missing:
+        return {"error": f"Thiếu thông tin định danh hóa đơn ({', '.join(missing)}) để tải XML."}
+
+    session = make_session()
+    used_token = token
+    logged_in_fresh = False
+    if not used_token:
+        used_token, err = login_tax_system(session, username, password)
+        if not used_token:
+            return {"error": err or "Đăng nhập thất bại."}
+        logged_in_fresh = True
+
+    is_sco = (loai == LOAI_MAP.get(8))
+    params = {"nbmst": nbmst, "khhdon": khhdon, "shdon": shdon}
+    if khmshdon not in (None, ""):
+        params["khmshdon"] = khmshdon
+    query_string = "?" + "&".join(f"{k}={quote(str(v))}" for k, v in params.items())
+
+    def _url(sco: bool) -> str:
+        base = f"{BASE_API}/sco-query/invoices/export-xml" if sco else f"{BASE_API}/query/invoices/export-xml"
+        return base + query_string
+
+    content, err = api_get_bytes(session, _url(is_sco), used_token)
+
+    token_rejected = bool(err and ("hết hạn" in err or "từ chối" in err))
+    if token_rejected and not logged_in_fresh:
+        new_token, login_err = login_tax_system(session, username, password)
+        if not new_token:
+            return {"error": login_err or err}
+        used_token = new_token
+        logged_in_fresh = True
+        content, err = api_get_bytes(session, _url(is_sco), used_token)
+
+    # Hóa đơn máy tính tiền / thường đôi khi lệch endpoint -> thử đầu kia khi 404
+    if err and "404" in err:
+        content, err = api_get_bytes(session, _url(not is_sco), used_token)
+
+    if err:
+        return {"error": err}
+    xml_text, parse_err = parse_export_xml_response(content)
+    if parse_err:
+        return {"error": parse_err}
+
+    return {
+        "xml": xml_text,
+        "filename": _invoice_xml_filename(invoice),
+        "token": used_token,
+    }
 
 
 # ==========================================
