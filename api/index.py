@@ -7,6 +7,7 @@ import sys
 import urllib.parse
 import requests
 import re
+import traceback
 from http.server import BaseHTTPRequestHandler
 
 import openpyxl
@@ -375,7 +376,11 @@ def handle_gdt_invoice(body):
     if not start_date or not end_date:
         return 400, {"error": "Vui lòng chọn Từ ngày và Đến ngày."}
 
-    res = lookup_gdt_invoices(username, password, start_date, end_date, is_purchase)
+    debug = []
+    try:
+        res = lookup_gdt_invoices(username, password, start_date, end_date, is_purchase, debug=debug)
+    except Exception as e:
+        return 500, {"error": f"Exception: {type(e).__name__}: {e}", "debug_steps": debug, "traceback": traceback.format_exc()}
     status = 400 if "error" in res else 200
     return status, res
 
@@ -397,7 +402,11 @@ def handle_gdt_invoice_by_type(body):
     except (TypeError, ValueError):
         return 400, {"error": "Thiếu hoặc sai tham số ttxly (chỉ chấp nhận 5, 6 hoặc 8)."}
 
-    res = lookup_gdt_invoices_by_type(username, password, start_date, end_date, is_purchase, ttxly, token=token)
+    debug = []
+    try:
+        res = lookup_gdt_invoices_by_type(username, password, start_date, end_date, is_purchase, ttxly, token=token, debug=debug)
+    except Exception as e:
+        return 500, {"error": f"Exception: {type(e).__name__}: {e}", "debug_steps": debug, "traceback": traceback.format_exc()}
     status = 400 if "error" in res else 200
     return status, res
 
@@ -411,7 +420,10 @@ def handle_gdt_invoice_detail(body):
     if not isinstance(invoice, dict) or not invoice:
         return 400, {"error": "Thiếu thông tin hóa đơn cần tra cứu chi tiết."}
 
-    res = gdt_fetch_invoice_detail(username, password, invoice)
+    try:
+        res = gdt_fetch_invoice_detail(username, password, invoice)
+    except Exception as e:
+        return 500, {"error": f"Exception: {type(e).__name__}: {e}", "traceback": traceback.format_exc()}
     status = 400 if "error" in res else 200
     return status, res
 
@@ -426,7 +438,10 @@ def handle_gdt_invoice_export_xml(body):
     if not isinstance(invoice, dict) or not invoice:
         return 400, {"error": "Thiếu thông tin hóa đơn cần tải XML."}
 
-    res = gdt_export_invoice_xml(username, password, invoice, token=token)
+    try:
+        res = gdt_export_invoice_xml(username, password, invoice, token=token)
+    except Exception as e:
+        return 500, {"error": f"Exception: {type(e).__name__}: {e}", "traceback": traceback.format_exc()}
     status = 400 if "error" in res else 200
     return status, res
 

@@ -33,6 +33,13 @@ from urllib.parse import quote
 
 import requests
 
+def _log(debug, msg: str):
+    """Ghi 1 dòng log kèm mốc thời gian vào list `debug` (nếu có truyền vào).
+    debug=None -> bỏ qua, không tốn chi phí, không đổi hành vi hàm gốc."""
+    if debug is not None:
+        debug.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
+
+
 DOMAIN = "https://hoadondientu.gdt.gov.vn"
 BASE_API = f"{DOMAIN}/api"
 CAPTCHA_URL = f"{BASE_API}/captcha"
@@ -109,17 +116,20 @@ def make_session() -> requests.Session:
     return s
 
 
-def login_tax_system(session: requests.Session, username: str, password: str, max_retries: int = 3):
+def login_tax_system(session: requests.Session, username: str, password: str, max_retries: int = 3, debug=None):
     """Trả về (token, error_message). Thành công: (token, None). Thất bại: (None, "lý do")."""
     last_message = None
     empty_captcha_count = 0
 
     for attempt in range(1, max_retries + 1):
+        _log(debug, f"Đăng nhập - lần thử {attempt}/{max_retries}: gọi {CAPTCHA_URL}")
         try:
             resp_captcha = session.get(CAPTCHA_URL, timeout=10)
+            _log(debug, f"  -> captcha HTTP {resp_captcha.status_code}")
             try:
                 c_data = resp_captcha.json()
             except Exception:
+                _log(debug, "  -> LỖI: body captcha không phải JSON")
                 return None, (
                     f"Không đọc được dữ liệu captcha từ máy chủ Thuế "
                     f"(HTTP {resp_captcha.status_code}, nội dung: {resp_captcha.text[:150]!r})."
@@ -129,26 +139,32 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
             c_value = detect_svg_captcha(raw_content)
             if not c_value:
                 empty_captcha_count += 1
+                _log(debug, "  -> Giải captcha thất bại (rỗng), thử lại")
                 time.sleep(1)
                 continue
+            _log(debug, f"  -> Giải captcha OK (độ dài {len(c_value)}), gọi {LOGIN_URL}")
 
             payload = {"username": username, "password": password, "cvalue": c_value, "ckey": c_data.get("key")}
             session.options(LOGIN_URL)
             resp_auth = session.post(LOGIN_URL, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
+            _log(debug, f"  -> login HTTP {resp_auth.status_code}")
 
             try:
                 auth_data = resp_auth.json()
             except Exception:
+                _log(debug, "  -> LỖI: body login không phải JSON")
                 return None, (
                     f"Máy chủ Thuế trả về dữ liệu đăng nhập không hợp lệ "
                     f"(HTTP {resp_auth.status_code}, nội dung: {resp_auth.text[:150]!r})."
                 )
 
             if "token" in auth_data:
+                _log(debug, "  -> Đăng nhập THÀNH CÔNG, nhận được token")
                 return auth_data["token"], None
 
             message = str(auth_data.get("message", "Unknown Error"))
             last_message = message
+            _log(debug, f"  -> Đăng nhập chưa thành công: {message}")
             message_lower = message.lower()
             if any(kw in message_lower for kw in WRONG_CREDENTIAL_KEYWORDS):
                 return None, f"Sai tài khoản hoặc mật khẩu: {message}"
@@ -157,11 +173,14 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
 
         except requests.exceptions.Timeout:
             last_message = "Timeout khi gọi máy chủ Thuế."
+            _log(debug, "  -> LỖI: Timeout")
             time.sleep(1)
         except requests.exceptions.ConnectionError as e:
             last_message = f"Lỗi kết nối mạng: {e}"
+            _log(debug, f"  -> LỖI: ConnectionError: {e}")
             time.sleep(1)
         except Exception as e:
+            _log(debug, f"  -> LỖI không xác định: {e}")
             return None, f"Lỗi không xác định khi đăng nhập: {e}"
 
     detail_parts = [f"Đăng nhập thất bại sau {max_retries} lần thử."]
@@ -175,18 +194,23 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
 # ==========================================
 # GỌI API DANH SÁCH HÓA ĐƠN
 # ==========================================
-def api_get(session: requests.Session, url: str, token: str, max_retries: int = 3):
+def api_get(session: requests.Session, url: str, token: str, max_retries: int = 3, debug=None, label: str = ""):
     """Trả về (json_data, error_message). error_message=None nếu thành công."""
     headers = {"Authorization": f"Bearer {token}"}
+    tag = f"[{label}] " if label else ""
     for attempt in range(1, max_retries + 1):
+        _log(debug, f"{tag}Gọi API (lần {attempt}/{max_retries}): {url}")
         try:
             resp = session.get(url, headers=headers, timeout=(10, 25))
+            _log(debug, f"{tag}  -> HTTP {resp.status_code}")
             if resp.status_code in (401, 403):
                 return None, f"Token hết hạn hoặc bị từ chối (HTTP {resp.status_code})."
             if resp.status_code == 429:
+                _log(debug, f"{tag}  -> Rate limit 429, chờ rồi thử lại")
                 time.sleep(3)
                 continue
             if resp.status_code in (500, 504):
+                _log(debug, f"{tag}  -> Lỗi {resp.status_code}, chờ rồi thử lại")
                 time.sleep(2)
                 continue
             if resp.status_code == 404:
@@ -194,10 +218,13 @@ def api_get(session: requests.Session, url: str, token: str, max_retries: int = 
             resp.raise_for_status()
             return resp.json(), None
         except requests.exceptions.Timeout:
+            _log(debug, f"{tag}  -> LỖI: Timeout, thử lại")
             time.sleep(2)
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError as e:
+            _log(debug, f"{tag}  -> LỖI: ConnectionError: {e}, thử lại")
             time.sleep(2)
         except Exception as e:
+            _log(debug, f"{tag}  -> LỖI không xác định: {e}")
             return None, str(e)
     return None, f"Không tải được dữ liệu sau {max_retries} lần thử: {url}"
 
@@ -236,7 +263,7 @@ def api_get_bytes(session: requests.Session, url: str, token: str, max_retries: 
 
 
 def fetch_invoices_of_type(session: requests.Session, token: str, start_date: str, end_date: str,
-                            is_purchase: bool, ttxly: int):
+                            is_purchase: bool, ttxly: int, debug=None):
     """
     Lấy toàn bộ hóa đơn của DUY NHẤT 1 loại (ttxly: 5, 6 hoặc 8) trong MỘT khoảng ngày
     (khoảng ngày này phải đã <= 1 tháng, việc chia chunk theo tháng do lớp gọi bên trên xử lý).
@@ -245,6 +272,7 @@ def fetch_invoices_of_type(session: requests.Session, token: str, start_date: st
     url_type = "purchase" if is_purchase else "sold"
     base_url = f"{BASE_API}/sco-query/invoices/{url_type}" if ttxly == 8 else f"{BASE_API}/query/invoices/{url_type}"
     loai = LOAI_MAP.get(ttxly, "")
+    label = f"{loai} {start_date}-{end_date}"
 
     invoices = []
     warnings = []
@@ -258,14 +286,16 @@ def fetch_invoices_of_type(session: requests.Session, token: str, start_date: st
             query_string += f"&state={state}"
         full_url = base_url + query_string
 
-        data, err = api_get(session, full_url, token)
+        data, err = api_get(session, full_url, token, debug=debug, label=f"{label} trang {page}")
         if err:
             warnings.append(err)
             break
         if not data:
+            _log(debug, f"[{label}] Trang {page}: không có dữ liệu trả về, dừng")
             break
 
         datas = data.get("datas", [])
+        _log(debug, f"[{label}] Trang {page}: nhận {len(datas)} hóa đơn")
         if not datas:
             break
 
@@ -291,13 +321,13 @@ def fetch_invoices_of_type(session: requests.Session, token: str, start_date: st
     return invoices, warnings
 
 
-def fetch_invoice_list(session: requests.Session, token: str, start_date: str, end_date: str, is_purchase: bool):
+def fetch_invoice_list(session: requests.Session, token: str, start_date: str, end_date: str, is_purchase: bool, debug=None):
     """Trả về (invoices, warnings). Lấy DANH SÁCH cả 3 loại hóa đơn (không gọi API chi tiết)."""
     invoices = []
     warnings = []
 
     for ttxly in (5, 6, 8):
-        type_invoices, type_warnings = fetch_invoices_of_type(session, token, start_date, end_date, is_purchase, ttxly)
+        type_invoices, type_warnings = fetch_invoices_of_type(session, token, start_date, end_date, is_purchase, ttxly, debug=debug)
         invoices.extend(type_invoices)
         if type_warnings:
             loai = LOAI_MAP.get(ttxly, "")
@@ -309,15 +339,17 @@ def fetch_invoice_list(session: requests.Session, token: str, start_date: str, e
 # ==========================================
 # HÀM CHÍNH - gọi từ index.py (action "gdt_invoice")
 # ==========================================
-def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date: str, is_purchase: bool = True) -> dict:
+def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date: str, is_purchase: bool = True, debug=None) -> dict:
+    if debug is None:
+        debug = []
     try:
         start_dt = datetime.strptime(start_date, "%d/%m/%Y")
         end_dt = datetime.strptime(end_date, "%d/%m/%Y")
     except ValueError:
-        return {"error": "Định dạng ngày phải là dd/mm/yyyy."}
+        return {"error": "Định dạng ngày phải là dd/mm/yyyy.", "debug_steps": debug}
 
     if start_dt > end_dt:
-        return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'."}
+        return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'.", "debug_steps": debug}
 
     # ---------------------------------------------------------
     # DATE CHUNKING: Chia nhỏ khoảng thời gian tối đa 1 tháng
@@ -341,11 +373,13 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         # Tiến cursor sang ngày đầu tiên của tháng tiếp theo
         cursor = chunk_end + timedelta(days=1)
 
+    _log(debug, f"Chia thành {len(date_chunks)} khoảng ngày (theo tháng): {date_chunks}")
+
     # Đăng nhập vào hệ thống thuế
     session = make_session()
-    token, err = login_tax_system(session, username, password)
+    token, err = login_tax_system(session, username, password, debug=debug)
     if not token:
-        return {"error": err or "Đăng nhập thất bại."}
+        return {"error": err or "Đăng nhập thất bại.", "debug_steps": debug}
 
     all_invoices = []
     all_warnings = []
@@ -359,7 +393,8 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         invoices, warnings = fetch_invoice_list(
             session, token,
             s_date, e_date,
-            is_purchase
+            is_purchase,
+            debug=debug,
         )
         all_invoices.extend(invoices)
 
@@ -371,7 +406,8 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
         "count": len(all_invoices),
         "invoices": all_invoices,
         "warnings": all_warnings,
-        "chunks_processed": len(date_chunks)
+        "chunks_processed": len(date_chunks),
+        "debug_steps": debug,
     }
 
 
@@ -381,7 +417,7 @@ def lookup_gdt_invoices(username: str, password: str, start_date: str, end_date:
 # phải chờ lấy xong cả 3 loại rồi mới trả 1 lần) - action "gdt_invoice_by_type"
 # ==========================================
 def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, end_date: str,
-                                 is_purchase: bool, ttxly: int, token: str = None) -> dict:
+                                 is_purchase: bool, ttxly: int, token: str = None, debug=None) -> dict:
     """
     Lấy DANH SÁCH hóa đơn của DUY NHẤT 1 loại (ttxly: 5, 6 hoặc 8), tự chia nhỏ
     khoảng ngày theo từng tháng giống lookup_gdt_invoices().
@@ -397,17 +433,20 @@ def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, e
         (token trả về để frontend dùng cho các lần gọi tiếp theo của 2 loại còn lại)
       - Thất bại:   {"error": "..."}
     """
+    if debug is None:
+        debug = []
+
     if ttxly not in LOAI_MAP:
-        return {"error": f"ttxly không hợp lệ: {ttxly} (chỉ chấp nhận 5, 6 hoặc 8)."}
+        return {"error": f"ttxly không hợp lệ: {ttxly} (chỉ chấp nhận 5, 6 hoặc 8).", "debug_steps": debug}
 
     try:
         start_dt = datetime.strptime(start_date, "%d/%m/%Y")
         end_dt = datetime.strptime(end_date, "%d/%m/%Y")
     except ValueError:
-        return {"error": "Định dạng ngày phải là dd/mm/yyyy."}
+        return {"error": "Định dạng ngày phải là dd/mm/yyyy.", "debug_steps": debug}
 
     if start_dt > end_dt:
-        return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'."}
+        return {"error": "'Từ ngày' phải trước hoặc bằng 'Đến ngày'.", "debug_steps": debug}
 
     date_chunks = []
     cursor = start_dt
@@ -418,15 +457,19 @@ def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, e
         date_chunks.append((cursor.strftime("%d/%m/%Y"), chunk_end.strftime("%d/%m/%Y")))
         cursor = chunk_end + timedelta(days=1)
 
+    _log(debug, f"[{LOAI_MAP[ttxly]}] Chia thành {len(date_chunks)} khoảng ngày (theo tháng): {date_chunks}")
+
     session = make_session()
 
     used_token = token
     logged_in_fresh = False
     if not used_token:
-        used_token, err = login_tax_system(session, username, password)
+        used_token, err = login_tax_system(session, username, password, debug=debug)
         if not used_token:
-            return {"error": err or "Đăng nhập thất bại."}
+            return {"error": err or "Đăng nhập thất bại.", "debug_steps": debug}
         logged_in_fresh = True
+    else:
+        _log(debug, "Dùng lại token có sẵn (bỏ qua đăng nhập/captcha)")
 
     all_invoices = []
     all_warnings = []
@@ -435,17 +478,18 @@ def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, e
         if i > 0:
             time.sleep(1)
 
-        invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly)
+        invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly, debug=debug)
 
         # Nếu đang dùng token cũ (không tự đăng nhập ở bước trên) mà bị từ chối/hết hạn
         # thì thử đăng nhập lại 1 lần bằng username/password rồi gọi lại chunk này.
         token_rejected = any(("hết hạn" in w or "từ chối" in w) for w in warnings)
         if token_rejected and not logged_in_fresh:
-            new_token, err = login_tax_system(session, username, password)
+            _log(debug, "Token bị từ chối/hết hạn giữa chừng, đăng nhập lại")
+            new_token, err = login_tax_system(session, username, password, debug=debug)
             if new_token:
                 used_token = new_token
                 logged_in_fresh = True
-                invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly)
+                invoices, warnings = fetch_invoices_of_type(session, used_token, s_date, e_date, is_purchase, ttxly, debug=debug)
 
         all_invoices.extend(invoices)
         if warnings:
@@ -456,6 +500,7 @@ def lookup_gdt_invoices_by_type(username: str, password: str, start_date: str, e
         "loai": LOAI_MAP[ttxly],
         "invoices": all_invoices,
         "warnings": all_warnings,
+        "debug_steps": debug,
     }
 
 
