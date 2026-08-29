@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>123AV Player - HLS</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17/dist/hls.min.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #e74c3c, #f39c12);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 0.5px;
+        }
+
+        .header h1 small {
+            font-size: 12px;
+            -webkit-text-fill-color: #888;
+            font-weight: 400;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .header-controls input {
+            padding: 8px 14px;
+            border-radius: 20px;
+            border: 1px solid #444;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 14px;
+            width: 200px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .header-controls input:focus {
+            border-color: #e74c3c;
+        }
+
+        .header-controls input::placeholder {
+            color: #666;
+        }
+
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #333;
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(231, 76, 60, 0.4);
+        }
+        .btn-secondary { background: #2c3e50; }
+        .btn-secondary:hover { background: #34495e; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #2ecc71; }
+        .btn-warning { background: #f39c12; color: #222; }
+        .btn-warning:hover { background: #e67e22; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+
+        .player-wrapper {
+            max-width: 960px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        .player-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
+        }
+
+        #videoPlayer {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: block;
+        }
+
+        .video-info {
+            padding: 16px 4px 8px;
+        }
+
+        .video-info h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #eee;
+            word-break: break-word;
+        }
+
+        .video-info .meta {
+            font-size: 13px;
+            color: #888;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .video-info .meta span {
+            background: #1a1a2e;
+            padding: 2px 12px;
+            border-radius: 12px;
+            border: 1px solid #2a2a3e;
+        }
+
+        .player-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .player-status .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #333;
+            border-top-color: #e74c3c;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .player-status .status-text {
+            font-size: 14px;
+            color: #aaa;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 18px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .player-status.hidden {
+            display: none;
+        }
+
+        .plugin-panel {
+            max-width: 960px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        .panel-toggle {
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+            width: 100%;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .panel-toggle:hover {
+            background: #222244;
+        }
+
+        .panel-toggle .arrow {
+            transition: transform 0.3s;
+        }
+        .panel-toggle .arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .panel-content {
+            background: #111122;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 16px;
+            display: none;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .panel-content.open {
+            display: block;
+        }
+
+        .panel-content label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-top: 12px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .panel-content input, 
+        .panel-content textarea,
+        .panel-content select {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #0a0a1a;
+            color: #fff;
+            font-size: 13px;
+            font-family: monospace;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .panel-content input:focus,
+        .panel-content textarea:focus {
+            border-color: #e74c3c;
+        }
+
+        .panel-content textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .panel-content .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .panel-content .row .col {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .panel-content .row .col.small {
+            flex: 0 0 auto;
+        }
+
+        .plugin-status {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .plugin-status.loaded {
+            background: #27ae60;
+            color: #fff;
+        }
+
+        .plugin-status.error {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .plugin-status.idle {
+            background: #555;
+            color: #ccc;
+        }
+
+        .sections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .sections-grid .section-item {
+            background: #1a1a2e;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3e;
+            cursor: pointer;
+            text-align: center;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .sections-grid .section-item:hover {
+            background: #2a2a4e;
+            border-color: #e74c3c;
+            transform: translateY(-2px);
+        }
+
+        .sections-grid .section-item .badge {
+            display: block;
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            max-width: 960px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        .movie-card {
+            background: #111122;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #222;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-4px);
+            border-color: #e74c3c;
+            box-shadow: 0 8px 30px rgba(231, 76, 60, 0.2);
+        }
+
+        .movie-card .thumb {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            background: #1a1a2e;
+            object-fit: cover;
+            display: block;
+        }
+
+        .movie-card .info {
+            padding: 10px 12px;
+        }
+
+        .movie-card .info .title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #eee;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+
+        .movie-card .info .sub {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px 0 40px;
+            flex-wrap: wrap;
+        }
+
+        .pagination .page-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .pagination .page-btn:hover {
+            background: #2a2a4e;
+            color: #fff;
+        }
+
+        .pagination .page-btn.active {
+            background: #e74c3c;
+            border-color: #e74c3c;
+            color: #fff;
+        }
+
+        .debug-info {
+            font-size: 11px;
+            color: #555;
+            padding: 8px 12px;
+            background: #0a0a1a;
+            border-radius: 6px;
+            margin-top: 4px;
+            word-break: break-all;
+            font-family: monospace;
+            max-height: 60px;
+            overflow-y: auto;
+        }
+
+        .debug-info .highlight {
+            color: #f39c12;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        @media (max-width: 640px) {
+            .header h1 { font-size: 16px; }
+            .header-controls input { width: 140px; font-size: 12px; }
+            .movie-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+            .sections-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+            .panel-content .row .col { min-width: 100px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+    <h1>🎬 123AV <small>HLS Player</small></h1>
+    <div class="header-controls">
+        <input type="text" id="searchInput" placeholder="Tìm kiếm phim..." />
+        <button class="btn btn-primary" onclick="doSearch()">🔍 Tìm</button>
+        <button class="btn btn-secondary" onclick="loadHome()">🏠 Home</button>
+    </div>
+</header>
+
+<!-- ===== PLAYER ===== -->
+<div class="player-wrapper">
+    <div class="player-container" id="playerContainer">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="player-status" id="playerStatus">
+            <div class="spinner"></div>
+            <div class="status-text">⏳ Đang tải video...</div>
+        </div>
+    </div>
+    <div class="video-info" id="videoInfo">
+        <h2 id="videoTitle">Chọn một bộ phim để xem</h2>
+        <div class="meta" id="videoMeta">
+            <span>🎥 Chất lượng: HD</span>
+            <span>📅 Năm: --</span>
+            <span>🎭 Thể loại: --</span>
+        </div>
+        <div class="debug-info" id="debugInfo">📡 Đang chờ...</div>
+    </div>
+</div>
+
+<!-- ===== PLUGIN PANEL ===== -->
+<div class="plugin-panel">
+    <button class="panel-toggle" onclick="togglePanel()">
+        <span>⚙️ Plugin 123AV v1.0.4</span>
+        <span class="arrow" id="panelArrow">▼</span>
+    </button>
+    <div class="panel-content" id="panelContent">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            <span>Trạng thái: <span class="plugin-status idle" id="pluginStatus">⏳ Chưa tải</span></span>
+            <div>
+                <button class="btn btn-success" onclick="loadPlugin()">📥 Nạp Plugin</button>
+                <button class="btn btn-secondary" onclick="loadHome()">🏠 Home</button>
+            </div>
+        </div>
+
+        <label>📋 Danh sách Section</label>
+        <div class="sections-grid" id="sectionsGrid">
+            <div class="section-item" onclick="loadSection('vi/new')">🆕 Mới cập nhật</div>
+            <div class="section-item" onclick="loadSection('vi/hot')">🔥 Hot</div>
+            <div class="section-item" onclick="loadSection('vi/censored')">🔞 Có che</div>
+            <div class="section-item" onclick="loadSection('vi/uncensored')">🔞 Không che</div>
+            <div class="section-item" onclick="loadSection('vi/uncensored-leaked')">💥 Leaked</div>
+        </div>
+
+        <label>🔗 URL tùy chỉnh</label>
+        <div class="row">
+            <div class="col">
+                <input type="text" id="customUrl" placeholder="https://123av.com/vi/v/cawb-024" />
+            </div>
+            <div class="col small">
+                <button class="btn btn-primary" onclick="playCustomUrl()">▶️ Phát</button>
+            </div>
+        </div>
+
+        <label>🔧 CORS Header (tự động thêm vào request)</label>
+        <div class="row">
+            <div class="col">
+                <input type="text" id="corsOrigin" value="https://123av.com" placeholder="Origin" />
+            </div>
+            <div class="col small">
+                <button class="btn btn-warning" onclick="toggleCorsHeader()">🔄 Bật/Tắt</button>
+            </div>
+        </div>
+        <div style="font-size:11px; color:#666; margin-top:4px;">
+            CORS Header: <span id="corsStatus">🟢 Bật (Origin: https://123av.com)</span>
+        </div>
+
+        <label>📦 Plugin Code (JavaScript)</label>
+        <textarea id="pluginCode" spellcheck="false">// Dán plugin code vào đây hoặc bấm "Nạp Plugin"</textarea>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="loadPlugin()">📥 Nạp Plugin</button>
+            <button class="btn btn-secondary" onclick="resetPlugin()">🔄 Reset</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MOVIE GRID ===== -->
+<div class="movie-grid" id="movieGrid">
+    <div style="grid-column:1/-1; text-align:center; color:#666; padding:40px 0;">
+        🎬 Bấm vào một section hoặc tìm kiếm để hiển thị danh sách phim
+    </div>
+</div>
+
+<!-- ===== PAGINATION ===== -->
+<div class="pagination" id="pagination"></div>
+
+<!-- ========================================================================== -->
+<!-- ===== MAIN JAVASCRIPT ===== -->
+<!-- ========================================================================== -->
+<script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    const state = {
+        plugin: null,
+        pluginLoaded: false,
+        currentSlug: 'vi/new',
+        currentPage: 1,
+        totalPages: 1,
+        filters: { sort: 'new' },
+        sections: [],
+        currentStreamUrl: null,
+        corsEnabled: true,
+        corsOrigin: 'https://123av.com',
+    };
+
+    // ============================================================
+    // DOM REFS
+    // ============================================================
+    const video = document.getElementById('videoPlayer');
+    const videoTitle = document.getElementById('videoTitle');
+    const videoMeta = document.getElementById('videoMeta');
+    const debugInfo = document.getElementById('debugInfo');
+    const playerStatus = document.getElementById('playerStatus');
+    const movieGrid = document.getElementById('movieGrid');
+    const pagination = document.getElementById('pagination');
+    const searchInput = document.getElementById('searchInput');
+    const pluginCode = document.getElementById('pluginCode');
+    const pluginStatus = document.getElementById('pluginStatus');
+    const corsOriginInput = document.getElementById('corsOrigin');
+    const corsStatus = document.getElementById('corsStatus');
+
+    // ============================================================
+    // HLS PLAYER
+    // ============================================================
+    let hls = null;
+
+    function initHls(url) {
+        debugInfo.textContent = '📡 Stream: ' + url;
+        
+        if (hls) {
+            hls.destroy();
+            hls = null;
+        }
+        video.pause();
+        video.removeAttribute('src');
+
+        playerStatus.classList.remove('hidden');
+
+        // Native HLS (Safari)
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.play().catch(() => {});
+            playerStatus.classList.add('hidden');
+            return;
+        }
+
+        // HLS.js
+        if (Hls.isSupported()) {
+            hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                backbufferLength: 30,
+                maxBufferLength: 30,
+                xhrSetup: function(xhr, url) {
+                    xhr.withCredentials = false;
+                    // Thêm Origin, Referer, User-Agent vào request
+                    if (state.corsEnabled && state.corsOrigin) {
+                        xhr.setRequestHeader('Origin', state.corsOrigin);
+                    }
+                    xhr.setRequestHeader('Referer', 'https://123av.com/');
+                    xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0');
+                }
+            });
+
+            hls.loadSource(url);
+            hls.attachMedia(video);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play().catch(() => {});
+                playerStatus.classList.add('hidden');
+            });
+
+            hls.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    console.error('HLS fatal error:', data);
+                    playerStatus.classList.add('hidden');
+                }
+            });
+
+        } else {
+            playerStatus.classList.add('hidden');
+            alert('Trình duyệt không hỗ trợ HLS.');
+        }
+    }
+
+    // ============================================================
+    // CORS HEADER CONTROL
+    // ============================================================
+    function toggleCorsHeader() {
+        state.corsEnabled = !state.corsEnabled;
+        state.corsOrigin = corsOriginInput.value.trim() || 'https://123av.com';
+        updateCorsStatus();
+        debugInfo.textContent = `📡 CORS ${state.corsEnabled ? '🟢 Bật' : '🔴 Tắt'} - Origin: ${state.corsOrigin}`;
+    }
+
+    function updateCorsStatus() {
+        if (state.corsEnabled) {
+            corsStatus.textContent = `🟢 Bật (Origin: ${state.corsOrigin})`;
+            corsStatus.style.color = '#2ecc71';
+        } else {
+            corsStatus.textContent = '🔴 Tắt';
+            corsStatus.style.color = '#e74c3c';
+        }
+    }
+
+    // ============================================================
+    // FETCH - TỰ ĐỘNG THÊM CORS HEADER
+    // ============================================================
+    async function fetchPage(url) {
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
+            'Referer': 'https://123av.com/',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'vi,en;q=0.9',
+        };
+        
+        if (state.corsEnabled && state.corsOrigin) {
+            headers['Origin'] = state.corsOrigin;
+        }
+
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.text();
+    }
+
+    // ============================================================
+    // PLUGIN LOADER
+    // ============================================================
+    function loadPlugin() {
+        try {
+            const code = pluginCode.value.trim();
+            if (!code) {
+                loadDefaultPlugin();
+                return;
+            }
+
+            const fn = new Function(
+                'getManifest',
+                'getHomeSections',
+                'getPrimaryCategories',
+                'getFilterConfig',
+                'getUrlList',
+                'getUrlSearch',
+                'getUrlDetail',
+                'getUrlCategories',
+                'getUrlCountries',
+                'getUrlYears',
+                'parseListResponse',
+                'parseSearchResponse',
+                'parseMovieDetail',
+                'parseDetailResponse',
+                'parseCategoriesResponse',
+                'parseCountriesResponse',
+                'parseYearsResponse',
+                code + '\nreturn { getManifest, getHomeSections, getPrimaryCategories, getFilterConfig, getUrlList, getUrlSearch, getUrlDetail, getUrlCategories, getUrlCountries, getUrlYears, parseListResponse, parseSearchResponse, parseMovieDetail, parseDetailResponse, parseCategoriesResponse, parseCountriesResponse, parseYearsResponse };'
+            );
+
+            const plugin = fn();
+
+            const required = ['getManifest', 'getHomeSections', 'getUrlList', 'getUrlSearch', 'getUrlDetail', 'parseListResponse', 'parseSearchResponse', 'parseMovieDetail', 'parseDetailResponse'];
+            for (const key of required) {
+                if (typeof plugin[key] !== 'function') {
+                    throw new Error(`Thiếu hàm bắt buộc: ${key}`);
+                }
+            }
+
+            state.plugin = plugin;
+            state.pluginLoaded = true;
+
+            try {
+                const manifest = JSON.parse(plugin.getManifest());
+                pluginStatus.textContent = `✅ ${manifest.name} v${manifest.version}`;
+                pluginStatus.className = 'plugin-status loaded';
+            } catch (e) {
+                pluginStatus.textContent = '✅ Đã tải';
+                pluginStatus.className = 'plugin-status loaded';
+            }
+
+            loadSections();
+            loadHome();
+
+        } catch (e) {
+            console.error('Plugin load error:', e);
+            pluginStatus.textContent = '❌ Lỗi: ' + e.message;
+            pluginStatus.className = 'plugin-status error';
+            state.pluginLoaded = false;
+        }
+    }
+
+    function loadDefaultPlugin() {
+        const defaultCode = document.getElementById('defaultPluginCode')?.textContent || '';
+        if (defaultCode) {
+            pluginCode.value = defaultCode;
+            loadPlugin();
+        } else {
+            alert('Không tìm thấy plugin mặc định.');
+        }
+    }
+
+    function resetPlugin() {
+        state.plugin = null;
+        state.pluginLoaded = false;
+        pluginStatus.textContent = '⏳ Chưa tải';
+        pluginStatus.className = 'plugin-status idle';
+        movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#666; padding:40px 0;">Chưa có dữ liệu</div>`;
+        pagination.innerHTML = '';
+        videoTitle.textContent = 'Chọn một bộ phim để xem';
+        videoMeta.innerHTML = '<span>🎥 Chất lượng: HD</span><span>📅 Năm: --</span><span>🎭 Thể loại: --</span>';
+        debugInfo.textContent = '📡 Đang chờ...';
+        video.pause();
+        video.removeAttribute('src');
+        if (hls) { hls.destroy(); hls = null; }
+    }
+
+    // ============================================================
+    // LOAD SECTIONS
+    // ============================================================
+    function loadSections() {
+        if (!state.pluginLoaded || !state.plugin) return;
+        try {
+            const sectionsJson = state.plugin.getHomeSections();
+            const sections = JSON.parse(sectionsJson);
+            state.sections = sections;
+
+            const grid = document.getElementById('sectionsGrid');
+            grid.innerHTML = sections.map(s => `
+                <div class="section-item" onclick="loadSection('${s.slug}')">
+                    ${s.title}
+                    <span class="badge">${s.type || 'List'}</span>
+                </div>
+            `).join('');
+
+        } catch (e) {
+            console.error('Load sections error:', e);
+        }
+    }
+
+    // ============================================================
+    // LOAD SECTION / LIST
+    // ============================================================
+    function loadSection(slug, page) {
+        if (!state.pluginLoaded || !state.plugin) {
+            alert('Vui lòng nạp plugin trước!');
+            return;
+        }
+
+        state.currentSlug = slug;
+        state.currentPage = page || 1;
+
+        try {
+            const filters = { ...state.filters, page: state.currentPage };
+            const url = state.plugin.getUrlList(slug, JSON.stringify(filters));
+
+            fetchPage(url)
+                .then(html => {
+                    const result = JSON.parse(state.plugin.parseListResponse(html));
+                    renderMovies(result.items);
+                    renderPagination(result.pagination);
+                })
+                .catch(err => {
+                    console.error('Fetch error:', err);
+                    movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi tải dữ liệu: ${err.message}</div>`;
+                });
+
+        } catch (e) {
+            console.error('Load section error:', e);
+            movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi: ${e.message}</div>`;
+        }
+    }
+
+    function loadHome() {
+        if (state.sections.length > 0) {
+            loadSection(state.sections[0].slug);
+        } else {
+            loadSection('vi/new');
+        }
+    }
+
+    // ============================================================
+    // SEARCH
+    // ============================================================
+    function doSearch() {
+        const keyword = searchInput.value.trim();
+        if (!keyword) { loadHome(); return; }
+        if (!state.pluginLoaded || !state.plugin) {
+            alert('Vui lòng nạp plugin trước!');
+            return;
+        }
+
+        try {
+            const filters = { ...state.filters, page: 1 };
+            const url = state.plugin.getUrlSearch(keyword, JSON.stringify(filters));
+
+            fetchPage(url)
+                .then(html => {
+                    const result = JSON.parse(state.plugin.parseSearchResponse(html));
+                    renderMovies(result.items);
+                    renderPagination(result.pagination);
+                    state.currentSlug = 'search';
+                    state.currentPage = 1;
+                })
+                .catch(err => {
+                    console.error('Search error:', err);
+                    movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi tìm kiếm: ${err.message}</div>`;
+                });
+
+        } catch (e) {
+            console.error('Search error:', e);
+        }
+    }
+
+    // ============================================================
+    // PLAY MOVIE - SỬA LỖI CORS & TỐI ƯU (thêm Origin vào mọi request)
+    // ============================================================
+    function playMovie(slug) {
+        if (!state.pluginLoaded || !state.plugin) {
+            alert('Vui lòng nạp plugin trước!');
+            return;
+        }
+
+        playerStatus.classList.remove('hidden');
+        videoTitle.textContent = '⏳ Đang tải thông tin phim...';
+        debugInfo.textContent = '📡 Đang lấy thông tin...';
+
+        try {
+            const url = state.plugin.getUrlDetail(slug);
+            debugInfo.textContent = '📡 Đang tải: ' + url;
+
+            fetchPage(url)
+                .then(html => {
+                    // 1. Parse detail bằng plugin
+                    let detail = null;
+                    try {
+                        const detailStr = state.plugin.parseMovieDetail(html);
+                        if (detailStr && detailStr !== "null") {
+                            detail = JSON.parse(detailStr);
+                        }
+                    } catch (e) {
+                        console.warn('Parse detail error:', e);
+                    }
+
+                    // 2. Cập nhật thông tin phim
+                    if (detail) {
+                        videoTitle.textContent = detail.title || 'Không có tiêu đề';
+                        videoMeta.innerHTML = `
+                            <span>🎥 Chất lượng: ${detail.quality || 'HD'}</span>
+                            <span>📅 Năm: ${detail.year || '--'}</span>
+                            <span>🎭 ${detail.category || '--'}</span>
+                            <span>👤 ${detail.casts || '--'}</span>
+                        `;
+                    }
+
+                    // 3. Tìm stream HLS
+                    let streamUrl = null;
+
+                    // 3a. Tìm m3u8 trực tiếp trong HTML (ưu tiên)
+                    const m3u8Matches = html.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi);
+                    if (m3u8Matches && m3u8Matches.length > 0) {
+                        streamUrl = m3u8Matches[0];
+                        debugInfo.textContent = '📡 Tìm thấy m3u8 trực tiếp';
+                        initHls(streamUrl);
+                        return;
+                    }
+
+                    // 3b. Lấy từ detail.servers (do plugin parse)
+                    if (detail && detail.servers && detail.servers.length > 0) {
+                        const server = detail.servers[0];
+                        if (server.episodes && server.episodes.length > 0) {
+                            const ep = server.episodes[0];
+                            let epUrl = ep.id;
+                            debugInfo.textContent = '📡 Lấy stream từ detail.servers: ' + epUrl;
+
+                            // Nếu epUrl là m3u8 -> phát ngay
+                            if (epUrl && epUrl.includes('.m3u8')) {
+                                initHls(epUrl);
+                                return;
+                            }
+
+                            // Nếu không, thử fetch epUrl để tìm m3u8 bên trong
+                            if (epUrl) {
+                                debugInfo.textContent = '📡 Fetch stream URL: ' + epUrl;
+                                const headers = {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
+                                    'Referer': 'https://123av.com/',
+                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                };
+                                if (state.corsEnabled && state.corsOrigin) {
+                                    headers['Origin'] = state.corsOrigin;
+                                }
+                                fetch(epUrl, { headers })
+                                .then(res => res.text())
+                                .then(body => {
+                                    const innerM3u8 = body.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi);
+                                    if (innerM3u8 && innerM3u8.length > 0) {
+                                        initHls(innerM3u8[0]);
+                                    } else {
+                                        playerStatus.classList.add('hidden');
+                                        alert('Không tìm thấy stream trong URL của episode.');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('Fetch episode error:', err);
+                                    playerStatus.classList.add('hidden');
+                                    alert('Lỗi khi tải stream: ' + err.message);
+                                });
+                                return;
+                            }
+                        }
+                    }
+
+                    // 3c. Tìm player JSON (cách cũ, nhưng không gọi javplayer.cc nữa)
+                    const playerMatch = html.match(/player\(\s*JSON\.parse\(\s*['"]([^'"]+)['"]\s*\)/i);
+                    if (playerMatch) {
+                        try {
+                            const cleanStr = playerMatch[1]
+                                .replace(/\\u([0-9a-fA-F]{4})/g, (m, g) => String.fromCharCode(parseInt(g, 16)))
+                                .replace(/\\/g, '');
+                            const playerData = JSON.parse(cleanStr);
+                            
+                            if (Array.isArray(playerData) && playerData.length > 0) {
+                                const item = playerData[0];
+                                if (item.url) {
+                                    // Thử phát trực tiếp nếu là m3u8, nếu không thì fetch
+                                    if (item.url.includes('.m3u8')) {
+                                        initHls(item.url);
+                                        return;
+                                    } else {
+                                        // Fetch URL để tìm m3u8
+                                        debugInfo.textContent = '📡 Fetch player URL: ' + item.url;
+                                        const headers = {
+                                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
+                                            'Referer': 'https://123av.com/',
+                                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                        };
+                                        if (state.corsEnabled && state.corsOrigin) {
+                                            headers['Origin'] = state.corsOrigin;
+                                        }
+                                        fetch(item.url, { headers })
+                                        .then(res => res.text())
+                                        .then(body => {
+                                            const innerM3u8 = body.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/gi);
+                                            if (innerM3u8 && innerM3u8.length > 0) {
+                                                initHls(innerM3u8[0]);
+                                            } else {
+                                                playerStatus.classList.add('hidden');
+                                                alert('Không tìm thấy stream trong player URL.');
+                                            }
+                                        })
+                                        .catch(err => {
+                                            playerStatus.classList.add('hidden');
+                                            alert('Lỗi fetch player URL: ' + err.message);
+                                        });
+                                        return;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Parse player data error:', e);
+                        }
+                    }
+
+                    // 3d. Không tìm thấy gì -> báo lỗi
+                    playerStatus.classList.add('hidden');
+                    alert('Không tìm thấy stream HLS (m3u8). Vui lòng thử lại hoặc dùng URL tùy chỉnh.');
+
+                })
+                .catch(err => {
+                    console.error('Play error:', err);
+                    playerStatus.classList.add('hidden');
+                    alert('Lỗi tải phim: ' + err.message);
+                });
+
+        } catch (e) {
+            console.error('Play error:', e);
+            playerStatus.classList.add('hidden');
+            alert('Lỗi: ' + e.message);
+        }
+    }
+
+    // ============================================================
+    // PLAY CUSTOM URL - thêm Origin
+    // ============================================================
+    function playCustomUrl() {
+        const url = document.getElementById('customUrl').value.trim();
+        if (!url) { alert('Vui lòng nhập URL'); return; }
+        
+        if (url.includes('.m3u8')) {
+            initHls(url);
+            return;
+        }
+
+        const slugMatch = url.match(/\/v\/([^/?]+)/);
+        if (slugMatch) {
+            playMovie('vi/v/' + slugMatch[1]);
+        } else {
+            // Thử fetch và tìm m3u8
+            playerStatus.classList.remove('hidden');
+            debugInfo.textContent = '📡 Đang tải: ' + url;
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
+                'Referer': 'https://123av.com/',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            };
+            if (state.corsEnabled && state.corsOrigin) {
+                headers['Origin'] = state.corsOrigin;
+            }
+            fetch(url, { headers })
+            .then(res => res.text())
+            .then(html => {
+                const m3u8Match = html.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i);
+                if (m3u8Match) {
+                    initHls(m3u8Match[0]);
+                } else {
+                    playerStatus.classList.add('hidden');
+                    alert('Không tìm thấy stream HLS tại URL này.');
+                }
+            })
+            .catch(err => {
+                playerStatus.classList.add('hidden');
+                alert('Lỗi tải URL: ' + err.message);
+            });
+        }
+    }
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    function renderMovies(items) {
+        if (!items || items.length === 0) {
+            movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#666; padding:40px 0;">📭 Không có kết quả</div>`;
+            return;
+        }
+
+        movieGrid.innerHTML = items.map(item => `
+            <div class="movie-card" onclick="playMovie('${item.id}')">
+                <img class="thumb" src="${item.posterUrl || ''}" alt="${item.title}" 
+                     onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22%3E%3Crect fill=%22%231a1a2e%22 width=%22200%22 height=%22300%22/%3E%3Ctext x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2214%22 font-family=%22sans-serif%22%3E📸%3C/text%3E%3C/svg%3E'" />
+                <div class="info">
+                    <div class="title">${item.title || 'Không tên'}</div>
+                    <div class="sub">${item.episode_current || ''} ${item.quality || ''}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderPagination(paginationData) {
+        if (!paginationData || paginationData.totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        const current = paginationData.currentPage || 1;
+        const total = paginationData.totalPages || 1;
+
+        let html = '';
+        if (current > 1) {
+            html += `<button class="page-btn" onclick="goToPage(${current - 1})">◀</button>`;
+        }
+
+        const start = Math.max(1, current - 2);
+        const end = Math.min(total, current + 2);
+
+        if (start > 1) {
+            html += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+            if (start > 2) html += `<span class="page-btn" style="border:none;background:transparent;">...</span>`;
+        }
+
+        for (let i = start; i <= end; i++) {
+            html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+        }
+
+        if (end < total) {
+            if (end < total - 1) html += `<span class="page-btn" style="border:none;background:transparent;">...</span>`;
+            html += `<button class="page-btn" onclick="goToPage(${total})">${total}</button>`;
+        }
+
+        if (current < total) {
+            html += `<button class="page-btn" onclick="goToPage(${current + 1})">▶</button>`;
+        }
+
+        pagination.innerHTML = html;
+    }
+
+    function goToPage(page) {
+        if (state.currentSlug === 'search') {
+            doSearch();
+        } else {
+            loadSection(state.currentSlug, page);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============================================================
+    // PANEL TOGGLE
+    // ============================================================
+    function togglePanel() {
+        const content = document.getElementById('panelContent');
+        const arrow = document.getElementById('panelArrow');
+        content.classList.toggle('open');
+        arrow.classList.toggle('open');
+    }
+
+    // ============================================================
+    // KEYBOARD SHORTCUTS
+    // ============================================================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.activeElement === searchInput) {
+            doSearch();
+        }
+    });
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    window.onload = function() {
+        updateCorsStatus();
+        const defaultCode = document.getElementById('defaultPluginCode');
+        if (defaultCode) {
+            pluginCode.value = defaultCode.textContent;
+            loadPlugin();
+        } else {
+            if (pluginCode.value.trim()) {
+                loadPlugin();
+            } else {
+                pluginStatus.textContent = '⚠️ Chưa có plugin';
+            }
+        }
+    };
+</script>
+
+<!-- ============================================================ -->
+<!-- PLUGIN CODE (Nhúng sẵn) -->
+<!-- ============================================================ -->
+<script id="defaultPluginCode" type="text/plain">
+// =============================================================================
+// CONFIGURATION & METADATA
+// =============================================================================
+
+function getManifest() {
+    return JSON.stringify({
+        "id": "123av",
+        "name": "123AV",
+        "version": "1.0.4",
+        "baseUrl": "https://123av.com",
+        "referrer": "https://123av.com/",
+        "iconUrl": "https://123av.com/assets/123av/favicon.png",
+        "isEnabled": true,
+        "isAdult": true,
+        "type": "VIDEO",
+        "layoutType": "HORIZONTAL",
+        "subtitleCat": false
+    });
+}
+
+function getHomeSections() {
+    return JSON.stringify([
+        { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
+        { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
+        { slug: 'vi/censored', title: 'Phim Có Che (Censored)', type: 'Horizontal', path: '' },
+        { slug: 'vi/uncensored', title: 'Không Che (Uncensored)', type: 'Horizontal', path: '' },
+        { slug: 'vi/uncensored-leaked', title: 'Không Che Rò Rỉ (Leaked)', type: 'Horizontal', path: '' }
+    ]);
+}
+
+function getPrimaryCategories() {
+    return JSON.stringify([
+        { name: 'Mới cập nhật', slug: 'vi/new' },
+        { name: 'Thịnh hành', slug: 'vi/hot' },
+        { name: 'Có che (Censored)', slug: 'vi/censored' },
+        { name: 'Không che (Uncensored)', slug: 'vi/uncensored' },
+        { name: 'Không che rò rỉ', slug: 'vi/uncensored-leaked' },
+        { name: 'Thể loại', slug: 'vi/genres' },
+        { name: 'Diễn viên', slug: 'vi/actresses' },
+        { name: 'Nhà sản xuất', slug: 'vi/makers' },
+        { name: 'Loạt phim (Series)', slug: 'vi/series' }
+    ]);
+}
+
+function getFilterConfig() {
+    return JSON.stringify({
+        sort: [
+            { name: 'Mới nhất', value: 'new' },
+            { name: 'Hôm nay', value: 'today' },
+            { name: 'Tuần này', value: 'week' },
+            { name: 'Tháng này', value: 'month' }
+        ],
+        category: [
+            { name: "Tất cả thể loại", value: "vi/genres" },
+            { name: "Có che (Censored)", value: "vi/censored" },
+            { name: "Không che (Uncensored)", value: "vi/uncensored" },
+            { name: "Không che rò rỉ", value: "vi/uncensored-leaked" },
+            { name: "Nữ diễn viên", value: "vi/actresses" },
+            { name: "Nhà sản xuất", value: "vi/makers" },
+            { name: "Loạt phim (Series)", value: "vi/series" }
+        ]
+    });
+}
+
+// =============================================================================
+// URL GENERATION
+// =============================================================================
+
+function getUrlList(slug, filtersJson) {
+    var filters = JSON.parse(filtersJson || "{}");
+    var page = filters.page || 1;
+    var baseUrl = "https://123av.com";
+    
+    var path = slug || "vi/new";
+    
+    if (path.indexOf("vi/") !== 0 && path.indexOf("/vi/") !== 0) {
+        if (path.indexOf("/") === 0) path = "vi" + path;
+        else path = "vi/" + path;
+    }
+    
+    if (path.indexOf("/") !== 0) path = "/" + path;
+    
+    var url = baseUrl + path;
+    
+    if (url.indexOf("?") !== -1) {
+        url += "&page=" + page;
+    } else {
+        url += "?page=" + page;
+    }
+    
+    if (filters.sort && filters.sort !== 'new') {
+        url += "&sort=" + filters.sort;
+    }
+    
+    return url;
+}
+
+function getUrlSearch(keyword, filtersJson) {
+    var filters = JSON.parse(filtersJson || "{}");
+    var page = filters.page || 1;
+    return "https://123av.com/vi/search?keyword=" + encodeURIComponent(keyword) + "&page=" + page;
+}
+
+function getUrlDetail(slug) {
+    if (slug.indexOf("http") === 0) return slug;
+    if (slug.indexOf("vi/v/") === 0) return "https://123av.com/" + slug;
+    if (slug.indexOf("/vi/v/") === 0) return "https://123av.com" + slug;
+    if (slug.indexOf("v/") === 0) return "https://123av.com/vi/" + slug;
+    if (slug.indexOf("/v/") === 0) return "https://123av.com/vi" + slug;
+    return "https://123av.com/vi/v/" + slug;
+}
+
+function getUrlCategories() { return "https://123av.com/vi/genres"; }
+function getUrlCountries() { return ""; }
+function getUrlYears() { return ""; }
+
+// =============================================================================
+// PARSERS
+// =============================================================================
+
+var PluginUtils = {
+    cleanText: function (text) {
+        if (!text) return "";
+        return text.replace(/<[^>]*>/g, "")
+            .replace(/&amp;/g, "&")
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/\s+/g, " ")
+            .trim();
+    },
+    getMeta: function (html, property) {
+        var regex1 = new RegExp('(?:property|name)=["\']' + property + '["\'][^>]*content=(["\'])(.*?)\\1', 'i');
+        var regex2 = new RegExp('content=(["\'])(.*?)\\1[^>]*(?:property|name)=["\']' + property + '["\']', 'i');
+        var match = html.match(regex1) || html.match(regex2);
+        return match ? match[2] : "";
+    },
+    decodePlayerJson: function (escapedStr) {
+        try {
+            var cleanStr = escapedStr.replace(/\\u([0-9a-fA-F]{4})/g, function (match, grp) {
+                return String.fromCharCode(parseInt(grp, 16));
+            }).replace(/\\/g, '');
+            return JSON.parse(cleanStr);
+        } catch (e) {
+            return [];
+        }
+    }
+};
+
+function parseListResponse(html) {
+    var movies = [];
+    
+    var actressLinkMatch = html.match(/href="[^"]*\/actresses\/[^"]+"/g);
+    var isActressesPage = (actressLinkMatch && actressLinkMatch.length > 10 && html.indexOf('Actresses') !== -1);
+    
+    var isAllGenresPage = (html.indexOf('/vi/genres/') !== -1 && html.indexOf('Genres') !== -1 && html.indexOf('title="Genres"') === -1);
+    
+    if (isActressesPage) {
+        var actressRegex = /<a[^>]+href="([^"]*\/actresses\/([^"\/]+))"[^>]*>([\s\S]*?)<\/a>/gi;
+        var foundActresses = {};
+        var match;
+        
+        while ((match = actressRegex.exec(html)) !== null) {
+            var url = match[1];
+            var slug = "vi/actresses/" + match[2];
+            var name = PluginUtils.cleanText(match[3]);
+            if (!name || name.length < 2 || name.match(/^\d+/) || name.indexOf('.') !== -1) continue;
+            
+            if (!foundActresses[slug]) {
+                movies.push({
+                    id: slug,
+                    title: name,
+                    posterUrl: "",
+                    backdropUrl: "",
+                    description: "Nữ diễn viên",
+                    year: 0,
+                    quality: "ACTRESS",
+                    episode_current: "",
+                    lang: ""
+                });
+                foundActresses[slug] = true;
+            }
+        }
+        
+    } else if (isAllGenresPage) {
+        var genreRegex = /<a[^>]+href="([^"]*\/genres\/([^"\/]+))"[^>]*>([\s\S]*?)<\/a>/gi;
+        var foundGenres = {};
+        var match;
+        
+        while ((match = genreRegex.exec(html)) !== null) {
+            var url = match[1];
+            var slug = "vi/genres/" + match[2];
+            var name = PluginUtils.cleanText(match[3]).replace(/\d+,\d+|\d+/g, '').trim();
+            if (!name || name.length < 2) continue;
+            
+            if (!foundGenres[slug]) {
+                movies.push({
+                    id: slug,
+                    title: name,
+                    posterUrl: "",
+                    backdropUrl: "",
+                    description: "Thể loại",
+                    year: 0,
+                    quality: "CAT",
+                    episode_current: "",
+                    lang: ""
+                });
+                foundGenres[slug] = true;
+            }
+        }
+        
+    } else {
+        var parts = html.split('class="card"');
+        if (parts.length <= 1) {
+            parts = html.split('class="featured"');
+        }
+        
+        for (var i = 1; i < parts.length; i++) {
+            var cardHtml = parts[i];
+            
+            var linkMatch = cardHtml.match(/href="([^"]*\/v\/([^"\/]+))"/i);
+            if (!linkMatch) continue;
+            var rawUrl = linkMatch[1];
+            var slug = "vi/v/" + linkMatch[2];
+            
+            var title = "";
+            var titleMatch = cardHtml.match(/<h[23][^>]*>([\s\S]*?)<\/h[23]>/i);
+            if (titleMatch) {
+                title = titleMatch[1].replace(/<[^>]*>/g, "").trim();
+            } else {
+                var altMatch = cardHtml.match(/<img[^>]+alt="([^"]+)"/i);
+                if (altMatch) title = altMatch[1].trim();
+            }
+            if (!title) title = linkMatch[2];
+            
+            var imgMatch = cardHtml.match(/<img[^>]+(?:src|data-src)="([^"]+)"/i);
+            var poster = imgMatch ? imgMatch[1] : "";
+            if (poster && poster.indexOf("//") === 0) poster = "https:" + poster;
+            
+            var durMatch = cardHtml.match(/class="(?:featured__dur|card__dur)"[^>]*>([^<]+)/i);
+            var duration = durMatch ? durMatch[1].trim() : "";
+            
+            movies.push({
+                id: slug,
+                title: PluginUtils.cleanText(title),
+                posterUrl: poster,
+                backdropUrl: poster,
+                description: duration ? "Thời lượng: " + duration : "",
+                year: 0,
+                quality: "HD",
+                episode_current: duration,
+                lang: "Censored"
+            });
+        }
+    }
+    
+    var currentPage = 1;
+    var totalPages = 1;
+    
+    var activePageMatch = html.match(/class="[^"]*active[^"]*"[^>]*>(\d+)<\/span>/i) || 
+                          html.match(/class="[^"]*active[^"]*"[^>]*>(\d+)<\/a>/i);
+    if (activePageMatch) currentPage = parseInt(activePageMatch[1]);
+    
+    var pageLinks = html.match(/page=(\d+)/g);
+    if (pageLinks) {
+        for (var p = 0; p < pageLinks.length; p++) {
+            var num = parseInt(pageLinks[p].match(/\d+/)[0]);
+            if (num > totalPages) totalPages = num;
+        }
+    }
+    
+    return JSON.stringify({
+        items: movies,
+        pagination: {
+            currentPage: currentPage,
+            totalPages: Math.max(totalPages, currentPage),
+            totalItems: movies.length,
+            itemsPerPage: 20
+        }
+    });
+}
+
+function parseSearchResponse(html) {
+    return parseListResponse(html);
+}
+
+function parseMovieDetail(htmlContent) {
+    try {
+        var title = PluginUtils.getMeta(htmlContent, "og:title") || "";
+        var thumb = PluginUtils.getMeta(htmlContent, "og:image") || "";
+        var desc = PluginUtils.getMeta(htmlContent, "og:description") || "";
+        
+        var coverMatch = htmlContent.match(/style="background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)"/i) ||
+                         htmlContent.match(/background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)/i) ||
+                         htmlContent.match(/src="([^"]+cover\.jpg[^"]*)"/i);
+        if (coverMatch) {
+            thumb = coverMatch[1];
+        } else if (thumb.indexOf("logo-square.png") !== -1 || thumb.indexOf("logo") !== -1) {
+            var coverGenericMatch = htmlContent.match(/https?:\/\/[^\s"'><]+?\/cover\.jpg[^\s"'><]*/i);
+            if (coverGenericMatch) {
+                thumb = coverGenericMatch[0];
+            }
+        }
+        
+        var releaseMatch = htmlContent.match(/<dt>Release date<\/dt>\s*<dd>([^<]+)<\/dd>/i);
+        var year = 0;
+        if (releaseMatch) {
+            var yr = parseInt(releaseMatch[1].substring(0, 4));
+            if (yr) year = yr;
+        }
+        
+        var actors = [];
+        var actorPattern = /href="[^"]*\/actresses\/[^"]+">([^<]+)<\/a>/gi;
+        var match;
+        while ((match = actorPattern.exec(htmlContent)) !== null) {
+            var aName = PluginUtils.cleanText(match[1]);
+            if (aName && actors.indexOf(aName) === -1) actors.push(aName);
+        }
+        
+        var genres = [];
+        var genrePattern = /href="[^"]*\/genres\/[^"]+">([^<]+)<\/a>/gi;
+        while ((match = genrePattern.exec(htmlContent)) !== null) {
+            var gName = PluginUtils.cleanText(match[1]);
+            if (gName && genres.indexOf(gName) === -1) genres.push(gName);
+        }
+        
+        var director = "";
+        var dirMatch = htmlContent.match(/<dt>Maker<\/dt>\s*<dd>[\s\S]*?href="[^"]*">([^<]+)<\/a>/i);
+        if (dirMatch) director = PluginUtils.cleanText(dirMatch[1]);
+        
+        var servers = [];
+        var playerJsonMatch = /player\(\s*JSON\.parse\(\s*['"]([^'"]+)['"]\s*\)/i.exec(htmlContent);
+        
+        if (playerJsonMatch) {
+            var playerItems = PluginUtils.decodePlayerJson(playerJsonMatch[1]);
+            var episodes = [];
+            for (var i = 0; i < playerItems.length; i++) {
+                var item = playerItems[i];
+                var rawUrl = item.url;
+                
+                episodes.push({
+                    id: rawUrl,
+                    name: "Server HD #" + (item.name || (i + 1)),
+                    slug: "server-" + (i + 1)
+                });
+            }
+            if (episodes.length > 0) {
+                servers.push({
+                    name: "123AV Play",
+                    episodes: episodes
+                });
+            }
+        }
+        
+        var slug = "";
+        var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="https:\/\/123av\.com\/[^"\/]+\/v\/([^"]+)"/i);
+        if (canonicalMatch) slug = canonicalMatch[1];
+        
+        return JSON.stringify({
+            id: slug,
+            title: PluginUtils.cleanText(title),
+            posterUrl: thumb,
+            backdropUrl: thumb,
+            description: PluginUtils.cleanText(desc),
+            year: year,
+            rating: 0,
+            quality: "HD",
+            servers: servers,
+            episode_current: servers.length > 0 ? "Full" : "No Source",
+            lang: "Censored",
+            category: genres.join(", "),
+            country: "Japan",
+            director: director,
+            casts: actors.join(", ")
+        });
+        
+    } catch (e) {
+        return "null";
+    }
+}
+
+function parseDetailResponse(htmlContent, pageUrl) {
+    return JSON.stringify({
+        url: pageUrl,
+        isEmbed: true,
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://123av.com/"
+        },
+        subtitles: []
+    });
+}
+
+function parseCategoriesResponse(html) {
+    var categories = [];
+    var genreRegex = /<a[^>]+href="([^"]*\/genres\/([^"\/]+))"[^>]*>([\s\S]*?)<\/a>/gi;
+    var foundGenres = {};
+    var match;
+    
+    while ((match = genreRegex.exec(html)) !== null) {
+        var slug = "vi/genres/" + match[2];
+        var name = PluginUtils.cleanText(match[3]).replace(/\d+,\d+|\d+/g, '').trim();
+        if (!name || name.length < 2) continue;
+        
+        if (!foundGenres[slug]) {
+            categories.push({ name: name, slug: slug });
+            foundGenres[slug] = true;
+        }
+    }
+    return JSON.stringify(categories);
+}
+
+function parseCountriesResponse(html) { return "[]"; }
+function parseYearsResponse(html) { return "[]"; }
+</script>
+
+</body>
+</html>
