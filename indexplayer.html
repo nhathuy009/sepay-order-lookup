@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Darker Glass Controls</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · No Watermark</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -88,19 +88,6 @@ video{
   object-fit:contain;
   background:#000;
 }
-.player-watermark{
-  position:absolute;
-  top:24px;
-  right:24px;
-  z-index:8;
-  pointer-events:none;
-  font-size:31px;
-  font-weight:700;
-  letter-spacing:-1.4px;
-  text-shadow:0 2px 10px #000;
-}
-.player-watermark .r{color:#ff2b2b}
-.player-watermark .net{font-size:.65em;margin-left:3px}
 .stats-btn{
   position:absolute;
   z-index:10;
@@ -447,12 +434,7 @@ html,body,button,input,select,textarea{
         <path d="m3.5 3.5 2 2"/>
       </svg>
     </div>
-
-    <div class="player-watermark">
-      <span>Film</span><span class="r">4k</span><span class="net">.Net</span>
-    </div>
-
-    <div class="settings-menu" id="settingsMenu">
+<div class="settings-menu" id="settingsMenu">
       
       <div class="menu-row" data-menu="quality">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
