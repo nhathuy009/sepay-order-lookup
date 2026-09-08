@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Film4K-style Player v5 · Python Proxy</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
+<style>
+*{box-sizing:border-box}
+:root{
+  --c-bg:#090a0a;
+  --c-ui:rgba(26,29,28,.94);
+  --c-ui2:rgba(37,40,38,.96);
+  --c-border:rgba(255,255,255,.12);
+  --c-text:#f4f4f4;
+  --c-dim:#b7b7b7;
+}
+body{
+  margin:0;
+  background:#0a0b0c;
+  color:var(--c-text);
+  font-family:Inter,Arial,Helvetica,sans-serif;
+}
+.app{
+  max-width:1200px;
+  margin:18px auto;
+  padding:0 14px;
+}
+.sourcebar{
+  display:flex;
+  gap:8px;
+  margin-bottom:8px;
+}
+.headerbar{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:10px;
+}
+.headerbar input{
+  min-width:0;
+  border:1px solid #333;
+  border-radius:8px;
+  background:#151616;
+  color:#fff;
+  padding:9px 11px;
+}
+@media(max-width:700px){
+  .headerbar{grid-template-columns:1fr}
+}
+.sourcebar input{
+  flex:1;
+  min-width:0;
+  border:1px solid #333;
+  border-radius:8px;
+  background:#151616;
+  color:#fff;
+  padding:10px 12px;
+}
+.sourcebar button{
+  border:0;
+  border-radius:8px;
+  padding:0 17px;
+  font-weight:700;
+  cursor:pointer;
+}
+.player{
+  position:relative;
+  background:#000;
+  aspect-ratio:16/9;
+  overflow:hidden;
+  border:1px solid #111;
+  user-select:none;
+}
+video{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  background:#000;
+}
+.player-watermark{
+  position:absolute;
+  top:24px;
+  right:24px;
+  z-index:8;
+  pointer-events:none;
+  font-size:31px;
+  font-weight:700;
+  letter-spacing:-1.4px;
+  text-shadow:0 2px 10px #000;
+}
+.player-watermark .r{color:#ff2b2b}
+.player-watermark .net{font-size:.65em;margin-left:3px}
+.stats-btn{
+  position:absolute;
+  z-index:10;
+  top:18px;
+  left:18px;
+  height:32px;
+  border-radius:17px;
+  border:1px solid rgba(255,255,255,.22);
+  background:rgba(14,15,15,.77);
+  color:#eee;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 14px;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:.3px;
+  cursor:pointer;
+  backdrop-filter:blur(10px);
+}
+.stats-btn svg{width:17px;height:17px}
+.stats-panel{
+  display:none;
+  position:absolute;
+  z-index:12;
+  top:57px;
+  left:18px;
+  min-width:220px;
+  padding:11px 13px;
+  border:1px solid var(--c-border);
+  border-radius:12px;
+  background:rgba(22,24,23,.95);
+  font:12px/1.55 Consolas,monospace;
+  box-shadow:0 12px 32px rgba(0,0,0,.45);
+}
+.stats-panel.show{display:block}
+
+.buffering{
+  position:absolute;
+  inset:0;
+  z-index:7;
+  display:none;
+  place-items:center;
+  pointer-events:none;
+}
+.buffering.show{display:grid}
+.spinner{
+  width:38px;
+  height:38px;
+}
+@keyframes spinner-fade{0%{opacity:1}to{opacity:.05}}
+.spinner path{
+  animation:spinner-fade 1s linear infinite;
+}
+.spinner path:nth-child(1){animation-delay:0s}
+.spinner path:nth-child(2){animation-delay:.125s}
+.spinner path:nth-child(3){animation-delay:.25s}
+.spinner path:nth-child(4){animation-delay:.375s}
+.spinner path:nth-child(5){animation-delay:.5s}
+.spinner path:nth-child(6){animation-delay:.625s}
+.spinner path:nth-child(7){animation-delay:.75s}
+.spinner path:nth-child(8){animation-delay:.875s}
+
+.controls{
+  position:absolute;
+  z-index:9;
+  left:10px;
+  right:10px;
+  bottom:12px;
+  min-height:54px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:28px;
+  background:rgba(26,29,28,.94);
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
+  backdrop-filter:blur(14px);
+  display:flex;
+  align-items:center;
+  padding:0 10px;
+  gap:10px;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.player.idle .controls{
+  opacity:0;
+  transform:translateY(8px);
+  pointer-events:none;
+}
+.media-button-group{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.media-button{
+  width:38px;
+  height:38px;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#fff;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+}
+.media-button:hover{background:rgba(255,255,255,.08)}
+.media-button svg{width:20px;height:20px}
+.media-button .state-icon{display:none}
+.media-button[data-state="play"] .play-icon{display:block}
+.media-button[data-state="pause"] .pause-icon{display:block}
+.media-button[data-volume="high"] .vol-high{display:block}
+.media-button[data-volume="low"] .vol-low{display:block}
+.media-button[data-volume="off"] .vol-off{display:block}
+.media-button[data-captions="on"] .cc-on{display:block}
+.media-button[data-captions="off"] .cc-off{display:block}
+
+.time-controls{
+  flex:1;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:11px;
+}
+.media-time{
+  font-size:14px;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.slider-wrap{
+  position:relative;
+  flex:1;
+  height:20px;
+  display:flex;
+  align-items:center;
+  cursor:pointer;
+}
+.slider-track{
+  position:absolute;
+  left:0;right:0;
+  height:4px;
+  border-radius:4px;
+  background:rgba(255,255,255,.18);
+  overflow:hidden;
+}
+.slider-buffer,
+.slider-fill{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+}
+.slider-buffer{background:rgba(255,255,255,.20);width:0}
+.slider-fill{background:#e9e9e9;width:0}
+.slider-thumb{
+  position:absolute;
+  top:50%;
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#f3f3f3;
+  transform:translate(-50%,-50%);
+  left:0;
+  opacity:0;
+  transition:opacity .12s;
+}
+.slider-wrap:hover .slider-thumb{opacity:1}
+.slider-input{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  cursor:pointer;
+}
+.preview{
+  position:absolute;
+  bottom:28px;
+  transform:translateX(-50%);
+  display:none;
+  padding:5px 7px;
+  border-radius:6px;
+  background:rgba(18,20,19,.95);
+  border:1px solid rgba(255,255,255,.10);
+  font-size:12px;
+  white-space:nowrap;
+  pointer-events:none;
+}
+.slider-wrap:hover .preview{display:block}
+
+.settings-menu,
+.submenu{
+  position:absolute;
+  z-index:20;
+  right:12px;
+  bottom:74px;
+  width:264px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:16px;
+  background:rgba(31,34,32,.97);
+  box-shadow:0 14px 38px rgba(0,0,0,.45);
+  overflow:hidden;
+  display:none;
+  backdrop-filter:blur(14px);
+}
+.settings-menu.show,.submenu.show{display:block}
+.menu-row{
+  min-height:42px;
+  display:grid;
+  grid-template-columns:28px 1fr auto 18px;
+  align-items:center;
+  gap:8px;
+  padding:0 13px;
+  cursor:pointer;
+}
+.menu-row:hover,.submenu-item:hover,.submenu-item.on{
+  background:rgba(255,255,255,.08);
+}
+.menu-row .val{
+  color:#b9b9b9;
+  max-width:115px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.menu-row .chev{font-size:21px;color:#aaa}
+.menu-row svg{width:19px;height:19px;opacity:.82}
+.submenu-head{
+  padding:12px 14px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  font-weight:700;
+  cursor:pointer;
+}
+.submenu-item{
+  padding:11px 14px;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.status{
+  margin-top:8px;
+  font-size:12px;
+  color:#888;
+}
+@media(max-width:720px){
+  .player-watermark{font-size:20px;top:13px;right:13px}
+  .stats-btn{top:11px;left:11px}
+  .controls{left:6px;right:6px;bottom:7px;gap:5px}
+  .media-button{width:34px;height:34px}
+  .media-time{font-size:12px}
+  .time-controls{gap:7px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sourcebar">
+    <input id="source" placeholder="Dán link .m3u8..." spellcheck="false">
+    <button id="direct">DIRECT</button>
+    <button id="proxy">PROXY</button>
+  </div>
+  <div class="headerbar">
+    <input id="origin" placeholder="Origin, ví dụ: https://example.com" spellcheck="false">
+    <input id="referer" placeholder="Referer, ví dụ: https://example.com/" spellcheck="false">
+  </div>
+
+  <div class="player" id="player">
+    <video id="video" playsinline preload="metadata"></video>
+
+    <button class="stats-btn" id="statsBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      </svg>
+      <span>STATS</span>
+    </button>
+
+    <div class="stats-panel" id="statsPanel"></div>
+
+    <div class="buffering" id="buffering">
+      <svg class="spinner" viewBox="0 0 18 18" fill="none" stroke="white" stroke-linecap="round" stroke-width="2">
+        <path d="M9 1.5v3"/>
+        <path d="m14.5 3.5-2 2"/>
+        <path d="M16.5 9h-3"/>
+        <path d="m14.5 14.5-2-2"/>
+        <path d="M9 16.5v-3"/>
+        <path d="m3.5 14.5 2-2"/>
+        <path d="M1.5 9h3"/>
+        <path d="m3.5 3.5 2 2"/>
+      </svg>
+    </div>
+
+    <div class="player-watermark">
+      <span>Film</span><span class="r">4k</span><span class="net">.Net</span>
+    </div>
+
+    <div class="settings-menu" id="settingsMenu">
+      <div class="menu-row" data-menu="audio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.2 2.3-5 6-5"/><path d="M14 7h7M14 11h7"/>
+        </svg>
+        <span>Audio</span><span class="val" id="audioValue">Default</span><span class="chev">›</span>
+      </div>
+      <div class="menu-row" data-menu="speed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="8"/><path d="M12 12l4-3"/><path d="M7 18l-2 2M17 18l2 2"/>
+        </svg>
+        <span>Speed</span><span class="val" id="speedValue">1×</span><span class="chev">›</span>
+      </div>
+      <div class="menu-row" data-menu="captions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6 11h4M14 11h4M6 15h6M15 15h3"/>
+        </svg>
+        <span>Captions</span><span class="val" id="captionValue">Off</span><span class="chev">›</span>
+      </div>
+    </div>
+
+    <div class="submenu" id="submenu"></div>
+
+    <div class="controls" id="controls">
+      <div class="media-button-group">
+        <button class="media-button" id="playBtn" data-state="play" aria-label="Play">
+          <svg class="state-icon play-icon" viewBox="0 0 18 18" fill="currentColor"><path d="m14.051 10.723-7.985 4.964a1.98 1.98 0 0 1-2.758-.638A2.06 2.06 0 0 1 3 13.964V4.036C3 2.91 3.895 2 5 2c.377 0 .747.109 1.066.313l7.985 4.964a2.057 2.057 0 0 1 .627 2.808c-.16.257-.373.475-.627.637"/></svg>
+          <svg class="state-icon pause-icon" viewBox="0 0 18 18" fill="currentColor"><rect width="5" height="14" x="2" y="2" rx="1.75"/><rect width="5" height="14" x="11" y="2" rx="1.75"/></svg>
+        </button>
+
+        <button class="media-button" id="muteBtn" data-volume="high" aria-label="Mute">
+          <svg class="state-icon vol-off" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752M14.5 7.586l-1.768-1.768a1 1 0 1 0-1.414 1.414L13.085 9l-1.767 1.768a1 1 0 0 0 1.414 1.414l1.768-1.768 1.768 1.768a1 1 0 0 0 1.414-1.414L15.914 9l1.768-1.768a1 1 0 0 0-1.414-1.414z"/></svg>
+          <svg class="state-icon vol-low" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
+          <svg class="state-icon vol-high" viewBox="0 0 18 18" fill="currentColor"><path d="M15.6 3.3c-.4-.4-1-.4-1.4 0s-.4 1 0 1.4C15.4 5.9 16 7.4 16 9s-.6 3.1-1.8 4.3c-.4.4-.4 1 0 1.4.2.2.5.3.7.3.3 0 .5-.1.7-.3C17.1 13.2 18 11.2 18 9s-.9-4.2-2.4-5.7"/><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
+        </button>
+      </div>
+
+      <div class="time-controls">
+        <time class="media-time" id="currentTime">0:00:00</time>
+
+        <div class="slider-wrap" id="sliderWrap">
+          <div class="slider-track">
+            <div class="slider-buffer" id="sliderBuffer"></div>
+            <div class="slider-fill" id="sliderFill"></div>
+          </div>
+          <div class="slider-thumb" id="sliderThumb"></div>
+          <input class="slider-input" id="seek" type="range" min="0" max="1000" value="0">
+          <output class="preview" id="preview">0:00:00</output>
+        </div>
+
+        <time class="media-time" id="remainingTime"><span>-</span>0:00:00</time>
+      </div>
+
+      <div class="media-button-group">
+        <button class="media-button" id="ccBtn" data-captions="off" aria-label="Captions">
+          <svg class="state-icon cc-off" viewBox="0 0 18 18" fill="none"><rect width="16" height="12" x="1" y="3" stroke="currentColor" stroke-width="2" rx="3"/><rect width="3" height="2" x="3" y="8" fill="currentColor" fill-opacity=".5" rx="1"/><rect width="2" height="2" x="13" y="8" fill="currentColor" fill-opacity=".5" rx="1"/><rect width="4" height="2" x="11" y="11" fill="currentColor" fill-opacity=".5" rx="1"/><rect width="5" height="2" x="7" y="8" fill="currentColor" fill-opacity=".5" rx="1"/><rect width="7" height="2" x="3" y="11" fill="currentColor" fill-opacity=".5" rx="1"/></svg>
+          <svg class="state-icon cc-on" viewBox="0 0 18 18" fill="currentColor"><path d="M15 2a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zM4 11a1 1 0 1 0 0 2h5a1 1 0 1 0 0-2zm8 0a1 1 0 1 0 0 2h2a1 1 0 1 0 0-2zM4 8a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2zm4 0a1 1 0 0 0 0 2h3a1 1 0 1 0 0-2zm6 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2"/></svg>
+        </button>
+
+        <button class="media-button" id="settingsBtn" aria-label="Settings">
+          <svg viewBox="0 0 18 18" fill="currentColor"><path d="M7.519 2.184c.357-1.578 2.605-1.579 2.962 0a1.518 1.518 0 0 0 2.292.949c1.368-.864 2.957.727 2.094 2.096-.56.886-.074 2.06.949 2.292 1.579.356 1.578 2.606 0 2.962a1.52 1.52 0 0 0-.95 2.293c.864 1.369-.725 2.96-2.093 2.095a1.52 1.52 0 0 0-2.292.95c-.357 1.578-2.606 1.578-2.962 0a1.52 1.52 0 0 0-2.292-.95c-1.368.864-2.957-.726-2.094-2.095a1.52 1.52 0 0 0-.949-2.293c-1.579-.356-1.579-2.606 0-2.962a1.52 1.52 0 0 0 .95-2.292c-.864-1.369.725-2.96 2.093-2.096.887.56 2.061.074 2.292-.95m1.48 3.474a3.343 3.343 0 1 0 .002 6.687 3.343 3.343 0 0 0-.002-6.687"/></svg>
+        </button>
+      </div>
+
+      <div class="media-button-group">
+        <button class="media-button" id="pipBtn" aria-label="Picture in picture">
+          <svg viewBox="0 0 18 18" fill="currentColor"><path d="M13 2a4 4 0 0 1 4 4v2.036A3.5 3.5 0 0 0 16.5 8H15V6.273C15 5.018 13.96 4 12.679 4H4.32C3.04 4 2 5.018 2 6.273v5.454C2 12.982 3.04 14 4.321 14H6v1.5q0 .255.036.5H4a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><rect width="10" height="7" x="8" y="10" rx="2"/><path d="M7.129 5.547a.6.6 0 0 0-.656.13L3.677 8.473A.6.6 0 0 0 4.102 9.5h2.796c.332 0 .602-.27.602-.602V6.103a.6.6 0 0 0-.371-.556"/></svg>
+        </button>
+
+        <button class="media-button" id="fullBtn" aria-label="Fullscreen">
+          <svg viewBox="0 0 18 18" fill="currentColor"><path d="M9.57 3.617A1 1 0 0 0 8.646 3H4c-.552 0-1 .449-1 1v4.646a.996.996 0 0 0 1.001 1 1 1 0 0 0 .706-.293l4.647-4.647a1 1 0 0 0 .216-1.089m4.812 4.812a1 1 0 0 0-1.089.217l-4.647 4.647a.998.998 0 0 0 .708 1.706H14c.552 0 1-.449 1-1V9.353a1 1 0 0 0-.618-.924"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status">Chưa tải nguồn.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'), player=$('player');
+let hls=null,totalBytes=0,samples=[],fps=0,frames=[],idleTimer=null;
+
+function fmt(sec){
+  sec=Number.isFinite(sec)&&sec>0?Math.floor(sec):0;
+  const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function status(s){$('status').textContent=s}
+
+function setIdleLater(){
+  clearTimeout(idleTimer);
+  player.classList.remove('idle');
+  idleTimer=setTimeout(()=>{if(!video.paused)player.classList.add('idle')},2200);
+}
+['mousemove','click','touchstart'].forEach(ev=>player.addEventListener(ev,setIdleLater));
+
+function addBytes(n){
+  if(!n||n<0)return;
+  totalBytes+=n;
+  const now=performance.now();
+  samples.push({t:now,b:n});
+  while(samples.length&&samples[0].t<now-10000)samples.shift();
+}
+function bandwidth(){
+  return samples.reduce((a,x)=>a+x.b,0)*8/10/1e6;
+}
+
+if(video.requestVideoFrameCallback){
+  const cb=(now,m)=>{
+    frames.push(m.mediaTime);
+    while(frames.length>1&&frames[0]<m.mediaTime-2)frames.shift();
+    if(frames.length>1)fps=(frames.length-1)/(frames.at(-1)-frames[0]);
+    video.requestVideoFrameCallback(cb);
+  };
+  video.requestVideoFrameCallback(cb);
+}
+
+function updateStats(){
+  const l=hls&&hls.currentLevel>=0?hls.levels[hls.currentLevel]:null;
+  $('statsPanel').innerHTML=
+    `Resolution: ${video.videoWidth?video.videoWidth+'×'+video.videoHeight:'—'}<br>`+
+    `FPS: ${fps?Math.round(fps):'—'}<br>`+
+    `Bitrate: ${l?.bitrate?(l.bitrate/1e6).toFixed(2)+' Mbps':'—'}<br>`+
+    `Bandwidth: ${bandwidth().toFixed(2)} Mbps<br>`+
+    `Used: ${(totalBytes/1e6).toFixed(1)} MB`;
+}
+
+function updateControls(){
+  $('playBtn').dataset.state=video.paused?'play':'pause';
+
+  const v=video.muted||video.volume===0?'off':video.volume<.5?'low':'high';
+  $('muteBtn').dataset.volume=v;
+
+  const d=Number.isFinite(video.duration)?video.duration:0;
+  const p=d>0?Math.min(1,video.currentTime/d):0;
+  $('currentTime').textContent=fmt(video.currentTime);
+  $('remainingTime').innerHTML='<span>-</span>'+fmt(Math.max(0,d-video.currentTime));
+  $('seek').value=Math.round(p*1000);
+  $('sliderFill').style.width=(p*100)+'%';
+  $('sliderThumb').style.left=(p*100)+'%';
+
+  let b=0;
+  try{
+    if(d>0&&video.buffered.length)b=Math.min(1,video.buffered.end(video.buffered.length-1)/d);
+  }catch{}
+  $('sliderBuffer').style.width=(b*100)+'%';
+}
+setInterval(()=>{updateControls();updateStats()},250);
+
+$('seek').addEventListener('input',()=>{
+  const d=video.duration;
+  if(Number.isFinite(d)&&d>0)video.currentTime=(+$('seek').value/1000)*d;
+});
+$('sliderWrap').addEventListener('mousemove',e=>{
+  const r=e.currentTarget.getBoundingClientRect();
+  const ratio=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+  $('preview').style.left=(ratio*100)+'%';
+  $('preview').textContent=fmt((video.duration||0)*ratio);
+});
+
+$('playBtn').onclick=()=>video.paused?video.play().catch(()=>{}):video.pause();
+$('muteBtn').onclick=()=>video.muted=!video.muted;
+
+$('statsBtn').onclick=()=>{$('statsPanel').classList.toggle('show');updateStats()};
+
+function closeMenus(){
+  $('settingsMenu').classList.remove('show');
+  $('submenu').classList.remove('show');
+}
+$('settingsBtn').onclick=e=>{
+  e.stopPropagation();
+  $('submenu').classList.remove('show');
+  $('settingsMenu').classList.toggle('show');
+};
+$('ccBtn').onclick=e=>{
+  e.stopPropagation();
+  openSub('captions');
+};
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#settingsMenu')&&!e.target.closest('#submenu')&&!e.target.closest('#settingsBtn')&&!e.target.closest('#ccBtn'))closeMenus();
+});
+
+document.querySelectorAll('.menu-row').forEach(x=>x.onclick=()=>openSub(x.dataset.menu));
+
+function openSub(kind){
+  const box=$('submenu');
+  box.innerHTML=`<div class="submenu-head">‹ ${kind[0].toUpperCase()+kind.slice(1)}</div>`;
+  box.querySelector('.submenu-head').onclick=()=>{
+    box.classList.remove('show');
+    $('settingsMenu').classList.add('show');
+  };
+
+  let items=[];
+  if(kind==='speed'){
+    items=[.5,.75,1,1.25,1.5,2].map(v=>({label:v+'×',value:v,on:video.playbackRate===v}));
+  }
+  if(kind==='audio'){
+    items=(hls?.audioTracks||[]).map((t,i)=>({label:t.name||t.lang||`Audio ${i+1}`,value:i,on:hls.audioTrack===i}));
+    if(!items.length)items=[{label:'Default',value:-1,on:true}];
+  }
+  if(kind==='captions'){
+    items=[{label:'Off',value:-1,on:(hls?.subtitleTrack??-1)<0}];
+    (hls?.subtitleTracks||[]).forEach((t,i)=>items.push({label:t.name||t.lang||`Subtitle ${i+1}`,value:i,on:hls.subtitleTrack===i}));
+  }
+
+  for(const it of items){
+    const row=document.createElement('div');
+    row.className='submenu-item'+(it.on?' on':'');
+    row.textContent=(it.on?'✓ ':'')+it.label;
+    row.onclick=()=>{
+      if(kind==='speed'){
+        video.playbackRate=it.value;
+        $('speedValue').textContent=it.label;
+      }else if(kind==='audio'&&hls){
+        if(it.value>=0)hls.audioTrack=it.value;
+        $('audioValue').textContent=it.label;
+      }else if(kind==='captions'&&hls){
+        hls.subtitleTrack=it.value;
+        hls.subtitleDisplay=it.value>=0;
+        $('captionValue').textContent=it.label;
+        $('ccBtn').dataset.captions=it.value>=0?'on':'off';
+      }
+      closeMenus();
+    };
+    box.appendChild(row);
+  }
+
+  $('settingsMenu').classList.remove('show');
+  box.classList.add('show');
+}
+
+$('pipBtn').onclick=async()=>{
+  try{
+    if(document.pictureInPictureElement)await document.exitPictureInPicture();
+    else await video.requestPictureInPicture?.();
+  }catch{}
+};
+$('fullBtn').onclick=async()=>{
+  try{
+    if(!document.fullscreenElement)await player.requestFullscreen();
+    else await document.exitFullscreen();
+  }catch{}
+};
+
+video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
+video.addEventListener('dblclick',()=>$('fullBtn').click());
+video.addEventListener('waiting',()=>$('buffering').classList.add('show'));
+video.addEventListener('stalled',()=>$('buffering').classList.add('show'));
+video.addEventListener('playing',()=>$('buffering').classList.remove('show'));
+video.addEventListener('canplay',()=>$('buffering').classList.remove('show'));
+
+window.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+  if(e.code==='Space'||e.key.toLowerCase()==='k'){e.preventDefault();$('playBtn').click()}
+  else if(e.key.toLowerCase()==='m')$('muteBtn').click();
+  else if(e.key.toLowerCase()==='f')$('fullBtn').click();
+  else if(e.key.toLowerCase()==='c')$('ccBtn').click();
+  else if(e.key==='ArrowLeft')video.currentTime=Math.max(0,video.currentTime-10);
+  else if(e.key==='ArrowRight')video.currentTime=Math.min(video.duration||Infinity,video.currentTime+10);
+});
+
+function refreshLabels(){
+  if(!hls)return;
+  const a=hls.audioTracks?.[hls.audioTrack];
+  $('audioValue').textContent=a?(a.name||a.lang||'Audio'):'Default';
+  const s=hls.subtitleTrack>=0?hls.subtitleTracks?.[hls.subtitleTrack]:null;
+  $('captionValue').textContent=s?(s.name||s.lang||'On'):'Off';
+  $('ccBtn').dataset.captions=s?'on':'off';
+}
+
+
+function proxied(url){
+  const origin=$('origin').value.trim();
+  const referer=$('referer').value.trim();
+  const q=new URLSearchParams({url});
+  if(origin)q.set('origin',origin);
+  if(referer)q.set('referer',referer);
+  return `/api/proxy?${q.toString()}`;
+}
+
+function load(useProxy=false){
+  let src=$('source').value.trim();
+  if(!src)return status('Vui lòng nhập link .m3u8.');
+
+  if(hls){try{hls.destroy()}catch{}}
+  totalBytes=0;samples=[];
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  $('buffering').classList.add('show');
+  if(useProxy){
+    const o=$('origin').value.trim(), r=$('referer').value.trim();
+    status(`Đang tải qua Python proxy${o?' · Origin='+o:''}${r?' · Referer='+r:''}...`);
+  }else{
+    status('Đang tải manifest trực tiếp...');
+  }
+
+  if(useProxy) src=proxied(src);
+
+  if(video.canPlayType('application/vnd.apple.mpegurl')&&!Hls.isSupported()){
+    video.src=src;
+    video.play().catch(()=>{});
+    status((useProxy?'PROXY':'DIRECT')+' · Native HLS.');
+    return;
+  }
+  if(!window.Hls||!Hls.isSupported()){
+    status('Trình duyệt không hỗ trợ HLS/MSE.');
+    return;
+  }
+
+  class CountingLoader extends Hls.DefaultConfig.loader{
+    constructor(c){super(c);this.prev=0}
+    load(ctx,cfg,cb){
+      const p=cb.onProgress;
+      cb.onProgress=(st,c,d,n)=>{
+        const cur=st.loaded||0;
+        if(cur>this.prev){addBytes(cur-this.prev);this.prev=cur}
+        p?.(st,c,d,n);
+      };
+      return super.load(ctx,cfg,cb);
+    }
+  }
+
+  hls=new Hls({
+    fLoader:CountingLoader,
+    renderTextTracksNatively:true,
+    progressive:false,
+    maxBufferLength:90,
+    maxMaxBufferLength:300,
+    maxBufferSize:150000000,
+    startFragPrefetch:true,
+    abrEwmaDefaultEstimate:800000,
+    maxStarvationDelay:30,
+    maxLoadingDelay:30,
+    maxBufferHole:1,
+    nudgeOffset:.2,
+    nudgeMaxRetry:6
+  });
+
+  hls.attachMedia(video);
+  hls.loadSource(src);
+
+  hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+    refreshLabels();
+    $('buffering').classList.remove('show');
+    status(`${useProxy?'PROXY':'DIRECT'} · Manifest OK · ${hls.levels.length} quality level(s).`);
+    video.play().catch(()=>{});
+  });
+  hls.on(Hls.Events.AUDIO_TRACK_SWITCHED,refreshLabels);
+  hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH,refreshLabels);
+
+  hls.on(Hls.Events.ERROR,(_,d)=>{
+    if(!d.fatal)return;
+    if(d.type===Hls.ErrorTypes.NETWORK_ERROR){
+      status(`${useProxy?'PROXY':'DIRECT'} · Network error — retrying...`);
+      try{hls.startLoad()}catch{}
+    }else if(d.type===Hls.ErrorTypes.MEDIA_ERROR){
+      status(`${useProxy?'PROXY':'DIRECT'} · Media error — recovering...`);
+      try{hls.recoverMediaError()}catch{}
+    }else{
+      status(`${useProxy?'PROXY':'DIRECT'} · Fatal: ${d.type} / ${d.details}`);
+      $('buffering').classList.remove('show');
+    }
+  });
+}
+
+$('direct').onclick=()=>load(false);
+$('proxy').onclick=()=>load(true);
+$('source').addEventListener('keydown',e=>{if(e.key==='Enter')load(false)});
+</script>
+</body>
+</html>
