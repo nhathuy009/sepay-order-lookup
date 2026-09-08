@@ -8,7 +8,7 @@ import socket
 import re
 
 # Vercel Python Serverless Function - stdlib only.
-# Route: /api/proxy?url=...&origin=...&referer=...
+# Route: /api/hlsproxy?url=...&origin=...&referer=...
 #
 # For testing streams you are authorized to access.
 # Private/local targets are blocked to reduce SSRF risk.
@@ -67,7 +67,7 @@ def _proxy_url(target: str, origin: str, referer: str, host: str, proto: str) ->
         q["origin"] = origin
     if referer:
         q["referer"] = referer
-    return f"{proto}://{host}/api/proxy?{urlencode(q)}"
+    return f"{proto}://{host}/api/hlsproxy?{urlencode(q)}"
 
 def _rewrite_playlist(text: str, base_url: str, origin: str, referer: str, host: str, proto: str) -> str:
     out = []
