@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player · External Subtitles</title>
+<title>Film4K-style Player · 10s Seek Controls</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -785,6 +785,39 @@ html,body,button,input,select,textarea{
   background:rgba(255,255,255,.08);
 }
 
+
+/* ===== 10-second seek buttons ===== */
+.seek10-button svg{
+  width:var(--media-icon-size);
+  height:var(--media-icon-size);
+}
+
+.seek10-button .seek10-label{
+  position:absolute;
+  font-size:calc(.58 * var(--size));
+  font-weight:700;
+  line-height:1;
+  letter-spacing:-.04em;
+  pointer-events:none;
+}
+
+.seek10-button{
+  position:relative;
+}
+
+/* Leave a little more room for the new seek controls. */
+.time-controls{
+  flex:0 1 72%;
+  min-width:120px;
+}
+
+@media (max-width:700px){
+  .time-controls{
+    flex:1 1 auto;
+    min-width:70px;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -869,21 +902,41 @@ html,body,button,input,select,textarea{
 </div>
 
         <div class="volume-wrap" id="volumeWrap">
-<div class="control-tip-wrap" data-tip-for="muteBtn">
 <button class="media-button" id="muteBtn" data-volume="high" aria-label="Mute">
           <svg class="state-icon vol-off" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752M14.5 7.586l-1.768-1.768a1 1 0 1 0-1.414 1.414L13.085 9l-1.767 1.768a1 1 0 0 0 1.414 1.414l1.768-1.768 1.768 1.768a1 1 0 0 0 1.414-1.414L15.914 9l1.768-1.768a1 1 0 0 0-1.414-1.414z"/></svg>
           <svg class="state-icon vol-low" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
           <svg class="state-icon vol-high" viewBox="0 0 18 18" fill="currentColor"><path d="M15.6 3.3c-.4-.4-1-.4-1.4 0s-.4 1 0 1.4C15.4 5.9 16 7.4 16 9s-.6 3.1-1.8 4.3c-.4.4-.4 1 0 1.4.2.2.5.3.7.3.3 0 .5-.1.7-.3C17.1 13.2 18 11.2 18 9s-.9-4.2-2.4-5.7"/><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
         </button>
-<div class="control-tooltip"><span id="muteTipLabel">Mute</span><span class="tip-kbd">M</span></div>
-</div>
           <div class="volume-pop" id="volumePop">
             <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
           </div>
         </div>
       </div>
 
-      <div class="time-controls">
+      
+        <div class="control-tip-wrap" data-tip-for="back10Btn">
+          <button class="media-button seek10-button" id="back10Btn" type="button" aria-label="Lùi 10 giây" aria-keyshortcuts="ArrowLeft">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 7 4 12l5 5"/>
+              <path d="M4 12h10a6 6 0 1 1-5.2 9"/>
+            </svg>
+            <span class="seek10-label">10</span>
+          </button>
+          <div class="control-tooltip"><span>Lùi 10 giây</span><span class="tip-kbd">←</span></div>
+        </div>
+
+        <div class="control-tip-wrap" data-tip-for="forward10Btn">
+          <button class="media-button seek10-button" id="forward10Btn" type="button" aria-label="Tới 10 giây" aria-keyshortcuts="ArrowRight">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 7 5 5-5 5"/>
+              <path d="M20 12H10a6 6 0 1 0 5.2 9"/>
+            </svg>
+            <span class="seek10-label">10</span>
+          </button>
+          <div class="control-tooltip"><span>Tới 10 giây</span><span class="tip-kbd">→</span></div>
+        </div>
+
+        <div class="time-controls">
         <time class="media-time" id="currentTime">0:00:00</time>
 
         <div class="slider-wrap" id="sliderWrap">
@@ -1076,9 +1129,6 @@ function updateControls(){
 
   const v=video.muted||video.volume===0?'off':video.volume<0.5?'low':'high';
   $('muteBtn').dataset.volume=v;
-  if($('muteTipLabel')){
-    $('muteTipLabel').textContent=(video.muted||video.volume===0)?'Unmute':'Mute';
-  }
   $('volumeSlider').value=Math.round(video.volume*100);
 
   const b=timelineBounds();
@@ -1193,6 +1243,17 @@ function finishPointerSeek(e){
 
 sliderWrap.addEventListener('pointerup',finishPointerSeek);
 sliderWrap.addEventListener('pointercancel',()=>{pointerSeeking=false;sliderWrap.classList.remove('dragging');showControls(true)});
+
+
+$('back10Btn').onclick=e=>{
+  e.stopPropagation();
+  seekBy(-10);
+};
+
+$('forward10Btn').onclick=e=>{
+  e.stopPropagation();
+  seekBy(10);
+};
 
 $('playBtn').onclick=()=>{
   if(video.ended){
@@ -1354,10 +1415,18 @@ function activateExternalSubtitle(id){
   disableHlsSubtitles();
   disableExternalSubtitles();
 
+  activeExternalSubtitleId=id;
   try{
     ext.el.track.mode='showing';
-    activeExternalSubtitleId=id;
   }catch{}
+
+  // Re-assert on the next task in case the browser has not attached the TextTrack yet.
+  setTimeout(()=>{
+    try{
+      ext.el.track.mode='showing';
+      activeExternalSubtitleId=id;
+    }catch{}
+  },0);
 
   $('captionValue').textContent=ext.label;
   $('ccBtn').dataset.captions='on';
@@ -1385,23 +1454,50 @@ function addExternalSubtitleFromText(text,label){
   el.label=label||'External subtitle';
   el.srclang='und';
   el.src=blobUrl;
+  el.default=true;
   video.appendChild(el);
 
   const ext={id,label:el.label,el,blobUrl};
   externalSubtitleTracks.push(ext);
 
-  const show=()=>{
-    activateExternalSubtitle(id);
-    if($('submenu').classList.contains('show'))openSub('captions');
+  // Select the newly added external subtitle immediately.
+  disableHlsSubtitles();
+  disableExternalSubtitles();
+  activeExternalSubtitleId=id;
+
+  try{
+    el.track.mode='showing';
+  }catch{}
+
+  $('captionValue').textContent=ext.label;
+  $('ccBtn').dataset.captions='on';
+  if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+  keepControls();
+
+  // Some browsers only fully initialize TextTrack after the track resource loads.
+  // Re-assert 'showing' then to guarantee the newly added subtitle is visible.
+  const ensureShowing=()=>{
+    disableHlsSubtitles();
+    for(const other of externalSubtitleTracks){
+      try{
+        if(other.id!==id && other.el?.track)other.el.track.mode='disabled';
+      }catch{}
+    }
+    try{
+      el.track.mode='showing';
+      activeExternalSubtitleId=id;
+    }catch{}
+    $('captionValue').textContent=ext.label;
+    $('ccBtn').dataset.captions='on';
+    if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+
+    if($('submenu').classList.contains('show')){
+      openSub('captions');
+    }
   };
 
-  el.addEventListener('load',show,{once:true});
-  // Some browsers expose the text track immediately.
-  setTimeout(()=>{
-    try{
-      if(el.track && el.track.cues!==null)show();
-    }catch{}
-  },100);
+  el.addEventListener('load',ensureShowing,{once:true});
+  setTimeout(ensureShowing,150);
 
   return ext;
 }
