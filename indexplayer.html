@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player · Original Behaviors</title>
+<title>Film4K-style Player · Scrollable Subtitle Menu</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -550,6 +550,51 @@ html,body,button,input,select,textarea{
   }
 }
 
+
+/* Constrain settings/submenu height inside the player area */
+.settings-menu,
+.submenu{
+  max-height:calc(100% - 96px);
+  overflow:hidden;
+}
+
+.menu-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+
+.settings-menu{
+  display:flex!important;
+  flex-direction:column;
+}
+
+.submenu{
+  display:flex!important;
+  flex-direction:column;
+}
+
+.submenu-head{
+  flex:0 0 auto;
+}
+
+.menu-scroll::-webkit-scrollbar{
+  width:10px;
+}
+.menu-scroll::-webkit-scrollbar-track{
+  background:transparent;
+}
+.menu-scroll::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14);
+  border-radius:9999px;
+}
+.menu-scroll{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,.14) transparent;
+}
+
 </style>
 </head>
 <body>
@@ -589,6 +634,7 @@ html,body,button,input,select,textarea{
       </svg>
     </div>
 <div class="settings-menu" id="settingsMenu">
+      <div class="menu-scroll" id="settingsScroll">
       
       <div class="menu-row" data-menu="quality">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -614,6 +660,8 @@ html,body,button,input,select,textarea{
           <rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6 11h4M14 11h4M6 15h6M15 15h3"/>
         </svg>
         <span>Captions</span><span class="val" id="captionValue">Off</span><span class="chev">›</span>
+      </div>
+    
       </div>
     </div>
 
@@ -1037,8 +1085,12 @@ function openSub(kind){
   const box=$('submenu');
   box.classList.remove('enter-back');
   box.classList.add('enter-forward');
-  box.innerHTML=`<div class="submenu-head">‹ ${kind[0].toUpperCase()+kind.slice(1)}</div>`;
-  box.querySelector('.submenu-head').onclick=()=>{
+
+  box.innerHTML='';
+  const head=document.createElement('div');
+  head.className='submenu-head';
+  head.textContent='‹ ' + kind[0].toUpperCase() + kind.slice(1);
+  head.onclick=()=>{
     box.classList.remove('enter-forward');
     box.classList.add('enter-back');
     setTimeout(()=>{
@@ -1048,6 +1100,11 @@ function openSub(kind){
       keepControls();
     },120);
   };
+  box.appendChild(head);
+
+  const scroll=document.createElement('div');
+  scroll.className='menu-scroll';
+  box.appendChild(scroll);
 
   let items=[];
   if(kind==='quality'){
@@ -1097,7 +1154,7 @@ function openSub(kind){
       }
       closeMenus();
     };
-    box.appendChild(row);
+    scroll.appendChild(row);
   }
 
   $('settingsMenu').classList.remove('show');
