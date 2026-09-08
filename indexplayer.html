@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Quality Menu</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -382,6 +382,14 @@ video{
     </div>
 
     <div class="settings-menu" id="settingsMenu">
+      
+      <div class="menu-row" data-menu="quality">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="5" width="18" height="14" rx="3"/>
+          <path d="M7 9h10M7 13h6"/>
+        </svg>
+        <span>Quality</span><span class="val" id="qualityValue">Auto</span><span class="chev">›</span>
+      </div>
       <div class="menu-row" data-menu="audio">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.2 2.3-5 6-5"/><path d="M14 7h7M14 11h7"/>
@@ -577,6 +585,13 @@ function openSub(kind){
   };
 
   let items=[];
+  if(kind==='quality'){
+    items=[{label:'Auto',value:-1,on:!hls || hls.autoLevelEnabled || hls.currentLevel<0}];
+    (hls?.levels||[]).forEach((l,i)=>{
+      const label=`${l.height||'?'}p${l.bitrate?' · '+Math.round(l.bitrate/1000)+' kbps':''}`;
+      items.push({label,value:i,on:!!hls && !hls.autoLevelEnabled && hls.currentLevel===i});
+    });
+  }
   if(kind==='speed'){
     items=[.5,.75,1,1.25,1.5,2].map(v=>({label:v+'×',value:v,on:video.playbackRate===v}));
   }
@@ -594,7 +609,16 @@ function openSub(kind){
     row.className='submenu-item'+(it.on?' on':'');
     row.textContent=(it.on?'✓ ':'')+it.label;
     row.onclick=()=>{
-      if(kind==='speed'){
+      if(kind==='quality'&&hls){
+        if(it.value<0){
+          hls.currentLevel=-1;
+          hls.nextLevel=-1;
+          $('qualityValue').textContent='Auto';
+        }else{
+          hls.currentLevel=it.value;
+          $('qualityValue').textContent=it.label.split(' · ')[0];
+        }
+      }else if(kind==='speed'){
         video.playbackRate=it.value;
         $('speedValue').textContent=it.label;
       }else if(kind==='audio'&&hls){
@@ -647,6 +671,14 @@ window.addEventListener('keydown',e=>{
 
 function refreshLabels(){
   if(!hls)return;
+
+  if(hls.autoLevelEnabled || hls.currentLevel<0){
+    $('qualityValue').textContent='Auto';
+  }else{
+    const q=hls.levels?.[hls.currentLevel];
+    $('qualityValue').textContent=q?.height?`${q.height}p`:`Level ${hls.currentLevel+1}`;
+  }
+
   const a=hls.audioTracks?.[hls.audioTrack];
   $('audioValue').textContent=a?(a.name||a.lang||'Audio'):'Default';
   const s=hls.subtitleTrack>=0?hls.subtitleTracks?.[hls.subtitleTrack]:null;
@@ -734,6 +766,8 @@ function load(useProxy=false){
   });
   hls.on(Hls.Events.AUDIO_TRACK_SWITCHED,refreshLabels);
   hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH,refreshLabels);
+  hls.on(Hls.Events.LEVEL_SWITCHED,refreshLabels);
+  hls.on(Hls.Events.LEVEL_UPDATED,refreshLabels);
 
   hls.on(Hls.Events.ERROR,(_,d)=>{
     if(!d.fatal)return;
