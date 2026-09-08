@@ -1,19 +1,27 @@
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import urlparse, parse_qs, urlencode, urljoin
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
 import ipaddress
 import socket
+import json
 import re
 
-# Vercel Python Serverless Function - stdlib only.
-# Route: /api/hlsproxy?url=...&origin=...&referer=...
-#
-# For testing streams you are authorized to access.
-# Private/local targets are blocked to reduce SSRF risk.
+# =========================================================
+# Shared safety / URL helpers
+# =========================================================
 
 URI_ATTR_RE = re.compile(r'URI="([^"]+)"', re.I)
+
+M3U8_RE = re.compile(
+    r'["\']((?:https?:)?//[^"\'<> ]+?\.m3u8(?:\?[^"\'<> ]*)?)["\']',
+    re.I
+)
+
+VTT_RE = re.compile(
+    r'["\']((?:https?:)?//[^"\'<> ]+?\.vtt(?:\?[^"\'<> ]*)?)["\']',
+    re.I
+)
 
 def _is_private_host(hostname: str) -> bool:
     if not hostname:
@@ -23,7 +31,6 @@ def _is_private_host(hostname: str) -> bool:
     if h in {"localhost", "localhost.localdomain"}:
         return True
 
-    # Literal IP
     try:
         ip = ipaddress.ip_address(h.strip("[]"))
         return (
@@ -33,7 +40,6 @@ def _is_private_host(hostname: str) -> bool:
     except ValueError:
         pass
 
-    # Resolve hostname and reject if any resolved address is local/private.
     try:
         infos = socket.getaddrinfo(h, None, proto=socket.IPPROTO_TCP)
         for info in infos:
@@ -48,18 +54,21 @@ def _is_private_host(hostname: str) -> bool:
             except ValueError:
                 continue
     except Exception:
-        # Let the upstream request surface DNS errors normally.
         pass
 
     return False
 
-def _valid_target(raw: str):
+def _validate_url(raw: str):
     u = urlparse(raw)
     if u.scheme not in ("http", "https"):
-        raise ValueError("Only http/https targets are allowed")
+        raise ValueError("Only http/https URLs are supported")
     if not u.hostname or _is_private_host(u.hostname):
         raise ValueError("Private/local target is not allowed")
     return u
+
+# =========================================================
+# HLS proxy helpers
+# =========================================================
 
 def _proxy_url(target: str, origin: str, referer: str, host: str, proto: str) -> str:
     q = {"url": target}
@@ -75,15 +84,12 @@ def _rewrite_playlist(text: str, base_url: str, origin: str, referer: str, host:
     for line in text.splitlines():
         stripped = line.strip()
 
-        # Rewrite URI="..." attributes used by EXT-X-KEY, EXT-X-MAP,
-        # EXT-X-MEDIA, etc.
         def repl(match):
             absolute = urljoin(base_url, match.group(1))
             return f'URI="{_proxy_url(absolute, origin, referer, host, proto)}"'
 
         line2 = URI_ATTR_RE.sub(repl, line)
 
-        # Rewrite bare URI lines: child playlists, media segments, subtitles...
         if stripped and not stripped.startswith("#"):
             absolute = urljoin(base_url, stripped)
             line2 = _proxy_url(absolute, origin, referer, host, proto)
@@ -92,7 +98,36 @@ def _rewrite_playlist(text: str, base_url: str, origin: str, referer: str, host:
 
     return "\n".join(out)
 
+# =========================================================
+# Generic resolver helpers
+# =========================================================
+
+def _extract_json_stream(obj):
+    if not isinstance(obj, dict):
+        return None, None
+
+    stream = None
+    vtt = None
+
+    media = obj.get("media")
+    if isinstance(media, dict):
+        stream = media.get("stream") or media.get("m3u8") or media.get("url")
+        vtt = media.get("vtt") or media.get("preview") or media.get("thumbnails")
+
+    stream = stream or obj.get("stream") or obj.get("m3u8")
+    vtt = vtt or obj.get("vtt") or obj.get("preview")
+
+    stream = stream.strip() if isinstance(stream, str) else None
+    vtt = vtt.strip() if isinstance(vtt, str) else None
+
+    return stream, vtt
+
+# =========================================================
+# Vercel handler
+# =========================================================
+
 class handler(BaseHTTPRequestHandler):
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -101,6 +136,19 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        path = urlparse(self.path).path.rstrip("/")
+
+        if path.endswith("/resolve"):
+            self._handle_resolve()
+        else:
+            # Default to HLS proxy for /api/hlsproxy and direct function invocation.
+            self._handle_hlsproxy()
+
+    # -----------------------------------------------------
+    # /api/hlsproxy
+    # -----------------------------------------------------
+
+    def _handle_hlsproxy(self):
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
 
@@ -113,7 +161,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            _valid_target(raw_url)
+            _validate_url(raw_url)
         except ValueError as e:
             self._text(403, str(e))
             return
@@ -183,8 +231,6 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
             except Exception as e:
-                # Headers may already be committed here on some runtimes;
-                # keep failure simple.
                 try:
                     self.end_headers()
                     self.wfile.write(str(e).encode("utf-8"))
@@ -192,7 +238,6 @@ class handler(BaseHTTPRequestHandler):
                     pass
             return
 
-        # Pass selected upstream headers for binary/media responses.
         for name in (
             "Content-Type",
             "Content-Length",
@@ -207,7 +252,6 @@ class handler(BaseHTTPRequestHandler):
 
         self.end_headers()
 
-        # Stream response instead of loading the entire segment into memory.
         try:
             while True:
                 chunk = upstream.read(256 * 1024)
@@ -222,9 +266,132 @@ class handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-    def log_message(self, format, *args):
-        # Keep Vercel logs quieter.
-        pass
+    # -----------------------------------------------------
+    # /api/resolve
+    # -----------------------------------------------------
+
+    def _handle_resolve(self):
+        try:
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            raw = (qs.get("url") or [""])[0].strip()
+
+            if not raw:
+                self._json(400, {"ok": False, "error": "Missing ?url="})
+                return
+
+            target = _validate_url(raw)
+
+            # Direct HLS URL
+            if ".m3u8" in target.path.lower():
+                self._json(200, {
+                    "ok": True,
+                    "stream": raw,
+                    "vtt": None,
+                    "type": "direct-m3u8"
+                })
+                return
+
+            headers = {
+                "Accept": "text/html,application/json,text/plain,*/*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            }
+
+            req = Request(raw, headers=headers, method="GET")
+
+            try:
+                upstream = urlopen(req, timeout=20)
+            except HTTPError as e:
+                self._json(e.code, {
+                    "ok": False,
+                    "error": f"Upstream HTTP {e.code}"
+                })
+                return
+            except URLError as e:
+                self._json(502, {
+                    "ok": False,
+                    "error": f"Upstream error: {e.reason}"
+                })
+                return
+
+            content_type = (upstream.headers.get("Content-Type") or "").lower()
+            final_url = upstream.geturl()
+
+            # Limit resolver response inspection to 2 MB.
+            raw_body = upstream.read(2 * 1024 * 1024)
+            text = raw_body.decode("utf-8", errors="replace")
+
+            # JSON metadata
+            if "json" in content_type or text.lstrip().startswith(("{", "[")):
+                try:
+                    obj = json.loads(text)
+                    stream, vtt = _extract_json_stream(obj)
+
+                    if stream:
+                        stream = urljoin(final_url, stream)
+                        if vtt:
+                            vtt = urljoin(final_url, vtt)
+
+                        self._json(200, {
+                            "ok": True,
+                            "stream": stream,
+                            "vtt": vtt,
+                            "type": "json"
+                        })
+                        return
+                except Exception:
+                    pass
+
+            # Explicit HLS URL embedded in public HTML/text
+            match = M3U8_RE.search(text)
+            if match:
+                stream = match.group(1)
+
+                if stream.startswith("//"):
+                    stream = f"{target.scheme}:{stream}"
+
+                stream = urljoin(final_url, stream)
+
+                vtt = None
+                vtt_match = VTT_RE.search(text)
+
+                if vtt_match:
+                    vtt = vtt_match.group(1)
+                    if vtt.startswith("//"):
+                        vtt = f"{target.scheme}:{vtt}"
+                    vtt = urljoin(final_url, vtt)
+
+                self._json(200, {
+                    "ok": True,
+                    "stream": stream,
+                    "vtt": vtt,
+                    "type": "html-explicit"
+                })
+                return
+
+            self._json(404, {
+                "ok": False,
+                "error": "No explicit HLS stream found"
+            })
+
+        except ValueError as e:
+            self._json(403, {"ok": False, "error": str(e)})
+        except Exception as e:
+            self._json(500, {"ok": False, "error": str(e)})
+
+    # -----------------------------------------------------
+    # response helpers
+    # -----------------------------------------------------
+
+    def _json(self, code: int, payload):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _text(self, code: int, text: str):
         body = text.encode("utf-8")
@@ -235,3 +402,6 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass
