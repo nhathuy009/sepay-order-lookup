@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Plus Jakarta Sans</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Darker Glass Controls</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -132,7 +132,7 @@ video{
   padding:11px 13px;
   border:1px solid var(--c-border);
   border-radius:12px;
-  background:rgba(22,24,23,.95);
+  background:rgba(16,18,20,.82);
   font:12px/1.55 Consolas,monospace;
   box-shadow:0 12px 32px rgba(0,0,0,.45);
 }
@@ -173,13 +173,12 @@ video{
   min-height:44px;
   border:0;
   border-radius:9999px;
-  background:rgba(255,255,255,.10);
+  background:rgba(18,20,22,.46);
   box-shadow:
-    0 0 0 1px rgba(0,0,0,.10),
-    0 1px 3px 0 rgba(0,0,0,.15),
-    0 1px 2px -1px rgba(0,0,0,.15),
-    inset 0 1px 0 0 rgba(255,255,255,.10),
-    inset 0 0 0 1px rgba(255,255,255,.05);
+    0 0 0 1px rgba(255,255,255,.06),
+    0 8px 24px rgba(0,0,0,.30),
+    inset 0 1px 0 0 rgba(255,255,255,.06),
+    inset 0 0 0 1px rgba(255,255,255,.03);
   backdrop-filter:blur(16px) saturate(1.5);
   -webkit-backdrop-filter:blur(16px) saturate(1.5);
   display:flex;
@@ -214,7 +213,7 @@ video{
   flex-shrink:0;
   transition:background-color .15s ease-out,scale .15s ease-out;
 }
-.media-button:hover{background:rgba(255,255,255,.10)}
+.media-button:hover{background:rgba(255,255,255,.08)}
 .media-button svg{width:18px;height:18px}
 .media-button .state-icon{display:none}
 .media-button[data-state="play"] .play-icon{display:block}
@@ -253,7 +252,7 @@ video{
   right:0;
   height:4px;
   border-radius:9999px;
-  background:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.12);
   overflow:hidden;
   isolation:isolate;
 }
@@ -264,7 +263,7 @@ video{
   top:0;
   bottom:0;
 }
-.slider-buffer{background:rgba(255,255,255,.20);width:0}
+.slider-buffer{background:rgba(255,255,255,.16);width:0}
 .slider-fill{background:currentColor;width:0}
 .slider-thumb{
   position:absolute;
@@ -313,7 +312,7 @@ video{
   width:264px;
   border:1px solid rgba(255,255,255,.13);
   border-radius:16px;
-  background:rgba(255,255,255,.10);
+  background:rgba(20,22,24,.58);
   box-shadow:0 14px 38px rgba(0,0,0,.45);
   overflow:hidden;
   display:none;
@@ -382,13 +381,12 @@ video{
   padding:12px 0;
   border:0;
   border-radius:9999px;
-  background:rgba(255,255,255,.10);
+  background:rgba(20,22,24,.58);
   box-shadow:
-    0 0 0 1px rgba(0,0,0,.10),
-    0 1px 3px 0 rgba(0,0,0,.15),
-    0 1px 2px -1px rgba(0,0,0,.15),
-    inset 0 1px 0 0 rgba(255,255,255,.10),
-    inset 0 0 0 1px rgba(255,255,255,.05);
+    0 0 0 1px rgba(255,255,255,.06),
+    0 8px 24px rgba(0,0,0,.28),
+    inset 0 1px 0 0 rgba(255,255,255,.06),
+    inset 0 0 0 1px rgba(255,255,255,.03);
   backdrop-filter:blur(16px) saturate(1.5);
   -webkit-backdrop-filter:blur(16px) saturate(1.5);
   display:none;
