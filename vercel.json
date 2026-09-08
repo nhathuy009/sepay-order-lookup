@@ -2,6 +2,7 @@
   "builds": [
     { "src": "api/index.py", "use": "@vercel/python@4.8.0" },
     { "src": "api/telegram.py", "use": "@vercel/python@4.8.0" },
+    { "src": "api/hlsproxy.py", "use": "@vercel/python@4.8.0" }
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "ebook.html", "use": "@vercel/static" },
     { "src": "jotun.html", "use": "@vercel/static" },
@@ -14,6 +15,7 @@
   ],
   "routes": [
     { "src": "/api/telegram", "dest": "/api/telegram.py" },
+    { "src": "/api/hlsproxy", "dest": "/api/hlsproxy.py" },
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/app.css", "dest": "/app.css" },
     { "src": "/app.js", "dest": "/app.js" },
