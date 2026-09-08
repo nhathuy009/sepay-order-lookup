@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Quality Menu</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Precise Seek</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -259,7 +259,7 @@ video{
   position:absolute;
   inset:0;
   opacity:0;
-  cursor:pointer;
+  pointer-events:none;
 }
 .preview{
   position:absolute;
@@ -518,38 +518,150 @@ function updateStats(){
     `Used: ${(totalBytes/1e6).toFixed(1)} MB`;
 }
 
+function timelineBounds(){
+  // For normal VOD, duration gives the complete timeline.
+  if(Number.isFinite(video.duration) && video.duration > 0){
+    return {start:0,end:video.duration,length:video.duration};
+  }
+
+  // For live/sliding HLS playlists, duration may be Infinity.
+  // In that case use the actual seekable window.
+  try{
+    if(video.seekable && video.seekable.length){
+      const start=video.seekable.start(0);
+      const end=video.seekable.end(video.seekable.length-1);
+      if(Number.isFinite(start) && Number.isFinite(end) && end>start){
+        return {start,end,length:end-start};
+      }
+    }
+  }catch{}
+
+  return {start:0,end:0,length:0};
+}
+
+function timelineRatio(time){
+  const b=timelineBounds();
+  if(!b.length)return 0;
+  return Math.min(1,Math.max(0,(time-b.start)/b.length));
+}
+
 function updateControls(){
   $('playBtn').dataset.state=video.paused?'play':'pause';
 
   const v=video.muted||video.volume===0?'off':video.volume<.5?'low':'high';
   $('muteBtn').dataset.volume=v;
 
-  const d=Number.isFinite(video.duration)?video.duration:0;
-  const p=d>0?Math.min(1,video.currentTime/d):0;
+  const b=timelineBounds();
+  const p=timelineRatio(video.currentTime);
+
   $('currentTime').textContent=fmt(video.currentTime);
-  $('remainingTime').innerHTML='<span>-</span>'+fmt(Math.max(0,d-video.currentTime));
+  $('remainingTime').innerHTML='<span>-</span>'+fmt(
+    b.length ? Math.max(0,b.end-video.currentTime) : 0
+  );
+
   $('seek').value=Math.round(p*1000);
   $('sliderFill').style.width=(p*100)+'%';
   $('sliderThumb').style.left=(p*100)+'%';
 
-  let b=0;
+  let bufferedRatio=0;
   try{
-    if(d>0&&video.buffered.length)b=Math.min(1,video.buffered.end(video.buffered.length-1)/d);
+    if(b.length && video.buffered.length){
+      let bufferedEnd=b.start;
+      // Use the buffered range containing/nearest the playhead.
+      for(let i=0;i<video.buffered.length;i++){
+        const s=video.buffered.start(i);
+        const e=video.buffered.end(i);
+        if(video.currentTime>=s-0.05 && video.currentTime<=e+0.05){
+          bufferedEnd=e;
+          break;
+        }
+        if(e>bufferedEnd)bufferedEnd=e;
+      }
+      bufferedRatio=Math.min(1,Math.max(0,(bufferedEnd-b.start)/b.length));
+    }
   }catch{}
-  $('sliderBuffer').style.width=(b*100)+'%';
+  $('sliderBuffer').style.width=(bufferedRatio*100)+'%';
 }
 setInterval(()=>{updateControls();updateStats()},250);
 
-$('seek').addEventListener('input',()=>{
-  const d=video.duration;
-  if(Number.isFinite(d)&&d>0)video.currentTime=(+$('seek').value/1000)*d;
-});
-$('sliderWrap').addEventListener('mousemove',e=>{
-  const r=e.currentTarget.getBoundingClientRect();
-  const ratio=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+const sliderWrap=$('sliderWrap');
+let pointerSeeking=false;
+
+function pointerRatio(clientX){
+  const r=sliderWrap.getBoundingClientRect();
+  if(!r.width)return 0;
+  return Math.min(1,Math.max(0,(clientX-r.left)/r.width));
+}
+
+function seekToRatio(ratio){
+  const b=timelineBounds();
+  if(!b.length)return;
+  const target=b.start + ratio*b.length;
+
+  try{
+    // Clamp to the currently seekable range when available.
+    if(video.seekable && video.seekable.length){
+      let best=target;
+      let found=false;
+      for(let i=0;i<video.seekable.length;i++){
+        const s=video.seekable.start(i);
+        const e=video.seekable.end(i);
+        if(target>=s && target<=e){
+          best=target;
+          found=true;
+          break;
+        }
+        if(target<s){
+          best=s;
+          found=true;
+          break;
+        }
+        best=e;
+      }
+      video.currentTime=best;
+    }else{
+      video.currentTime=target;
+    }
+  }catch{
+    try{video.currentTime=target}catch{}
+  }
+
+  updateControls();
+}
+
+function updatePreview(clientX){
+  const ratio=pointerRatio(clientX);
+  const b=timelineBounds();
   $('preview').style.left=(ratio*100)+'%';
-  $('preview').textContent=fmt((video.duration||0)*ratio);
+  $('preview').textContent=fmt(b.start + ratio*b.length);
+}
+
+sliderWrap.addEventListener('pointerdown',e=>{
+  if(e.button!==undefined && e.button!==0)return;
+  e.preventDefault();
+  pointerSeeking=true;
+  try{sliderWrap.setPointerCapture(e.pointerId)}catch{}
+  updatePreview(e.clientX);
+  seekToRatio(pointerRatio(e.clientX));
 });
+
+sliderWrap.addEventListener('pointermove',e=>{
+  updatePreview(e.clientX);
+  if(pointerSeeking){
+    e.preventDefault();
+    seekToRatio(pointerRatio(e.clientX));
+  }
+});
+
+function finishPointerSeek(e){
+  if(!pointerSeeking)return;
+  pointerSeeking=false;
+  try{sliderWrap.releasePointerCapture(e.pointerId)}catch{}
+  seekToRatio(pointerRatio(e.clientX));
+}
+
+sliderWrap.addEventListener('pointerup',finishPointerSeek);
+sliderWrap.addEventListener('pointercancel',()=>{pointerSeeking=false});
 
 $('playBtn').onclick=()=>video.paused?video.play().catch(()=>{}):video.pause();
 $('muteBtn').onclick=()=>video.muted=!video.muted;
