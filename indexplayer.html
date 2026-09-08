@@ -3,9 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Original Media Skin CSS</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Plus Jakarta Sans</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
+
+@font-face{
+  font-family:"Plus Jakarta Sans";
+  src:url("https://film4k.net/cf-fonts/v/plus-jakarta-sans/5.2.8/latin/wght/normal.woff2") format("woff2");
+  font-style:normal;
+  font-weight:100 900;
+  font-display:swap;
+}
+
 *{box-sizing:border-box}
 :root{
   --c-bg:#090a0a;
@@ -19,7 +28,7 @@ body{
   margin:0;
   background:#0a0b0c;
   color:var(--c-text);
-  font-family:Inter,Arial,Helvetica,sans-serif;
+  font-family:"Plus Jakarta Sans",Inter,Arial,Helvetica,sans-serif;
 }
 .app{
   max-width:1200px;
@@ -395,6 +404,11 @@ video{
   transform:rotate(-90deg);
   accent-color:#fff;
   cursor:pointer;
+}
+
+
+html,body,button,input,select,textarea{
+  font-family:"Plus Jakarta Sans",Inter,Arial,Helvetica,sans-serif;
 }
 
 </style>
