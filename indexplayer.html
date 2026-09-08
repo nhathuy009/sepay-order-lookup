@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player · Fixed 10s Seek Icons</title>
+<title>Film4K-style Player · Generic Resolver</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -821,6 +821,39 @@ html,body,button,input,select,textarea{
   }
 }
 
+
+/* ===== Generic stream resolver UI ===== */
+.resolvebar{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+  margin-bottom:10px;
+}
+.resolvebar input{
+  width:100%;
+  min-width:0;
+  border:1px solid #333;
+  border-radius:8px;
+  background:#151616;
+  color:#fff;
+  padding:9px 11px;
+}
+.resolve-label{
+  font-size:var(--font-size-small);
+  color:#999;
+  margin-bottom:2px;
+}
+.resolve-row{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:4px;
+}
+@media(min-width:800px){
+  .resolvebar{
+    grid-template-columns:1fr 1fr;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -829,11 +862,24 @@ html,body,button,input,select,textarea{
     <input id="source" placeholder="Dán link .m3u8..." spellcheck="false">
     <button id="direct">DIRECT</button>
     <button id="proxy">PROXY</button>
+    <button id="resolveBtn">RESOLVE</button>
   </div>
   <div class="headerbar">
     <input id="origin" placeholder="Origin, ví dụ: https://example.com" spellcheck="false">
     <input id="referer" placeholder="Referer, ví dụ: https://example.com/" spellcheck="false">
   </div>
+
+  <div class="resolvebar">
+    <div class="resolve-row">
+      <div class="resolve-label">Resolved Stream URL</div>
+      <input id="resolvedStream" readonly placeholder="Chưa resolve được stream">
+    </div>
+    <div class="resolve-row">
+      <div class="resolve-label">Preview VTT URL</div>
+      <input id="resolvedVtt" readonly placeholder="Không có preview VTT">
+    </div>
+  </div>
+
 
   <div class="player" id="player">
     <video id="video" playsinline preload="metadata"></video>
@@ -1847,6 +1893,45 @@ function refreshLabels(){
 }
 
 
+
+async function resolveSource(){
+  const raw=$('source').value.trim();
+  if(!raw){
+    status('Vui lòng nhập URL nguồn.');
+    return;
+  }
+
+  $('resolvedStream').value='';
+  $('resolvedVtt').value='';
+  status('Đang resolve nguồn...');
+
+  try{
+    const q=new URLSearchParams({url:raw});
+    const res=await fetch(`/api/resolve?${q.toString()}`,{cache:'no-store'});
+    const data=await res.json();
+
+    if(!res.ok || !data?.ok){
+      throw new Error(data?.error||`HTTP ${res.status}`);
+    }
+
+    const stream=data.stream||'';
+    const vtt=data.vtt||'';
+
+    $('resolvedStream').value=stream;
+    $('resolvedVtt').value=vtt;
+
+    if(stream){
+      $('source').value=stream;
+      status(`Resolved: ${stream}`);
+      load(false);
+    }else{
+      status('Resolver không tìm thấy stream URL.');
+    }
+  }catch(err){
+    status(`Resolve error: ${err.message}`);
+  }
+}
+
 function proxied(url){
   const origin=$('origin').value.trim();
   const referer=$('referer').value.trim();
@@ -1947,6 +2032,7 @@ function load(useProxy=false){
 
 showControls(false);
 
+$('resolveBtn').onclick=resolveSource;
 $('direct').onclick=()=>load(false);
 $('proxy').onclick=()=>load(true);
 $('source').addEventListener('keydown',e=>{if(e.key==='Enter')load(false)});
