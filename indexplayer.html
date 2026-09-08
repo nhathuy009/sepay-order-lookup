@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Precise Seek</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Soft Controls · Thin Volume</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -162,11 +162,11 @@ video{
   right:10px;
   bottom:12px;
   min-height:54px;
-  border:1px solid rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.08);
   border-radius:28px;
-  background:rgba(26,29,28,.94);
-  box-shadow:0 4px 24px rgba(0,0,0,.4);
-  backdrop-filter:blur(14px);
+  background:rgba(28,30,29,.72);
+  box-shadow:0 3px 16px rgba(0,0,0,.24);
+  backdrop-filter:blur(10px) saturate(110%);
   display:flex;
   align-items:center;
   padding:0 10px;
@@ -194,14 +194,14 @@ video{
   place-items:center;
   cursor:pointer;
 }
-.media-button:hover{background:rgba(255,255,255,.08)}
+.media-button:hover{background:rgba(255,255,255,.065)}
 .media-button svg{width:20px;height:20px}
 .media-button .state-icon{display:none}
 .media-button[data-state="play"] .play-icon{display:block}
 .media-button[data-state="pause"] .pause-icon{display:block}
 .media-button[data-volume="high"] .vol-high{display:block}
-.media-button[data-volume="low"] .vol-low{display:block}
 .media-button[data-volume="off"] .vol-off{display:block}
+.media-button[data-volume="low"] .vol-low{display:block}
 .media-button[data-captions="on"] .cc-on{display:block}
 .media-button[data-captions="off"] .cc-off{display:block}
 
@@ -230,7 +230,7 @@ video{
   left:0;right:0;
   height:4px;
   border-radius:4px;
-  background:rgba(255,255,255,.18);
+  background:rgba(255,255,255,.15);
   overflow:hidden;
 }
 .slider-buffer,
@@ -240,7 +240,7 @@ video{
   top:0;
   bottom:0;
 }
-.slider-buffer{background:rgba(255,255,255,.20);width:0}
+.slider-buffer{background:rgba(255,255,255,.17);width:0}
 .slider-fill{background:#e9e9e9;width:0}
 .slider-thumb{
   position:absolute;
@@ -338,6 +338,39 @@ video{
   .media-time{font-size:12px}
   .time-controls{gap:7px}
 }
+
+.volume-wrap{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.volume-pop{
+  position:absolute;
+  left:50%;
+  bottom:45px;
+  transform:translateX(-50%);
+  width:32px;
+  height:130px;
+  padding:8px 0;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:15px;
+  background:rgba(34,36,35,.68);
+  box-shadow:0 6px 18px rgba(0,0,0,.24);
+  backdrop-filter:blur(10px) saturate(110%);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:25;
+}
+.volume-pop.show{display:flex}
+.volume-slider{
+  width:96px;
+  height:3px;
+  transform:rotate(-90deg);
+  accent-color:#f3f3f3;
+  cursor:pointer;
+}
+
 </style>
 </head>
 <body>
@@ -419,11 +452,16 @@ video{
           <svg class="state-icon pause-icon" viewBox="0 0 18 18" fill="currentColor"><rect width="5" height="14" x="2" y="2" rx="1.75"/><rect width="5" height="14" x="11" y="2" rx="1.75"/></svg>
         </button>
 
-        <button class="media-button" id="muteBtn" data-volume="high" aria-label="Mute">
+        <div class="volume-wrap" id="volumeWrap">
+<button class="media-button" id="muteBtn" data-volume="high" aria-label="Mute">
           <svg class="state-icon vol-off" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752M14.5 7.586l-1.768-1.768a1 1 0 1 0-1.414 1.414L13.085 9l-1.767 1.768a1 1 0 0 0 1.414 1.414l1.768-1.768 1.768 1.768a1 1 0 0 0 1.414-1.414L15.914 9l1.768-1.768a1 1 0 0 0-1.414-1.414z"/></svg>
           <svg class="state-icon vol-low" viewBox="0 0 18 18" fill="currentColor"><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
           <svg class="state-icon vol-high" viewBox="0 0 18 18" fill="currentColor"><path d="M15.6 3.3c-.4-.4-1-.4-1.4 0s-.4 1 0 1.4C15.4 5.9 16 7.4 16 9s-.6 3.1-1.8 4.3c-.4.4-.4 1 0 1.4.2.2.5.3.7.3.3 0 .5-.1.7-.3C17.1 13.2 18 11.2 18 9s-.9-4.2-2.4-5.7"/><path d="M.714 6.008h3.072l4.071-3.857c.5-.376 1.143 0 1.143.601V15.28c0 .602-.643.903-1.143.602l-4.071-3.858H.714c-.428 0-.714-.3-.714-.752V6.76c0-.451.286-.752.714-.752m10.568.59a.91.91 0 0 1 0-1.316.91.91 0 0 1 1.316 0c1.203 1.203 1.47 2.216 1.522 3.208q.012.255.011.51c0 1.16-.358 2.733-1.533 3.803a.7.7 0 0 1-.298.156c-.382.106-.873-.011-1.018-.156a.91.91 0 0 1 0-1.316c.57-.57.995-1.551.995-2.487 0-.944-.26-1.667-.995-2.402"/></svg>
         </button>
+          <div class="volume-pop" id="volumePop">
+            <input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Volume">
+          </div>
+        </div>
       </div>
 
       <div class="time-controls">
@@ -548,8 +586,9 @@ function timelineRatio(time){
 function updateControls(){
   $('playBtn').dataset.state=video.paused?'play':'pause';
 
-  const v=video.muted||video.volume===0?'off':video.volume<.5?'low':'high';
+  const v=video.muted||video.volume===0?'off':video.volume<0.5?'low':'high';
   $('muteBtn').dataset.volume=v;
+  $('volumeSlider').value=Math.round(video.volume*100);
 
   const b=timelineBounds();
   const p=timelineRatio(video.currentTime);
@@ -664,7 +703,28 @@ sliderWrap.addEventListener('pointerup',finishPointerSeek);
 sliderWrap.addEventListener('pointercancel',()=>{pointerSeeking=false});
 
 $('playBtn').onclick=()=>video.paused?video.play().catch(()=>{}):video.pause();
-$('muteBtn').onclick=()=>video.muted=!video.muted;
+$('muteBtn').onclick=e=>{
+  e.stopPropagation();
+  $('volumePop').classList.toggle('show');
+};
+
+$('volumeSlider').addEventListener('input',e=>{
+  e.stopPropagation();
+  const v=Math.max(0,Math.min(100,Number(e.target.value)))/100;
+  video.volume=v;
+  video.muted=v===0;
+  updateControls();
+});
+
+$('volumeSlider').addEventListener('click',e=>e.stopPropagation());
+
+$('volumeWrap').addEventListener('click',e=>e.stopPropagation());
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#volumeWrap')){
+    $('volumePop').classList.remove('show');
+  }
+});
 
 $('statsBtn').onclick=()=>{$('statsPanel').classList.toggle('show');updateStats()};
 
@@ -763,6 +823,8 @@ $('fullBtn').onclick=async()=>{
     else await document.exitFullscreen();
   }catch{}
 };
+
+video.addEventListener('volumechange',updateControls);
 
 video.addEventListener('click',()=>video.paused?video.play().catch(()=>{}):video.pause());
 video.addEventListener('dblclick',()=>$('fullBtn').click());
