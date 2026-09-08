@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player · Compact Menu + Tooltips</title>
+<title>Film4K-style Player · External Subtitles</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 
@@ -766,6 +766,25 @@ html,body,button,input,select,textarea{
   .control-tooltip{transition-duration:50ms}
 }
 
+
+/* External subtitle actions */
+.submenu-item.caption-action{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:500;
+}
+.submenu-item.caption-action svg{
+  width:var(--media-icon-size);
+  height:var(--media-icon-size);
+  flex:0 0 auto;
+}
+.submenu-separator{
+  height:1px;
+  margin:4px 8px;
+  background:rgba(255,255,255,.08);
+}
+
 </style>
 </head>
 <body>
@@ -915,6 +934,12 @@ html,body,button,input,select,textarea{
     </div>
   </div>
 
+
+  <input id="subtitleFileInput"
+         type="file"
+         accept=".vtt,.srt,text/vtt,application/x-subrip,text/plain"
+         hidden>
+
   <div class="status" id="status">Chưa tải nguồn.</div>
 </div>
 
@@ -923,6 +948,7 @@ const $=id=>document.getElementById(id);
 const video=$('video'), player=$('player');
 let hls=null,totalBytes=0,samples=[],fps=0,frames=[],idleTimer=null,feedbackTimer=null;
 let menuOpen=false,volumeOpen=false,pointerSeeking=false;
+let externalSubtitleTracks=[],activeExternalSubtitleId=null;
 
 function fmt(sec){
   sec=Number.isFinite(sec)&&sec>0?Math.floor(sec):0;
@@ -1246,26 +1272,8 @@ $('settingsBtn').onclick=e=>{
 };
 $('ccBtn').onclick=e=>{
   e.stopPropagation();
-  if(hls && (hls.subtitleTracks||[]).length){
-    if(hls.subtitleTrack>=0){
-      hls.subtitleTrack=-1;
-      hls.subtitleDisplay=false;
-      $('captionValue').textContent='Off';
-      $('ccBtn').dataset.captions='off';
-    }else{
-      const first=(hls.subtitleTracks||[]).findIndex(Boolean);
-      if(first>=0){
-        hls.subtitleTrack=first;
-        hls.subtitleDisplay=true;
-        const s=hls.subtitleTracks[first];
-        $('captionValue').textContent=s?.name||s?.lang||'On';
-        $('ccBtn').dataset.captions='on';
-      }
-    }
-    keepControls();
-  }else{
-    openSub('captions');
-  }
+  keepControls();
+  openSub('captions');
 };
 
 document.addEventListener('click',e=>{
@@ -1273,6 +1281,196 @@ document.addEventListener('click',e=>{
 });
 
 document.querySelectorAll('.menu-row').forEach(x=>x.onclick=()=>{keepControls();openSub(x.dataset.menu)});
+
+
+function srtToVtt(text){
+  let s=String(text||'').replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').trim();
+
+  // Already WebVTT.
+  if(/^WEBVTT(?:\s|$)/i.test(s))return s;
+
+  // Convert SRT timestamps (comma milliseconds) to WebVTT timestamps.
+  s=s.replace(
+    /(\d{1,2}:\d{2}:\d{2}),(\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}),(\d{3})/g,
+    '$1.$2 --> $3.$4'
+  );
+
+  // Also accept MM:SS,mmm style if encountered.
+  s=s.replace(
+    /(^|\n)(\d{1,2}:\d{2}),(\d{3})\s*-->\s*(\d{1,2}:\d{2}),(\d{3})/g,
+    '$1$2.$3 --> $4.$5'
+  );
+
+  return 'WEBVTT\n\n'+s+'\n';
+}
+
+function subtitleToVtt(text, name='subtitle'){
+  const clean=String(text||'').replace(/^\uFEFF/,'');
+  if(/^WEBVTT(?:\s|$)/i.test(clean.trim()))return clean;
+
+  // SRT normally contains comma-millisecond timestamps.
+  if(/-->/m.test(clean)){
+    return srtToVtt(clean);
+  }
+
+  throw new Error(`Không nhận dạng được định dạng phụ đề: ${name}. Hỗ trợ VTT và SRT.`);
+}
+
+function disableExternalSubtitles(){
+  for(const ext of externalSubtitleTracks){
+    try{
+      const track=ext.el?.track;
+      if(track)track.mode='disabled';
+    }catch{}
+  }
+  activeExternalSubtitleId=null;
+}
+
+function disableHlsSubtitles(){
+  if(!hls)return;
+  try{
+    hls.subtitleTrack=-1;
+    hls.subtitleDisplay=false;
+  }catch{}
+}
+
+function updateExternalCaptionUi(){
+  if(activeExternalSubtitleId){
+    const ext=externalSubtitleTracks.find(x=>x.id===activeExternalSubtitleId);
+    $('captionValue').textContent=ext?.label||'External';
+    $('ccBtn').dataset.captions='on';
+    if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+  }else if(!hls || hls.subtitleTrack<0){
+    $('captionValue').textContent='Off';
+    $('ccBtn').dataset.captions='off';
+    if($('ccTipLabel'))$('ccTipLabel').textContent='Captions';
+  }
+}
+
+function activateExternalSubtitle(id){
+  const ext=externalSubtitleTracks.find(x=>x.id===id);
+  if(!ext)return;
+
+  disableHlsSubtitles();
+  disableExternalSubtitles();
+
+  try{
+    ext.el.track.mode='showing';
+    activeExternalSubtitleId=id;
+  }catch{}
+
+  $('captionValue').textContent=ext.label;
+  $('ccBtn').dataset.captions='on';
+  if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+  keepControls();
+}
+
+function removeExternalSubtitleElements(){
+  for(const ext of externalSubtitleTracks){
+    try{ext.el?.remove()}catch{}
+    try{if(ext.blobUrl)URL.revokeObjectURL(ext.blobUrl)}catch{}
+  }
+  externalSubtitleTracks=[];
+  activeExternalSubtitleId=null;
+}
+
+function addExternalSubtitleFromText(text,label){
+  const vtt=subtitleToVtt(text,label);
+  const blob=new Blob([vtt],{type:'text/vtt;charset=utf-8'});
+  const blobUrl=URL.createObjectURL(blob);
+  const id='ext-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+
+  const el=document.createElement('track');
+  el.kind='subtitles';
+  el.label=label||'External subtitle';
+  el.srclang='und';
+  el.src=blobUrl;
+  video.appendChild(el);
+
+  const ext={id,label:el.label,el,blobUrl};
+  externalSubtitleTracks.push(ext);
+
+  const show=()=>{
+    activateExternalSubtitle(id);
+    if($('submenu').classList.contains('show'))openSub('captions');
+  };
+
+  el.addEventListener('load',show,{once:true});
+  // Some browsers expose the text track immediately.
+  setTimeout(()=>{
+    try{
+      if(el.track && el.track.cues!==null)show();
+    }catch{}
+  },100);
+
+  return ext;
+}
+
+async function addSubtitleUrl(){
+  const url=prompt('Dán link phụ đề (.vtt hoặc .srt):','');
+  if(!url)return;
+
+  keepControls();
+  status('Đang tải phụ đề ngoài...');
+
+  let response=null;
+  let directError=null;
+
+  try{
+    response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+  }catch(err){
+    directError=err;
+    try{
+      response=await fetch(proxied(url),{cache:'no-store'});
+      if(!response.ok)throw new Error(`Proxy HTTP ${response.status}`);
+    }catch(proxyErr){
+      status(`Không tải được phụ đề: ${proxyErr.message}`);
+      alert(`Không tải được phụ đề.\nDirect: ${directError?.message||'failed'}\nProxy: ${proxyErr.message}`);
+      return;
+    }
+  }
+
+  try{
+    const text=await response.text();
+    let pathname='subtitle';
+    try{
+      pathname=decodeURIComponent(new URL(url).pathname.split('/').pop()||'subtitle');
+    }catch{}
+    const label=pathname.replace(/\.(vtt|srt)$/i,'')||'External subtitle';
+    addExternalSubtitleFromText(text,label);
+    status(`Đã thêm phụ đề: ${label}`);
+  }catch(err){
+    status(`Lỗi phụ đề: ${err.message}`);
+    alert(err.message);
+  }
+}
+
+function loadSubtitleFile(){
+  $('subtitleFileInput').value='';
+  $('subtitleFileInput').click();
+}
+
+$('subtitleFileInput').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];
+  if(!file)return;
+
+  try{
+    const text=await file.text();
+    const label=file.name.replace(/\.(vtt|srt)$/i,'')||file.name||'Local subtitle';
+    addExternalSubtitleFromText(text,label);
+    status(`Đã nạp phụ đề từ máy: ${file.name}`);
+  }catch(err){
+    status(`Lỗi phụ đề: ${err.message}`);
+    alert(err.message);
+  }
+});
+
+function turnCaptionsOff(){
+  disableHlsSubtitles();
+  disableExternalSubtitles();
+  updateExternalCaptionUi();
+}
 
 function openSub(kind){
   menuOpen=true;
@@ -1301,6 +1499,36 @@ function openSub(kind){
   scroll.className='menu-scroll';
   box.appendChild(scroll);
 
+  if(kind==='captions'){
+    const urlRow=document.createElement('div');
+    urlRow.className='submenu-item caption-action';
+    urlRow.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/>
+      <path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/>
+    </svg><span>Add subtitle URL</span>`;
+    urlRow.onclick=async()=>{
+      closeMenus();
+      await addSubtitleUrl();
+    };
+    scroll.appendChild(urlRow);
+
+    const fileRow=document.createElement('div');
+    fileRow.className='submenu-item caption-action';
+    fileRow.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/>
+      <path d="M5 21h14"/>
+    </svg><span>Load subtitle file</span>`;
+    fileRow.onclick=()=>{
+      closeMenus();
+      loadSubtitleFile();
+    };
+    scroll.appendChild(fileRow);
+
+    const sep=document.createElement('div');
+    sep.className='submenu-separator';
+    scroll.appendChild(sep);
+  }
+
   let items=[];
   if(kind==='quality'){
     items=[{label:'Auto',value:-1,on:!hls || hls.autoLevelEnabled || hls.currentLevel<0}];
@@ -1317,8 +1545,24 @@ function openSub(kind){
     if(!items.length)items=[{label:'Default',value:-1,on:true}];
   }
   if(kind==='captions'){
-    items=[{label:'Off',value:-1,on:(hls?.subtitleTrack??-1)<0}];
-    (hls?.subtitleTracks||[]).forEach((t,i)=>items.push({label:t.name||t.lang||`Subtitle ${i+1}`,value:i,on:hls.subtitleTrack===i}));
+    const nothingOn=!activeExternalSubtitleId && (!hls || hls.subtitleTrack<0);
+    items=[{label:'Off',value:-1,type:'off',on:nothingOn}];
+
+    for(const ext of externalSubtitleTracks){
+      items.push({
+        label:ext.label,
+        value:ext.id,
+        type:'external',
+        on:activeExternalSubtitleId===ext.id
+      });
+    }
+
+    (hls?.subtitleTracks||[]).forEach((t,i)=>items.push({
+      label:t.name||t.lang||`Subtitle ${i+1}`,
+      value:i,
+      type:'hls',
+      on:!activeExternalSubtitleId && hls.subtitleTrack===i
+    }));
   }
 
   for(const it of items){
@@ -1341,11 +1585,19 @@ function openSub(kind){
       }else if(kind==='audio'&&hls){
         if(it.value>=0)hls.audioTrack=it.value;
         $('audioValue').textContent=it.label;
-      }else if(kind==='captions'&&hls){
-        hls.subtitleTrack=it.value;
-        hls.subtitleDisplay=it.value>=0;
-        $('captionValue').textContent=it.label;
-        $('ccBtn').dataset.captions=it.value>=0?'on':'off';
+      }else if(kind==='captions'){
+        if(it.type==='off'){
+          turnCaptionsOff();
+        }else if(it.type==='external'){
+          activateExternalSubtitle(it.value);
+        }else if(it.type==='hls'&&hls){
+          disableExternalSubtitles();
+          hls.subtitleTrack=it.value;
+          hls.subtitleDisplay=true;
+          $('captionValue').textContent=it.label;
+          $('ccBtn').dataset.captions='on';
+          if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+        }
       }
       closeMenus();
     };
@@ -1432,7 +1684,19 @@ window.addEventListener('keydown',e=>{
   }
   else if(key==='c'){
     e.preventDefault();
-    $('ccBtn').click();
+    if(activeExternalSubtitleId || (hls && hls.subtitleTrack>=0)){
+      turnCaptionsOff();
+    }else if(externalSubtitleTracks.length){
+      activateExternalSubtitle(externalSubtitleTracks[0].id);
+    }else if(hls && (hls.subtitleTracks||[]).length){
+      disableExternalSubtitles();
+      hls.subtitleTrack=0;
+      hls.subtitleDisplay=true;
+      refreshLabels();
+    }else{
+      openSub('captions');
+    }
+    showControls(true);
   }
   else if(e.key==='ArrowLeft'){
     e.preventDefault();
@@ -1469,10 +1733,17 @@ function refreshLabels(){
   const a=hls.audioTracks?.[hls.audioTrack];
   $('audioValue').textContent=a?(a.name||a.lang||'Audio'):'Default';
   const s=hls.subtitleTrack>=0?hls.subtitleTracks?.[hls.subtitleTrack]:null;
-  $('captionValue').textContent=s?(s.name||s.lang||'On'):'Off';
-  $('ccBtn').dataset.captions=s?'on':'off';
-  if($('ccTipLabel')){
-    $('ccTipLabel').textContent=s?'Disable captions':'Captions';
+  if(activeExternalSubtitleId){
+    const ext=externalSubtitleTracks.find(x=>x.id===activeExternalSubtitleId);
+    $('captionValue').textContent=ext?.label||'External';
+    $('ccBtn').dataset.captions='on';
+    if($('ccTipLabel'))$('ccTipLabel').textContent='Disable captions';
+  }else{
+    $('captionValue').textContent=s?(s.name||s.lang||'On'):'Off';
+    $('ccBtn').dataset.captions=s?'on':'off';
+    if($('ccTipLabel')){
+      $('ccTipLabel').textContent=s?'Disable captions':'Captions';
+    }
   }
 }
 
@@ -1492,6 +1763,7 @@ function load(useProxy=false){
 
   if(hls){try{hls.destroy()}catch{}}
   totalBytes=0;samples=[];
+  removeExternalSubtitleElements();
   video.pause();
   video.removeAttribute('src');
   video.load();
