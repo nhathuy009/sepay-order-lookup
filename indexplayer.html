@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python HLS Proxy · Soft Controls · Thin Volume</title>
+<title>Film4K-style Player v5 · Python HLS Proxy · Original Media Skin CSS</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -158,24 +158,31 @@ video{
 .controls{
   position:absolute;
   z-index:9;
-  left:10px;
-  right:10px;
-  bottom:12px;
-  min-height:54px;
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:28px;
-  background:rgba(28,30,29,.72);
-  box-shadow:0 3px 16px rgba(0,0,0,.24);
-  backdrop-filter:blur(10px) saturate(110%);
+  left:8px;
+  right:8px;
+  bottom:8px;
+  min-height:44px;
+  border:0;
+  border-radius:9999px;
+  background:rgba(255,255,255,.10);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.10),
+    0 1px 3px 0 rgba(0,0,0,.15),
+    0 1px 2px -1px rgba(0,0,0,.15),
+    inset 0 1px 0 0 rgba(255,255,255,.10),
+    inset 0 0 0 1px rgba(255,255,255,.05);
+  backdrop-filter:blur(16px) saturate(1.5);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);
   display:flex;
   align-items:center;
-  padding:0 10px;
-  gap:10px;
-  transition:opacity .18s ease,transform .18s ease;
+  padding:4px;
+  gap:4px;
+  transition:opacity .10s ease-out,transform .10s ease-out,filter .10s ease-out;
 }
 .player.idle .controls{
   opacity:0;
-  transform:translateY(8px);
+  transform:translateY(4px) scale(.95);
+  filter:blur(8px);
   pointer-events:none;
 }
 .media-button-group{
@@ -184,18 +191,22 @@ video{
   gap:4px;
 }
 .media-button{
-  width:38px;
-  height:38px;
+  width:36px;
+  height:36px;
+  min-height:0;
+  padding:0;
   border:0;
-  border-radius:50%;
+  border-radius:9999px;
   background:transparent;
   color:#fff;
   display:grid;
   place-items:center;
   cursor:pointer;
+  flex-shrink:0;
+  transition:background-color .15s ease-out,scale .15s ease-out;
 }
-.media-button:hover{background:rgba(255,255,255,.065)}
-.media-button svg{width:20px;height:20px}
+.media-button:hover{background:rgba(255,255,255,.10)}
+.media-button svg{width:18px;height:18px}
 .media-button .state-icon{display:none}
 .media-button[data-state="play"] .play-icon{display:block}
 .media-button[data-state="pause"] .pause-icon{display:block}
@@ -210,7 +221,7 @@ video{
   min-width:0;
   display:flex;
   align-items:center;
-  gap:11px;
+  gap:10px;
 }
 .media-time{
   font-size:14px;
@@ -220,18 +231,22 @@ video{
 .slider-wrap{
   position:relative;
   flex:1;
-  height:20px;
+  min-width:80px;
+  height:32px;
   display:flex;
   align-items:center;
   cursor:pointer;
+  border-radius:9999px;
 }
 .slider-track{
   position:absolute;
-  left:0;right:0;
+  left:0;
+  right:0;
   height:4px;
-  border-radius:4px;
-  background:rgba(255,255,255,.15);
+  border-radius:9999px;
+  background:rgba(255,255,255,.18);
   overflow:hidden;
+  isolation:isolate;
 }
 .slider-buffer,
 .slider-fill{
@@ -240,21 +255,25 @@ video{
   top:0;
   bottom:0;
 }
-.slider-buffer{background:rgba(255,255,255,.17);width:0}
-.slider-fill{background:#e9e9e9;width:0}
+.slider-buffer{background:rgba(255,255,255,.20);width:0}
+.slider-fill{background:currentColor;width:0}
 .slider-thumb{
   position:absolute;
   top:50%;
-  width:9px;
-  height:9px;
-  border-radius:50%;
-  background:#f3f3f3;
+  width:10px;
+  height:10px;
+  border-radius:9999px;
+  background:currentColor;
   transform:translate(-50%,-50%);
   left:0;
   opacity:0;
-  transition:opacity .12s;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.10),
+    0 1px 3px rgba(0,0,0,.35),
+    0 1px 2px -1px rgba(0,0,0,.35);
+  transition:opacity .15s ease-out,width .15s ease-out,height .15s ease-out;
 }
-.slider-wrap:hover .slider-thumb{opacity:1}
+.slider-wrap:hover .slider-thumb{opacity:1;width:12px;height:12px}
 .slider-input{
   position:absolute;
   inset:0;
@@ -285,11 +304,11 @@ video{
   width:264px;
   border:1px solid rgba(255,255,255,.13);
   border-radius:16px;
-  background:rgba(31,34,32,.97);
+  background:rgba(255,255,255,.10);
   box-shadow:0 14px 38px rgba(0,0,0,.45);
   overflow:hidden;
   display:none;
-  backdrop-filter:blur(14px);
+  backdrop-filter:blur(16px) saturate(1.5);
 }
 .settings-menu.show,.submenu.show{display:block}
 .menu-row{
@@ -347,16 +366,22 @@ video{
 .volume-pop{
   position:absolute;
   left:50%;
-  bottom:45px;
+  bottom:44px;
   transform:translateX(-50%);
   width:32px;
-  height:130px;
-  padding:8px 0;
-  border:1px solid rgba(255,255,255,.09);
-  border-radius:15px;
-  background:rgba(34,36,35,.68);
-  box-shadow:0 6px 18px rgba(0,0,0,.24);
-  backdrop-filter:blur(10px) saturate(110%);
+  height:104px;
+  padding:12px 0;
+  border:0;
+  border-radius:9999px;
+  background:rgba(255,255,255,.10);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.10),
+    0 1px 3px 0 rgba(0,0,0,.15),
+    0 1px 2px -1px rgba(0,0,0,.15),
+    inset 0 1px 0 0 rgba(255,255,255,.10),
+    inset 0 0 0 1px rgba(255,255,255,.05);
+  backdrop-filter:blur(16px) saturate(1.5);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);
   display:none;
   align-items:center;
   justify-content:center;
@@ -364,10 +389,11 @@ video{
 }
 .volume-pop.show{display:flex}
 .volume-slider{
-  width:96px;
-  height:3px;
+  width:80px;
+  height:4px;
+  margin:0;
   transform:rotate(-90deg);
-  accent-color:#f3f3f3;
+  accent-color:#fff;
   cursor:pointer;
 }
 
