@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Film4K-style Player v5 · Python Proxy</title>
+<title>Film4K-style Player v5 · Python HLS Proxy</title>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.17/dist/hls.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -661,7 +661,7 @@ function proxied(url){
   const q=new URLSearchParams({url});
   if(origin)q.set('origin',origin);
   if(referer)q.set('referer',referer);
-  return `/api/proxy?${q.toString()}`;
+  return `/api/hlsproxy?${q.toString()}`;
 }
 
 function load(useProxy=false){
