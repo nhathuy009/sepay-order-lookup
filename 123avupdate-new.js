@@ -440,7 +440,7 @@ function parseListResponse(html, apiUrl, datasend) {
     } else {
         // Parse danh sách phim
         $doc.find(".card, .featured").each(function() {
-            var link = this.find("a[href*='/v/']").first();
+            var link = this.find(".card__body .card__link, .featured__body .card__link").first();
             if (!link) return;
             
             var href = link.attr("href");
