@@ -1,6 +1,6 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 3.0.0
+// Version: 3.0.1
 // Cập nhật: Thêm previewUrl, sửa lỗi title "0", parse chính xác hơn
 // =============================================================================
 
@@ -370,12 +370,17 @@ function fetchStreamDataAdvanced(hashId, poster) {
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
+    // Parse filters từ JSON
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var baseUrl = "https://123av.com";
     
+    // ============================================================
+    // BƯỚC 1: XÁC ĐỊNH PATH CƠ BẢN
+    // ============================================================
     var path = slug || "vi/new";
     
+    // Xử lý path: đảm bảo có tiền tố vi/ hoặc en/
     if (path.indexOf("vi/") !== 0 && path.indexOf("/vi/") !== 0) {
         if (path.indexOf("/") === 0) path = "en" + path;
         else path = "vi/" + path;
@@ -383,56 +388,86 @@ function getUrlList(slug, filtersJson) {
     
     if (path.indexOf("/") !== 0) path = "/" + path;
     
+    // ============================================================
+    // BƯỚC 2: XÂY DỰNG URL
+    // ============================================================
     var url = baseUrl + path;
     
-    if (url.indexOf("?") !== -1) {
-        url += "&page=" + page;
-    } else {
-        url += "?page=" + page;
+    // ============================================================
+    // BƯỚC 3: THÊM CÁC THAM SỐ FILTER
+    // ============================================================
+    var params = [];
+    
+    // --- 3.1: Page (luôn có) ---
+    params.push("page=" + page);
+    
+    // --- 3.2: Type (filter theo loại nội dung) ---
+    // Các giá trị có thể: censored, uncensored, uncensored-leaked
+    if (filters.type) {
+        params.push("type=" + encodeURIComponent(filters.type));
     }
     
-    if (filters.sort && filters.sort !== 'new') {
-        url += "&sort=" + filters.sort;
+    // --- 3.3: Year (filter theo năm) ---
+    if (filters.year) {
+        params.push("year=" + encodeURIComponent(filters.year));
     }
     
-    return url;
-}
-
-function getUrlSearch(keyword, filtersJson) {
-    var filters = JSON.parse(filtersJson || "{}");
-    var page = filters.page || 1;
-    return "https://123av.com/vi/search?keyword=" + encodeURIComponent(keyword) + "&page=" + page;
-}
-
-function getUrlDetail(slug, datasend) {
-    if (datasend) {
-        try {
-            var data = JSON.parse(datasend);
-            if (data && data.id) {
-                return datasend;
-            }
-        } catch (e) {}
+    // --- 3.4: Actress (filter theo diễn viên) ---
+    if (filters.actress) {
+        params.push("actress=" + encodeURIComponent(filters.actress));
     }
     
-    if (slug.indexOf("http") === 0) return slug;
-    if (slug.indexOf("vi/v/") === 0) return "https://123av.com/" + slug;
-    if (slug.indexOf("/vi/v/") === 0) return "https://123av.com" + slug;
-    if (slug.indexOf("v/") === 0) return "https://123av.com/vi/" + slug;
-    if (slug.indexOf("/v/") === 0) return "https://123av.com/en" + slug;
+    // --- 3.5: Sort (sắp xếp) ---
+    // Ánh xạ các giá trị sort từ plugin sang URL
+    if (filters.sort) {
+        var sortMap = {
+            'new': 'release_date',      // Mới nhất theo ngày phát hành
+            'today': 'today_views',     // Xem nhiều hôm nay
+            'week': 'weekly_views',     // Xem nhiều tuần này
+            'month': 'monthly_views',   // Xem nhiều tháng này
+            'views': 'total_views',     // Xem nhiều nhất
+            'rating': 'rating',         // Đánh giá cao nhất
+            'release_date': 'release_date' // Ngày phát hành
+        };
+        
+        var sortValue = sortMap[filters.sort] || filters.sort;
+        params.push("sort=" + encodeURIComponent(sortValue));
+    }
     
-    return "https://123av.com/vi/v/" + slug;
-}
-
-function getUrlCategories() { 
-    return "https://123av.com/vi/genres"; 
-}
-
-function getUrlCountries() { 
-    return ""; 
-}
-
-function getUrlYears() { 
-    return ""; 
+    // --- 3.6: Keyword (từ khóa tìm kiếm) ---
+    if (filters.keyword) {
+        params.push("keyword=" + encodeURIComponent(filters.keyword));
+    }
+    
+    // --- 3.7: Genre (thể loại) ---
+    if (filters.genre) {
+        params.push("genre=" + encodeURIComponent(filters.genre));
+    }
+    
+    // --- 3.8: Maker (nhà sản xuất) ---
+    if (filters.maker) {
+        params.push("maker=" + encodeURIComponent(filters.maker));
+    }
+    
+    // --- 3.9: Series (loạt phim) ---
+    if (filters.series) {
+        params.push("series=" + encodeURIComponent(filters.series));
+    }
+    
+    // --- 3.10: Duration (thời lượng) ---
+    if (filters.duration) {
+        params.push("duration=" + encodeURIComponent(filters.duration));
+    }
+    
+    // --- 3.11: Status (trạng thái) ---
+    if (filters.status) {
+        params.push("status=" + encodeURIComponent(filters.status));
+    }
+    
+    // ============================================================
+    // BƯỚC 4: KẾT HỢP URL HOÀN CHỈNH
+    // ============================================================
+    return url + "?" + params.join("&");
 }
 
 // =============================================================================
