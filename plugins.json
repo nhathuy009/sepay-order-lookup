@@ -4,7 +4,7 @@
         {
             "id": "123av",
             "name": "123AV",
-            "version": "3.0.1",
+            "version": "4.0.0",
             "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/123avupdate-new.js",
             "iconUrl": "https://raw.githubusercontent.com/youngbi/repo/main/plugins/missav.ico"
         }
