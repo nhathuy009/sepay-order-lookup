@@ -443,11 +443,12 @@ function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     var $doc = _$(html);
     
-    // Kiểm tra nếu là trang diễn viên
+    // ============================================================
+    // KIỂM TRA LOẠI TRANG
+    // ============================================================
     var isActressesPage = $doc.find("a[href*='/actresses/']").length > 10 && 
                           html.indexOf('Actresses') !== -1;
     
-    // Kiểm tra nếu là trang thể loại
     var isAllGenresPage = html.indexOf('/vi/genres/') !== -1 && 
                           html.indexOf('Genres') !== -1 && 
                           html.indexOf('title="Genres"') === -1;
@@ -543,75 +544,115 @@ function parseListResponse(html, apiUrl, datasend) {
     }
     
     // ============================================================
-    // PARSE DANH SÁCH PHIM (CẢI TIẾN)
+    // PARSE DANH SÁCH PHIM (CẢI TIẾN HOÀN TOÀN)
     // ============================================================
     $doc.find(".card, .featured").each(function() {
-        // --- LẤY SLUG ---
-        var link = this.find(".card__body .card__link, .featured__body .card__link, a[href*='/v/']").first();
-        if (!link) return;
+        // ============================================================
+        // BƯỚC 1: LẤY SLUG VÀ URL TỪ CARD__BODY (ƯU TIÊN)
+        // ============================================================
+        var href = "";
+        var slug = "";
+        var link = null;
         
-        var href = link.attr("href");
-        if (!href) return;
-        
-        var slugMatch = href.match(/\/v\/([^"\/]+)/);
-        if (!slugMatch) return;
-        var slug = "vi/v/" + slugMatch[1];
-        
-        // --- LẤY TITLE (ƯU TIÊN TỪ CARD__BODY) ---
-        var title = "";
+        // Ưu tiên 1: Lấy từ card__body
         var bodyLink = this.find(".card__body .card__link, .featured__body .card__link").first();
-        if (bodyLink) {
-            title = bodyLink.text().trim();
+        if (bodyLink && bodyLink.length > 0) {
+            link = bodyLink;
+            href = bodyLink.attr("href") || "";
+            var slugMatch = href.match(/\/v\/([^"\/]+)/);
+            if (slugMatch) slug = "vi/v/" + slugMatch[1];
         }
         
-        // Fallback 1: Từ link chính
-        if (!title || title === "0" || title.match(/^\d+$/)) {
-            title = link.text().trim();
-        }
-        
-        // Fallback 2: Từ img alt
-        if (!title || title === "0" || title.match(/^\d+$/)) {
-            var img = this.find(".card__poster img, .featured__poster img").first();
-            if (img) {
-                title = img.attr("alt") || "";
+        // Ưu tiên 2: Nếu không có, lấy từ card__poster (chỉ để lấy slug)
+        if (!slug) {
+            var posterLink = this.find(".card__poster .card__cover, .featured__poster .card__cover").first();
+            if (posterLink && posterLink.length > 0) {
+                href = posterLink.attr("href") || "";
+                var slugMatch2 = href.match(/\/v\/([^"\/]+)/);
+                if (slugMatch2) slug = "vi/v/" + slugMatch2[1];
+                // Không gán link = posterLink vì nó không có text
             }
         }
         
-        // Fallback 3: Từ h3
+        // Nếu vẫn không có slug, bỏ qua card này
+        if (!slug) return;
+        
+        // ============================================================
+        // BƯỚC 2: LẤY TITLE (CHỈ TỪ CARD__BODY)
+        // ============================================================
+        var title = "";
+        
+        // Nguồn 1: Từ link trong card__body (text của thẻ a)
+        if (bodyLink && bodyLink.length > 0) {
+            title = bodyLink.text().trim();
+        }
+        
+        // Nguồn 2: Từ thẻ h3.card__title
         if (!title || title === "0" || title.match(/^\d+$/)) {
             var titleEl = this.find(".card__title, .featured__title, h3").first();
-            if (titleEl) {
+            if (titleEl && titleEl.length > 0) {
                 title = titleEl.text().trim();
             }
         }
         
-        // Fallback 4: Từ slug
+        // Nguồn 3: Từ toàn bộ card__body
         if (!title || title === "0" || title.match(/^\d+$/)) {
-            title = slugMatch[1].replace(/-/g, " ");
+            var bodyEl = this.find(".card__body, .featured__body").first();
+            if (bodyEl && bodyEl.length > 0) {
+                // Lấy text nhưng loại bỏ meta (views, time)
+                var bodyText = bodyEl.text().trim();
+                // Cắt bỏ phần meta (thường nằm cuối)
+                var metaIndex = bodyText.lastIndexOf("\n") || bodyText.length;
+                if (metaIndex > 0) {
+                    title = bodyText.substring(0, metaIndex).trim();
+                } else {
+                    title = bodyText;
+                }
+            }
         }
         
-        // --- LẤY POSTER ---
+        // Nguồn 4: Từ img alt (fallback cuối)
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            var img = this.find(".card__poster img, .featured__poster img").first();
+            if (img && img.length > 0) {
+                title = img.attr("alt") || "";
+            }
+        }
+        
+        // Nguồn 5: Từ slug (fallback cuối cùng)
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            title = slug.replace("vi/v/", "").replace(/-/g, " ");
+        }
+        
+        // Clean title
+        title = cleanText(title);
+        
+        // ============================================================
+        // BƯỚC 3: LẤY POSTER
+        // ============================================================
         var poster = "";
         var posterImg = this.find(".card__poster img, .featured__poster img").first();
-        if (posterImg) {
+        if (posterImg && posterImg.length > 0) {
             poster = posterImg.attr("data-src") || posterImg.attr("src") || "";
-            poster = PluginUtils.normalizeUrl(poster);
+            if (poster && poster.indexOf("//") === 0) poster = "https:" + poster;
         }
         
-        // --- LẤY PREVIEW URL (MỚI) ---
+        // ============================================================
+        // BƯỚC 4: LẤY PREVIEW URL
+        // ============================================================
         var previewUrl = "";
         var cardHtml = this.html() || "";
         
-        // Strategy 1: Từ data-preview
+        // Strategy 1: Từ data-preview của card__poster
         var posterDiv = this.find(".card__poster, .featured__poster").first();
-        if (posterDiv) {
+        if (posterDiv && posterDiv.length > 0) {
             previewUrl = posterDiv.attr("data-preview") || "";
         }
         
         // Strategy 2: Từ video data-src
         if (!previewUrl) {
             var video = this.find(".card__preview, .featured__preview, video").first();
-            if (video) {
+            if (video && video.length > 0) {
                 previewUrl = video.attr("data-src") || video.attr("src") || "";
             }
         }
@@ -624,41 +665,64 @@ function parseListResponse(html, apiUrl, datasend) {
             }
         }
         
-        previewUrl = PluginUtils.normalizeUrl(previewUrl);
+        // Chuẩn hóa URL preview
+        if (previewUrl && previewUrl.indexOf("//") === 0) {
+            previewUrl = "https:" + previewUrl;
+        }
         
-        // --- LẤY DURATION ---
+        // ============================================================
+        // BƯỚC 5: LẤY DURATION
+        // ============================================================
         var duration = "";
         var durEl = this.find(".card__dur, .featured__dur").first();
-        if (durEl) {
+        if (durEl && durEl.length > 0) {
             duration = durEl.text().trim();
         }
         
-        // --- LẤY VIEWS ---
+        // ============================================================
+        // BƯỚC 6: LẤY VIEWS
+        // ============================================================
         var views = "";
         var viewsEl = this.find(".card__views, .featured__views").first();
-        if (viewsEl) {
+        if (viewsEl && viewsEl.length > 0) {
             views = viewsEl.text().trim();
         }
         
-        // --- XÁC ĐỊNH LANG ---
-        var lang = PluginUtils.detectLanguage(this, href, title, html);
+        // ============================================================
+        // BƯỚC 7: XÁC ĐỊNH LANG
+        // ============================================================
+        var lang = "Censored";
+        var checkHtml = (href + title + cardHtml).toLowerCase();
+        if (checkHtml.indexOf("uncensored") !== -1) {
+            lang = "Uncensored";
+        }
         
-        // --- XÁC ĐỊNH QUALITY ---
-        var quality = lang === 'Uncensored' ? "K.K.Duyệt" : "HD";
+        // ============================================================
+        // BƯỚC 8: XÁC ĐỊNH QUALITY
+        // ============================================================
+        var quality = lang === "Uncensored" ? "K.K.Duyệt" : "HD";
         
-        // --- THÊM VÀO DANH SÁCH ---
+        // ============================================================
+        // BƯỚC 9: TẠO MÔ TẢ
+        // ============================================================
+        var description = "";
+        if (duration) description += "⏱ " + duration;
+        if (views) description += (description ? " | " : "") + "👁 " + views;
+        
+        // ============================================================
+        // BƯỚC 10: THÊM VÀO DANH SÁCH
+        // ============================================================
         movies.push({
             id: slug,
-            title: cleanText(title),
+            title: title,
             posterUrl: poster,
             backdropUrl: poster,
-            description: (duration ? "⏱ " + duration : "") + 
-                        (views ? " | 👁 " + views : ""),
+            description: description,
             year: 0,
             quality: quality,
             episode_current: duration || "Full",
             lang: lang,
-            previewUrl: previewUrl  // ← PREVIEW URL MỚI
+            previewUrl: previewUrl
         });
     });
     
