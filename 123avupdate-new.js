@@ -25,7 +25,7 @@ function getManifest() {
         "type": "VIDEO",
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
-        "subtitleCat": false,
+        "subtitleCat": true,
         "debug": false,
         "adblock": true
     });
@@ -35,9 +35,9 @@ function getHomeSections() {
     return JSON.stringify([
         { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
-        { slug: 'vi/censored', title: 'Phim Có Che (Censored)', type: 'Horizontal', path: '' },
-        { slug: 'vi/uncensored', title: 'Không Che (Uncensored)', type: 'Horizontal', path: '' },
-        { slug: 'vi/uncensored-leaked', title: 'Không Che Rò Rỉ (Leaked)', type: 'Horizontal', path: '' }
+        { slug: 'vi/recent', title: 'Mới thêm gần đây', type: 'Horizontal', path: '' },
+        { slug: 'vi/all?sort=today', title: 'Xu hướng hôm nay', type: 'Horizontal', path: '' },
+        { slug: 'vi/all?sort=week', title: 'Xu hướng tuần này', type: 'Horizontal', path: '' }
     ]);
 }
 
