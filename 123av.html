@@ -102,16 +102,6 @@
         .btn-warning:hover { background: #e67e22; }
         .btn-danger { background: #e74c3c; }
         .btn-danger:hover { background: #c0392b; }
-        .btn-disabled {
-            background: #444;
-            color: #666;
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-        .btn-disabled:hover {
-            transform: none;
-            box-shadow: none;
-        }
 
         .player-wrapper {
             max-width: 960px;
@@ -362,16 +352,6 @@
             margin-top: 4px;
         }
 
-        .sections-grid .section-item.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .sections-grid .section-item.disabled:hover {
-            transform: none;
-            border-color: #2a2a3e;
-        }
-
         .movie-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -425,17 +405,6 @@
             margin-top: 4px;
         }
 
-        .movie-card.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .movie-card.disabled:hover {
-            transform: none;
-            border-color: #222;
-            box-shadow: none;
-        }
-
         .pagination {
             display: flex;
             justify-content: center;
@@ -466,11 +435,6 @@
             color: #fff;
         }
 
-        .pagination .page-btn.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
         .debug-info {
             font-size: 11px;
             color: #555;
@@ -488,19 +452,23 @@
             color: #f39c12;
         }
 
+        /* ===== OVERLAY LỖI CHI TIẾT ===== */
         .overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.92);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            flex-direction: column;
             padding: 20px;
+        }
+
+        .overlay.hidden {
+            display: none;
         }
 
         .overlay .error-box {
@@ -508,18 +476,55 @@
             border: 2px solid #e74c3c;
             border-radius: 16px;
             padding: 40px;
-            max-width: 500px;
-            text-align: center;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .overlay .error-box .icon {
             font-size: 48px;
             margin-bottom: 16px;
+            text-align: center;
         }
 
         .overlay .error-box h2 {
             color: #e74c3c;
             margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .overlay .error-box .error-detail {
+            background: #0a0a1a;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .overlay .error-box .error-detail .label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .overlay .error-box .error-detail .value {
+            color: #f39c12;
+            font-family: monospace;
+            font-size: 13px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .overlay .error-box .error-detail .value.error-text {
+            color: #e74c3c;
+        }
+
+        .overlay .error-box .error-detail .value.success-text {
+            color: #2ecc71;
         }
 
         .overlay .error-box p {
@@ -529,12 +534,16 @@
             margin-bottom: 16px;
         }
 
-        .overlay .error-box .btn {
-            margin-top: 8px;
+        .overlay .error-box .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 16px;
         }
 
-        .overlay.hidden {
-            display: none;
+        .overlay .error-box .btn-group .btn {
+            min-width: 120px;
         }
 
         ::-webkit-scrollbar {
@@ -558,19 +567,50 @@
             .sections-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
             .panel-content .row .col { min-width: 100px; }
             .overlay .error-box { padding: 24px; margin: 16px; }
+            .overlay .error-box .btn-group .btn { min-width: 100px; font-size: 12px; }
         }
     </style>
 </head>
 <body>
 
-<!-- ===== OVERLAY LỖI KHI KHÔNG CÓ PLUGIN ===== -->
+<!-- ===== OVERLAY LỖI CHI TIẾT ===== -->
 <div class="overlay" id="errorOverlay">
     <div class="error-box">
-        <div class="icon">❌</div>
-        <h2>Không thể tải Plugin</h2>
-        <p id="errorMessage">Đang tải plugin từ file <strong>123av-plugin.js</strong>...</p>
-        <button class="btn btn-primary" onclick="retryLoadPlugin()">🔄 Thử lại</button>
-        <button class="btn btn-secondary" onclick="openPanelAndPaste()">📋 Dán plugin thủ công</button>
+        <div class="icon">🔍</div>
+        <h2 id="errorTitle">Đang kiểm tra plugin...</h2>
+        
+        <div class="error-detail">
+            <div class="label">📌 Trạng thái</div>
+            <div class="value" id="errorStatus">Đang tải plugin từ file 123av-plugin.js...</div>
+        </div>
+
+        <div class="error-detail" id="errorDetailContainer" style="display:none;">
+            <div class="label">⚠️ Chi tiết lỗi</div>
+            <div class="value error-text" id="errorDetail"></div>
+        </div>
+
+        <div class="error-detail" id="errorStackContainer" style="display:none;">
+            <div class="label">📋 Stack trace</div>
+            <div class="value" id="errorStack" style="font-size:12px; color:#888;"></div>
+        </div>
+
+        <div class="error-detail" id="errorJQueryContainer" style="display:none;">
+            <div class="label">📦 Kiểm tra jQuery</div>
+            <div class="value" id="errorJQueryStatus"></div>
+        </div>
+
+        <div class="error-detail" id="errorHlsContainer" style="display:none;">
+            <div class="label">📦 Kiểm tra HLS.js</div>
+            <div class="value" id="errorHlsStatus"></div>
+        </div>
+
+        <div id="errorActionButtons">
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="retryLoadPlugin()">🔄 Thử lại</button>
+                <button class="btn btn-warning" onclick="openPanelAndPaste()">📋 Dán plugin thủ công</button>
+                <button class="btn btn-secondary" onclick="showSystemInfo()">🖥️ Thông tin hệ thống</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -621,11 +661,11 @@
 
         <label>📋 Danh sách Section</label>
         <div class="sections-grid" id="sectionsGrid">
-            <div class="section-item disabled">🆕 Mới cập nhật</div>
-            <div class="section-item disabled">🔥 Hot</div>
-            <div class="section-item disabled">🔞 Có che</div>
-            <div class="section-item disabled">🔞 Không che</div>
-            <div class="section-item disabled">💥 Leaked</div>
+            <div class="section-item" style="opacity:0.3;cursor:not-allowed;">🆕 Mới cập nhật</div>
+            <div class="section-item" style="opacity:0.3;cursor:not-allowed;">🔥 Hot</div>
+            <div class="section-item" style="opacity:0.3;cursor:not-allowed;">🔞 Có che</div>
+            <div class="section-item" style="opacity:0.3;cursor:not-allowed;">🔞 Không che</div>
+            <div class="section-item" style="opacity:0.3;cursor:not-allowed;">💥 Leaked</div>
         </div>
 
         <label>🔗 URL tùy chỉnh</label>
@@ -638,7 +678,7 @@
             </div>
         </div>
 
-        <label>🔧 CORS Header (tự động thêm vào request)</label>
+        <label>🔧 CORS Header</label>
         <div class="row">
             <div class="col">
                 <input type="text" id="corsOrigin" value="https://123av.com" placeholder="Origin" />
@@ -656,6 +696,7 @@
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="loadPlugin()">📥 Nạp Plugin</button>
             <button class="btn btn-secondary" onclick="resetPlugin()">🔄 Reset</button>
+            <button class="btn btn-secondary" onclick="showSystemInfo()">🖥️ System Info</button>
         </div>
     </div>
 </div>
@@ -688,6 +729,7 @@
         currentStreamUrl: null,
         corsEnabled: true,
         corsOrigin: 'https://123av.com',
+        debugMode: true,
     };
 
     // ============================================================
@@ -705,8 +747,149 @@
     const pluginStatus = document.getElementById('pluginStatus');
     const corsOriginInput = document.getElementById('corsOrigin');
     const corsStatus = document.getElementById('corsStatus');
+    
+    // Error overlay
     const errorOverlay = document.getElementById('errorOverlay');
-    const errorMessage = document.getElementById('errorMessage');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorStatus = document.getElementById('errorStatus');
+    const errorDetail = document.getElementById('errorDetail');
+    const errorStack = document.getElementById('errorStack');
+    const errorDetailContainer = document.getElementById('errorDetailContainer');
+    const errorStackContainer = document.getElementById('errorStackContainer');
+    const errorJQueryContainer = document.getElementById('errorJQueryContainer');
+    const errorJQueryStatus = document.getElementById('errorJQueryStatus');
+    const errorHlsContainer = document.getElementById('errorHlsContainer');
+    const errorHlsStatus = document.getElementById('errorHlsStatus');
+    const errorActionButtons = document.getElementById('errorActionButtons');
+
+    // ============================================================
+    // DEBUG LOG
+    // ============================================================
+    function debugLog(message, data) {
+        if (state.debugMode) {
+            console.log('[DEBUG]', message, data || '');
+            const debugEl = document.getElementById('debugInfo');
+            if (debugEl) {
+                const timestamp = new Date().toLocaleTimeString();
+                debugEl.textContent = `[${timestamp}] ${message}`;
+            }
+        }
+    }
+
+    // ============================================================
+    // SHOW ERROR - CHI TIẾT
+    // ============================================================
+    function showError(title, status, detail, stack) {
+        errorTitle.textContent = title || '❌ Lỗi';
+        errorStatus.textContent = status || 'Không xác định';
+        errorStatus.className = 'value error-text';
+        
+        if (detail) {
+            errorDetailContainer.style.display = 'block';
+            errorDetail.textContent = detail;
+            errorDetail.className = 'value error-text';
+        } else {
+            errorDetailContainer.style.display = 'none';
+        }
+        
+        if (stack) {
+            errorStackContainer.style.display = 'block';
+            errorStack.textContent = stack;
+        } else {
+            errorStackContainer.style.display = 'none';
+        }
+        
+        // Kiểm tra jQuery
+        checkJQuery();
+        checkHls();
+        
+        errorOverlay.classList.remove('hidden');
+        errorActionButtons.style.display = 'flex';
+    }
+
+    function checkJQuery() {
+        errorJQueryContainer.style.display = 'block';
+        if (typeof $ !== 'undefined') {
+            errorJQueryStatus.textContent = '✅ jQuery đã sẵn sàng (v' + $.fn.jquery + ')';
+            errorJQueryStatus.className = 'value success-text';
+        } else {
+            errorJQueryStatus.textContent = '❌ jQuery KHÔNG được tải! Đây có thể là nguyên nhân gây lỗi "$ is not defined"';
+            errorJQueryStatus.className = 'value error-text';
+        }
+    }
+
+    function checkHls() {
+        errorHlsContainer.style.display = 'block';
+        if (typeof Hls !== 'undefined') {
+            errorHlsStatus.textContent = '✅ HLS.js đã sẵn sàng (v' + (Hls.version || 'unknown') + ')';
+            errorHlsStatus.className = 'value success-text';
+        } else {
+            errorHlsStatus.textContent = '❌ HLS.js KHÔNG được tải!';
+            errorHlsStatus.className = 'value error-text';
+        }
+    }
+
+    function showSystemInfo() {
+        const info = {
+            'User Agent': navigator.userAgent,
+            'Platform': navigator.platform,
+            'jQuery': typeof $ !== 'undefined' ? '✅ v' + $.fn.jquery : '❌ Không có',
+            'HLS.js': typeof Hls !== 'undefined' ? '✅ v' + (Hls.version || 'unknown') : '❌ Không có',
+            'Plugin loaded': state.pluginLoaded ? '✅ Có' : '❌ Chưa',
+            'CORS': state.corsEnabled ? '🟢 Bật' : '🔴 Tắt',
+            'CORS Origin': state.corsOrigin,
+            'Current Section': state.currentSlug,
+            'Current Page': state.currentPage,
+        };
+        
+        let infoText = '';
+        for (const [key, value] of Object.entries(info)) {
+            infoText += `${key}: ${value}\n`;
+        }
+        
+        showError(
+            '🖥️ Thông tin hệ thống',
+            'Đây là thông tin debug',
+            infoText,
+            null
+        );
+        
+        // Ẩn nút hành động, chỉ giữ nút đóng
+        errorActionButtons.innerHTML = `
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="closeError()">✅ Đóng</button>
+                <button class="btn btn-secondary" onclick="copySystemInfo()">📋 Copy</button>
+            </div>
+        `;
+    }
+
+    function copySystemInfo() {
+        const text = errorDetail.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            alert('✅ Đã copy thông tin vào clipboard!');
+        }).catch(() => {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Đã copy thông tin vào clipboard!');
+        });
+    }
+
+    function closeError() {
+        errorOverlay.classList.add('hidden');
+        // Reset buttons
+        errorActionButtons.innerHTML = `
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="retryLoadPlugin()">🔄 Thử lại</button>
+                <button class="btn btn-warning" onclick="openPanelAndPaste()">📋 Dán plugin thủ công</button>
+                <button class="btn btn-secondary" onclick="showSystemInfo()">🖥️ Thông tin hệ thống</button>
+            </div>
+        `;
+    }
 
     // ============================================================
     // HLS PLAYER
@@ -714,6 +897,7 @@
     let hls = null;
 
     function initHls(url) {
+        debugLog('Init HLS', url);
         debugInfo.textContent = '📡 Stream: ' + url;
         
         if (hls) {
@@ -732,40 +916,57 @@
             return;
         }
 
-        if (Hls.isSupported()) {
-            hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: true,
-                backbufferLength: 30,
-                maxBufferLength: 30,
-                xhrSetup: function(xhr, url) {
-                    xhr.withCredentials = false;
-                    if (state.corsEnabled && state.corsOrigin) {
-                        xhr.setRequestHeader('Origin', state.corsOrigin);
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+            try {
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backbufferLength: 30,
+                    maxBufferLength: 30,
+                    xhrSetup: function(xhr, url) {
+                        xhr.withCredentials = false;
+                        if (state.corsEnabled && state.corsOrigin) {
+                            xhr.setRequestHeader('Origin', state.corsOrigin);
+                        }
+                        xhr.setRequestHeader('Referer', 'https://123av.com/');
+                        xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0');
                     }
-                    xhr.setRequestHeader('Referer', 'https://123av.com/');
-                    xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0');
-                }
-            });
+                });
 
-            hls.loadSource(url);
-            hls.attachMedia(video);
+                hls.loadSource(url);
+                hls.attachMedia(video);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                video.play().catch(() => {});
-                playerStatus.classList.add('hidden');
-            });
-
-            hls.on(Hls.Events.ERROR, function(event, data) {
-                if (data.fatal) {
-                    console.error('HLS fatal error:', data);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play().catch(() => {});
                     playerStatus.classList.add('hidden');
-                }
-            });
+                });
+
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        console.error('HLS fatal error:', data);
+                        playerStatus.classList.add('hidden');
+                    }
+                });
+
+            } catch (e) {
+                console.error('HLS init error:', e);
+                playerStatus.classList.add('hidden');
+                showError(
+                    '❌ Lỗi HLS',
+                    'Không thể khởi tạo HLS player',
+                    e.message,
+                    e.stack
+                );
+            }
 
         } else {
             playerStatus.classList.add('hidden');
-            alert('Trình duyệt không hỗ trợ HLS.');
+            showError(
+                '❌ HLS không hỗ trợ',
+                'Trình duyệt không hỗ trợ HLS',
+                'Vui lòng sử dụng trình duyệt hiện đại (Chrome, Firefox, Edge)',
+                null
+            );
         }
     }
 
@@ -793,6 +994,7 @@
     // FETCH
     // ============================================================
     async function fetchPage(url) {
+        debugLog('Fetch page', url);
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
             'Referer': 'https://123av.com/',
@@ -816,12 +1018,27 @@
         try {
             const code = pluginCode.value.trim();
             if (!code) {
-                showError('Plugin code trống! Vui lòng dán plugin code vào textarea.');
+                showError(
+                    '❌ Plugin code trống',
+                    'Không có code để nạp',
+                    'Vui lòng dán plugin code vào textarea hoặc tải từ file.',
+                    null
+                );
                 return;
             }
 
             pluginStatus.textContent = '⏳ Đang nạp...';
             pluginStatus.className = 'plugin-status loading';
+
+            debugLog('Loading plugin from textarea', code.substring(0, 200) + '...');
+
+            // Kiểm tra xem plugin có dùng jQuery không
+            if (code.includes('$(') || code.includes('.$')) {
+                if (typeof $ === 'undefined') {
+                    throw new Error('Plugin sử dụng jQuery ($) nhưng jQuery chưa được tải!');
+                }
+                debugLog('Plugin uses jQuery, jQuery is loaded');
+            }
 
             const fn = new Function(
                 'getManifest',
@@ -847,10 +1064,14 @@
             const plugin = fn();
 
             const required = ['getManifest', 'getHomeSections', 'getUrlList', 'getUrlSearch', 'getUrlDetail', 'parseListResponse', 'parseSearchResponse', 'parseMovieDetail', 'parseDetailResponse'];
+            const missing = [];
             for (const key of required) {
                 if (typeof plugin[key] !== 'function') {
-                    throw new Error(`Thiếu hàm bắt buộc: ${key}`);
+                    missing.push(key);
                 }
+            }
+            if (missing.length > 0) {
+                throw new Error(`Thiếu hàm bắt buộc: ${missing.join(', ')}`);
             }
 
             state.plugin = plugin;
@@ -860,14 +1081,14 @@
                 const manifest = JSON.parse(plugin.getManifest());
                 pluginStatus.textContent = `✅ ${manifest.name} v${manifest.version}`;
                 pluginStatus.className = 'plugin-status loaded';
+                debugLog('Plugin loaded successfully', manifest);
             } catch (e) {
-                pluginStatus.textContent = '✅ Đã tải';
+                pluginStatus.textContent = '✅ Đã tải (không parse được manifest)';
                 pluginStatus.className = 'plugin-status loaded';
+                debugLog('Plugin loaded but manifest parse failed', e.message);
             }
 
-            // Ẩn overlay lỗi
-            errorOverlay.classList.add('hidden');
-
+            closeError();
             loadSections();
             loadHome();
 
@@ -876,22 +1097,36 @@
             pluginStatus.textContent = '❌ Lỗi: ' + e.message;
             pluginStatus.className = 'plugin-status error';
             state.pluginLoaded = false;
-            showError('Lỗi nạp plugin: ' + e.message);
+            
+            showError(
+                '❌ Lỗi nạp plugin',
+                e.message,
+                e.stack || 'Không có stack trace',
+                e.stack
+            );
         }
     }
 
     function loadPluginFromFile() {
         pluginStatus.textContent = '⏳ Đang tải từ file...';
         pluginStatus.className = 'plugin-status loading';
-        errorMessage.innerHTML = 'Đang tải plugin từ file <strong>123av-plugin.js</strong>...';
+        errorStatus.textContent = 'Đang tải plugin từ file 123av-plugin.js...';
+        errorStatus.className = 'value';
+
+        debugLog('Loading plugin from file: 123av-plugin.js');
 
         fetch('123av-plugin.js')
             .then(res => {
-                if (!res.ok) throw new Error('Không tìm thấy file 123av-plugin.js (HTTP ' + res.status + ')');
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status} - ${res.statusText}`);
+                }
                 return res.text();
             })
             .then(code => {
-                if (!code.trim()) throw new Error('File plugin trống');
+                if (!code.trim()) {
+                    throw new Error('File plugin trống (0 bytes)');
+                }
+                debugLog('Plugin file loaded, size: ' + code.length + ' bytes');
                 pluginCode.value = code;
                 loadPlugin();
             })
@@ -899,7 +1134,25 @@
                 console.error('Load plugin from file error:', err);
                 pluginStatus.textContent = '❌ Không tìm thấy file';
                 pluginStatus.className = 'plugin-status error';
-                showError('Không thể tải file plugin: ' + err.message);
+                
+                // Kiểm tra xem có phải lỗi jQuery không
+                let detail = err.message;
+                let stack = err.stack;
+                
+                if (err.message.includes('$ is not defined')) {
+                    detail = 'Plugin sử dụng jQuery ($) nhưng chưa được tải.\n\n' +
+                             'Kiểm tra:\n' +
+                             '1. File 123av-plugin.js có sử dụng $ không?\n' +
+                             '2. jQuery đã được tải chưa? (kiểm tra Network tab)\n' +
+                             '3. Có thể thử dùng phiên bản jQuery khác';
+                }
+                
+                showError(
+                    '❌ Không thể tải file plugin',
+                    err.message,
+                    detail,
+                    stack
+                );
             });
     }
 
@@ -908,20 +1161,11 @@
     }
 
     function openPanelAndPaste() {
-        errorOverlay.classList.add('hidden');
+        closeError();
         document.getElementById('panelContent').classList.add('open');
         document.getElementById('panelArrow').classList.add('open');
         pluginCode.focus();
-    }
-
-    function showError(message) {
-        errorMessage.innerHTML = message;
-        errorOverlay.classList.remove('hidden');
-        
-        // Vô hiệu hóa các nút chức năng
-        document.querySelectorAll('.movie-card, .section-item, .page-btn').forEach(el => {
-            el.classList.add('disabled');
-        });
+        pluginCode.select();
     }
 
     function resetPlugin() {
@@ -938,8 +1182,12 @@
         video.removeAttribute('src');
         if (hls) { hls.destroy(); hls = null; }
         
-        // Hiển thị overlay yêu cầu nạp plugin
-        showError('Plugin đã bị reset. Vui lòng nạp lại plugin.');
+        showError(
+            '🔄 Plugin đã reset',
+            'Plugin bị xóa khỏi bộ nhớ',
+            'Vui lòng nạp lại plugin để tiếp tục sử dụng.',
+            null
+        );
     }
 
     // ============================================================
@@ -947,13 +1195,14 @@
     // ============================================================
     function loadSections() {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể load sections', 'Vui lòng nạp plugin trước.', null);
             return;
         }
         try {
             const sectionsJson = state.plugin.getHomeSections();
             const sections = JSON.parse(sectionsJson);
             state.sections = sections;
+            debugLog('Sections loaded', sections.length + ' sections');
 
             const grid = document.getElementById('sectionsGrid');
             grid.innerHTML = sections.map(s => `
@@ -965,6 +1214,12 @@
 
         } catch (e) {
             console.error('Load sections error:', e);
+            showError(
+                '❌ Lỗi load sections',
+                e.message,
+                e.stack,
+                e.stack
+            );
         }
     }
 
@@ -973,7 +1228,7 @@
     // ============================================================
     function loadSection(slug, page) {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể load section', 'Vui lòng nạp plugin trước.', null);
             return;
         }
 
@@ -983,6 +1238,7 @@
         try {
             const filters = { ...state.filters, page: state.currentPage };
             const url = state.plugin.getUrlList(slug, JSON.stringify(filters));
+            debugLog('Loading section', url);
 
             fetchPage(url)
                 .then(html => {
@@ -993,17 +1249,29 @@
                 .catch(err => {
                     console.error('Fetch error:', err);
                     movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi tải dữ liệu: ${err.message}</div>`;
+                    showError(
+                        '❌ Lỗi tải dữ liệu',
+                        err.message,
+                        err.stack,
+                        err.stack
+                    );
                 });
 
         } catch (e) {
             console.error('Load section error:', e);
             movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi: ${e.message}</div>`;
+            showError(
+                '❌ Lỗi load section',
+                e.message,
+                e.stack,
+                e.stack
+            );
         }
     }
 
     function loadHome() {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể load home', 'Vui lòng nạp plugin trước.', null);
             return;
         }
         if (state.sections.length > 0) {
@@ -1018,7 +1286,7 @@
     // ============================================================
     function doSearch() {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể tìm kiếm', 'Vui lòng nạp plugin trước.', null);
             return;
         }
         const keyword = searchInput.value.trim();
@@ -1027,6 +1295,7 @@
         try {
             const filters = { ...state.filters, page: 1 };
             const url = state.plugin.getUrlSearch(keyword, JSON.stringify(filters));
+            debugLog('Searching', url);
 
             fetchPage(url)
                 .then(html => {
@@ -1039,10 +1308,22 @@
                 .catch(err => {
                     console.error('Search error:', err);
                     movieGrid.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#e74c3c; padding:40px 0;">❌ Lỗi tìm kiếm: ${err.message}</div>`;
+                    showError(
+                        '❌ Lỗi tìm kiếm',
+                        err.message,
+                        err.stack,
+                        err.stack
+                    );
                 });
 
         } catch (e) {
             console.error('Search error:', e);
+            showError(
+                '❌ Lỗi tìm kiếm',
+                e.message,
+                e.stack,
+                e.stack
+            );
         }
     }
 
@@ -1051,7 +1332,7 @@
     // ============================================================
     function playMovie(slug) {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể phát phim', 'Vui lòng nạp plugin trước.', null);
             return;
         }
 
@@ -1061,6 +1342,7 @@
 
         try {
             const url = state.plugin.getUrlDetail(slug);
+            debugLog('Playing movie', url);
             debugInfo.textContent = '📡 Đang tải: ' + url;
 
             fetchPage(url)
@@ -1073,6 +1355,7 @@
                         }
                     } catch (e) {
                         console.warn('Parse detail error:', e);
+                        debugLog('Parse detail error', e.message);
                     }
 
                     if (detail) {
@@ -1194,12 +1477,24 @@
                     console.error('Play error:', err);
                     playerStatus.classList.add('hidden');
                     alert('Lỗi tải phim: ' + err.message);
+                    showError(
+                        '❌ Lỗi phát phim',
+                        err.message,
+                        err.stack,
+                        err.stack
+                    );
                 });
 
         } catch (e) {
             console.error('Play error:', e);
             playerStatus.classList.add('hidden');
             alert('Lỗi: ' + e.message);
+            showError(
+                '❌ Lỗi phát phim',
+                e.message,
+                e.stack,
+                e.stack
+            );
         }
     }
 
@@ -1208,7 +1503,7 @@
     // ============================================================
     function playCustomUrl() {
         if (!state.pluginLoaded || !state.plugin) {
-            showError('Plugin chưa được nạp!');
+            showError('Plugin chưa được nạp!', 'Không thể phát URL', 'Vui lòng nạp plugin trước.', null);
             return;
         }
         const url = document.getElementById('customUrl').value.trim();
@@ -1336,14 +1631,79 @@
         if (e.key === 'Enter' && document.activeElement === searchInput) {
             doSearch();
         }
+        if (e.key === 'Escape') {
+            closeError();
+        }
     });
 
     // ============================================================
     // INIT
     // ============================================================
     window.onload = function() {
+        debugLog('Page loaded, initializing...');
         updateCorsStatus();
+        
+        // Kiểm tra jQuery ngay khi load
+        if (typeof $ === 'undefined') {
+            console.warn('⚠️ jQuery not loaded!');
+            showError(
+                '⚠️ jQuery chưa được tải',
+                'Thiếu thư viện jQuery',
+                'Plugin 123AV yêu cầu jQuery để hoạt động.\n\n' +
+                'Kiểm tra:\n' +
+                '1. Kết nối Internet có ổn định không?\n' +
+                '2. Có thể CDN bị chặn, thử dùng CDN khác\n' +
+                '3. Kiểm tra Network tab để xem file jquery có được tải không',
+                null
+            );
+            return;
+        }
+        
+        debugLog('jQuery loaded: v' + $.fn.jquery);
+        
+        // Kiểm tra HLS.js
+        if (typeof Hls === 'undefined') {
+            console.warn('⚠️ HLS.js not loaded!');
+            showError(
+                '⚠️ HLS.js chưa được tải',
+                'Thiếu thư viện HLS.js',
+                'Trình phát cần HLS.js để phát video.\n\n' +
+                'Kiểm tra:\n' +
+                '1. Kết nối Internet có ổn định không?\n' +
+                '2. Có thể CDN bị chặn\n' +
+                '3. Kiểm tra Network tab để xem file hls.js có được tải không',
+                null
+            );
+            return;
+        }
+        
+        debugLog('HLS.js loaded');
+        
+        // Tải plugin từ file
         loadPluginFromFile();
+    };
+
+    // ============================================================
+    // GLOBAL ERROR HANDLER
+    // ============================================================
+    window.onerror = function(message, source, lineno, colno, error) {
+        console.error('Global error:', message, error);
+        if (message.includes('$ is not defined')) {
+            showError(
+                '❌ Lỗi jQuery: $ is not defined',
+                'Plugin hoặc code sử dụng $ nhưng jQuery chưa sẵn sàng',
+                'Nguyên nhân:\n' +
+                '1. jQuery chưa được tải xong khi plugin chạy\n' +
+                '2. Có thể CDN jQuery bị chặn\n' +
+                '3. Plugin sử dụng $ nhưng không kiểm tra sự tồn tại của nó\n\n' +
+                'Giải pháp:\n' +
+                '1. Thêm kiểm tra typeof $ !== "undefined" trong plugin\n' +
+                '2. Sử dụng CDN khác cho jQuery\n' +
+                '3. Tải jQuery từ file local',
+                error ? error.stack : null
+            );
+        }
+        return false;
     };
 </script>
 
