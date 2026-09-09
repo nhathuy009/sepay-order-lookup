@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>123AV Player - HLS</title>
     
+    <!-- THÊM JQUERY TRƯỚC HLS.JS -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17/dist/hls.min.js"></script>
     
     <style>
@@ -887,7 +889,7 @@
     }
 
     // ============================================================
-    // PLAY MOVIE - SỬA LỖI CORS & TỐI ƯU (thêm Origin vào mọi request)
+    // PLAY MOVIE
     // ============================================================
     function playMovie(slug) {
         if (!state.pluginLoaded || !state.plugin) {
@@ -947,13 +949,11 @@
                             let epUrl = ep.id;
                             debugInfo.textContent = '📡 Lấy stream từ detail.servers: ' + epUrl;
 
-                            // Nếu epUrl là m3u8 -> phát ngay
                             if (epUrl && epUrl.includes('.m3u8')) {
                                 initHls(epUrl);
                                 return;
                             }
 
-                            // Nếu không, thử fetch epUrl để tìm m3u8 bên trong
                             if (epUrl) {
                                 debugInfo.textContent = '📡 Fetch stream URL: ' + epUrl;
                                 const headers = {
@@ -985,7 +985,7 @@
                         }
                     }
 
-                    // 3c. Tìm player JSON (cách cũ, nhưng không gọi javplayer.cc nữa)
+                    // 3c. Tìm player JSON (cách cũ)
                     const playerMatch = html.match(/player\(\s*JSON\.parse\(\s*['"]([^'"]+)['"]\s*\)/i);
                     if (playerMatch) {
                         try {
@@ -997,12 +997,10 @@
                             if (Array.isArray(playerData) && playerData.length > 0) {
                                 const item = playerData[0];
                                 if (item.url) {
-                                    // Thử phát trực tiếp nếu là m3u8, nếu không thì fetch
                                     if (item.url.includes('.m3u8')) {
                                         initHls(item.url);
                                         return;
                                     } else {
-                                        // Fetch URL để tìm m3u8
                                         debugInfo.textContent = '📡 Fetch player URL: ' + item.url;
                                         const headers = {
                                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0',
@@ -1055,7 +1053,7 @@
     }
 
     // ============================================================
-    // PLAY CUSTOM URL - thêm Origin
+    // PLAY CUSTOM URL
     // ============================================================
     function playCustomUrl() {
         const url = document.getElementById('customUrl').value.trim();
@@ -1070,7 +1068,6 @@
         if (slugMatch) {
             playMovie('vi/v/' + slugMatch[1]);
         } else {
-            // Thử fetch và tìm m3u8
             playerStatus.classList.remove('hidden');
             debugInfo.textContent = '📡 Đang tải: ' + url;
             const headers = {
@@ -1191,22 +1188,33 @@
     // ============================================================
     window.onload = function() {
         updateCorsStatus();
-        const defaultCode = document.getElementById('defaultPluginCode');
-        if (defaultCode) {
-            pluginCode.value = defaultCode.textContent;
-            loadPlugin();
-        } else {
-            if (pluginCode.value.trim()) {
+        
+        // THAY ĐỔI: Tự động tải plugin từ file bên ngoài
+        fetch('123av-plugin.js')
+            .then(res => {
+                if (!res.ok) throw new Error('Không tìm thấy file plugin');
+                return res.text();
+            })
+            .then(code => {
+                pluginCode.value = code;
                 loadPlugin();
-            } else {
-                pluginStatus.textContent = '⚠️ Chưa có plugin';
-            }
-        }
+            })
+            .catch(() => {
+                // Fallback: dùng plugin nhúng sẵn nếu có
+                const defaultCode = document.getElementById('defaultPluginCode');
+                if (defaultCode && defaultCode.textContent.trim()) {
+                    pluginCode.value = defaultCode.textContent;
+                    loadPlugin();
+                } else {
+                    pluginStatus.textContent = '⚠️ Không tìm thấy plugin';
+                    pluginStatus.className = 'plugin-status error';
+                }
+            });
     };
 </script>
 
 <!-- ============================================================ -->
-<!-- PLUGIN CODE (Nhúng sẵn) -->
+<!-- PLUGIN CODE (Nhúng sẵn - dùng làm fallback) -->
 <!-- ============================================================ -->
 <script id="defaultPluginCode" type="text/plain">
 // =============================================================================
