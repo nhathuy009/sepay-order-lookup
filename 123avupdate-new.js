@@ -1,6 +1,7 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 2.0.1
+// Version: 3.0.0
+// Cập nhật: Thêm previewUrl, sửa lỗi title "0", parse chính xác hơn
 // =============================================================================
 
 // =============================================================================
@@ -11,7 +12,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "123av",
         "name": "123AV",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "baseUrl": "https://123av.com",
         "fallbackUrls": [
             "https://123av.net",
@@ -25,7 +26,7 @@ function getManifest() {
         "type": "VIDEO",
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
-        "subtitleCat": true,
+        "subtitleCat": false,
         "debug": false,
         "adblock": true
     });
@@ -35,9 +36,9 @@ function getHomeSections() {
     return JSON.stringify([
         { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
-        { slug: 'vi/recent', title: 'Mới thêm gần đây', type: 'Horizontal', path: '' },
-        { slug: 'vi/all?sort=today', title: 'Xu hướng hôm nay', type: 'Horizontal', path: '' },
-        { slug: 'vi/all?sort=week', title: 'Xu hướng tuần này', type: 'Horizontal', path: '' }
+        { slug: 'vi/censored', title: 'Phim Có Che (Censored)', type: 'Horizontal', path: '' },
+        { slug: 'vi/uncensored', title: 'Không Che (Uncensored)', type: 'Horizontal', path: '' },
+        { slug: 'vi/uncensored-leaked', title: 'Không Che Rò Rỉ (Leaked)', type: 'Horizontal', path: '' }
     ]);
 }
 
@@ -76,10 +77,118 @@ function getFilterConfig() {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
+// UTILITY FUNCTIONS
 // =============================================================================
 
-// Helper: Lấy dữ liệu từ pipe |data:
+var PluginUtils = {
+    /**
+     * Làm sạch text: loại bỏ HTML tags, entities, khoảng trắng thừa
+     */
+    cleanText: function(text) {
+        if (!text) return "";
+        return text.replace(/<[^>]*>/g, "")
+            .replace(/&amp;/g, "&")
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/\s+/g, " ")
+            .trim();
+    },
+
+    /**
+     * Lấy meta tag từ HTML
+     */
+    getMeta: function(html, property) {
+        var regex1 = new RegExp('(?:property|name)=["\']' + property + '["\'][^>]*content=(["\'])(.*?)\\1', 'i');
+        var regex2 = new RegExp('content=(["\'])(.*?)\\1[^>]*(?:property|name)=["\']' + property + '["\']', 'i');
+        var match = html.match(regex1) || html.match(regex2);
+        return match ? match[2] : "";
+    },
+
+    /**
+     * Chuẩn hóa URL: thêm https: nếu thiếu
+     */
+    normalizeUrl: function(url) {
+        if (!url) return "";
+        if (url.indexOf('//') === 0) return "https:" + url;
+        if (url.indexOf('/') === 0) return "https://123av.com" + url;
+        return url;
+    },
+
+    /**
+     * Trích xuất preview URL từ card với 3 strategy
+     */
+    extractPreviewUrl: function(itemHtml, $element) {
+        var url = "";
+
+        // Strategy 1: Lấy từ data-preview attribute (PNG)
+        // HTML: <div class="card__poster" x-data="preview" data-preview="https://.../preview.png">
+        var previewMatch = itemHtml.match(/data-preview="([^"]+)"/);
+        if (previewMatch) {
+            url = previewMatch[1];
+        }
+
+        // Nếu dùng jQuery
+        if (!url && $element) {
+            var posterDiv = $element.find(".card__poster, .featured__poster").first();
+            if (posterDiv) {
+                url = posterDiv.attr("data-preview") || "";
+            }
+        }
+
+        // Strategy 2: Lấy từ video data-src (MP4)
+        if (!url) {
+            var videoMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
+            if (videoMatch) {
+                url = videoMatch[1];
+            }
+        }
+
+        // Strategy 3: Thử chuyển PNG sang MP4
+        if (url && url.indexOf('.png') !== -1) {
+            var mp4Url = url.replace('.png', '.mp4');
+            // Giữ nguyên PNG, nhưng có thể dùng MP4 nếu muốn
+            // url = mp4Url;
+        }
+
+        // Chuẩn hóa URL
+        return PluginUtils.normalizeUrl(url);
+    },
+
+    /**
+     * Xác định loại phim (Censored/Uncensored) từ nhiều nguồn
+     */
+    detectLanguage: function($element, href, title, html) {
+        // Kiểm tra trong URL
+        if (href && href.indexOf('uncensored') !== -1) {
+            return 'Uncensored';
+        }
+
+        // Kiểm tra trong title
+        if (title && title.toLowerCase().indexOf('uncensored') !== -1) {
+            return 'Uncensored';
+        }
+
+        // Kiểm tra class của card
+        if ($element && $element.find('[class*="uncensored"]').length > 0) {
+            return 'Uncensored';
+        }
+
+        // Kiểm tra HTML của card
+        var cardHtml = $element ? $element.html() || "" : "";
+        if (cardHtml.toLowerCase().indexOf('uncensored') !== -1) {
+            return 'Uncensored';
+        }
+
+        return 'Censored';
+    }
+};
+
+// =============================================================================
+// HELPER FUNCTIONS (Giữ nguyên từ plugin cũ)
+// =============================================================================
+
 function getPipeData(raw) {
     if (!raw) return "";
     var i = raw.indexOf("|");
@@ -91,7 +200,6 @@ function getPipeData(raw) {
     return s;
 }
 
-// Helper: Làm sạch URL (bỏ phần |data:)
 function cleanUrl(raw) {
     if (!raw) return "";
     var i = raw.indexOf("|");
@@ -99,7 +207,6 @@ function cleanUrl(raw) {
     return raw.substring(0, i);
 }
 
-// Helper: Trích xuất hash ID từ URL
 function extractHashId(url) {
     if (!url) return null;
     
@@ -125,7 +232,6 @@ function extractHashId(url) {
     return null;
 }
 
-// Helper: Trích xuất poster từ URL
 function extractPosterFromUrl(url) {
     try {
         var urlObj = new URL(url);
@@ -135,7 +241,6 @@ function extractPosterFromUrl(url) {
     }
 }
 
-// Helper: Giải mã player JSON (xử lý Unicode escapes)
 function decodePlayerJson(escapedStr) {
     try {
         var cleanStr = escapedStr.replace(/\\u([0-9a-fA-F]{4})/g, function(match, grp) {
@@ -147,110 +252,13 @@ function decodePlayerJson(escapedStr) {
     }
 }
 
-// Helper: Làm sạch text
 function cleanText(text) {
-    if (!text) return "";
-    return text.replace(/<[^>]*>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&quot;/g, '"')
-        .replace(/&#039;/g, "'")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/\s+/g, " ")
-        .trim();
+    return PluginUtils.cleanText(text);
 }
 
-// Helper: Lấy meta tag từ HTML
 function getMeta(html, property) {
-    var regex1 = new RegExp('(?:property|name)=["\']' + property + '["\'][^>]*content=(["\'])(.*?)\\1', 'i');
-    var regex2 = new RegExp('content=(["\'])(.*?)\\1[^>]*(?:property|name)=["\']' + property + '["\']', 'i');
-    var match = html.match(regex1) || html.match(regex2);
-    return match ? match[2] : "";
+    return PluginUtils.getMeta(html, property);
 }
-
-var PreviewUtils = {
-    /**
-     * Trích xuất Preview URL từ card với 2 strategy:
-     * Strategy 1: Lấy từ data-preview attribute (PNG preview)
-     * Strategy 2: Lấy từ video data-src (MP4 preview)
-     * Strategy 3: Convert PNG sang MP4 (fallback)
-     */
-    extractPreviewUrl: function (itemHtml, $element) {
-        var url = "";
-        
-        // ============================================================
-        // STRATEGY 1: Lấy từ data-preview attribute (PNG)
-        // ============================================================
-        // HTML: <div class="card__poster" x-data="preview" data-preview="https://.../preview.png">
-        var previewMatch = itemHtml.match(/data-preview="([^"]+)"/);
-        if (previewMatch) {
-            url = previewMatch[1];
-        }
-        
-        // Nếu dùng jQuery
-        if (!url && $element) {
-            var posterDiv = $element.find(".card__poster, .featured__poster").first();
-            if (posterDiv) {
-                url = posterDiv.attr("data-preview") || "";
-            }
-        }
-        
-        // ============================================================
-        // STRATEGY 2: Lấy từ video data-src (MP4)
-        // ============================================================
-        // HTML: <video class="card__preview" data-src="https://.../preview.mp4">
-        if (!url) {
-            var videoMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
-            if (videoMatch) {
-                url = videoMatch[1];
-            }
-        }
-        
-        // ============================================================
-        // STRATEGY 3: Convert PNG sang MP4 (fallback)
-        // ============================================================
-        // Nếu có preview PNG, thử convert sang MP4
-        if (url && url.indexOf('.png') !== -1) {
-            var mp4Url = url.replace('.png', '.mp4');
-            // Kiểm tra xem MP4 có tồn tại không (có thể không)
-            // Trong thực tế, 123AV thường có cả PNG và MP4
-            // url = mp4Url; // Có thể bỏ comment nếu muốn thử
-        }
-        
-        // ============================================================
-        // CHUẨN HÓA URL
-        // ============================================================
-        if (url && url.indexOf('//') === 0) {
-            url = "https:" + url;
-        }
-        
-        return url;
-    },
-    
-    /**
-     * Kiểm tra xem preview có phải là video (MP4) không
-     */
-    isVideoPreview: function (url) {
-        if (!url) return false;
-        return url.indexOf('.mp4') !== -1 || 
-               url.indexOf('.webm') !== -1 ||
-               url.indexOf('preview.mp4') !== -1;
-    },
-    
-    /**
-     * Chuyển đổi preview PNG thành MP4 (nếu có)
-     */
-    getVideoPreview: function (pngUrl) {
-        if (!pngUrl) return "";
-        // Thử các format khác nhau
-        var formats = [
-            pngUrl.replace('.png', '.mp4'),
-            pngUrl.replace('/preview.png', '/preview.mp4'),
-            pngUrl.replace('.png', '.webm')
-        ];
-        return formats[0]; // Trả về MP4 đầu tiên
-    }
-};
 
 // =============================================================================
 // X-DATA PARSER (PHƯƠNG PHÁP MỚI)
@@ -316,7 +324,7 @@ function extractPlayerDataFromXData(html) {
 }
 
 // =============================================================================
-// STREAM DATA FETCHER (SỬ DỤNG httpRequest NATIVE)
+// STREAM DATA FETCHER
 // =============================================================================
 
 function fetchStreamDataAdvanced(hashId, poster) {
@@ -397,19 +405,15 @@ function getUrlSearch(keyword, filtersJson) {
 }
 
 function getUrlDetail(slug, datasend) {
-    // Nếu có datasend và là JSON hợp lệ, trả về thẳng (bỏ qua fetch HTTP)
     if (datasend) {
         try {
             var data = JSON.parse(datasend);
             if (data && data.id) {
                 return datasend;
             }
-        } catch (e) {
-            // Không phải JSON, tiếp tục xử lý bình thường
-        }
+        } catch (e) {}
     }
     
-    // Xử lý URL
     if (slug.indexOf("http") === 0) return slug;
     if (slug.indexOf("vi/v/") === 0) return "https://123av.com/" + slug;
     if (slug.indexOf("/vi/v/") === 0) return "https://123av.com" + slug;
@@ -432,149 +436,235 @@ function getUrlYears() {
 }
 
 // =============================================================================
-// LIST PARSERS
+// LIST PARSER (CẢI TIẾN - CÓ PREVIEW URL)
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     var $doc = _$(html);
     
-    // Kiểm tra nếu là trang diễn viên hoặc thể loại
-    var isActressesPage = $doc.find("a[href*='/actresses/']").length > 10;
-    var isAllGenresPage = html.indexOf('/vi/genres/') !== -1 && 
-                          html.indexOf('Genres') !== -1;
+    // Kiểm tra nếu là trang diễn viên
+    var isActressesPage = $doc.find("a[href*='/actresses/']").length > 10 && 
+                          html.indexOf('Actresses') !== -1;
     
+    // Kiểm tra nếu là trang thể loại
+    var isAllGenresPage = html.indexOf('/vi/genres/') !== -1 && 
+                          html.indexOf('Genres') !== -1 && 
+                          html.indexOf('title="Genres"') === -1;
+    
+    // ============================================================
+    // PARSE TRANG DIỄN VIÊN
+    // ============================================================
     if (isActressesPage) {
-        // ... parse actresses (giữ nguyên)
-    } else if (isAllGenresPage) {
-        // ... parse genres (giữ nguyên)
-    } else {
-        // Parse danh sách phim (có preview)
-        $doc.find(".card, .featured").each(function() {
-            var link = this.find("a[href*='/v/']").first();
-            if (!link) return;
-            
-            var href = link.attr("href");
+        $doc.find("a[href*='/actresses/']").each(function() {
+            var href = this.attr("href");
             if (!href) return;
             
-            var slugMatch = href.match(/\/v\/([^"\/]+)/);
+            var slugMatch = href.match(/\/actresses\/([^"\/]+)/);
             if (!slugMatch) return;
             
-            var slug = "vi/v/" + slugMatch[1];
+            var name = this.text().trim();
+            if (!name || name.length < 2 || name.match(/^\d+/) || name.indexOf('.') !== -1) return;
             
-            // ============================================================
-            // LẤY TITLE
-            // ============================================================
-            var title = "";
-            var bodyLink = this.find(".card__body .card__link, .featured__body .card__link").first();
-            if (bodyLink) {
-                title = bodyLink.text().trim();
-            }
+            var slug = "vi/actresses/" + slugMatch[1];
             
-            if (!title || title === "0") {
-                title = link.text().trim();
-            }
-            
-            if (!title || title === "0") {
-                var img = this.find("img").first();
-                if (img) {
-                    title = img.attr("alt") || "";
+            var exists = false;
+            for (var i = 0; i < movies.length; i++) {
+                if (movies[i].id === slug) {
+                    exists = true;
+                    break;
                 }
             }
             
-            if (!title || title === "0") {
-                title = slugMatch[1].replace(/-/g, " ");
+            if (!exists) {
+                movies.push({
+                    id: slug,
+                    title: name,
+                    posterUrl: "",
+                    backdropUrl: "",
+                    description: "Nữ diễn viên",
+                    year: 0,
+                    quality: "ACTRESS",
+                    episode_current: "",
+                    lang: "",
+                    previewUrl: ""
+                });
             }
-            
-            // ============================================================
-            // LẤY POSTER
-            // ============================================================
-            var poster = "";
-            var img = this.find(".card__poster img, .featured__poster img").first();
-            if (img) {
-                poster = img.attr("data-src") || img.attr("src") || "";
-                if (poster && poster.indexOf("//") === 0) poster = "https:" + poster;
-            }
-            
-            // ============================================================
-            // LẤY PREVIEW URL (MỚI)
-            // ============================================================
-            var previewUrl = "";
-            
-            // Strategy 1: Lấy từ data-preview của card__poster
-            var posterDiv = this.find(".card__poster, .featured__poster").first();
-            if (posterDiv) {
-                previewUrl = posterDiv.attr("data-preview") || "";
-            }
-            
-            // Strategy 2: Lấy từ video data-src
-            if (!previewUrl) {
-                var video = this.find(".card__preview, .featured__preview, video").first();
-                if (video) {
-                    previewUrl = video.attr("data-src") || video.attr("src") || "";
-                }
-            }
-            
-            // Strategy 3: Thử chuyển PNG sang MP4
-            if (previewUrl && previewUrl.indexOf('.png') !== -1) {
-                // Giữ nguyên PNG (có thể dùng làm thumbnail động)
-                // Hoặc thử MP4 nếu muốn
-                var mp4Url = previewUrl.replace('.png', '.mp4');
-                // Có thể kiểm tra tồn tại bằng HEAD request (nếu muốn)
-                // previewUrl = mp4Url; // Bỏ comment để dùng MP4
-            }
-            
-            // Chuẩn hóa URL
-            if (previewUrl && previewUrl.indexOf('//') === 0) {
-                previewUrl = "https:" + previewUrl;
-            }
-            
-            // ============================================================
-            // LẤY CÁC THÔNG TIN KHÁC
-            // ============================================================
-            var duration = "";
-            var durEl = this.find(".card__dur, .featured__dur").first();
-            if (durEl) {
-                duration = durEl.text().trim();
-            }
-            
-            var views = "";
-            var viewsEl = this.find(".card__views, .featured__views").first();
-            if (viewsEl) {
-                views = viewsEl.text().trim();
-            }
-            
-            // ============================================================
-            // XÁC ĐỊNH LANG (Censored/Uncensored)
-            // ============================================================
-            var lang = 'Censored';
-            var cardHtml = this.html() || "";
-            if (cardHtml.indexOf('uncensored') !== -1 || 
-                href.indexOf('uncensored') !== -1 ||
-                title.toLowerCase().indexOf('uncensored') !== -1) {
-                lang = 'Uncensored';
-            }
-            
-            // ============================================================
-            // THÊM VÀO DANH SÁCH
-            // ============================================================
-            movies.push({
-                id: slug,
-                title: cleanText(title),
-                posterUrl: poster,
-                backdropUrl: poster,
-                description: (duration ? "⏱ " + duration : "") + 
-                            (views ? " | 👁 " + views : ""),
-                year: 0,
-                quality: lang === 'Uncensored' ? "K.K.Duyệt" : "HD",
-                episode_current: duration || "Full",
-                lang: lang,
-                previewUrl: previewUrl  // ← THÊM PREVIEW URL
-            });
+        });
+        return JSON.stringify({
+            items: movies,
+            pagination: { currentPage: 1, totalPages: 1, totalItems: movies.length, itemsPerPage: 20 }
         });
     }
     
-    // Pagination
+    // ============================================================
+    // PARSE TRANG THỂ LOẠI
+    // ============================================================
+    if (isAllGenresPage) {
+        $doc.find("a[href*='/genres/']").each(function() {
+            var href = this.attr("href");
+            if (!href) return;
+            
+            var slugMatch = href.match(/\/genres\/([^"\/]+)/);
+            if (!slugMatch) return;
+            
+            var name = cleanText(this.text()).replace(/\d+,\d+|\d+/g, '').trim();
+            if (!name || name.length < 2) return;
+            
+            var slug = "vi/genres/" + slugMatch[1];
+            
+            var exists = false;
+            for (var i = 0; i < movies.length; i++) {
+                if (movies[i].id === slug) {
+                    exists = true;
+                    break;
+                }
+            }
+            
+            if (!exists) {
+                movies.push({
+                    id: slug,
+                    title: name,
+                    posterUrl: "",
+                    backdropUrl: "",
+                    description: "Thể loại",
+                    year: 0,
+                    quality: "CAT",
+                    episode_current: "",
+                    lang: "",
+                    previewUrl: ""
+                });
+            }
+        });
+        return JSON.stringify({
+            items: movies,
+            pagination: { currentPage: 1, totalPages: 1, totalItems: movies.length, itemsPerPage: 20 }
+        });
+    }
+    
+    // ============================================================
+    // PARSE DANH SÁCH PHIM (CẢI TIẾN)
+    // ============================================================
+    $doc.find(".card, .featured").each(function() {
+        // --- LẤY SLUG ---
+        var link = this.find(".card__body .card__link, .featured__body .card__link, a[href*='/v/']").first();
+        if (!link) return;
+        
+        var href = link.attr("href");
+        if (!href) return;
+        
+        var slugMatch = href.match(/\/v\/([^"\/]+)/);
+        if (!slugMatch) return;
+        var slug = "vi/v/" + slugMatch[1];
+        
+        // --- LẤY TITLE (ƯU TIÊN TỪ CARD__BODY) ---
+        var title = "";
+        var bodyLink = this.find(".card__body .card__link, .featured__body .card__link").first();
+        if (bodyLink) {
+            title = bodyLink.text().trim();
+        }
+        
+        // Fallback 1: Từ link chính
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            title = link.text().trim();
+        }
+        
+        // Fallback 2: Từ img alt
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            var img = this.find(".card__poster img, .featured__poster img").first();
+            if (img) {
+                title = img.attr("alt") || "";
+            }
+        }
+        
+        // Fallback 3: Từ h3
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            var titleEl = this.find(".card__title, .featured__title, h3").first();
+            if (titleEl) {
+                title = titleEl.text().trim();
+            }
+        }
+        
+        // Fallback 4: Từ slug
+        if (!title || title === "0" || title.match(/^\d+$/)) {
+            title = slugMatch[1].replace(/-/g, " ");
+        }
+        
+        // --- LẤY POSTER ---
+        var poster = "";
+        var posterImg = this.find(".card__poster img, .featured__poster img").first();
+        if (posterImg) {
+            poster = posterImg.attr("data-src") || posterImg.attr("src") || "";
+            poster = PluginUtils.normalizeUrl(poster);
+        }
+        
+        // --- LẤY PREVIEW URL (MỚI) ---
+        var previewUrl = "";
+        var cardHtml = this.html() || "";
+        
+        // Strategy 1: Từ data-preview
+        var posterDiv = this.find(".card__poster, .featured__poster").first();
+        if (posterDiv) {
+            previewUrl = posterDiv.attr("data-preview") || "";
+        }
+        
+        // Strategy 2: Từ video data-src
+        if (!previewUrl) {
+            var video = this.find(".card__preview, .featured__preview, video").first();
+            if (video) {
+                previewUrl = video.attr("data-src") || video.attr("src") || "";
+            }
+        }
+        
+        // Strategy 3: Từ regex trong HTML
+        if (!previewUrl) {
+            var previewMatch = cardHtml.match(/data-preview="([^"]+)"/);
+            if (previewMatch) {
+                previewUrl = previewMatch[1];
+            }
+        }
+        
+        previewUrl = PluginUtils.normalizeUrl(previewUrl);
+        
+        // --- LẤY DURATION ---
+        var duration = "";
+        var durEl = this.find(".card__dur, .featured__dur").first();
+        if (durEl) {
+            duration = durEl.text().trim();
+        }
+        
+        // --- LẤY VIEWS ---
+        var views = "";
+        var viewsEl = this.find(".card__views, .featured__views").first();
+        if (viewsEl) {
+            views = viewsEl.text().trim();
+        }
+        
+        // --- XÁC ĐỊNH LANG ---
+        var lang = PluginUtils.detectLanguage(this, href, title, html);
+        
+        // --- XÁC ĐỊNH QUALITY ---
+        var quality = lang === 'Uncensored' ? "K.K.Duyệt" : "HD";
+        
+        // --- THÊM VÀO DANH SÁCH ---
+        movies.push({
+            id: slug,
+            title: cleanText(title),
+            posterUrl: poster,
+            backdropUrl: poster,
+            description: (duration ? "⏱ " + duration : "") + 
+                        (views ? " | 👁 " + views : ""),
+            year: 0,
+            quality: quality,
+            episode_current: duration || "Full",
+            lang: lang,
+            previewUrl: previewUrl  // ← PREVIEW URL MỚI
+        });
+    });
+    
+    // ============================================================
+    // PAGINATION
+    // ============================================================
     var currentPage = 1;
     var totalPages = 1;
     
@@ -606,7 +696,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER
+// MOVIE DETAIL PARSER (CẢI TIẾN - CÓ PREVIEW URL)
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -617,15 +707,12 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             try {
                 detailData = JSON.parse(datasend);
                 if (detailData && detailData.servers) {
-                    // Đã có đầy đủ dữ liệu, trả về ngay
                     return JSON.stringify(detailData);
                 }
-            } catch (e) {
-                // Không phải JSON, tiếp tục parse từ HTML
-            }
+            } catch (e) {}
         }
         
-        // === 2. THỬ PARSE X-DATA (PHƯƠNG PHÁP MỚI) ===
+        // === 2. THỬ PARSE X-DATA ===
         var xDataResult = extractPlayerDataFromXData(htmlContent);
         var servers = [];
         var title = '';
@@ -636,12 +723,29 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         var genres = [];
         var director = '';
         var slug = '';
+        var previewUrl = '';
         
         if (xDataResult && xDataResult.iframeUrl) {
             // Lấy metadata
             title = getMeta(htmlContent, "og:title") || xDataResult.code || '';
             thumb = getMeta(htmlContent, "og:image") || xDataResult.poster || '';
             desc = getMeta(htmlContent, "og:description") || '';
+            
+            // --- LẤY PREVIEW URL ---
+            var previewMatch = htmlContent.match(/<video[^>]+data-src="([^"]+)"/);
+            if (previewMatch) {
+                previewUrl = previewMatch[1];
+            }
+            if (!previewUrl) {
+                var previewDivMatch = htmlContent.match(/<div[^>]+data-preview="([^"]+)"/);
+                if (previewDivMatch) {
+                    previewUrl = previewDivMatch[1];
+                }
+            }
+            if (!previewUrl && thumb) {
+                previewUrl = thumb.replace('/cover.jpg', '/preview.png');
+            }
+            previewUrl = PluginUtils.normalizeUrl(previewUrl);
             
             // Lấy stream từ API
             var streamData = fetchStreamDataAdvanced(xDataResult.hashId, xDataResult.poster);
@@ -706,7 +810,8 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 category: genres.join(", "),
                 country: "Japan",
                 director: director,
-                casts: actors.join(", ")
+                casts: actors.join(", "),
+                previewUrl: previewUrl  // ← PREVIEW URL MỚI
             });
         }
         
@@ -727,6 +832,23 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 thumb = coverGenericMatch[0];
             }
         }
+        
+        // --- LẤY PREVIEW URL (FALLBACK) ---
+        var previewUrl = "";
+        var previewMatch = htmlContent.match(/<video[^>]+data-src="([^"]+)"/);
+        if (previewMatch) {
+            previewUrl = previewMatch[1];
+        }
+        if (!previewUrl) {
+            var previewDivMatch = htmlContent.match(/<div[^>]+data-preview="([^"]+)"/);
+            if (previewDivMatch) {
+                previewUrl = previewDivMatch[1];
+            }
+        }
+        if (!previewUrl && thumb) {
+            previewUrl = thumb.replace('/cover.jpg', '/preview.png');
+        }
+        previewUrl = PluginUtils.normalizeUrl(previewUrl);
         
         var releaseMatch = htmlContent.match(/<dt>Release date<\/dt>\s*<dd>([^<]+)<\/dd>/i);
         var year = 0;
@@ -816,11 +938,12 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             quality: "HD",
             servers: servers,
             episode_current: servers.length > 0 ? "Full" : "No Source",
-            lang: "Censored",
+            lang: htmlContent.indexOf('uncensored') !== -1 ? 'Uncensored' : 'Censored',
             category: genres.join(", "),
             country: "Japan",
             director: director,
-            casts: actors.join(", ")
+            casts: actors.join(", "),
+            previewUrl: previewUrl  // ← PREVIEW URL MỚI
         });
         
     } catch (e) {
@@ -838,7 +961,6 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
-        // Nếu có datasend và là JSON hợp lệ, trả về thẳng
         if (datasend) {
             try {
                 var data = JSON.parse(datasend);
@@ -854,26 +976,20 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                         subtitles: data.subtitles || []
                     });
                 }
-            } catch (e) {
-                // Không phải JSON, tiếp tục parse từ HTML
-            }
+            } catch (e) {}
         }
         
-        // Kiểm tra xem có x-data không
         var hasXData = htmlContent.indexOf('x-data="') !== -1 && 
                        htmlContent.indexOf('player(JSON.parse') !== -1;
         
-        // Kiểm tra xem có video trực tiếp không
         var hasVideo = htmlContent.indexOf('<video') !== -1 || 
                        htmlContent.indexOf('.m3u8') !== -1 ||
                        htmlContent.indexOf('player(') !== -1;
         
-        // Kiểm tra embed
         var isEmbed = htmlContent.indexOf('iframe') !== -1 && 
                       !hasVideo &&
                       !hasXData;
         
-        // Nếu là embed, trả về URL embed
         if (isEmbed) {
             var iframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']+)["']/i);
             if (iframeMatch) {
@@ -888,7 +1004,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }
         }
         
-        // Nếu có x-data, parse để lấy stream
         if (hasXData) {
             var xDataResult = extractPlayerDataFromXData(htmlContent);
             if (xDataResult && xDataResult.iframeUrl) {
@@ -910,7 +1025,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }
         }
         
-        // Fallback: tìm link M3U8 trực tiếp
         var m3u8Match = htmlContent.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
             return JSON.stringify({
@@ -924,7 +1038,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             });
         }
         
-        // Không tìm thấy gì
         return JSON.stringify({
             url: "",
             isEmbed: false,
@@ -946,12 +1059,11 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// EMBED RESPONSE PARSER (HỖ TRỢ RECURSIVE EMBED)
+// EMBED RESPONSE PARSER
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
     try {
-        // Tìm iframe trong embed
         var iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
         if (iframeMatch) {
             return JSON.stringify({
@@ -964,7 +1076,6 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
         
-        // Tìm M3U8 trực tiếp
         var m3u8Match = html.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
             return JSON.stringify({
@@ -978,7 +1089,6 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
         
-        // Tìm video file
         var videoMatch = html.match(/["'](?:file|src|url)["']\s*:\s*["']([^"']+\.(?:mp4|mkv|m3u8)[^"']*)["']/i);
         if (videoMatch) {
             return JSON.stringify({
@@ -991,7 +1101,6 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
         
-        // Không tìm thấy
         return JSON.stringify({
             url: "",
             isEmbed: false
@@ -1055,10 +1164,9 @@ function parseYearsResponse(html) {
 }
 
 // =============================================================================
-// EXPOSE FUNCTIONS (TƯƠNG THÍCH VỚI VAAPP)
+// EXPOSE FUNCTIONS
 // =============================================================================
 
-// Các hàm được expose để VAAPP có thể gọi
 var pluginExports = {
     getManifest: getManifest,
     getHomeSections: getHomeSections,
@@ -1081,15 +1189,13 @@ var pluginExports = {
 };
 
 // =============================================================================
-// AUTO-REGISTER CHO MÔI TRƯỜNG VAAPP
+// AUTO-REGISTER
 // =============================================================================
 
-// Nếu chạy trong môi trường VAAPP (có _vaapp_register)
 if (typeof _vaapp_register !== 'undefined') {
     _vaapp_register(pluginExports);
 }
 
-// Nếu chạy trong môi trường browser (debug)
 if (typeof window !== 'undefined') {
     for (var key in pluginExports) {
         if (pluginExports.hasOwnProperty(key)) {
@@ -1098,7 +1204,6 @@ if (typeof window !== 'undefined') {
     }
 }
 
-// Nếu chạy trong môi trường Node.js (test)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = pluginExports;
 }
