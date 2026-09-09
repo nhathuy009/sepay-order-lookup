@@ -22,7 +22,7 @@ function getManifest() {
         "iconUrl": "https://123av.com/assets/123av/favicon.png",
         "isEnabled": true,
         "isAdult": true,
-        "type": "MOVIDE",
+        "type": "MOVIE",
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
         "subtitleCat": true,
