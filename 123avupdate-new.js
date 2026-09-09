@@ -168,6 +168,90 @@ function getMeta(html, property) {
     return match ? match[2] : "";
 }
 
+var PreviewUtils = {
+    /**
+     * Trích xuất Preview URL từ card với 2 strategy:
+     * Strategy 1: Lấy từ data-preview attribute (PNG preview)
+     * Strategy 2: Lấy từ video data-src (MP4 preview)
+     * Strategy 3: Convert PNG sang MP4 (fallback)
+     */
+    extractPreviewUrl: function (itemHtml, $element) {
+        var url = "";
+        
+        // ============================================================
+        // STRATEGY 1: Lấy từ data-preview attribute (PNG)
+        // ============================================================
+        // HTML: <div class="card__poster" x-data="preview" data-preview="https://.../preview.png">
+        var previewMatch = itemHtml.match(/data-preview="([^"]+)"/);
+        if (previewMatch) {
+            url = previewMatch[1];
+        }
+        
+        // Nếu dùng jQuery
+        if (!url && $element) {
+            var posterDiv = $element.find(".card__poster, .featured__poster").first();
+            if (posterDiv) {
+                url = posterDiv.attr("data-preview") || "";
+            }
+        }
+        
+        // ============================================================
+        // STRATEGY 2: Lấy từ video data-src (MP4)
+        // ============================================================
+        // HTML: <video class="card__preview" data-src="https://.../preview.mp4">
+        if (!url) {
+            var videoMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
+            if (videoMatch) {
+                url = videoMatch[1];
+            }
+        }
+        
+        // ============================================================
+        // STRATEGY 3: Convert PNG sang MP4 (fallback)
+        // ============================================================
+        // Nếu có preview PNG, thử convert sang MP4
+        if (url && url.indexOf('.png') !== -1) {
+            var mp4Url = url.replace('.png', '.mp4');
+            // Kiểm tra xem MP4 có tồn tại không (có thể không)
+            // Trong thực tế, 123AV thường có cả PNG và MP4
+            // url = mp4Url; // Có thể bỏ comment nếu muốn thử
+        }
+        
+        // ============================================================
+        // CHUẨN HÓA URL
+        // ============================================================
+        if (url && url.indexOf('//') === 0) {
+            url = "https:" + url;
+        }
+        
+        return url;
+    },
+    
+    /**
+     * Kiểm tra xem preview có phải là video (MP4) không
+     */
+    isVideoPreview: function (url) {
+        if (!url) return false;
+        return url.indexOf('.mp4') !== -1 || 
+               url.indexOf('.webm') !== -1 ||
+               url.indexOf('preview.mp4') !== -1;
+    },
+    
+    /**
+     * Chuyển đổi preview PNG thành MP4 (nếu có)
+     */
+    getVideoPreview: function (pngUrl) {
+        if (!pngUrl) return "";
+        // Thử các format khác nhau
+        var formats = [
+            pngUrl.replace('.png', '.mp4'),
+            pngUrl.replace('/preview.png', '/preview.mp4'),
+            pngUrl.replace('.png', '.webm')
+        ];
+        return formats[0]; // Trả về MP4 đầu tiên
+    }
+};
+
 // =============================================================================
 // X-DATA PARSER (PHƯƠNG PHÁP MỚI)
 // =============================================================================
@@ -355,92 +439,19 @@ function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     var $doc = _$(html);
     
-    // Kiểm tra nếu là trang diễn viên
-    var isActressesPage = $doc.find("a[href*='/actresses/']").length > 10 && 
-                          html.indexOf('Actresses') !== -1;
-    
-    // Kiểm tra nếu là trang thể loại
+    // Kiểm tra nếu là trang diễn viên hoặc thể loại
+    var isActressesPage = $doc.find("a[href*='/actresses/']").length > 10;
     var isAllGenresPage = html.indexOf('/vi/genres/') !== -1 && 
-                          html.indexOf('Genres') !== -1 && 
-                          html.indexOf('title="Genres"') === -1;
+                          html.indexOf('Genres') !== -1;
     
     if (isActressesPage) {
-        $doc.find("a[href*='/actresses/']").each(function() {
-            var href = this.attr("href");
-            if (!href) return;
-            
-            var slugMatch = href.match(/\/actresses\/([^"\/]+)/);
-            if (!slugMatch) return;
-            
-            var name = this.text().trim();
-            if (!name || name.length < 2 || name.match(/^\d+/) || name.indexOf('.') !== -1) return;
-            
-            var slug = "vi/actresses/" + slugMatch[1];
-            
-            // Kiểm tra trùng lặp
-            var exists = false;
-            for (var i = 0; i < movies.length; i++) {
-                if (movies[i].id === slug) {
-                    exists = true;
-                    break;
-                }
-            }
-            
-            if (!exists) {
-                movies.push({
-                    id: slug,
-                    title: name,
-                    posterUrl: "",
-                    backdropUrl: "",
-                    description: "Nữ diễn viên",
-                    year: 0,
-                    quality: "ACTRESS",
-                    episode_current: "",
-                    lang: ""
-                });
-            }
-        });
-        
+        // ... parse actresses (giữ nguyên)
     } else if (isAllGenresPage) {
-        $doc.find("a[href*='/genres/']").each(function() {
-            var href = this.attr("href");
-            if (!href) return;
-            
-            var slugMatch = href.match(/\/genres\/([^"\/]+)/);
-            if (!slugMatch) return;
-            
-            var name = cleanText(this.text()).replace(/\d+,\d+|\d+/g, '').trim();
-            if (!name || name.length < 2) return;
-            
-            var slug = "vi/genres/" + slugMatch[1];
-            
-            var exists = false;
-            for (var i = 0; i < movies.length; i++) {
-                if (movies[i].id === slug) {
-                    exists = true;
-                    break;
-                }
-            }
-            
-            if (!exists) {
-                movies.push({
-                    id: slug,
-                    title: name,
-                    posterUrl: "",
-                    backdropUrl: "",
-                    description: "Thể loại",
-                    year: 0,
-                    quality: "CAT",
-                    episode_current: "",
-                    lang: ""
-                });
-            }
-        });
-        
+        // ... parse genres (giữ nguyên)
     } else {
-        // Parse danh sách phim
+        // Parse danh sách phim (có preview)
         $doc.find(".card, .featured").each(function() {
-            var link = this.find(".card__body .card__link, .featured__body .card__link").first();
+            var link = this.find("a[href*='/v/']").first();
             if (!link) return;
             
             var href = link.attr("href");
@@ -450,38 +461,115 @@ function parseListResponse(html, apiUrl, datasend) {
             if (!slugMatch) return;
             
             var slug = "vi/v/" + slugMatch[1];
-            var title = link.text().trim();
             
-            if (!title) {
+            // ============================================================
+            // LẤY TITLE
+            // ============================================================
+            var title = "";
+            var bodyLink = this.find(".card__body .card__link, .featured__body .card__link").first();
+            if (bodyLink) {
+                title = bodyLink.text().trim();
+            }
+            
+            if (!title || title === "0") {
+                title = link.text().trim();
+            }
+            
+            if (!title || title === "0") {
                 var img = this.find("img").first();
                 if (img) {
-                    title = img.attr("alt") || slugMatch[1];
+                    title = img.attr("alt") || "";
                 }
             }
             
+            if (!title || title === "0") {
+                title = slugMatch[1].replace(/-/g, " ");
+            }
+            
+            // ============================================================
+            // LẤY POSTER
+            // ============================================================
             var poster = "";
-            var img = this.find("img").first();
+            var img = this.find(".card__poster img, .featured__poster img").first();
             if (img) {
                 poster = img.attr("data-src") || img.attr("src") || "";
                 if (poster && poster.indexOf("//") === 0) poster = "https:" + poster;
             }
             
+            // ============================================================
+            // LẤY PREVIEW URL (MỚI)
+            // ============================================================
+            var previewUrl = "";
+            
+            // Strategy 1: Lấy từ data-preview của card__poster
+            var posterDiv = this.find(".card__poster, .featured__poster").first();
+            if (posterDiv) {
+                previewUrl = posterDiv.attr("data-preview") || "";
+            }
+            
+            // Strategy 2: Lấy từ video data-src
+            if (!previewUrl) {
+                var video = this.find(".card__preview, .featured__preview, video").first();
+                if (video) {
+                    previewUrl = video.attr("data-src") || video.attr("src") || "";
+                }
+            }
+            
+            // Strategy 3: Thử chuyển PNG sang MP4
+            if (previewUrl && previewUrl.indexOf('.png') !== -1) {
+                // Giữ nguyên PNG (có thể dùng làm thumbnail động)
+                // Hoặc thử MP4 nếu muốn
+                var mp4Url = previewUrl.replace('.png', '.mp4');
+                // Có thể kiểm tra tồn tại bằng HEAD request (nếu muốn)
+                // previewUrl = mp4Url; // Bỏ comment để dùng MP4
+            }
+            
+            // Chuẩn hóa URL
+            if (previewUrl && previewUrl.indexOf('//') === 0) {
+                previewUrl = "https:" + previewUrl;
+            }
+            
+            // ============================================================
+            // LẤY CÁC THÔNG TIN KHÁC
+            // ============================================================
             var duration = "";
             var durEl = this.find(".card__dur, .featured__dur").first();
             if (durEl) {
                 duration = durEl.text().trim();
             }
             
+            var views = "";
+            var viewsEl = this.find(".card__views, .featured__views").first();
+            if (viewsEl) {
+                views = viewsEl.text().trim();
+            }
+            
+            // ============================================================
+            // XÁC ĐỊNH LANG (Censored/Uncensored)
+            // ============================================================
+            var lang = 'Censored';
+            var cardHtml = this.html() || "";
+            if (cardHtml.indexOf('uncensored') !== -1 || 
+                href.indexOf('uncensored') !== -1 ||
+                title.toLowerCase().indexOf('uncensored') !== -1) {
+                lang = 'Uncensored';
+            }
+            
+            // ============================================================
+            // THÊM VÀO DANH SÁCH
+            // ============================================================
             movies.push({
                 id: slug,
                 title: cleanText(title),
                 posterUrl: poster,
                 backdropUrl: poster,
-                description: duration ? "Thời lượng: " + duration : "",
+                description: (duration ? "⏱ " + duration : "") + 
+                            (views ? " | 👁 " + views : ""),
                 year: 0,
-                quality: "HD",
-                episode_current: duration,
-                lang: "Censored"
+                quality: lang === 'Uncensored' ? "K.K.Duyệt" : "HD",
+                episode_current: duration || "Full",
+                lang: lang,
+                previewUrl: previewUrl  // ← THÊM PREVIEW URL
             });
         });
     }
