@@ -1,6 +1,6 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 4.0.0
+// Version: 4.0.1
 // Cập nhật: 
 //   - Thêm previewUrl với 3 strategy
 //   - Sửa lỗi title bị "0"
@@ -41,9 +41,9 @@ function getHomeSections() {
     return JSON.stringify([
         { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
-        { slug: 'vi/censored', title: 'Phim Có Che (Censored)', type: 'Horizontal', path: '' },
-        { slug: 'vi/uncensored', title: 'Không Che (Uncensored)', type: 'Horizontal', path: '' },
-        { slug: 'vi/uncensored-leaked', title: 'Không Che Rò Rỉ (Leaked)', type: 'Horizontal', path: '' }
+        { slug: 'vi/recent', title: 'Mới thêm gần đây', type: 'Horizontal', path: '' },
+        { slug: 'vi/all?sort=today', title: 'Xu hướng (Hôm Nay)', type: 'Horizontal', path: '' },
+        { slug: 'vi/all?sort=week', title: 'Xu hướng (Tuần Này)', type: 'Horizontal', path: '' }
     ]);
 }
 
@@ -51,9 +51,9 @@ function getPrimaryCategories() {
     return JSON.stringify([
         { name: 'Mới cập nhật', slug: 'vi/new' },
         { name: 'Thịnh hành', slug: 'vi/hot' },
-        { name: 'Có che (Censored)', slug: 'vi/censored' },
-        { name: 'Không che (Uncensored)', slug: 'vi/uncensored' },
-        { name: 'Không che rò rỉ', slug: 'vi/uncensored-leaked' },
+        { name: 'Mới thêm gần đây', slug: 'vi/recent' },
+        { name: 'Xu hướng (Hôm Nay)', slug: 'vi/all?sort=today' },
+        { name: 'Xu hướng (Tuần Này)', slug: 'vi/all?sort=week' },
         { name: 'Thể loại', slug: 'vi/genres' },
         { name: 'Diễn viên', slug: 'vi/actresses' },
         { name: 'Nhà sản xuất', slug: 'vi/makers' },
