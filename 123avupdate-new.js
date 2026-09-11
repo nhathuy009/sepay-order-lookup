@@ -42,8 +42,8 @@ function getHomeSections() {
         { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
         { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
         { slug: 'vi/recent', title: 'Mới thêm gần đây', type: 'Horizontal', path: '' },
-        { slug: 'vi/all?sort=today', title: 'Xu hướng (Hôm Nay)', type: 'Horizontal', path: '' },
-        { slug: 'vi/all?sort=week', title: 'Xu hướng (Tuần Này)', type: 'Horizontal', path: '' }
+        { slug: 'vi/all?sort=today&type=uncensored-leaked', title: 'Xu hướng (Hôm Nay)', type: 'Horizontal', path: '' },
+        { slug: 'vi/all?sort=week&type=uncensored-leaked', title: 'Xu hướng (Tuần Này)', type: 'Horizontal', path: '' }
     ]);
 }
 
@@ -52,8 +52,8 @@ function getPrimaryCategories() {
         { name: 'Mới cập nhật', slug: 'vi/new' },
         { name: 'Thịnh hành', slug: 'vi/hot' },
         { name: 'Mới thêm gần đây', slug: 'vi/recent' },
-        { name: 'Xu hướng (Hôm Nay)', slug: 'vi/all?sort=today' },
-        { name: 'Xu hướng (Tuần Này)', slug: 'vi/all?sort=week' },
+        { name: 'Xu hướng (Hôm Nay)', slug: 'vi/all?sort=today&type=uncensored-leaked' },
+        { name: 'Xu hướng (Tuần Này)', slug: 'vi/all?sort=week&type=uncensored-leaked' },
         { name: 'Thể loại', slug: 'vi/genres' },
         { name: 'Diễn viên', slug: 'vi/actresses' },
         { name: 'Nhà sản xuất', slug: 'vi/makers' },
