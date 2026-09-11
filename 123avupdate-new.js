@@ -17,7 +17,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "123av",
         "name": "123AV",
-        "version": "4.0.0",
+        "version": "4.0.1",
         "baseUrl": "https://123av.com",
         "fallbackUrls": [
             "https://123av.net",
