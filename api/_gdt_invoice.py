@@ -45,7 +45,12 @@ BASE_API = f"{DOMAIN}/api"
 CAPTCHA_URL = f"{BASE_API}/captcha"
 LOGIN_URL = f"{BASE_API}/security-taxpayer/authenticate"
 
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+# UA gần với Chrome hiện tại (2026) — giảm fingerprint bot so với bản 124 cũ.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 
 # Giới hạn an toàn cho môi trường serverless: tránh 1 request chạy quá lâu / vượt timeout của Vercel.
 MAX_PAGES_PER_TYPE = 40
@@ -53,7 +58,18 @@ PAGE_SIZE = 50
 
 WRONG_CREDENTIAL_KEYWORDS = [
     "mật khẩu", "password", "tài khoản", "sai tên đăng nhập",
-    "không tồn tại", "invalid", "unauthorized", "incorrect"
+    "không tồn tại", "invalid", "unauthorized", "incorrect",
+]
+
+# Message WAF / anti-bot của cổng Thuế — gặp thì DỪNG ngay, không spam retry.
+WAF_BLOCK_KEYWORDS = [
+    "hành vi không hợp lệ",
+    "yêu cầu đã bị chặn",
+    "phát hiện hành vi",
+    "access denied",
+    "request blocked",
+    "too many requests",
+    "rate limit",
 ]
 
 # ==========================================
@@ -105,34 +121,82 @@ def detect_svg_captcha(svg_captcha: str) -> str:
 # SESSION / ĐĂNG NHẬP
 # ==========================================
 def make_session() -> requests.Session:
+    """Session với header gần trình duyệt Chrome thật hơn — giảm rủi ro WAF gắn cờ bot."""
     s = requests.Session()
     s.headers.update({
         "User-Agent": USER_AGENT,
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
         "Referer": f"{DOMAIN}/",
         "Origin": DOMAIN,
+        "Connection": "keep-alive",
+        "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
     })
     return s
 
 
+def _is_waf_block(message: str) -> bool:
+    m = (message or "").lower()
+    return any(kw in m for kw in WAF_BLOCK_KEYWORDS)
+
+
 def login_tax_system(session: requests.Session, username: str, password: str, max_retries: int = 3, debug=None):
-    """Trả về (token, error_message). Thành công: (token, None). Thất bại: (None, "lý do")."""
+    """Trả về (token, error_message). Thành công: (token, None). Thất bại: (None, "lý do").
+
+    - Gặp WAF ("hành vi không hợp lệ" / "yêu cầu đã bị chặn") → dừng ngay, không retry
+      (retry chỉ làm khóa IP nặng hơn).
+    - Sai mật khẩu → dừng ngay.
+    - Captcha rỗng / captcha sai → mới retry (có backoff).
+    """
     last_message = None
     empty_captcha_count = 0
 
     for attempt in range(1, max_retries + 1):
         _log(debug, f"Đăng nhập - lần thử {attempt}/{max_retries}: gọi {CAPTCHA_URL}")
         try:
-            resp_captcha = session.get(CAPTCHA_URL, timeout=10)
+            resp_captcha = session.get(
+                CAPTCHA_URL,
+                headers={
+                    "Accept": "application/json, text/plain, */*",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "cors",
+                    "Sec-Fetch-Site": "same-origin",
+                },
+                timeout=12,
+            )
             _log(debug, f"  -> captcha HTTP {resp_captcha.status_code}")
+
+            # HTTP 403/429 từ WAF ngay từ bước captcha
+            if resp_captcha.status_code in (403, 429):
+                snippet = (resp_captcha.text or "")[:200]
+                _log(debug, f"  -> WAF chặn lúc lấy captcha: HTTP {resp_captcha.status_code}")
+                return None, (
+                    f"Máy chủ Thuế chặn yêu cầu (HTTP {resp_captcha.status_code}). "
+                    f"Có thể do IP Vercel bị WAF gắn cờ. Thử lại sau 30–60 phút, "
+                    f"hoặc đăng nhập tay trên trình duyệt để kiểm tra tài khoản. "
+                    f"Chi tiết: {snippet!r}"
+                )
+
             try:
                 c_data = resp_captcha.json()
             except Exception:
+                body_preview = (resp_captcha.text or "")[:150]
+                # Body HTML/text có thể cũng là trang chặn WAF
+                if _is_waf_block(body_preview) or resp_captcha.status_code >= 400:
+                    return None, (
+                        f"Máy chủ Thuế từ chối lấy captcha (HTTP {resp_captcha.status_code}). "
+                        f"Nội dung: {body_preview!r}"
+                    )
                 _log(debug, "  -> LỖI: body captcha không phải JSON")
                 return None, (
                     f"Không đọc được dữ liệu captcha từ máy chủ Thuế "
-                    f"(HTTP {resp_captcha.status_code}, nội dung: {resp_captcha.text[:150]!r})."
+                    f"(HTTP {resp_captcha.status_code}, nội dung: {body_preview!r})."
                 )
 
             raw_content = c_data.get("content", "")
@@ -140,22 +204,53 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
             if not c_value:
                 empty_captcha_count += 1
                 _log(debug, "  -> Giải captcha thất bại (rỗng), thử lại")
-                time.sleep(1)
+                time.sleep(1.5 * attempt)
                 continue
             _log(debug, f"  -> Giải captcha OK (độ dài {len(c_value)}), gọi {LOGIN_URL}")
 
-            payload = {"username": username, "password": password, "cvalue": c_value, "ckey": c_data.get("key")}
-            session.options(LOGIN_URL)
-            resp_auth = session.post(LOGIN_URL, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
+            payload = {
+                "username": username,
+                "password": password,
+                "cvalue": c_value,
+                "ckey": c_data.get("key"),
+            }
+            # Không gọi OPTIONS trước POST — preflight thừa dễ bị WAF gắn cờ bot.
+            resp_auth = session.post(
+                LOGIN_URL,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/plain, */*",
+                    "Sec-Fetch-Dest": "empty",
+                    "Sec-Fetch-Mode": "cors",
+                    "Sec-Fetch-Site": "same-origin",
+                },
+                timeout=15,
+            )
             _log(debug, f"  -> login HTTP {resp_auth.status_code}")
+
+            if resp_auth.status_code in (403, 429):
+                snippet = (resp_auth.text or "")[:200]
+                _log(debug, f"  -> WAF chặn lúc đăng nhập: HTTP {resp_auth.status_code}")
+                return None, (
+                    f"Máy chủ Thuế chặn đăng nhập (HTTP {resp_auth.status_code}). "
+                    f"IP có thể đang bị WAF khóa tạm — chờ 30–60 phút rồi thử lại. "
+                    f"Chi tiết: {snippet!r}"
+                )
 
             try:
                 auth_data = resp_auth.json()
             except Exception:
+                body_preview = (resp_auth.text or "")[:150]
+                if _is_waf_block(body_preview):
+                    return None, (
+                        f"Máy chủ Thuế chặn đăng nhập (WAF). "
+                        f"Nội dung: {body_preview!r}. Thử lại sau 30–60 phút."
+                    )
                 _log(debug, "  -> LỖI: body login không phải JSON")
                 return None, (
                     f"Máy chủ Thuế trả về dữ liệu đăng nhập không hợp lệ "
-                    f"(HTTP {resp_auth.status_code}, nội dung: {resp_auth.text[:150]!r})."
+                    f"(HTTP {resp_auth.status_code}, nội dung: {body_preview!r})."
                 )
 
             if "token" in auth_data:
@@ -166,19 +261,30 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
             last_message = message
             _log(debug, f"  -> Đăng nhập chưa thành công: {message}")
             message_lower = message.lower()
+
+            # WAF: dừng ngay — retry chỉ làm nặng thêm
+            if _is_waf_block(message):
+                return None, (
+                    f"Máy chủ Thuế chặn yêu cầu: \"{message}\". "
+                    f"Thường do IP (Vercel/datacenter) bị WAF gắn cờ hoặc thử quá nhiều lần. "
+                    f"Cách xử lý: chờ 30–60 phút, đăng nhập tay trên trình duyệt để xác nhận "
+                    f"tài khoản còn hoạt động, rồi thử lại trên app."
+                )
+
             if any(kw in message_lower for kw in WRONG_CREDENTIAL_KEYWORDS):
                 return None, f"Sai tài khoản hoặc mật khẩu: {message}"
 
-            time.sleep(1)  # có thể do captcha đoán sai -> thử lại
+            # Captcha sai hoặc lỗi tạm thời → backoff tăng dần rồi thử lại
+            time.sleep(1.5 * attempt)
 
         except requests.exceptions.Timeout:
             last_message = "Timeout khi gọi máy chủ Thuế."
             _log(debug, "  -> LỖI: Timeout")
-            time.sleep(1)
+            time.sleep(1.5 * attempt)
         except requests.exceptions.ConnectionError as e:
             last_message = f"Lỗi kết nối mạng: {e}"
             _log(debug, f"  -> LỖI: ConnectionError: {e}")
-            time.sleep(1)
+            time.sleep(1.5 * attempt)
         except Exception as e:
             _log(debug, f"  -> LỖI không xác định: {e}")
             return None, f"Lỗi không xác định khi đăng nhập: {e}"
@@ -186,6 +292,10 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
     detail_parts = [f"Đăng nhập thất bại sau {max_retries} lần thử."]
     if last_message:
         detail_parts.append(f"Phản hồi gần nhất từ máy chủ Thuế: \"{last_message}\".")
+        if _is_waf_block(last_message):
+            detail_parts.append(
+                "Đây là phản hồi WAF — nên chờ 30–60 phút trước khi thử lại."
+            )
     if empty_captcha_count:
         detail_parts.append(f"Không giải được captcha {empty_captcha_count}/{max_retries} lần.")
     return None, " ".join(detail_parts)
@@ -196,22 +306,36 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
 # ==========================================
 def api_get(session: requests.Session, url: str, token: str, max_retries: int = 3, debug=None, label: str = ""):
     """Trả về (json_data, error_message). error_message=None nếu thành công."""
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json, text/plain, */*",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+    }
     tag = f"[{label}] " if label else ""
     for attempt in range(1, max_retries + 1):
         _log(debug, f"{tag}Gọi API (lần {attempt}/{max_retries}): {url}")
         try:
             resp = session.get(url, headers=headers, timeout=(10, 25))
             _log(debug, f"{tag}  -> HTTP {resp.status_code}")
-            if resp.status_code in (401, 403):
+            if resp.status_code == 401:
                 return None, f"Token hết hạn hoặc bị từ chối (HTTP {resp.status_code})."
+            if resp.status_code == 403:
+                snippet = (resp.text or "")[:150]
+                if _is_waf_block(snippet):
+                    return None, (
+                        f"WAF chặn truy vấn (HTTP 403): {snippet!r}. "
+                        f"Chờ 30–60 phút rồi thử lại."
+                    )
+                return None, f"Token hết hạn hoặc bị từ chối (HTTP 403)."
             if resp.status_code == 429:
                 _log(debug, f"{tag}  -> Rate limit 429, chờ rồi thử lại")
-                time.sleep(3)
+                time.sleep(3 * attempt)
                 continue
             if resp.status_code in (500, 504):
                 _log(debug, f"{tag}  -> Lỗi {resp.status_code}, chờ rồi thử lại")
-                time.sleep(2)
+                time.sleep(2 * attempt)
                 continue
             if resp.status_code == 404:
                 return None, "Không tìm thấy hóa đơn này trên hệ thống Thuế (HTTP 404)."
