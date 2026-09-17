@@ -146,6 +146,48 @@ def _is_waf_block(message: str) -> bool:
     return any(kw in m for kw in WAF_BLOCK_KEYWORDS)
 
 
+def _warmup_session(session: requests.Session, debug=None) -> str | None:
+    """Vào trang chủ trước khi gọi API — lấy cookie / session giống trình duyệt.
+
+    Trả về None nếu OK, hoặc chuỗi lỗi nếu WAF chặn ngay từ trang chủ.
+    """
+    _log(debug, f"Warmup: GET {DOMAIN}/")
+    try:
+        resp = session.get(
+            f"{DOMAIN}/",
+            headers={
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            },
+            timeout=15,
+            allow_redirects=True,
+        )
+        _log(debug, f"  -> homepage HTTP {resp.status_code}, cookies={list(session.cookies.keys())}")
+        body = (resp.text or "")[:300]
+        if resp.status_code in (403, 429) or _is_waf_block(body):
+            return (
+                f"Máy chủ Thuế chặn ngay từ trang chủ (HTTP {resp.status_code}). "
+                f"IP Vercel gần như chắc đang bị WAF khóa. "
+                f"Chi tiết: {body[:150]!r}"
+            )
+        # Nghỉ ngắn như người dùng thật trước khi gọi captcha
+        time.sleep(0.8)
+        return None
+    except requests.exceptions.Timeout:
+        _log(debug, "  -> Warmup timeout (bỏ qua, vẫn thử login)")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        _log(debug, f"  -> Warmup ConnectionError: {e} (bỏ qua)")
+        return None
+    except Exception as e:
+        _log(debug, f"  -> Warmup lỗi: {e} (bỏ qua)")
+        return None
+
+
 def login_tax_system(session: requests.Session, username: str, password: str, max_retries: int = 3, debug=None):
     """Trả về (token, error_message). Thành công: (token, None). Thất bại: (None, "lý do").
 
@@ -154,6 +196,11 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
     - Sai mật khẩu → dừng ngay.
     - Captcha rỗng / captcha sai → mới retry (có backoff).
     """
+    # Warmup 1 lần / session trước vòng retry
+    waf_early = _warmup_session(session, debug=debug)
+    if waf_early:
+        return None, waf_early
+
     last_message = None
     empty_captcha_count = 0
 
@@ -164,6 +211,7 @@ def login_tax_system(session: requests.Session, username: str, password: str, ma
                 CAPTCHA_URL,
                 headers={
                     "Accept": "application/json, text/plain, */*",
+                    "Referer": f"{DOMAIN}/",
                     "Sec-Fetch-Dest": "empty",
                     "Sec-Fetch-Mode": "cors",
                     "Sec-Fetch-Site": "same-origin",
