@@ -6159,8 +6159,9 @@ function applyCustomsDataToForm(data) {
   if (whReason && soToKhai) {
     whReason.value = `Phiếu xuất kho cho tờ khai xuất khẩu số ${soToKhai} ngày ${ngayDangKy}`;
   }
-  if (whUnit && tenCongTy) {
-    whUnit.value = tenCongTy;
+  // ShiftUnitName mặc định cố định — không ghi đè từ tờ khai
+  if (whUnit && !whUnit.value.trim()) {
+    whUnit.value = "CÔNG TY TNHH MAY MẶC THÀNH KIỀU";
   }
   if (whDate) {
     // Chuyển DD/MM/YYYY -> YYYY-MM-DD nếu có thể
