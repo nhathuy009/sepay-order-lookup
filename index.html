@@ -665,32 +665,31 @@
           <div class="msg" id="ehoadonLoginStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
-        <!-- 2. FORM ĐỌC TỜ KHAI (Ẩn ban đầu) -->
-        <div class="card" id="ehoadonCustomsCard" style="display:none; margin-bottom:16px;">
-          <h3 style="margin:0 0 4px 0;">Đọc tờ khai hải quan (Excel)</h3>
-          <div class="hint" style="margin-top:0; margin-bottom:10px;">
-            Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích. Dữ liệu sẽ tự động điền vào form hóa đơn bên dưới.
-          </div>
-          <div class="row" style="align-items:flex-end;">
-            <div><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
-            <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
-          </div>
-          <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
-          <div id="ehoadonCustomsResult" style="margin-top: 12px;"></div>
-        </div>
-
-        <!-- 3. TÌM KHÁCH HÀNG (Ẩn ban đầu) -->
-        <div class="card" id="ehoadonBuyerCard" style="display:none; margin-bottom:16px;">
-          <label>Tìm khách hàng (mã hoặc tên, vd: AT, AW)</label>
-          <div class="row" style="align-items:flex-end;">
-            <div style="flex:1; min-width:220px;">
-              <input type="text" id="ehoadonBuyerKeyword" placeholder="Nhập mã hoặc tên khách hàng..." />
+        <!-- 2+3. ĐỌC TỜ KHAI + TÌM KHÁCH HÀNG (50:50 desktop, xếp dọc mobile) -->
+        <div id="ehoadonCustomsBuyerRow" class="ehoadon-split-row" style="display:none;">
+          <div class="card ehoadon-split-card" id="ehoadonCustomsCard">
+            <h3 style="margin:0 0 4px 0;">Đọc tờ khai hải quan (Excel)</h3>
+            <div class="hint" style="margin-top:0; margin-bottom:10px;">
+              Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích. Dữ liệu sẽ tự động điền vào form hóa đơn bên dưới.
             </div>
-            <div style="flex:0 0 auto;">
+            <div class="row ehoadon-action-row">
+              <div class="ehoadon-action-field"><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
+              <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
+            </div>
+            <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
+            <div id="ehoadonCustomsResult" style="margin-top: 12px;"></div>
+          </div>
+
+          <div class="card ehoadon-split-card" id="ehoadonBuyerCard">
+            <label>Tìm khách hàng (mã hoặc tên, vd: AT, AW)</label>
+            <div class="row ehoadon-action-row">
+              <div class="ehoadon-action-field">
+                <input type="text" id="ehoadonBuyerKeyword" placeholder="Nhập mã hoặc tên khách hàng..." />
+              </div>
               <button id="ehoadonBuyerSearchBtn" onclick="doEhoadonBuyerSearch()">Tìm kiếm</button>
             </div>
+            <div id="ehoadonBuyerResults" style="margin-top: 12px;"></div>
           </div>
-          <div id="ehoadonBuyerResults" style="margin-top: 12px;"></div>
         </div>
 
         <!-- 4. FORM NHẬP HÓA ĐƠN (Ẩn ban đầu) -->
