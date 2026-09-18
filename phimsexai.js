@@ -31,7 +31,7 @@ function getManifest() {
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
         "subtitleCat": false,
-        "debug": false,
+        "debug": true,
         "adblock": false
     });
 }
