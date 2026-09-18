@@ -1,6 +1,6 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 5.1.0 - FIX: Fetch player ngay trong parseMovieDetail
+// Version: 5.2.0 - FIX PHIM BỘ: Trả URL trang chi tiết tập cho VAAPP fetch
 // Base: https://phimsexai.site
 // =============================================================================
 
@@ -12,7 +12,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "5.1.0",
+        "version": "5.2.0",
         "baseUrl": "https://phimsexai.site",
         "fallbackUrls": [],
         "referrer": "https://phimsexai.site/",
@@ -24,7 +24,7 @@ function getManifest() {
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
         "subtitleCat": false,
-        "debug": true,
+        "debug": false,
         "adblock": false
     });
 }
@@ -330,14 +330,16 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// PLAYER PARSER (Parse 7 servers từ HTML player)
+// PLAYER HELPERS
 // =============================================================================
 
+/**
+ * Parse 7 servers từ HTML player
+ */
 function parsePlayerServers(playerHtml) {
     var servers = [];
     var match;
     
-    // Parse từ cvp-tab-pane
     var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]+class="[^"]*cvp-tab-pane[^"]*"[^>]+data-link="([^"]+)"/gi;
     while ((match = tabRegex.exec(playerHtml)) !== null) {
         var num = parseInt(match[1].replace("cvp-tab-", ""));
@@ -351,7 +353,6 @@ function parsePlayerServers(playerHtml) {
         });
     }
     
-    // Fallback: data-link bất kỳ
     if (servers.length === 0) {
         var idx = 0;
         var regex2 = /data-link="([^"]+)"/gi;
@@ -368,7 +369,6 @@ function parsePlayerServers(playerHtml) {
         }
     }
     
-    // Fallback cuối: tìm m3u8/mp4 trực tiếp
     if (servers.length === 0) {
         var m3u8Match = playerHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
         if (m3u8Match) {
@@ -382,9 +382,7 @@ function parsePlayerServers(playerHtml) {
         }
     }
     
-    // Sort by score
     servers.sort(function(a, b) { return b.score - a.score; });
-    
     return servers;
 }
 
@@ -418,8 +416,80 @@ function resolveStreamUrl(originalUrl) {
     return originalUrl;
 }
 
+/**
+ * Tìm embed URL (URL player) từ HTML trang chi tiết
+ */
+function findEmbedUrl(htmlContent) {
+    var embedUrl = "";
+    
+    // Strategy 1: Schema VideoObject
+    var schemaMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
+    if (schemaMatch) {
+        embedUrl = schemaMatch[1].replace(/\\\//g, "/");
+    }
+    
+    // Strategy 2: iframe okplayer-frame
+    if (!embedUrl) {
+        var iframeMatch = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
+        if (iframeMatch) {
+            var srcMatch = iframeMatch[0].match(/src=["']([^"']+)["']/i);
+            if (srcMatch) embedUrl = srcMatch[1].replace(/\\\//g, "/");
+        }
+    }
+    
+    // Strategy 3: Bất kỳ iframe /player/
+    if (!embedUrl) {
+        var playerIframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*\/player\/[^"']+)["']/i);
+        if (playerIframeMatch) embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
+    }
+    
+    // Strategy 4: Post ID
+    if (!embedUrl) {
+        var postIdMatch = htmlContent.match(/postid-(\d+)/i) || 
+                         htmlContent.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
+                         htmlContent.match(/\?p=(\d+)/i);
+        if (postIdMatch) embedUrl = "https://phimsexai.site/player/" + postIdMatch[1];
+    }
+    
+    if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
+    return embedUrl;
+}
+
+/**
+ * Parse danh sách tập từ HTML trang chi tiết
+ */
+function findEpisodesList(htmlContent) {
+    var episodesList = [];
+    
+    var episodeListMatch = htmlContent.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (!episodeListMatch) return episodesList;
+    
+    var buttons = episodeListMatch[1].match(/<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>[\s\S]*?<\/a>/gi);
+    if (!buttons) return episodesList;
+    
+    for (var e = 0; e < buttons.length; e++) {
+        var btnHtml = buttons[e];
+        var hrefMatch = btnHtml.match(/href=["']([^"']+)["']/i);
+        var numMatch = btnHtml.match(/>([\s\S]*?)<\/a>/i);
+        
+        if (hrefMatch && numMatch) {
+            var epNum = parseInt(PluginUtils.cleanText(numMatch[1]));
+            var epSlug = PluginUtils.extractSlugFromUrl(hrefMatch[1]);
+            if (epNum > 0 && epSlug) {
+                episodesList.push({
+                    num: epNum,
+                    slug: epSlug,
+                    url: hrefMatch[1]
+                });
+            }
+        }
+    }
+    
+    return episodesList;
+}
+
 // =============================================================================
-// MOVIE DETAIL PARSER - VERSION 5.1.0 (FETCH PLAYER TRỰC TIẾP)
+// MOVIE DETAIL PARSER - VERSION 5.2.0
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -464,65 +534,44 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         var durationMatch = htmlContent.match(/"duration"\s*:\s*"([^"]+)"/i);
         if (durationMatch) duration = PluginUtils.parseDuration(durationMatch[1]);
         
-        // ===== TÌM PLAYER URL (EMBED URL) =====
-        var embedUrl = "";
+        // ===== TÌM EMBED URL VÀ DANH SÁCH TẬP =====
+        var embedUrl = findEmbedUrl(htmlContent);
+        var episodesList = findEpisodesList(htmlContent);
         
-        // Strategy 1: Schema VideoObject
-        var schemaEmbedMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
-        if (schemaEmbedMatch) {
-            embedUrl = schemaEmbedMatch[1].replace(/\\\//g, "/");
-        }
+        // ===== BUILD SERVERS =====
         
-        // Strategy 2: iframe okplayer-frame
-        if (!embedUrl) {
-            var iframeOkMatch = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
-            if (iframeOkMatch) {
-                var srcMatch = iframeOkMatch[0].match(/src=["']([^"']+)["']/i);
-                if (srcMatch) embedUrl = srcMatch[1].replace(/\\\//g, "/");
+        if (episodesList.length > 0) {
+            // ═══════════════════════════════════════════════════════
+            // PHIM BỘ: Trả về DANH SÁCH URL TRANG CHI TIẾT TẬP
+            // VAAPP sẽ tự fetch từng URL khi user chọn tập
+            // ═══════════════════════════════════════════════════════
+            var seriesEpisodes = [];
+            
+            for (var i = 0; i < episodesList.length; i++) {
+                var ep = episodesList[i];
+                var epUrl = "https://phimsexai.site/" + ep.slug + "/";
+                
+                seriesEpisodes.push({
+                    id: epUrl,           // ← URL trang chi tiết tập
+                    name: "Tập " + ep.num,
+                    slug: ep.slug
+                });
             }
-        }
-        
-        // Strategy 3: Bất kỳ iframe /player/
-        if (!embedUrl) {
-            var playerIframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*\/player\/[^"']+)["']/i);
-            if (playerIframeMatch) embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
-        }
-        
-        // Strategy 4: Post ID
-        if (!embedUrl) {
-            var postIdMatch = htmlContent.match(/postid-(\d+)/i) || 
-                             htmlContent.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
-                             htmlContent.match(/\?p=(\d+)/i);
-            if (postIdMatch) embedUrl = "https://phimsexai.site/player/" + postIdMatch[1];
-        }
-        
-        if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
-        
-        // ===== PARSE EPISODES (danh sách tập) =====
-        var episodesList = [];
-        var episodeListMatch = htmlContent.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-        if (episodeListMatch) {
-            var buttons = episodeListMatch[1].match(/<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>[\s\S]*?<\/a>/gi);
-            if (buttons) {
-                for (var e = 0; e < buttons.length; e++) {
-                    var btnHtml = buttons[e];
-                    var hrefMatch = btnHtml.match(/href=["']([^"']+)["']/i);
-                    var numMatch = btnHtml.match(/>([\s\S]*?)<\/a>/i);
-                    if (hrefMatch && numMatch) {
-                        var epNum = parseInt(PluginUtils.cleanText(numMatch[1]));
-                        var epSlug = PluginUtils.extractSlugFromUrl(hrefMatch[1]);
-                        if (epNum > 0 && epSlug) {
-                            episodesList.push({ num: epNum, slug: epSlug, url: hrefMatch[1] });
-                        }
-                    }
-                }
-            }
-        }
-        
-        // ===== FETCH PLAYER URL ĐỂ LẤY STREAM URL =====
-        var playerServers = [];
-        
-        if (embedUrl) {
+            
+            result.servers.push({
+                name: "PhimSexAI",
+                episodes: seriesEpisodes
+            });
+            
+            result.quality = "SERIES";
+            result.episode_current = episodesList.length + " tập";
+            
+        } else if (embedUrl) {
+            // ═══════════════════════════════════════════════════════
+            // PHIM LẺ: Fetch player URL để lấy stream URL ngay
+            // ═══════════════════════════════════════════════════════
+            var playerServers = [];
+            
             if (typeof httpRequest !== "undefined") {
                 try {
                     var playerResp = httpRequest(embedUrl, {
@@ -536,73 +585,50 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                     if (playerResp && playerResp.status === 200 && playerResp.body) {
                         playerServers = parsePlayerServers(playerResp.body);
                     }
-                } catch (e) {
-                    // Bỏ qua, dùng fallback
-                }
-            }
-        }
-        
-        // ===== RESOLVE STREAM URL CHO SERVER TỐT NHẤT =====
-        if (playerServers.length > 0) {
-            // Resolve URL cho server tốt nhất
-            var bestServer = playerServers[0];
-            var resolvedUrl = bestServer.url;
-            
-            if (!bestServer.isEmbed && typeof httpRequest !== "undefined") {
-                resolvedUrl = resolveStreamUrl(bestServer.url);
+                } catch (e) {}
             }
             
-            // Server tốt nhất
-            result.servers.push({
-                name: "PhimSexAI - " + bestServer.label + " ★",
-                episodes: [{
-                    id: resolvedUrl,
-                    name: duration ? "Full (" + duration + ")" : "Full",
-                    slug: "full"
-                }]
-            });
-            
-            // Các server phụ (để user chọn nếu server chính lỗi)
-            for (var s = 1; s < playerServers.length; s++) {
-                var srv = playerServers[s];
+            if (playerServers.length > 0) {
+                // Fetch thành công → stream URL trực tiếp
+                var bestServer = playerServers[0];
+                var resolvedUrl = bestServer.isEmbed ? bestServer.url : resolveStreamUrl(bestServer.url);
+                
                 result.servers.push({
-                    name: "PhimSexAI - " + srv.label,
+                    name: "PhimSexAI - " + bestServer.label + " ★",
                     episodes: [{
-                        id: srv.url,
-                        name: "Full",
-                        slug: "server-" + srv.num
+                        id: resolvedUrl,
+                        name: duration ? "Full (" + duration + ")" : "Full",
+                        slug: "full"
+                    }]
+                });
+                
+                // Thêm các server phụ
+                for (var s = 1; s < playerServers.length; s++) {
+                    var srv = playerServers[s];
+                    result.servers.push({
+                        name: "PhimSexAI - " + srv.label,
+                        episodes: [{
+                            id: srv.url,
+                            name: "Full",
+                            slug: "server-" + srv.num
+                        }]
+                    });
+                }
+            } else {
+                // Fetch fail → dùng embedUrl (URL player), VAAPP tự fetch
+                result.servers.push({
+                    name: "PhimSexAI",
+                    episodes: [{
+                        id: embedUrl,
+                        name: duration ? "Full (" + duration + ")" : "Full",
+                        slug: "full"
                     }]
                 });
             }
             
             result.episode_current = duration ? "Full (" + duration + ")" : "Full";
-            
-        } else if (embedUrl) {
-            // Fallback: dùng embed URL gốc
-            result.servers.push({
-                name: "PhimSexAI",
-                episodes: [{
-                    id: embedUrl,
-                    name: duration ? "Full (" + duration + ")" : "Full",
-                    slug: "full"
-                }]
-            });
-            result.episode_current = duration ? "Full (" + duration + ")" : "Full";
         } else {
             result.episode_current = "No Source";
-        }
-        
-        // ===== THÊM DANH SÁCH TẬP (NẾU LÀ PHIM BỘ) =====
-        if (episodesList.length > 0) {
-            result.quality = "SERIES";
-            result.episode_current = episodesList.length + " tập";
-            
-            // Thêm info về danh sách tập vào description
-            var epInfo = [];
-            for (var x = 0; x < episodesList.length; x++) {
-                epInfo.push("Tập " + episodesList[x].num);
-            }
-            result.description = (result.description || "") + "\n\n📺 " + episodesList.length + " tập: " + epInfo.join(", ");
         }
         
         // ===== TAGS =====
@@ -626,59 +652,56 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// DETAIL RESPONSE PARSER (Fallback nếu VAAPP gọi function này)
+// DETAIL RESPONSE PARSER - 3 CASES
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
-        // Nếu datasend là player URL
-        if (datasend && datasend.indexOf("/player/") !== -1) {
-            // Fetch và parse luôn
-            if (typeof httpRequest !== "undefined") {
-                try {
-                    var playerResp = httpRequest(datasend, {
-                        method: "GET",
-                        headers: {
-                            "Referer": "https://phimsexai.site/",
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        }
-                    });
-                    
-                    if (playerResp && playerResp.status === 200 && playerResp.body) {
-                        var servers = parsePlayerServers(playerResp.body);
-                        if (servers.length > 0) {
-                            var best = servers[0];
-                            var streamUrl = best.url;
-                            if (!best.isEmbed) {
-                                streamUrl = resolveStreamUrl(best.url);
-                            }
-                            return JSON.stringify({
-                                url: streamUrl,
-                                isEmbed: best.isEmbed,
-                                mimeType: best.url.indexOf(".mp4") !== -1 ? "video/mp4" : "application/x-mpegURL",
-                                headers: {
-                                    "Referer": "https://phimsexai.site/",
-                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                },
-                                subtitles: []
-                            });
-                        }
-                    }
-                } catch (e) {}
-            }
+        // ═══════════════════════════════════════════════════════
+        // CASE 1: htmlContent là HTML player (có cvp-tab-pane)
+        // → Parse stream URL trực tiếp
+        // ═══════════════════════════════════════════════════════
+        if (htmlContent && htmlContent.indexOf("cvp-tab-pane") !== -1) {
+            var playerServers = parsePlayerServers(htmlContent);
             
-            // Fallback: trả về embed URL
-            return JSON.stringify({
-                url: datasend,
-                isEmbed: true,
-                headers: {
-                    "Referer": "https://phimsexai.site/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                }
-            });
+            if (playerServers.length > 0) {
+                var best = playerServers[0];
+                var streamUrl = best.isEmbed ? best.url : resolveStreamUrl(best.url);
+                
+                return JSON.stringify({
+                    url: streamUrl,
+                    isEmbed: best.isEmbed,
+                    mimeType: best.url.indexOf(".mp4") !== -1 ? "video/mp4" : "application/x-mpegURL",
+                    headers: {
+                        "Referer": "https://phimsexai.site/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    },
+                    subtitles: []
+                });
+            }
         }
         
-        // Nếu datasend là URL stream trực tiếp (m3u8/mp4)
+        // ═══════════════════════════════════════════════════════
+        // CASE 2: htmlContent là HTML trang chi tiết phim
+        // → Trả về embed URL (URL player) để VAAPP fetch tiếp
+        // ═══════════════════════════════════════════════════════
+        if (htmlContent) {
+            var embedUrl = findEmbedUrl(htmlContent);
+            if (embedUrl) {
+                return JSON.stringify({
+                    url: embedUrl,
+                    isEmbed: true,
+                    headers: {
+                        "Referer": "https://phimsexai.site/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                });
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════
+        // CASE 3: datasend là stream URL trực tiếp
+        // ═══════════════════════════════════════════════════════
         if (datasend && (datasend.indexOf(".m3u8") !== -1 || datasend.indexOf(".mp4") !== -1)) {
             return JSON.stringify({
                 url: datasend,
@@ -692,22 +715,17 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             });
         }
         
-        // Parse từ HTML (fallback)
-        var schemaEmbedMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
-        if (schemaEmbedMatch) {
-            var url1 = schemaEmbedMatch[1].replace(/\\\//g, "/");
-            if (url1.indexOf("//") === 0) url1 = "https:" + url1;
-            return JSON.stringify({
-                url: url1,
-                isEmbed: true,
-                headers: {
-                    "Referer": "https://phimsexai.site/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                }
-            });
-        }
-        
-        return JSON.stringify({ url: "", isEmbed: false });
+        // ═══════════════════════════════════════════════════════
+        // FALLBACK: Trả về empty
+        // ═══════════════════════════════════════════════════════
+        return JSON.stringify({
+            url: "",
+            isEmbed: false,
+            headers: {
+                "Referer": "https://phimsexai.site/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+        });
         
     } catch (e) {
         return JSON.stringify({ url: "", isEmbed: false, error: true, message: e.message });
@@ -715,7 +733,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// EMBED RESPONSE PARSER (Xử lý HTML player)
+// EMBED RESPONSE PARSER
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
@@ -723,6 +741,19 @@ function parseEmbedResponse(html, sourceUrl) {
         var servers = parsePlayerServers(html);
         
         if (servers.length === 0) {
+            // Fallback: check if html is actually a detail page with embedUrl
+            var embedUrl = findEmbedUrl(html);
+            if (embedUrl) {
+                return JSON.stringify({
+                    url: embedUrl,
+                    isEmbed: true,
+                    headers: {
+                        "Referer": "https://phimsexai.site/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                });
+            }
+            
             return JSON.stringify({
                 url: "",
                 isEmbed: false,
@@ -731,13 +762,8 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
         
-        // Server tốt nhất
         var best = servers[0];
-        var streamUrl = best.url;
-        
-        if (!best.isEmbed) {
-            streamUrl = resolveStreamUrl(best.url);
-        }
+        var streamUrl = best.isEmbed ? best.url : resolveStreamUrl(best.url);
         
         return JSON.stringify({
             url: streamUrl,
@@ -748,7 +774,6 @@ function parseEmbedResponse(html, sourceUrl) {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             },
             subtitles: [],
-            // Danh sách tất cả servers cho fallback
             servers: servers.map(function(s) {
                 return {
                     name: "PhimSexAI - " + s.label,
