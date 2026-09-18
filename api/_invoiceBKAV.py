@@ -25,6 +25,10 @@ _EHOADON_CREATE_URL = (
     "https://van.ehoadon.vn/InvoiceNewEdit?InvoiceGUID=00000000-0000-0000-0000-000000000000"
     "&IsMTT=false&InvoiceTypeID=1&SourceId=1&TypeCreateInvoice=0"
 )
+_EHOADON_WAREHOUSE_CREATE_URL = (
+    "https://van.ehoadon.vn/InvoiceNewEdit?InvoiceGUID=00000000-0000-0000-0000-000000000000"
+    "&IsMTT=false&InvoiceTypeID=5&SourceId=1&TypeCreateInvoice=0"
+)
 _EHOADON_SUGGEST_URL = "https://van.ehoadon.vn/WebServices/wsInvoice.asmx/GetSuggestion"
 _EHOADON_POPUP_URL = "https://van.ehoadon.vn/InvoiceDetailsNewEdit"
 _EHOADON_SAVE_URL = "https://van.ehoadon.vn/WebServices/wsInvoice.asmx/SaveInvoice"
@@ -277,6 +281,176 @@ def ehoadon_invoice_create(cookies, buyer_info, note_input, items):
                 return {"error": "Không trích xuất được InvoiceGUID ở mặt hàng đầu tiên (có thể phiên đăng nhập đã hết hạn)."}
 
     invoice_header["InvoiceGUID"] = current_invoice_guid
+    res_final = session.post(
+        _EHOADON_SAVE_URL,
+        json={"invoice": invoice_header, "typeCreateInvoice": "0", "listBillID": ""},
+        headers=ajax_headers,
+    )
+    if res_final.status_code != 200:
+        return {"error": f"Mã lỗi HTTP: {res_final.status_code}"}
+
+    result_data = res_final.json()
+    if not result_data.get("d", {}).get("isOk", False):
+        return {"error": f"Hệ thống eHoadon từ chối lưu: {result_data.get('d', {}).get('Code')}"}
+
+    return {
+        "invoice_guid": current_invoice_guid,
+        "cookies": _dump_cookies(session),
+    }
+
+
+def ehoadon_warehouse_create(cookies, warehouse_info, items):
+    """Tạo Phiếu xuất kho kiêm vận chuyển nội bộ (InvoiceTypeID=5).
+
+    warehouse_info keys (map UIDefine):
+      ShiftCommandNo, ShiftCommandDate, ShiftUnitName, ShiftReason,
+      ReferenceNote, TransporterName, ContractNo, OutWareHouse,
+      InWareHouse, Transportation, TaxCodeAgent
+
+    items: list[{name, unit, qty, price, amount}] — đơn giá & thành tiền bắt buộc.
+    Trả về {"invoice_guid": ..., "cookies": {...}} hoặc {"error": ...}.
+    """
+    warehouse_info = warehouse_info or {}
+    session = _build_session(cookies)
+    ajax_headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": _EHOADON_WAREHOUSE_CREATE_URL,
+    }
+    session.get(_EHOADON_WAREHOUSE_CREATE_URL)
+
+    current_invoice_guid = "00000000-0000-0000-0000-000000000000"
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    shift_date = (warehouse_info.get("ShiftCommandDate") or current_date).strip()
+
+    ui_define = {
+        "ShiftCommandNo": warehouse_info.get("ShiftCommandNo") or "",
+        "ShiftCommandDate": shift_date,
+        "ShiftUnitName": warehouse_info.get("ShiftUnitName") or "",
+        "ShiftReason": warehouse_info.get("ShiftReason") or "",
+        "ReferenceNote": warehouse_info.get("ReferenceNote") or "",
+        "TransporterName": warehouse_info.get("TransporterName") or "",
+        "ContractNo": warehouse_info.get("ContractNo") or "",
+        "OutWareHouse": warehouse_info.get("OutWareHouse") or "",
+        "InWareHouse": warehouse_info.get("InWareHouse") or "",
+        "Transportation": warehouse_info.get("Transportation") or "",
+        "TaxCodeAgent": warehouse_info.get("TaxCodeAgent") or "",
+    }
+
+    invoice_header = {
+        "InvoiceStatusID": 1,
+        "InvoiceTypeID": "5",
+        "SourceID": "1",
+        "InvoiceTemplateID": "1141351",
+        "InvoiceForm": "6-C23NAA",
+        "InvoiceSerial": "C26NAA",
+        "InvoiceDate": current_date,
+        "InvoiceNo": 0,
+        "BuyerCode": "",
+        "BuyerName": "",
+        "BuyerTaxcode": "",
+        "BuyerUnitName": "",
+        "ReceiveTypeID": "1",
+        "ReceiverEmail": "",
+        "ReceiverMobile": "",
+        "ReceiverName": "",
+        "ReceiverAddress": "",
+        "Note": "",
+        "CurrencyID": "VND",
+        "CurrencyCode": "VND",
+        "ExchangeRate": 1,
+        "TaxRateHeaderID": "5",
+        "TaxRateHeader": 0,
+        "IsCheckMST": False,
+        "IsBTH": False,
+        "CCCD": "",
+        "PassportNumber": "",
+        "FiscalCodes": "",
+        "UIDefine": json.dumps(ui_define, ensure_ascii=False),
+        "Reason": None,
+        "IsFinanceLease": False,
+        "BusinessLocationCode": None,
+    }
+
+    for index, item in enumerate(items):
+        item_name = (item.get("name") or "").strip()
+        item_unit = (item.get("unit") or "").strip() or "Bộ"
+        item_qty = (item.get("qty") or "").strip()
+        item_price = (item.get("price") or "").strip()
+        item_amount = (item.get("amount") or "").strip()
+
+        if not item_name:
+            return {"error": f"Mặt hàng {index + 1}: thiếu tên hàng hóa"}
+        if not item_qty:
+            return {"error": f"Mặt hàng {index + 1}: thiếu số lượng"}
+        if not item_price:
+            return {"error": f"Mặt hàng {index + 1}: thiếu đơn giá"}
+        if not item_amount:
+            try:
+                item_amount = _format_vn_number(_parse_vn_number(item_qty) * _parse_vn_number(item_price))
+            except Exception:
+                return {"error": f"Mặt hàng {index + 1}: thiếu thành tiền"}
+
+        # Khớp HAR: OriginalInvoiceGUID luôn zero-GUID; InvoiceGUID cập nhật sau dòng đầu
+        invoice_header["InvoiceGUID"] = current_invoice_guid
+        invoice_header["OriginalInvoiceGUID"] = "00000000-0000-0000-0000-000000000000"
+
+        popup_payload = {
+            "Invoice": invoice_header,
+            "InvoiceDetailID": 0,
+            "ItemTypeID": 0,
+            "TypeCreateInvoice": 0,
+            "InvoiceOrgWithOutSystem": None,
+        }
+        res_popup = session.post(_EHOADON_POPUP_URL, json=popup_payload, headers=ajax_headers)
+        if res_popup.status_code != 200:
+            return {"error": f"Lỗi tải popup chi tiết (mặt hàng {index + 1})"}
+
+        popup_soup = BeautifulSoup(res_popup.text, "html.parser")
+        # Form Ghi lại type 5: KHÔNG có field thuế (khác HĐ GTGT type 1)
+        item_form_data = {
+            "__EVENTTARGET": _get_hidden(popup_soup, "__EVENTTARGET"),
+            "__EVENTARGUMENT": _get_hidden(popup_soup, "__EVENTARGUMENT"),
+            "__VIEWSTATE": _get_hidden(popup_soup, "__VIEWSTATE"),
+            "__VIEWSTATEGENERATOR": _get_hidden(popup_soup, "__VIEWSTATEGENERATOR"),
+            "__VIEWSTATEENCRYPTED": _get_hidden(popup_soup, "__VIEWSTATEENCRYPTED"),
+            "ctl00$MasterPlaceHolderBlank$hfItemCode": "",
+            "ctl00$MasterPlaceHolderBlank$hfPreItemCode": "",
+            "ctl00$MasterPlaceHolderBlank$hfPreItemName": "",
+            "ctl00$MasterPlaceHolderBlank$txtItemName": item_name,
+            "ctl00$MasterPlaceHolderBlank$txtUnitName": item_unit,
+            "ctl00$MasterPlaceHolderBlank$txtQty": item_qty,
+            "ctl00$MasterPlaceHolderBlank$txtPrice": item_price,
+            "ctl00$MasterPlaceHolderBlank$txtAmount": item_amount,
+            "ctl00$MasterPlaceHolderBlank$btnAdd": "Ghi lại",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceDetailID": "0",
+            "ctl00$MasterPlaceHolderBlank$hdfIsChange": "False",
+            "ctl00$MasterPlaceHolderBlank$hdfOriginalInvoiceGUID": "00000000-0000-0000-0000-000000000000",
+            "ctl00$MasterPlaceHolderBlank$hdfItemTypeID": "0",
+            "ctl00$MasterPlaceHolderBlank$hdfCurrencyID": "VND",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceTypeID": "5",
+            "ctl00$MasterPlaceHolderBlank$hdfInvoiceStatusID": "1",
+            "ctl00$MasterPlaceHolderBlank$hdfHasAfterTax": "false",
+            "ctl00$MasterPlaceHolderBlank$hdfQuyetDinhSo": _get_hidden(popup_soup, "hdfQuyetDinhSo", "204/2025/QH15"),
+        }
+        form_headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": _EHOADON_WAREHOUSE_CREATE_URL,
+        }
+        res_save_item = session.post(_EHOADON_POPUP_URL, data=item_form_data, headers=form_headers)
+
+        if index == 0:
+            match = re.search(r"ClosePopDetail\('([a-fA-F0-9\-]{36})'", res_save_item.text)
+            if match:
+                current_invoice_guid = match.group(1)
+            else:
+                return {"error": "Không trích xuất được InvoiceGUID ở mặt hàng đầu tiên (có thể phiên đăng nhập đã hết hạn)."}
+
+    # SaveInvoice: khớp HAR — OriginalInvoiceGUID giữ zero-GUID
+    invoice_header["InvoiceGUID"] = current_invoice_guid
+    invoice_header["OriginalInvoiceGUID"] = "00000000-0000-0000-0000-000000000000"
+    invoice_header["UIDefine"] = json.dumps(ui_define, ensure_ascii=False)
+
     res_final = session.post(
         _EHOADON_SAVE_URL,
         json={"invoice": invoice_header, "typeCreateInvoice": "0", "listBillID": ""},
