@@ -709,6 +709,66 @@
           <div class="msg" id="ehoadonInvoiceStatus" style="display:none; margin-top: 10px;"></div>
         </div>
 
+        <!-- 4b. PHIẾU XUẤT KHO KIÊM VẬN CHUYỂN NỘI BỘ (Ẩn ban đầu) -->
+        <div class="card" id="ehoadonWarehouseCard" style="display:none; margin-bottom:16px;">
+          <h3 style="margin:0 0 12px 0;">Phiếu xuất kho kiêm vận chuyển nội bộ</h3>
+          <div class="hint" style="margin-top:0; margin-bottom:12px;">
+            Dùng chung danh sách hàng hóa phía trên. Đơn giá &amp; thành tiền bắt buộc.
+          </div>
+          <div class="row">
+            <div style="flex:1; min-width:160px;">
+              <label>Số lệnh điều động</label>
+              <input type="text" id="ehoadonWhCommandNo" placeholder="vd: 19/09/26-AT" />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label>Ngày lệnh</label>
+              <input type="text" id="ehoadonWhCommandDate" placeholder="YYYY-MM-DD" />
+            </div>
+            <div style="flex:1; min-width:200px;">
+              <label>Đơn vị / bên nhận</label>
+              <input type="text" id="ehoadonWhUnitName" placeholder="Tên công ty / đơn vị" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div style="flex:1; min-width:200px;">
+              <label>Lý do xuất kho</label>
+              <input type="text" id="ehoadonWhReason" placeholder="Phiếu xuất kho cho tờ khai..." />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div style="flex:1; min-width:160px;">
+              <label>Kho xuất</label>
+              <input type="text" id="ehoadonWhOut" placeholder="Xưởng Bến Tre" value="Xưởng Bến Tre" />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label>Kho nhập / đích</label>
+              <input type="text" id="ehoadonWhIn" placeholder="Cảng Cát Lái" value="Cảng Cát Lái" />
+            </div>
+            <div style="flex:1; min-width:140px;">
+              <label>Phương tiện</label>
+              <input type="text" id="ehoadonWhTransport" placeholder="Xe Tải" value="Xe Tải" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div style="flex:1; min-width:160px;">
+              <label>Người vận chuyển</label>
+              <input type="text" id="ehoadonWhTransporter" placeholder="(tùy chọn)" />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label>Số hợp đồng</label>
+              <input type="text" id="ehoadonWhContract" placeholder="(tùy chọn)" />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label>MST đại lý</label>
+              <input type="text" id="ehoadonWhTaxAgent" placeholder="(tùy chọn)" />
+            </div>
+          </div>
+          <div style="margin-top:20px;">
+            <button id="ehoadonWarehouseBtn" onclick="doEhoadonCreateWarehouse()">Tạo &amp; lưu phiếu xuất kho</button>
+          </div>
+          <div class="msg" id="ehoadonWarehouseStatus" style="display:none; margin-top: 10px;"></div>
+        </div>
+
         <!-- 5. DANH SÁCH HÓA ĐƠN (Ẩn ban đầu) -->
         <div class="card" id="ehoadonListCard" style="display:none;">
           <h3 style="margin:0 0 12px 0;">Danh sách hóa đơn</h3>
