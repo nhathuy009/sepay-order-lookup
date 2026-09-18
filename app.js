@@ -6066,12 +6066,12 @@ async function doEhoadonCreateWarehouse() {
     ShiftUnitName: document.getElementById("ehoadonWhUnitName").value.trim(),
     ShiftReason: document.getElementById("ehoadonWhReason").value.trim(),
     ReferenceNote: "",
-    TransporterName: document.getElementById("ehoadonWhTransporter").value.trim(),
-    ContractNo: document.getElementById("ehoadonWhContract").value.trim(),
+    TransporterName: "",
+    ContractNo: "",
     OutWareHouse: document.getElementById("ehoadonWhOut").value.trim(),
     InWareHouse: document.getElementById("ehoadonWhIn").value.trim(),
     Transportation: document.getElementById("ehoadonWhTransport").value.trim(),
-    TaxCodeAgent: document.getElementById("ehoadonWhTaxAgent").value.trim(),
+    TaxCodeAgent: "",
   };
 
   btn.disabled = true;
@@ -6156,7 +6156,6 @@ function applyCustomsDataToForm(data) {
   const whUnit = document.getElementById("ehoadonWhUnitName");
   const whDate = document.getElementById("ehoadonWhCommandDate");
   const whCmdNo = document.getElementById("ehoadonWhCommandNo");
-  const whTaxAgent = document.getElementById("ehoadonWhTaxAgent");
   if (whReason && soToKhai) {
     whReason.value = `Phiếu xuất kho cho tờ khai xuất khẩu số ${soToKhai} ngày ${ngayDangKy}`;
   }
@@ -6177,10 +6176,6 @@ function applyCustomsDataToForm(data) {
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     const yy = String(d.getFullYear()).slice(-2);
     whCmdNo.value = `${dd}/${mm}/${yy}-AT`;
-  }
-  if (whTaxAgent) {
-    const mst = data.thong_tin_chung?.ma_so_thue_dai_dien || "";
-    if (mst) whTaxAgent.value = mst;
   }
   // Kho nhập (InWareHouse) từ địa điểm xếp hàng
   const whIn = document.getElementById("ehoadonWhIn");
