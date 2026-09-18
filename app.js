@@ -6182,6 +6182,16 @@ function applyCustomsDataToForm(data) {
     const mst = data.thong_tin_chung?.ma_so_thue_dai_dien || "";
     if (mst) whTaxAgent.value = mst;
   }
+  // Kho nhập (InWareHouse) từ địa điểm xếp hàng
+  const whIn = document.getElementById("ehoadonWhIn");
+  if (whIn) {
+    const diaDiemXep = String(data.thong_tin_van_chuyen_luu_kho?.dia_diem_xep_hang || "").toUpperCase();
+    if (diaDiemXep.includes("VNSGN")) {
+      whIn.value = "Kho hải quan Tân Sơn Nhất";
+    } else if (diaDiemXep.includes("VNCLI")) {
+      whIn.value = "Cảng Cát Lái";
+    }
+  }
 
   // 3. Xử lý danh sách hàng hóa
   const itemsContainer = document.getElementById("ehoadonItemsContainer");
