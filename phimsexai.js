@@ -19,7 +19,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.0.0",
+        "version": "6.0.1",
         "baseUrl": "https://phimsexai.site",
         "fallbackUrls": [],
         "referrer": "https://phimsexai.site/",
@@ -27,7 +27,7 @@ function getManifest() {
         "iconUrl": "https://phimsexai.site/wp-content/uploads/cropped-icon-192x192.jpg",
         "isEnabled": true,
         "isAdult": true,
-        "type": "VIDEO",
+        "type": "MOVIE",
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
         "subtitleCat": false,
