@@ -31,7 +31,7 @@ from collections import defaultdict
 from _payment import search_sepay_transaction, list_sepay_transactions, get_sepay_bank_accounts
 from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail, gdt_export_invoice_xml
-from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list
+from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list, ehoadon_warehouse_create
 from _customsdeclaration import parse_customs_declaration_from_bytes
 # TẠM THỜI TẮT chức năng refund (_refund.py trên server đang lệch version,
 # thiếu hàm get_case_with_checklist -> import lỗi làm sập toàn bộ app).
@@ -678,6 +678,19 @@ def handle_ehoadon_invoice_create(body):
     return (400 if "error" in res else 200), res
 
 
+def handle_ehoadon_warehouse_create(body):
+    """Tạo Phiếu xuất kho kiêm vận chuyển nội bộ (InvoiceTypeID=5)."""
+    cookies = body.get("cookies") or {}
+    warehouse_info = body.get("warehouse_info") or {}
+    items = body.get("items") or []
+    if not cookies:
+        return 400, {"error": "Thiếu phiên đăng nhập eHoadon (cookies). Vui lòng đăng nhập lại."}
+    if not items:
+        return 400, {"error": "Phải có ít nhất 1 hàng hóa"}
+    res = ehoadon_warehouse_create(cookies, warehouse_info, items)
+    return (400 if "error" in res else 200), res
+
+
 def handle_ehoadon_invoice_list(body):
     cookies = body.get("cookies") or {}
     if not cookies:
@@ -787,6 +800,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_ehoadon_buyer_search(body)
         elif action == "ehoadon_invoice_create":
             status, payload = handle_ehoadon_invoice_create(body)
+        elif action == "ehoadon_warehouse_create":
+            status, payload = handle_ehoadon_warehouse_create(body)
         elif action == "ehoadon_invoice_list":
             status, payload = handle_ehoadon_invoice_list(body)
         elif action == "parse_customs_declaration":
