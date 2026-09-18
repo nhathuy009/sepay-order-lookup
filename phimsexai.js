@@ -1,12 +1,14 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 4.0.0
+// Version: 5.0.0
 // Base: https://phimsexai.site
 // Platform: WordPress + Custom Player (cvp-player)
+// 
 // Features:
-//   - Hiển thị 7 servers cho user chọn
-//   - Auto-fallback khi server lỗi
-//   - Hỗ trợ M3U8, MP4, Embed
+//   - Parse phim lẻ + phim bộ (episodes)
+//   - Ưu tiên Schema VideoObject (không bị adblock strip)
+//   - 7 servers với auto-fallback
+//   - Preview poster HD
 // =============================================================================
 
 // =============================================================================
@@ -17,7 +19,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "4.0.0",
+        "version": "5.0.0",
         "baseUrl": "https://phimsexai.site",
         "fallbackUrls": [],
         "referrer": "https://phimsexai.site/",
@@ -30,7 +32,7 @@ function getManifest() {
         "playerType": "exoplayer",
         "subtitleCat": false,
         "debug": false,
-        "adblock": true
+        "adblock": false
     });
 }
 
@@ -140,9 +142,6 @@ var PluginUtils = {
         }
     },
 
-    /**
-     * Xác định loại server từ URL
-     */
     detectServerType: function(url) {
         if (!url) return "unknown";
         if (url.indexOf(".m3u8") !== -1) return "m3u8";
@@ -153,9 +152,6 @@ var PluginUtils = {
         return "embed";
     },
 
-    /**
-     * Lấy tên hiển thị cho server
-     */
     getServerLabel: function(num, url) {
         var type = PluginUtils.detectServerType(url);
         var typeNames = {
@@ -165,33 +161,26 @@ var PluginUtils = {
             "usersporn": "UsersPorn",
             "abyss": "Abyss",
             "embed": "Embed",
-            "unknown": "Server"
+            "unknown": "SV"
         };
         return "SV " + num + " (" + (typeNames[type] || "Server") + ")";
     },
 
-    /**
-     * Chấm điểm server để ưu tiên
-     * Điểm cao hơn = ưu tiên hơn
-     */
     scoreServer: function(url, num) {
         var score = 0;
         var type = PluginUtils.detectServerType(url);
         
-        // Ưu tiên theo loại
         switch (type) {
-            case "m3u8": score += 100; break;      // HLS tốt nhất
-            case "mp4": score += 80; break;         // MP4 cũng tốt
-            case "abyss": score += 60; break;       // Player chuyên dụng
-            case "youjizz": score += 50; break;     // Embed phổ biến
-            case "usersporn": score += 40; break;   // Embed
+            case "m3u8": score += 100; break;
+            case "mp4": score += 80; break;
+            case "abyss": score += 60; break;
+            case "youjizz": score += 50; break;
+            case "usersporn": score += 40; break;
             case "embed": score += 30; break;
             default: score += 10;
         }
         
-        // Ưu tiên server số nhỏ (thường là server chính)
         score += (10 - num) * 5;
-        
         return score;
     }
 };
@@ -264,6 +253,7 @@ function getUrlYears() {
 function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     
+    // Parse standard posts (phim lẻ)
     var standardRegex = /<article[^>]+class="[^"]*standard-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     var match;
     while ((match = standardRegex.exec(html)) !== null) {
@@ -271,12 +261,14 @@ function parseListResponse(html, apiUrl, datasend) {
         if (movie) movies.push(movie);
     }
     
+    // Parse series posts (phim bộ)
     var seriesRegex = /<article[^>]+class="[^"]*series-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = seriesRegex.exec(html)) !== null) {
         var movie = parseSeriesPost(match[1]);
         if (movie) movies.push(movie);
     }
     
+    // Pagination
     var currentPage = 1;
     var totalPages = 1;
     
@@ -373,6 +365,7 @@ function parseSeriesPost(itemHtml) {
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*series-slide-img[^"]*"/i);
         if (imgMatch) poster = PluginUtils.normalizeUrl(imgMatch[1]);
         
+        // Đếm số tập từ series-episodes-list
         var episodeCount = 0;
         var episodeMatches = itemHtml.match(/<li>\s*<a[^>]+href="[^"]+"[^>]*>\s*<span[^>]+class="[^"]*ep-badge[^"]*"/g);
         if (episodeMatches) episodeCount = episodeMatches.length;
@@ -407,7 +400,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER
+// MOVIE DETAIL PARSER - VERSION 5.0.0
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -431,12 +424,16 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             previewUrl: ""
         };
         
-        // Metadata
+        // ============================================================
+        // 1. METADATA
+        // ============================================================
         var title = PluginUtils.getMeta(htmlContent, "og:title");
         var thumb = PluginUtils.getMeta(htmlContent, "og:image");
         var desc = PluginUtils.getMeta(htmlContent, "og:description");
         
-        if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+        if (title) {
+            title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+        }
         
         if (!title) {
             var h1Match = htmlContent.match(/<h1[^>]+class="[^"]*entry-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i);
@@ -453,23 +450,23 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         result.backdropUrl = thumb;
         result.description = PluginUtils.cleanText(desc);
         
-        // Duration
+        // Duration từ Schema
         var duration = "";
         var durationMatch = htmlContent.match(/"duration"\s*:\s*"([^"]+)"/i);
         if (durationMatch) duration = PluginUtils.parseDuration(durationMatch[1]);
         
-        // ═══════════════════════════════════════════════════
-        // TÌM PLAYER URL - 5 STRATEGIES
-        // ═══════════════════════════════════════════════════
+        // ============================================================
+        // 2. TÌM PLAYER URL - 5 STRATEGIES
+        // ============================================================
         var embedUrl = "";
         
-        // Strategy 1: TỪ SCHEMA VIDEOOBJECT (an toàn nhất)
+        // ⭐ Strategy 1: TỪ SCHEMA VIDEOOBJECT (an toàn nhất)
         var schemaEmbedMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
         if (schemaEmbedMatch) {
             embedUrl = schemaEmbedMatch[1].replace(/\\\//g, "/");
         }
         
-        // Strategy 2: Từ iframe okplayer-frame
+        // Strategy 2: Từ iframe okplayer-frame (linh hoạt với xuống dòng)
         if (!embedUrl) {
             var iframeOkMatch = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
             if (iframeOkMatch) {
@@ -510,35 +507,109 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             embedUrl = "https:" + embedUrl;
         }
         
-        // Parse episodes (series)
+        // ============================================================
+        // 3. PARSE EPISODES - ĐÚNG VỚI HTML THỰC TẾ
+        // ============================================================
         var episodes = [];
-        var epRegex = /<a[^>]+href="([^"]+)"[^>]*>\s*<span[^>]+class="[^"]*ep-title[^"]*"[^>]*>[\s\S]*?<span[^>]+class="[^"]*ep-badge[^"]*">(\d+)\.<\/span>([\s\S]*?)<\/span>/gi;
-        var epMatch;
-        while ((epMatch = epRegex.exec(htmlContent)) !== null) {
-            episodes.push({
-                num: parseInt(epMatch[2]),
-                title: PluginUtils.cleanText(epMatch[3]),
-                slug: PluginUtils.extractSlugFromUrl(epMatch[1])
-            });
+        
+        // Cách 1: Parse từ .episode-buttons
+        var episodeListMatch = htmlContent.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (episodeListMatch) {
+            var episodeButtons = episodeListMatch[1].match(/<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>([\s\S]*?)<\/a>/gi);
+            
+            if (episodeButtons) {
+                for (var e = 0; e < episodeButtons.length; e++) {
+                    var btnHtml = episodeButtons[e];
+                    
+                    var hrefMatch = btnHtml.match(/href=["']([^"']+)["']/i);
+                    var numMatch = btnHtml.match(/>([\s\S]*?)<\/a>/i);
+                    
+                    if (hrefMatch && numMatch) {
+                        var epUrl = hrefMatch[1];
+                        var epNum = parseInt(PluginUtils.cleanText(numMatch[1]));
+                        var epSlug = PluginUtils.extractSlugFromUrl(epUrl);
+                        
+                        var labelMatch = btnHtml.match(/aria-label=["']([^"']+)["']/i);
+                        var epTitle = labelMatch ? PluginUtils.cleanText(labelMatch[1]) : ("Tập " + epNum);
+                        
+                        if (epNum > 0 && epSlug) {
+                            episodes.push({
+                                num: epNum,
+                                title: epTitle,
+                                slug: epSlug,
+                                url: epUrl,
+                                isActive: btnHtml.indexOf("active") !== -1
+                            });
+                        }
+                    }
+                }
+            }
         }
         
-        // Build servers
+        // Cách 2: Fallback - Parse tất cả link có class episode-btn
+        if (episodes.length === 0) {
+            var allBtnRegex = /<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+            var btnMatch;
+            var idx = 0;
+            
+            while ((btnMatch = allBtnRegex.exec(htmlContent)) !== null) {
+                idx++;
+                var fullBtn = btnMatch[0];
+                var hrefMatch2 = fullBtn.match(/href=["']([^"']+)["']/i);
+                var numText = PluginUtils.cleanText(btnMatch[1]);
+                var num = parseInt(numText) || idx;
+                
+                if (hrefMatch2) {
+                    var epUrl2 = hrefMatch2[1];
+                    var epSlug2 = PluginUtils.extractSlugFromUrl(epUrl2);
+                    
+                    var labelMatch2 = fullBtn.match(/aria-label=["']([^"']+)["']/i);
+                    var epTitle2 = labelMatch2 ? PluginUtils.cleanText(labelMatch2[1]) : ("Tập " + num);
+                    
+                    episodes.push({
+                        num: num,
+                        title: epTitle2,
+                        slug: epSlug2,
+                        url: epUrl2,
+                        isActive: fullBtn.indexOf("active") !== -1
+                    });
+                }
+            }
+        }
+        
+        // ============================================================
+        // 4. BUILD SERVERS - PHÂN BIỆT PHIM LẺ / PHIM BỘ
+        // ============================================================
+        
         if (episodes.length > 0) {
+            // ═══════════════════════════════════════════
+            // PHIM BỘ: Mỗi tập là 1 episode, id = URL trang chi tiết tập
+            // ═══════════════════════════════════════════
             var seriesEpisodes = [];
+            
             for (var i = 0; i < episodes.length; i++) {
+                var ep = episodes[i];
+                var epUrl = "https://phimsexai.site/" + ep.slug + "/";
+                
                 seriesEpisodes.push({
-                    id: "https://phimsexai.site/" + episodes[i].slug + "/",
-                    name: "Tập " + episodes[i].num + ": " + episodes[i].title,
-                    slug: episodes[i].slug
+                    id: epUrl,
+                    name: ep.title || ("Tập " + ep.num),
+                    slug: ep.slug
                 });
             }
+            
             result.servers.push({
                 name: "PhimSexAI",
                 episodes: seriesEpisodes
             });
+            
             result.episode_current = episodes.length + " tập";
             result.quality = "SERIES";
+            
         } else if (embedUrl) {
+            // ═══════════════════════════════════════════
+            // PHIM LẺ: 1 player URL duy nhất
+            // ═══════════════════════════════════════════
             result.servers.push({
                 name: "PhimSexAI",
                 episodes: [{
@@ -547,14 +618,17 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                     slug: "full"
                 }]
             });
+            
             result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+            
         } else {
-            // Không tìm thấy player URL
             result.episode_current = "No Source";
             result.description = (result.description || "") + "\n\n⚠️ Không tìm thấy player URL";
         }
         
-        // Tags
+        // ============================================================
+        // 5. TAGS
+        // ============================================================
         var tags = [];
         var tagsSection = htmlContent.match(/<div[^>]+class="[^"]*post-tags[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
         if (tagsSection) {
@@ -580,6 +654,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
+        // Nếu datasend là embed URL player
         if (datasend && datasend.indexOf("/player/") !== -1) {
             return JSON.stringify({
                 url: datasend,
@@ -591,12 +666,13 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             });
         }
         
-        var playerFrameMatch = htmlContent.match(/<iframe[^>]+id=["']okplayer-frame["'][^>]+src=["']([^"']+)["']/i);
-        if (playerFrameMatch) {
-            var url = playerFrameMatch[1];
-            if (url.indexOf("//") === 0) url = "https:" + url;
+        // Strategy 1: Schema
+        var schemaEmbedMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
+        if (schemaEmbedMatch) {
+            var url1 = schemaEmbedMatch[1].replace(/\\\//g, "/");
+            if (url1.indexOf("//") === 0) url1 = "https:" + url1;
             return JSON.stringify({
-                url: url,
+                url: url1,
                 isEmbed: true,
                 headers: {
                     "Referer": "https://phimsexai.site/",
@@ -605,12 +681,31 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             });
         }
         
+        // Strategy 2: iframe okplayer-frame
+        var iframeOkMatch = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
+        if (iframeOkMatch) {
+            var srcMatch = iframeOkMatch[0].match(/src=["']([^"']+)["']/i);
+            if (srcMatch) {
+                var url2 = srcMatch[1].replace(/\\\//g, "/");
+                if (url2.indexOf("//") === 0) url2 = "https:" + url2;
+                return JSON.stringify({
+                    url: url2,
+                    isEmbed: true,
+                    headers: {
+                        "Referer": "https://phimsexai.site/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                });
+            }
+        }
+        
+        // Strategy 3: Bất kỳ iframe có /player/
         var playerIframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*\/player\/[^"']+)["']/i);
         if (playerIframeMatch) {
-            var url2 = playerIframeMatch[1];
-            if (url2.indexOf("//") === 0) url2 = "https:" + url2;
+            var url3 = playerIframeMatch[1].replace(/\\\//g, "/");
+            if (url3.indexOf("//") === 0) url3 = "https:" + url3;
             return JSON.stringify({
-                url: url2,
+                url: url3,
                 isEmbed: true,
                 headers: {
                     "Referer": "https://phimsexai.site/",
@@ -634,13 +729,13 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// EMBED RESPONSE PARSER - OPTION C: HIỂN THỊ TẤT CẢ SERVERS
+// EMBED RESPONSE PARSER - OPTION C: 7 SERVERS + AUTO-FALLBACK
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
     try {
         // ============================================================
-        // 1. PARSE TẤT CẢ SERVERS TỪ CVP-TAB-PANE
+        // 1. PARSE TẤT CẢ SERVERS
         // ============================================================
         var serverList = [];
         var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]+class="[^"]*cvp-tab-pane[^"]*"[^>]+data-link="([^"]+)"/gi;
@@ -650,10 +745,6 @@ function parseEmbedResponse(html, sourceUrl) {
             var tabId = match[1];
             var link = match[2];
             var num = parseInt(tabId.replace("cvp-tab-", ""));
-            
-            // Bỏ qua server 7 (AbyssPlayer) vì thường không ổn định
-            // Có thể bật lại nếu muốn
-            // if (num === 7) continue;
             
             serverList.push({
                 num: num,
@@ -665,7 +756,7 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
         
-        // Fallback: nếu không parse được tab nào
+        // Fallback: data-link bất kỳ
         if (serverList.length === 0) {
             var idx = 0;
             var regex2 = /data-link="([^"]+)"/gi;
@@ -685,10 +776,10 @@ function parseEmbedResponse(html, sourceUrl) {
         
         // Fallback cuối: tìm m3u8/mp4 trực tiếp
         if (serverList.length === 0) {
-            var m3u8Match = html.match(/https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/i);
+            var m3u8Match = html.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
             if (m3u8Match) {
                 return JSON.stringify({
-                    url: m3u8Match[0],
+                    url: m3u8Match[0].replace(/\\\//g, "/"),
                     isEmbed: false,
                     mimeType: "application/x-mpegURL",
                     headers: {
@@ -708,28 +799,25 @@ function parseEmbedResponse(html, sourceUrl) {
         }
         
         // ============================================================
-        // 2. SẮP XẾP THEO ĐIỂM (ưu tiên server tốt)
+        // 2. SẮP XẾP THEO ĐIỂM
         // ============================================================
         serverList.sort(function(a, b) {
             return b.score - a.score;
         });
         
         // ============================================================
-        // 3. XỬ LÝ TỪNG SERVER QUA API /get-video
+        // 3. RESOLVE URL QUA API /get-video CHO SERVER TỐT NHẤT
         // ============================================================
-        var subtitles = [];
         var headers = {
             "Referer": "https://phimsexai.site/",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         };
         
-        // Chọn server đầu tiên (tốt nhất) làm mặc định
         var bestServer = serverList[0];
         var resolvedUrl = bestServer.link;
         var isEmbed = false;
         var mimeType = "application/x-mpegURL";
         
-        // Thử gọi API /get-video cho server tốt nhất
         try {
             var encodedUrl = PluginUtils.safeBtoa(bestServer.link);
             
@@ -761,11 +849,8 @@ function parseEmbedResponse(html, sourceUrl) {
         }
         
         // ============================================================
-        // 4. TRẢ VỀ KẾT QUẢ VỚI NHIỀU SERVERS (OPTION C)
+        // 4. TRẢ VỀ KẾT QUẢ VỚI NHIỀU SERVERS
         // ============================================================
-        // VAAPP sẽ hiển thị list servers này cho user chọn
-        // và tự động fallback nếu server hiện tại lỗi
-        
         var servers = [];
         
         // Server chính (đã resolve URL)
@@ -778,35 +863,26 @@ function parseEmbedResponse(html, sourceUrl) {
             }]
         });
         
-        // Các server phụ (dùng URL gốc, chưa resolve)
+        // Các server phụ (dùng URL gốc)
         for (var s = 1; s < serverList.length; s++) {
             var srv = serverList[s];
-            var srvUrl = srv.link;
-            var srvIsEmbed = (srv.type === "embed" || 
-                              srv.type === "youjizz" || 
-                              srv.type === "usersporn" || 
-                              srv.type === "abyss");
-            
             servers.push({
                 name: "PhimSexAI - " + srv.label,
                 episodes: [{
-                    id: srvUrl,
+                    id: srv.link,
                     name: "Full",
-                    slug: "server-" + srv.num,
-                    isEmbed: srvIsEmbed
+                    slug: "server-" + srv.num
                 }]
             });
         }
         
-        // Trả về kết quả chính (server tốt nhất)
-        // VAAPP sẽ dùng trường "servers" để hiển thị danh sách
         return JSON.stringify({
             url: resolvedUrl,
             isEmbed: isEmbed,
             mimeType: mimeType,
             headers: headers,
-            subtitles: subtitles,
-            servers: servers,  // ← Danh sách tất cả servers cho user chọn
+            subtitles: [],
+            servers: servers,
             bestServer: bestServer.num,
             totalServers: serverList.length
         });
