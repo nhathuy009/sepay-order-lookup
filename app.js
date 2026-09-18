@@ -5860,6 +5860,8 @@ async function doEhoadonLogin() {
     document.getElementById("ehoadonCustomsCard").style.display = "block";
     document.getElementById("ehoadonBuyerCard").style.display = "block";
     document.getElementById("ehoadonInvoiceCard").style.display = "block";
+    const whCard = document.getElementById("ehoadonWarehouseCard");
+    if (whCard) whCard.style.display = "block";
     document.getElementById("ehoadonListCard").style.display = "block";
     
     // Gán ngày hôm nay vào lịch Flatpickr của tab eHoadon
@@ -6034,6 +6036,75 @@ async function doEhoadonCreateInvoice() {
     btn.disabled = false;
   }
 }
+
+async function doEhoadonCreateWarehouse() {
+  const statusEl = document.getElementById("ehoadonWarehouseStatus");
+  const btn = document.getElementById("ehoadonWarehouseBtn");
+  const items = collectEhoadonItems();
+
+  if (!ehoadonCookies) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Chưa đăng nhập eHoadon.</span>';
+    return;
+  }
+  if (items.length === 0) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Phải nhập ít nhất 1 hàng hóa (dùng danh sách hàng phía trên).</span>';
+    return;
+  }
+  // Phiếu XK bắt buộc đơn giá & thành tiền
+  const missing = items.find(it => !String(it.price || "").trim() || (!String(it.amount || "").trim() && !String(it.qty || "").trim()));
+  if (missing) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Mỗi dòng hàng cần có đơn giá (và thành tiền hoặc số lượng để tự tính).</span>';
+    return;
+  }
+
+  const warehouse_info = {
+    ShiftCommandNo: document.getElementById("ehoadonWhCommandNo").value.trim(),
+    ShiftCommandDate: document.getElementById("ehoadonWhCommandDate").value.trim(),
+    ShiftUnitName: document.getElementById("ehoadonWhUnitName").value.trim(),
+    ShiftReason: document.getElementById("ehoadonWhReason").value.trim(),
+    ReferenceNote: "",
+    TransporterName: document.getElementById("ehoadonWhTransporter").value.trim(),
+    ContractNo: document.getElementById("ehoadonWhContract").value.trim(),
+    OutWareHouse: document.getElementById("ehoadonWhOut").value.trim(),
+    InWareHouse: document.getElementById("ehoadonWhIn").value.trim(),
+    Transportation: document.getElementById("ehoadonWhTransport").value.trim(),
+    TaxCodeAgent: document.getElementById("ehoadonWhTaxAgent").value.trim(),
+  };
+
+  btn.disabled = true;
+  statusEl.style.display = "block";
+  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tạo phiếu xuất kho...';
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "ehoadon_warehouse_create",
+        cookies: ehoadonCookies,
+        warehouse_info,
+        items,
+        access_token: getToken()
+      })
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tạo phiếu xuất kho thất bại")}</span>`;
+      return;
+    }
+    if (data.cookies) ehoadonCookies = { ...ehoadonCookies, ...data.cookies };
+
+    statusEl.innerHTML = `<span class="ok">✅ Phiếu xuất kho đã lưu (GUID: ${escapeHtml(data.invoice_guid || "")})</span>`;
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
   
 // Hàm tính khoảng cách Levenshtein để đo độ giống nhau của 2 chuỗi
 function stringSimilarity(s1, s2) {
@@ -6071,13 +6142,45 @@ function applyCustomsDataToForm(data) {
     document.getElementById("ehoadonBuyerKeyword").value = tenCongTy;
   }
 
-  // 2. Điền số tờ khai & ngày đăng ký vào ô Ghi chú
+  // 2. Điền số tờ khai & ngày đăng ký vào ô Ghi chú + form phiếu XK
   const soToKhai = data.thong_tin_chung?.so_to_khai || "";
   const ngayDangKyTime = data.thong_tin_chung?.ngay_dang_ky || "";
   const ngayDangKy = ngayDangKyTime.split(" ")[0]; // Lấy phần ngày DD/MM/YYYY
   
   if (soToKhai) {
     document.getElementById("ehoadonNote").value = `Hóa đơn GTGT cho tờ khai xuất khẩu số ${soToKhai} ngày ${ngayDangKy}`;
+  }
+
+  // Map sang form Phiếu xuất kho
+  const whReason = document.getElementById("ehoadonWhReason");
+  const whUnit = document.getElementById("ehoadonWhUnitName");
+  const whDate = document.getElementById("ehoadonWhCommandDate");
+  const whCmdNo = document.getElementById("ehoadonWhCommandNo");
+  const whTaxAgent = document.getElementById("ehoadonWhTaxAgent");
+  if (whReason && soToKhai) {
+    whReason.value = `Phiếu xuất kho cho tờ khai xuất khẩu số ${soToKhai} ngày ${ngayDangKy}`;
+  }
+  if (whUnit && tenCongTy) {
+    whUnit.value = tenCongTy;
+  }
+  if (whDate) {
+    // Chuyển DD/MM/YYYY -> YYYY-MM-DD nếu có thể
+    let isoDate = "";
+    const m = ngayDangKy.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) isoDate = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    else isoDate = new Date().toISOString().slice(0, 10);
+    whDate.value = isoDate;
+  }
+  if (whCmdNo && !whCmdNo.value.trim()) {
+    const d = new Date();
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(-2);
+    whCmdNo.value = `${dd}/${mm}/${yy}-AT`;
+  }
+  if (whTaxAgent) {
+    const mst = data.thong_tin_chung?.ma_so_thue_dai_dien || "";
+    if (mst) whTaxAgent.value = mst;
   }
 
   // 3. Xử lý danh sách hàng hóa
