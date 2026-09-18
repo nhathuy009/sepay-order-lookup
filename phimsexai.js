@@ -412,26 +412,6 @@ function parseSearchResponse(html, apiUrl, datasend) {
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
     try {
-                // === DEBUG ===
-        console.log("=== parseMovieDetail DEBUG ===");
-        console.log("HTML length:", htmlContent.length);
-        console.log("Has okplayer-frame:", htmlContent.indexOf("okplayer-frame") !== -1);
-        console.log("Has /player/:", htmlContent.indexOf("/player/") !== -1);
-        
-        // Tìm và log iframe
-        var iframeTest = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
-        if (iframeTest) {
-            console.log("✅ Found iframe:", iframeTest[0].substring(0, 200));
-            var srcTest = iframeTest[0].match(/src=["']([^"']+)["']/i);
-            console.log("✅ src =", srcTest ? srcTest[1] : "NOT FOUND");
-        } else {
-            console.log("❌ iframe okplayer-frame NOT FOUND");
-            
-            // Thử regex khác
-            var anyIframe = htmlContent.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-            console.log("Any iframe src:", anyIframe ? anyIframe[1] : "NONE");
-        }
-        // === END DEBUG ===
         var result = {
             id: "",
             title: "",
@@ -451,13 +431,12 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             previewUrl: ""
         };
         
+        // Metadata
         var title = PluginUtils.getMeta(htmlContent, "og:title");
         var thumb = PluginUtils.getMeta(htmlContent, "og:image");
         var desc = PluginUtils.getMeta(htmlContent, "og:description");
         
-        if (title) {
-            title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
-        }
+        if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
         
         if (!title) {
             var h1Match = htmlContent.match(/<h1[^>]+class="[^"]*entry-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i);
@@ -474,22 +453,62 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         result.backdropUrl = thumb;
         result.description = PluginUtils.cleanText(desc);
         
+        // Duration
         var duration = "";
         var durationMatch = htmlContent.match(/"duration"\s*:\s*"([^"]+)"/i);
         if (durationMatch) duration = PluginUtils.parseDuration(durationMatch[1]);
         
+        // ═══════════════════════════════════════════════════
+        // TÌM PLAYER URL - 5 STRATEGIES
+        // ═══════════════════════════════════════════════════
         var embedUrl = "";
-        var playerFrameMatch = htmlContent.match(/<iframe[^>]+id=["']okplayer-frame["'][^>]+src=["']([^"']+)["']/i);
-        if (playerFrameMatch) {
-            embedUrl = playerFrameMatch[1];
+        
+        // Strategy 1: TỪ SCHEMA VIDEOOBJECT (an toàn nhất)
+        var schemaEmbedMatch = htmlContent.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
+        if (schemaEmbedMatch) {
+            embedUrl = schemaEmbedMatch[1].replace(/\\\//g, "/");
         }
         
+        // Strategy 2: Từ iframe okplayer-frame
+        if (!embedUrl) {
+            var iframeOkMatch = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
+            if (iframeOkMatch) {
+                var srcMatch = iframeOkMatch[0].match(/src=["']([^"']+)["']/i);
+                if (srcMatch) embedUrl = srcMatch[1].replace(/\\\//g, "/");
+            }
+        }
+        
+        // Strategy 3: Bất kỳ iframe có /player/
         if (!embedUrl) {
             var playerIframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']*\/player\/[^"']+)["']/i);
-            if (playerIframeMatch) embedUrl = playerIframeMatch[1];
+            if (playerIframeMatch) {
+                embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
+            }
         }
         
-        if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
+        // Strategy 4: Tìm trong script/json
+        if (!embedUrl) {
+            var scriptPlayerMatch = htmlContent.match(/["'](https?:\/\/[^"']*\/player\/\d+[^"']*)["']/i);
+            if (scriptPlayerMatch) {
+                embedUrl = scriptPlayerMatch[1].replace(/\\\//g, "/");
+            }
+        }
+        
+        // Strategy 5: Xây dựng từ post ID
+        if (!embedUrl) {
+            var postIdMatch = htmlContent.match(/postid-(\d+)/i) || 
+                             htmlContent.match(/"postid"\s*:\s*(\d+)/i) ||
+                             htmlContent.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
+                             htmlContent.match(/shortlink["']\s*href=["']https?:\/\/[^"']+\?p=(\d+)/i);
+            if (postIdMatch) {
+                embedUrl = "https://phimsexai.site/player/" + postIdMatch[1];
+            }
+        }
+        
+        // Chuẩn hóa
+        if (embedUrl && embedUrl.indexOf("//") === 0) {
+            embedUrl = "https:" + embedUrl;
+        }
         
         // Parse episodes (series)
         var episodes = [];
@@ -505,7 +524,6 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         
         // Build servers
         if (episodes.length > 0) {
-            // SERIES: Mỗi tập là 1 episode
             var seriesEpisodes = [];
             for (var i = 0; i < episodes.length; i++) {
                 seriesEpisodes.push({
@@ -521,7 +539,6 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             result.episode_current = episodes.length + " tập";
             result.quality = "SERIES";
         } else if (embedUrl) {
-            // PHIM ĐƠN: 1 episode là player URL
             result.servers.push({
                 name: "PhimSexAI",
                 episodes: [{
@@ -531,8 +548,13 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 }]
             });
             result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+        } else {
+            // Không tìm thấy player URL
+            result.episode_current = "No Source";
+            result.description = (result.description || "") + "\n\n⚠️ Không tìm thấy player URL";
         }
         
+        // Tags
         var tags = [];
         var tagsSection = htmlContent.match(/<div[^>]+class="[^"]*post-tags[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
         if (tagsSection) {
@@ -548,7 +570,6 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         return JSON.stringify(result);
         
     } catch (e) {
-        toast("Lỗi parseMovieDetail: " + e.message);
         return JSON.stringify({ error: true, message: e.message });
     }
 }
