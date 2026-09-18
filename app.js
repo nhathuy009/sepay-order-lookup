@@ -6171,12 +6171,24 @@ function applyCustomsDataToForm(data) {
     else isoDate = new Date().toISOString().slice(0, 10);
     whDate.value = isoDate;
   }
-  if (whCmdNo && !whCmdNo.value.trim()) {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = String(d.getFullYear()).slice(-2);
-    whCmdNo.value = `${dd}/${mm}/${yy}-AT`;
+  // ShiftCommandNo: dd/mm/yy-{2 chữ cái đầu tên KH} từ ngày ĐK tờ khai + ten_cong_ty
+  if (whCmdNo) {
+    let datePart = "";
+    const mDate = ngayDangKy.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (mDate) {
+      const dd = mDate[1].padStart(2, "0");
+      const mm = mDate[2].padStart(2, "0");
+      const yy = mDate[3].length === 4 ? mDate[3].slice(-2) : mDate[3].padStart(2, "0");
+      datePart = `${dd}/${mm}/${yy}`;
+    } else {
+      const d = new Date();
+      datePart = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
+    }
+    const letters = String(tenCongTy || "")
+      .replace(/[^A-Za-zÀ-ỹ]/g, "")
+      .toUpperCase()
+      .slice(0, 2) || "XX";
+    whCmdNo.value = `${datePart}-${letters}`;
   }
   // Kho nhập (InWareHouse) từ địa điểm xếp hàng
   const whIn = document.getElementById("ehoadonWhIn");
