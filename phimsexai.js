@@ -1,7 +1,14 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 5.5.0 - Fetch hết các tập ngay trong parseMovieDetail
+// Version: 6.0.0
 // Base: https://phimsexai.site
+// 
+// FEATURES:
+//   - Nhận diện 5 loại page: Homepage, Series Archive, Episode Detail, Single Movie, Player
+//   - Parse danh sách tập từ Series Archive
+//   - Fetch player → extract stream URL trực tiếp (m3u8/mp4)
+//   - Bypass overlay quảng cáo (chỉ dùng stream URL)
+//   - Auto-fallback khi server lỗi
 // =============================================================================
 
 // =============================================================================
@@ -12,7 +19,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "5.5.0",
+        "version": "6.0.0",
         "baseUrl": "https://phimsexai.site",
         "fallbackUrls": [],
         "referrer": "https://phimsexai.site/",
@@ -176,12 +183,11 @@ function getUrlCountries() { return ""; }
 function getUrlYears() { return ""; }
 
 // =============================================================================
-// HELPER: HTTP REQUEST VỚI RETRY
+// HTTP HELPER
 // =============================================================================
 
 function fetchUrl(url) {
     if (!url || typeof httpRequest === "undefined") return null;
-
     try {
         var resp = httpRequest(url, {
             method: "GET",
@@ -190,17 +196,41 @@ function fetchUrl(url) {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
         });
-
-        if (resp && resp.status === 200 && resp.body) {
-            return resp.body;
-        }
+        if (resp && resp.status === 200 && resp.body) return resp.body;
     } catch (e) {}
-
     return null;
 }
 
 // =============================================================================
-// HELPER: Tìm embed URL từ trang chi tiết
+// PAGE TYPE DETECTION
+// =============================================================================
+
+function detectPageType(html) {
+    if (!html) return "UNKNOWN";
+    
+    // 1. PLAYER PAGE (có cvp-tab-pane + data-link)
+    if (html.indexOf("cvp-tab-pane") !== -1 && html.indexOf("data-link") !== -1) {
+        return "PLAYER";
+    }
+    
+    // 2. SERIES ARCHIVE (có archive-header + video-list + episode-label)
+    if (html.indexOf("archive-header") !== -1 &&
+        html.indexOf("organic-masonry-grid video-list") !== -1 &&
+        html.indexOf("episode-label") !== -1) {
+        return "SERIES_ARCHIVE";
+    }
+    
+    // 3. EPISODE DETAIL / SINGLE MOVIE (có okplayer-frame hoặc single-post-container)
+    if (html.indexOf("okplayer-frame") !== -1 ||
+        html.indexOf("single-post-container") !== -1) {
+        return "EPISODE_DETAIL";
+    }
+    
+    return "UNKNOWN";
+}
+
+// =============================================================================
+// HELPER: Find embed URL (player URL) từ Episode Detail
 // =============================================================================
 
 function findEmbedUrl(html) {
@@ -239,42 +269,7 @@ function findEmbedUrl(html) {
 }
 
 // =============================================================================
-// HELPER: Tìm danh sách tập từ trang chi tiết
-// =============================================================================
-
-function findEpisodes(html) {
-    var episodes = [];
-
-    var listMatch = html.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    if (!listMatch) return episodes;
-
-    var buttons = listMatch[1].match(/<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>[\s\S]*?<\/a>/gi);
-    if (!buttons) return episodes;
-
-    for (var i = 0; i < buttons.length; i++) {
-        var btn = buttons[i];
-        var hrefMatch = btn.match(/href=["']([^"']+)["']/i);
-        var numMatch = btn.match(/>([\s\S]*?)<\/a>/i);
-
-        if (hrefMatch && numMatch) {
-            var num = parseInt(U.clean(numMatch[1]));
-            var slug = U.slug(hrefMatch[1]);
-            if (num > 0 && slug) {
-                episodes.push({
-                    num: num,
-                    slug: slug,
-                    url: hrefMatch[1],
-                    isActive: btn.indexOf("active") !== -1
-                });
-            }
-        }
-    }
-
-    return episodes;
-}
-
-// =============================================================================
-// HELPER: Extract stream URL từ player HTML
+// HELPER: Extract stream URL từ Player HTML
 // =============================================================================
 
 function extractStreamFromPlayer(playerHtml) {
@@ -361,34 +356,30 @@ function extractStreamFromPlayer(playerHtml) {
 }
 
 // =============================================================================
-// HELPER: Fetch tập và extract stream URL
+// HELPER: Fetch Episode Stream (từ URL trang chi tiết tập)
 // =============================================================================
 
-/**
- * Fetch 1 tập (trang chi tiết) → extract stream URL
- * Return: { url, duration, success } hoặc null
- */
 function fetchEpisodeStream(epDetailUrl) {
     if (!epDetailUrl) return null;
 
-    // Bước 1: Fetch trang chi tiết tập
+    // Fetch trang chi tiết tập
     var detailHtml = fetchUrl(epDetailUrl);
-    if (!detailHtml) return null;
+    if (!detailHtml) return { url: "", duration: "", success: false };
 
-    // Duration của tập
+    // Duration
     var duration = "";
     var durMatch = detailHtml.match(/"duration"\s*:\s*"([^"]+)"/i);
     if (durMatch) duration = U.duration(durMatch[1]);
 
-    // Tìm embed URL của tập
-    var epEmbedUrl = findEmbedUrl(detailHtml);
-    if (!epEmbedUrl) return { url: "", duration: duration, success: false };
+    // Tìm embed URL
+    var embedUrl = findEmbedUrl(detailHtml);
+    if (!embedUrl) return { url: "", duration: duration, success: false };
 
-    // Bước 2: Fetch player HTML
-    var playerHtml = fetchUrl(epEmbedUrl);
+    // Fetch player
+    var playerHtml = fetchUrl(embedUrl);
     if (!playerHtml) return { url: "", duration: duration, success: false };
 
-    // Bước 3: Extract stream URL
+    // Extract stream
     var stream = extractStreamFromPlayer(playerHtml);
     if (!stream) return { url: "", duration: duration, success: false };
 
@@ -401,6 +392,234 @@ function fetchEpisodeStream(epDetailUrl) {
 }
 
 // =============================================================================
+// HELPER: Parse Series Archive
+// =============================================================================
+
+function parseSeriesArchive(html) {
+    var result = {
+        id: "",
+        title: "",
+        posterUrl: "",
+        backdropUrl: "",
+        description: "",
+        year: 0,
+        rating: 0,
+        quality: "SERIES",
+        servers: [],
+        episode_current: "",
+        lang: "Vietsub",
+        category: "",
+        country: "",
+        director: "",
+        casts: "",
+        previewUrl: ""
+    };
+
+    // Metadata
+    var title = U.meta(html, "og:title");
+    var poster = U.meta(html, "og:image");
+    var desc = U.meta(html, "og:description");
+
+    if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+
+    var slug = "";
+    var canonicalMatch = html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
+    if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
+
+    result.id = slug;
+    result.title = title;
+    result.posterUrl = poster;
+    result.backdropUrl = poster;
+    result.description = U.clean(desc);
+
+    // Parse danh sách tập từ .organic-masonry-grid.video-list
+    var episodes = [];
+    var epRegex = /<article[^>]+id="(post-\d+)"[^>]*class="[^"]*organic-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
+    var match;
+
+    while ((match = epRegex.exec(html)) !== null) {
+        var epHtml = match[2];
+
+        // URL tập
+        var urlMatch = epHtml.match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*organic-thumb-link[^"]*"/i);
+        if (!urlMatch) continue;
+
+        var epUrl = urlMatch[1];
+        if (epUrl.indexOf("http") !== 0) {
+            epUrl = "https://phimsexai.site" + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
+        }
+
+        // Số tập + tên tập (từ span.episode-label và text sau đó)
+        var epNum = 0;
+        var epName = "";
+        var epSlug = U.slug(epUrl);
+
+        // Tìm span.episode-label
+        var labelMatch = epHtml.match(/<span[^>]+class="[^"]*episode-label[^"]*">([\s\S]*?)<\/span>([\s\S]*?)<\/a>/i);
+        if (labelMatch) {
+            var labelText = U.clean(labelMatch[1]);      // "Tập 1:"
+            var titleText = U.clean(labelMatch[2]);      // "Lừa vợ..."
+            
+            // Parse số tập từ label
+            var numMatch = labelText.match(/(\d+)/);
+            if (numMatch) epNum = parseInt(numMatch[1]);
+            
+            epName = labelText + " " + titleText;
+        }
+
+        // Fallback: lấy từ post-title
+        if (!epName) {
+            var titleMatch = epHtml.match(/<h2[^>]+class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+            if (titleMatch) epName = U.clean(titleMatch[1]);
+        }
+
+        if (epNum > 0 && epSlug) {
+            episodes.push({
+                id: epUrl,
+                name: epName || ("Tập " + epNum),
+                slug: epSlug,
+                num: epNum
+            });
+        }
+    }
+
+    result.servers.push({
+        name: "PhimSexAI",
+        episodes: episodes
+    });
+
+    result.episode_current = episodes.length + " tập";
+
+    // Category từ tags
+    var tags = [];
+    var tagsSection = html.match(/<div[^>]+class="[^"]*tag-cloud[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (tagsSection) {
+        var tagRegex = /<a[^>]+href="[^"]*\/tag\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
+        var tagMatch;
+        while ((tagMatch = tagRegex.exec(tagsSection[1])) !== null) {
+            var tagName = U.clean(tagMatch[1]);
+            if (tagName) tags.push(tagName);
+        }
+    }
+    result.category = tags.join(", ");
+
+    return JSON.stringify(result);
+}
+
+// =============================================================================
+// HELPER: Parse Episode Detail / Single Movie
+// =============================================================================
+
+function parseEpisodeDetail(html) {
+    var result = {
+        id: "",
+        title: "",
+        posterUrl: "",
+        backdropUrl: "",
+        description: "",
+        year: 0,
+        rating: 0,
+        quality: "HD",
+        servers: [],
+        episode_current: "Full",
+        lang: "Vietsub",
+        category: "",
+        country: "",
+        director: "",
+        casts: "",
+        previewUrl: ""
+    };
+
+    // Metadata
+    var title = U.meta(html, "og:title");
+    var poster = U.meta(html, "og:image");
+    var desc = U.meta(html, "og:description");
+
+    if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+
+    var slug = "";
+    var canonicalMatch = html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
+    if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
+
+    result.id = slug;
+    result.title = title;
+    result.posterUrl = poster;
+    result.backdropUrl = poster;
+    result.description = U.clean(desc);
+
+    // Duration
+    var duration = "";
+    var durMatch = html.match(/"duration"\s*:\s*"([^"]+)"/i);
+    if (durMatch) duration = U.duration(durMatch[1]);
+
+    // Tìm embed URL
+    var embedUrl = findEmbedUrl(html);
+
+    // Fetch player & extract stream
+    if (embedUrl) {
+        var stream = fetchEpisodeStream("https://phimsexai.site/" + slug + "/");
+
+        // Fallback: fetch trực tiếp embed URL
+        if (!stream || !stream.success) {
+            var playerHtml = fetchUrl(embedUrl);
+            if (playerHtml) {
+                var directStream = extractStreamFromPlayer(playerHtml);
+                if (directStream) {
+                    stream = {
+                        url: directStream.url,
+                        duration: duration,
+                        serverLabel: directStream.serverLabel,
+                        success: true
+                    };
+                }
+            }
+        }
+
+        if (stream && stream.success && stream.url) {
+            // ✅ Có stream URL trực tiếp
+            result.servers.push({
+                name: "PhimSexAI - " + (stream.serverLabel || "Stream"),
+                episodes: [{
+                    id: stream.url,
+                    name: duration ? "Full (" + duration + ")" : "Full",
+                    slug: "full"
+                }]
+            });
+            result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+        } else {
+            // Fallback: trả về embed URL để VAAPP tự fetch
+            result.servers.push({
+                name: "PhimSexAI",
+                episodes: [{
+                    id: embedUrl,
+                    name: duration ? "Full (" + duration + ")" : "Full",
+                    slug: "full"
+                }]
+            });
+            result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+        }
+    } else {
+        result.episode_current = "No Source";
+        result.description = (result.description || "") + "\n\n⚠️ Không tìm thấy player URL.";
+    }
+
+    // Tags
+    var tags = [];
+    var tagsSection = html.match(/<div[^>]+class="[^"]*post-tags[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    if (tagsSection) {
+        var tagRegex = /<a[^>]+href="[^"]*\/tag\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
+        var tagMatch;
+        while ((tagMatch = tagRegex.exec(tagsSection[1])) !== null) {
+            var tagName = U.clean(tagMatch[1]);
+            if (tagName) tags.push(tagName);
+        }
+    }
+    result.category = tags.join(", ");
+
+    return JSON.stringify(result);
+}
+
+// =============================================================================
 // LIST PARSER
 // =============================================================================
 
@@ -408,18 +627,21 @@ function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     var match;
 
+    // Standard posts
     var standardRegex = /<article[^>]+class="[^"]*standard-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = standardRegex.exec(html)) !== null) {
         var m = parseStandardPost(match[1]);
         if (m) movies.push(m);
     }
 
+    // Series posts
     var seriesRegex = /<article[^>]+class="[^"]*series-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = seriesRegex.exec(html)) !== null) {
         var m2 = parseSeriesPost(match[1]);
         if (m2) movies.push(m2);
     }
 
+    // Pagination
     var currentPage = 1, totalPages = 1;
     var currentMatch = html.match(/<span[^>]+class=['"]current['"][^>]*>(\d+)<\/span>/i);
     if (currentMatch) currentPage = parseInt(currentMatch[1]);
@@ -510,6 +732,7 @@ function parseSeriesPost(itemHtml) {
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*series-slide-img[^"]*"/i);
         if (imgMatch) poster = U.url(imgMatch[1]);
 
+        // Đếm số tập
         var episodeCount = 0;
         var epMatches = itemHtml.match(/<li>\s*<a[^>]+href="[^"]+"[^>]*>\s*<span[^>]+class="[^"]*ep-badge[^"]*"/g);
         if (epMatches) episodeCount = epMatches.length;
@@ -523,7 +746,7 @@ function parseSeriesPost(itemHtml) {
         if (episodeCount > 0) description += (description ? " • " : "") + "📺 " + episodeCount + " tập";
 
         return {
-            id: slug,
+            id: slug,                       // "phim-bo/trao-doi-ban-tinh"
             title: title,
             posterUrl: poster,
             backdropUrl: poster,
@@ -542,173 +765,30 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER - VERSION 5.5.0 (FETCH HẾT CÁC TẬP)
+// MOVIE DETAIL PARSER - VERSION 6.0.0 (PHÂN LOẠI PAGE TYPE)
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
     try {
-        var result = {
-            id: "",
-            title: "",
-            posterUrl: "",
-            backdropUrl: "",
-            description: "",
-            year: 0,
-            rating: 0,
-            quality: "HD",
-            servers: [],
-            episode_current: "Full",
-            lang: "Vietsub",
-            category: "",
-            country: "",
-            director: "",
-            casts: "",
-            previewUrl: ""
-        };
+        var pageType = detectPageType(htmlContent);
 
-        // ===== METADATA =====
-        var title = U.meta(htmlContent, "og:title");
-        var thumb = U.meta(htmlContent, "og:image");
-        var desc = U.meta(htmlContent, "og:description");
+        switch (pageType) {
+            case "SERIES_ARCHIVE":
+                return parseSeriesArchive(htmlContent);
 
-        if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+            case "EPISODE_DETAIL":
+                return parseEpisodeDetail(htmlContent);
 
-        var slug = "";
-        var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
-        if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
-
-        result.id = slug;
-        result.title = title;
-        result.posterUrl = thumb;
-        result.backdropUrl = thumb;
-        result.description = U.clean(desc);
-
-        var duration = "";
-        var durationMatch = htmlContent.match(/"duration"\s*:\s*"([^"]+)"/i);
-        if (durationMatch) duration = U.duration(durationMatch[1]);
-
-        // ===== TÌM EMBED URL VÀ EPISODES =====
-        var embedUrl = findEmbedUrl(htmlContent);
-        var episodesList = findEpisodes(htmlContent);
-
-        // ============================================================
-        // BUILD SERVERS
-        // ============================================================
-
-        if (episodesList.length > 0) {
-            // ═══════════════════════════════════════════════════════
-            // PHIM BỘ: FETCH TẤT CẢ CÁC TẬP NGAY
-            // ═══════════════════════════════════════════════════════
-            var seriesEpisodes = [];
-            var successCount = 0;
-
-            for (var i = 0; i < episodesList.length; i++) {
-                var ep = episodesList[i];
-                var epDetailUrl = "https://phimsexai.site/" + ep.slug + "/";
-
-                // Fetch tập để lấy stream URL
-                var epResult = fetchEpisodeStream(epDetailUrl);
-
-                if (epResult && epResult.success && epResult.url) {
-                    // ✅ Có stream URL trực tiếp
-                    seriesEpisodes.push({
-                        id: epResult.url,
-                        name: "Tập " + ep.num + (epResult.duration ? " (" + epResult.duration + ")" : ""),
-                        slug: ep.slug
-                    });
-                    successCount++;
-                } else {
-                    // ⚠️ Không lấy được link - dùng URL trang chi tiết làm fallback
-                    seriesEpisodes.push({
-                        id: epDetailUrl,
-                        name: "Tập " + ep.num + (epResult && epResult.duration ? " (" + epResult.duration + ")" : ""),
-                        slug: ep.slug
-                    });
-                }
-            }
-
-            result.servers.push({
-                name: "PhimSexAI",
-                episodes: seriesEpisodes
-            });
-
-            result.quality = "SERIES";
-            result.episode_current = successCount + "/" + episodesList.length + " tập";
-
-            // Thông báo nếu có tập lỗi
-            if (successCount < episodesList.length) {
-                var failCount = episodesList.length - successCount;
-                result.description = (result.description || "") +
-                    "\n\n⚠️ " + failCount + "/" + episodesList.length + " tập chưa lấy được link trực tiếp.";
-            }
-
-        } else if (embedUrl) {
-            // ═══════════════════════════════════════════════════════
-            // PHIM LẺ: Fetch player → extract stream URL
-            // ═══════════════════════════════════════════════════════
-            var stream = fetchEpisodeStream(slug ? ("https://phimsexai.site/" + slug + "/") : "");
-
-            // Nếu fetch qua function trên không được, thử fetch trực tiếp
-            if (!stream || !stream.success) {
-                var playerHtml = fetchUrl(embedUrl);
-                if (playerHtml) {
-                    var directStream = extractStreamFromPlayer(playerHtml);
-                    if (directStream) {
-                        stream = {
-                            url: directStream.url,
-                            duration: duration,
-                            serverLabel: directStream.serverLabel,
-                            success: true
-                        };
-                    }
-                }
-            }
-
-            if (stream && stream.success && stream.url) {
-                result.servers.push({
-                    name: "PhimSexAI - " + (stream.serverLabel || "Stream"),
-                    episodes: [{
-                        id: stream.url,
-                        name: duration ? "Full (" + duration + ")" : "Full",
-                        slug: "full"
-                    }]
-                });
-                result.episode_current = duration ? "Full (" + duration + ")" : "Full";
-            } else {
-                // Fallback: trả về embed URL
-                result.servers.push({
-                    name: "PhimSexAI",
-                    episodes: [{
-                        id: embedUrl,
-                        name: duration ? "Full (" + duration + ")" : "Full",
-                        slug: "full"
-                    }]
-                });
-                result.episode_current = duration ? "Full (" + duration + ")" : "Full";
-            }
-
-        } else {
-            result.episode_current = "No Source";
-            result.description = (result.description || "") + "\n\n⚠️ Không tìm thấy player URL.";
+            default:
+                // Fallback: thử parse episode detail
+                return parseEpisodeDetail(htmlContent);
         }
-
-        // ===== TAGS =====
-        var tags = [];
-        var tagsSection = htmlContent.match(/<div[^>]+class="[^"]*post-tags[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-        if (tagsSection) {
-            var tagRegex = /<a[^>]+href="[^"]*\/tag\/[^"]*"[^>]*>([^<]+)<\/a>/gi;
-            var tagMatch;
-            while ((tagMatch = tagRegex.exec(tagsSection[1])) !== null) {
-                var tagName = U.clean(tagMatch[1]);
-                if (tagName) tags.push(tagName);
-            }
-        }
-        result.category = tags.join(", ");
-
-        return JSON.stringify(result);
 
     } catch (e) {
-        return JSON.stringify({ error: true, message: e.message });
+        return JSON.stringify({
+            error: true,
+            message: "parseMovieDetail error: " + e.message
+        });
     }
 }
 
@@ -735,7 +815,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }
         }
 
-        // CASE 2: Trang chi tiết → fetch player
+        // CASE 2: Episode Detail HTML → fetch player
         if (htmlContent) {
             var embedUrl = findEmbedUrl(htmlContent);
             if (embedUrl) {
@@ -772,6 +852,26 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             });
         }
 
+        // CASE 4: datasend là embed URL
+        if (datasend && datasend.indexOf("/player/") !== -1) {
+            var playerHtml4 = fetchUrl(datasend);
+            if (playerHtml4) {
+                var stream4 = extractStreamFromPlayer(playerHtml4);
+                if (stream4) {
+                    return JSON.stringify({
+                        url: stream4.url,
+                        isEmbed: false,
+                        mimeType: stream4.mimeType,
+                        headers: {
+                            "Referer": "https://phimsexai.site/",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        },
+                        subtitles: []
+                    });
+                }
+            }
+        }
+
         return JSON.stringify({
             url: "",
             isEmbed: false,
@@ -790,6 +890,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 
 function parseEmbedResponse(html, sourceUrl) {
     try {
+        // Extract stream từ player HTML
         var stream = extractStreamFromPlayer(html);
         if (stream) {
             return JSON.stringify({
@@ -803,7 +904,7 @@ function parseEmbedResponse(html, sourceUrl) {
             });
         }
 
-        // Fallback: fetch player từ embed URL
+        // Fallback: tìm embed URL và fetch
         var embedUrl = findEmbedUrl(html);
         if (embedUrl) {
             var playerHtml = fetchUrl(embedUrl);
