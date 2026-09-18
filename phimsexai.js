@@ -412,6 +412,26 @@ function parseSearchResponse(html, apiUrl, datasend) {
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
     try {
+                // === DEBUG ===
+        console.log("=== parseMovieDetail DEBUG ===");
+        console.log("HTML length:", htmlContent.length);
+        console.log("Has okplayer-frame:", htmlContent.indexOf("okplayer-frame") !== -1);
+        console.log("Has /player/:", htmlContent.indexOf("/player/") !== -1);
+        
+        // Tìm và log iframe
+        var iframeTest = htmlContent.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
+        if (iframeTest) {
+            console.log("✅ Found iframe:", iframeTest[0].substring(0, 200));
+            var srcTest = iframeTest[0].match(/src=["']([^"']+)["']/i);
+            console.log("✅ src =", srcTest ? srcTest[1] : "NOT FOUND");
+        } else {
+            console.log("❌ iframe okplayer-frame NOT FOUND");
+            
+            // Thử regex khác
+            var anyIframe = htmlContent.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+            console.log("Any iframe src:", anyIframe ? anyIframe[1] : "NONE");
+        }
+        // === END DEBUG ===
         var result = {
             id: "",
             title: "",
