@@ -5856,7 +5856,7 @@ async function doEhoadonLogin() {
 
     ehoadonCookies = data.cookies || null;
     statusEl.innerHTML = '<span class="ok">✅ Đăng nhập eHoadon thành công.</span>';
-    // MỚI THÊM: Hiện toàn bộ các chức năng còn lại sau khi có Cookie
+    // Hiện toàn bộ các chức năng còn lại sau khi có Cookie
     document.getElementById("ehoadonCustomsCard").style.display = "block";
     document.getElementById("ehoadonBuyerCard").style.display = "block";
     document.getElementById("ehoadonInvoiceCard").style.display = "block";
