@@ -1646,3 +1646,101 @@
 .refund-badge-processing { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--sky-200, #9FD4F8); }
 .refund-badge-done { background: color-mix(in srgb, #22c55e 16%, transparent); color: #86efac; }
 .refund-badge-error { background: color-mix(in srgb, #f97316 16%, transparent); color: #fdba74; }
+
+/* ===== eHoadon: 2 card ngang 50:50, xếp dọc trên mobile ===== */
+.ehoadon-split-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+.ehoadon-split-card {
+  flex: 1 1 calc(50% - 8px);
+  min-width: 0;
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+.ehoadon-action-row {
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+.ehoadon-action-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ehoadon-action-field input[type="file"],
+.ehoadon-action-field input[type="text"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ehoadon-action-row > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Login row eHoadon */
+#ehoadonLoginCard .row {
+  align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+  .ehoadon-split-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .ehoadon-split-card {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .ehoadon-action-row {
+    flex-wrap: wrap;
+  }
+  .ehoadon-action-field {
+    flex: 1 1 100%;
+  }
+  .ehoadon-action-row > button {
+    width: 100%;
+  }
+  #ehoadonLoginCard .row > div {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  #ehoadonLoginCard .row > div:last-child {
+    flex: 1 1 100%;
+  }
+  #ehoadonLoginCard button {
+    width: 100%;
+  }
+  #ehoadonInvoiceCard .row,
+  #ehoadonListCard .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #ehoadonListCard .row > div {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  #ehoadonListCard button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .ehoadon-split-row {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  #tabEhoadon h2 {
+    font-size: 1.15rem;
+  }
+  .ehoadon-split-card h3 {
+    font-size: 0.95rem;
+  }
+  .ehoadon-split-card .hint {
+    font-size: 12px;
+  }
+}
