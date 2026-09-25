@@ -1,15 +1,17 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.3.0 - ACTIVE BASE URL
+// Version: 6.4.0 - NORMALIZE URL + FIX BTOA
 // Base: https://phimsexai.site
 //
 // CHANGELOG:
-//   v6.3.0 - Thêm setActiveBase(apiUrl): plugin tự nhận domain thực tế mà App
-//            đã fetch, thay vì chỉ đọc baseUrl từ manifest. Khắc phục lỗi khi
-//            user đổi Base URL tùy chỉnh (VD: .site -> .xyz) thì bấm vào phim
-//            không load được.
-//   v6.2.0 - Gom domain vào getBase(), whitelist domain trong fetchUrl()
-//   v6.1.0 - Tối ưu tốc độ, không fetch trong parseMovieDetail
+//   v6.4.0 - [FIX] normalizeUrl(): thay domain cũ -> activeBase trong MỌI URL
+//            trích từ HTML (poster, embedUrl, data-link, m3u8...).
+//          - [FIX] U.btoa() dùng BASE64.encode (QuickJS) thay vì btoa() browser.
+//            Trước đây U.btoa() luôn trả "" -> API /get-video không bao giờ gọi.
+//          - [FIX] U.url() normalize cả URL tuyệt đối, không chỉ URL tương đối.
+//   v6.3.0 - setActiveBase(apiUrl): nhận domain thực tế App đã fetch.
+//   v6.2.0 - Gom domain vào getBase(), whitelist domain trong fetchUrl().
+//   v6.1.0 - Tối ưu tốc độ, không fetch trong parseMovieDetail.
 // =============================================================================
 
 // =============================================================================
@@ -22,7 +24,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.3.0",
+        "version": "6.4.0",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -75,20 +77,18 @@ function getFilterConfig() {
 }
 
 // =============================================================================
-// ACTIVE BASE URL (ưu tiên domain thực tế mà App đã fetch)
+// ACTIVE BASE URL
 // =============================================================================
 
 var _cachedBase = null;
 var _activeBase = null;
 
-// Gọi ở đầu mỗi parseXxx để ghi nhận domain App đã fetch (có thể đã đổi)
 function setActiveBase(url) {
     if (!url) return;
     var m = String(url).match(/^https?:\/\/[^\/]+/i);
     if (m && m[0]) _activeBase = m[0];
 }
 
-// Trả về base URL đang hoạt động: ưu tiên activeBase > manifest.baseUrl
 function getBase() {
     if (_activeBase) return _activeBase;
 
@@ -104,6 +104,26 @@ function getBase() {
         }
     }
     return _cachedBase;
+}
+
+// ⭐ [v6.4.0] Chuẩn hóa URL: thay domain cũ (DEFAULT_BASE) -> domain đang active
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeUrl(url) {
+    if (!url) return url;
+    if (!_activeBase) return url;
+
+    var defaultHost = DEFAULT_BASE.replace(/^https?:\/\//, "");
+    var activeHost = _activeBase.replace(/^https?:\/\//, "");
+
+    if (defaultHost === activeHost) return url;
+
+    // Chỉ thay khi "//<defaultHost>" được theo sau bởi "/", ":", "?", "#" hoặc hết chuỗi.
+    // Tránh nhầm với "//phimsexai.site.evil.com" hoặc "//cdn.phimsexai.site".
+    var re = new RegExp("\\/\\/" + escapeRegex(defaultHost) + "(?=[\\/\\:?#]|$)", "gi");
+    return String(url).replace(re, "//" + activeHost);
 }
 
 // =============================================================================
@@ -128,11 +148,13 @@ var U = {
         return m ? m[2] : "";
     },
 
+    // ⭐ [v6.4.0] Normalize MỌI URL (kể cả tuyệt đối) qua normalizeUrl
     url: function(u) {
         if (!u) return "";
-        if (u.indexOf('//') === 0) return "https:" + u;
-        if (u.indexOf('/') === 0) return getBase() + u;
-        return u;
+        var s = String(u);
+        if (s.indexOf('//') === 0) return "https:" + normalizeUrl(s);
+        if (s.indexOf('/') === 0) return getBase() + s;
+        return normalizeUrl(s);
     },
 
     slug: function(u) {
@@ -152,8 +174,14 @@ var U = {
         return min + ":" + String(s).padStart(2, "0");
     },
 
+    // ⭐ [v6.4.0] FIX: QuickJS không có btoa() -> dùng BASE64.encode
     btoa: function(str) {
         try {
+            if (typeof BASE64 !== 'undefined' && BASE64 && typeof BASE64.encode === 'function') {
+                return BASE64.encode(str)
+                    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            }
+            // Fallback (chỉ chạy trong môi trường browser test)
             return btoa(unescape(encodeURIComponent(str)))
                 .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         } catch (e) { return ""; }
@@ -187,30 +215,30 @@ var U = {
 
 var __httpCache = {};
 
-// Whitelist domain CDN/player phổ biến (mở rộng khi cần)
 var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com)/i;
 
 function isAllowedFetchUrl(url) {
     if (!url) return false;
 
-    // 1. Domain đang hoạt động (có thể đã được user đổi Base URL)
     if (_activeBase) {
         var activeHost = _activeBase.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
         if (activeHost && url.indexOf(activeHost) !== -1) return true;
     }
 
-    // 2. Domain baseUrl trong manifest
     try {
         var baseHost = getBase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
         if (baseHost && url.indexOf(baseHost) !== -1) return true;
     } catch (e) {}
 
-    // 3. Whitelist CDN/player phổ biến
     return ALLOWED_HOST_REGEX.test(url);
 }
 
 function fetchUrl(url) {
     if (!url || typeof httpRequest === "undefined") return null;
+
+    // Normalize trước khi fetch (tránh gọi domain cũ)
+    url = normalizeUrl(url);
+
     if (!isAllowedFetchUrl(url)) return null;
 
     if (__httpCache[url]) {
@@ -265,7 +293,7 @@ function getUrlSearch(keyword, filtersJson) {
 
 function getUrlDetail(slug, datasend) {
     if (!slug) return "";
-    if (slug.indexOf("http") === 0) return slug;
+    if (slug.indexOf("http") === 0) return normalizeUrl(slug);
     if (slug.indexOf("/") === 0) return getBase() + slug;
     return getBase() + "/" + slug + "/";
 }
@@ -335,7 +363,9 @@ function findEmbedUrl(html) {
     }
 
     if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
-    return embedUrl;
+
+    // ⭐ [v6.4.0] Normalize: HTML có thể chứa URL domain cũ
+    return normalizeUrl(embedUrl);
 }
 
 // =============================================================================
@@ -351,7 +381,8 @@ function extractStreamFromPlayer(playerHtml) {
     var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]+class="[^"]*cvp-tab-pane[^"]*"[^>]+data-link="([^"]+)"/gi;
     while ((match = tabRegex.exec(playerHtml)) !== null) {
         var num = parseInt(match[1].replace("cvp-tab-", ""));
-        allLinks.push({ num: num, url: match[2].replace(/\\\//g, "/") });
+        // ⭐ Normalize
+        allLinks.push({ num: num, url: normalizeUrl(match[2].replace(/\\\//g, "/")) });
     }
 
     if (allLinks.length === 0) {
@@ -359,13 +390,17 @@ function extractStreamFromPlayer(playerHtml) {
         var regex2 = /data-link="([^"]+)"/gi;
         while ((match = regex2.exec(playerHtml)) !== null) {
             idx++;
-            allLinks.push({ num: idx, url: match[1].replace(/\\\//g, "/") });
+            // ⭐ Normalize
+            allLinks.push({ num: idx, url: normalizeUrl(match[1].replace(/\\\//g, "/")) });
         }
     }
 
     if (allLinks.length === 0) {
         var m3u8Match = playerHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
-        if (m3u8Match) allLinks.push({ num: 1, url: m3u8Match[0].replace(/\\\//g, "/") });
+        if (m3u8Match) {
+            // ⭐ Normalize
+            allLinks.push({ num: 1, url: normalizeUrl(m3u8Match[0].replace(/\\\//g, "/")) });
+        }
     }
 
     var streamLinks = [];
@@ -404,7 +439,8 @@ function extractStreamFromPlayer(playerHtml) {
                     var data = JSON.parse(resp.body);
                     if (data && data.status === "success" && data.video_url) {
                         if (U.isStream(data.video_url)) {
-                            resolvedUrl = data.video_url;
+                            // ⭐ Normalize URL trả về từ API
+                            resolvedUrl = normalizeUrl(data.video_url);
                         }
                     }
                 } catch (e) {}
@@ -456,8 +492,8 @@ function parseSeriesArchive(html) {
 
     result.id = slug;
     result.title = title;
-    result.posterUrl = poster;
-    result.backdropUrl = poster;
+    result.posterUrl = U.url(poster);
+    result.backdropUrl = U.url(poster);
     result.description = U.clean(desc);
 
     var episodes = [];
@@ -473,6 +509,9 @@ function parseSeriesArchive(html) {
         var epUrl = urlMatch[1];
         if (epUrl.indexOf("http") !== 0) {
             epUrl = getBase() + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
+        } else {
+            // ⭐ Normalize URL tuyệt đối với domain cũ
+            epUrl = normalizeUrl(epUrl);
         }
 
         var epNum = 0;
@@ -562,8 +601,8 @@ function parseEpisodeDetail(html) {
 
     result.id = slug;
     result.title = title;
-    result.posterUrl = poster;
-    result.backdropUrl = poster;
+    result.posterUrl = U.url(poster);
+    result.backdropUrl = U.url(poster);
     result.description = U.clean(desc);
 
     var duration = "";
@@ -589,7 +628,7 @@ function parseEpisodeDetail(html) {
                         episodesList.push({
                             num: epNum,
                             slug: epSlug,
-                            url: hrefMatch[1],
+                            url: normalizeUrl(hrefMatch[1]),
                             isActive: btnHtml.indexOf("active") !== -1
                         });
                     }
@@ -694,6 +733,7 @@ function parseStandardPost(itemHtml) {
         var poster = "";
         var imgMatch = itemHtml.match(/<img[^>]+class="[^"]*organic-img[^"]*"[^>]+src="([^"]+)"/i) ||
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*organic-img[^"]*"/i);
+        // ⭐ U.url() đã normalize
         if (imgMatch) poster = U.url(imgMatch[1]);
 
         var badges = [];
@@ -737,6 +777,7 @@ function parseSeriesPost(itemHtml) {
         var poster = "";
         var imgMatch = itemHtml.match(/<img[^>]+class="[^"]*series-slide-img[^"]*"[^>]+src="([^"]+)"/i) ||
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*series-slide-img[^"]*"/i);
+        // ⭐ U.url() đã normalize
         if (imgMatch) poster = U.url(imgMatch[1]);
 
         var episodeCount = 0;
@@ -849,10 +890,11 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 
         // CASE 3: datasend là stream URL
         if (datasend && U.isStream(datasend)) {
+            var dsUrl = normalizeUrl(datasend);
             return JSON.stringify({
-                url: datasend,
+                url: dsUrl,
                 isEmbed: false,
-                mimeType: U.mime(datasend),
+                mimeType: U.mime(dsUrl),
                 headers: {
                     "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -863,7 +905,8 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 
         // CASE 4: datasend là player URL
         if (datasend && datasend.indexOf("/player/") !== -1) {
-            var playerHtml4 = fetchUrl(datasend);
+            var dsPlayerUrl = normalizeUrl(datasend);
+            var playerHtml4 = fetchUrl(dsPlayerUrl);
             if (playerHtml4) {
                 var stream4 = extractStreamFromPlayer(playerHtml4);
                 if (stream4) {
