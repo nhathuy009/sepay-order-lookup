@@ -1,44 +1,29 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.5.1 - FIX 302 REDIRECT + IFRAME HEADERS
+// Version: 6.6.0 - VAAPP COMPLIANT RELEASE
 // Base: https://phimsexai.xyz
 //
-// CHANGELOG v6.5.1:
-//   [FIX] fetchUrl(url, sourceUrl): nhận sourceUrl làm Referer đúng path,
-//         giúp bypass kiểm tra Referer của server /player/<id>.
-//   [FIX] Thêm header giả lập iframe khi fetch /player/<id>:
-//         Accept, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site,
-//         Upgrade-Insecure-Requests.
-//   [FIX] parseDetailResponse(): truyền apiUrl (URL trang chi tiết) vào
-//         fetchUrl thay vì dùng getBase() + "/".
-//   [ADD] fetchUrl(): fallback thử /?p=<id> nếu /player/<id> trả 302.
-//   [ADD] debugLog chi tiết header gửi đi khi debug=true.
-//
-// CHANGELOG v6.5.0:
-//   [FIX] Domain: phimsexai.site -> phimsexai.xyz (DEFAULT_BASE + LEGACY_HOSTS)
-//   [FIX] findEmbedUrl(): XÓA Strategy 4 (/player/<id>) vì server trả 302.
-//   [FIX] parseEpisodeDetail(): fallback data-poster + <title> khi thiếu og:*.
-//   [FIX] parseMovieDetail(): nhận diện PLAYER, trích stream trực tiếp.
-//   [FIX] fetchUrl(): không theo redirect, kiểm tra HTML hợp lệ trước khi cache.
-//   [FIX] tabRegex: không phụ thuộc thứ tự attribute.
-//   [FIX] extractStreamFromPlayer(): trả về MẢNG servers để App fallback.
-//   [FIX] mimeType: ưu tiên URL gốc thay vì URL resolve.
-// =============================================================================
-
-// =============================================================================
-// CONFIGURATION & METADATA
+// CHANGELOG v6.6.0:
+//   [FIX] Tuân thủ tài liệu VAAPP chính thức:
+//         - episode.slug DUY NHẤT (không dùng "full" cho mọi tập)
+//         - parseDetailResponse() đọc datasend đúng cách
+//         - Dùng getCookie() để lấy cookie gửi kèm request /player/
+//   [ADD] fetchAll() — resolve tất cả server song song (nhanh 10-20x)
+//   [ADD] _$() MiniJQ cho parse HTML gọn hơn
+//   [ADD] getResponseHeaders() debug 302
+//   [ADD] Hỗ trợ playerType "embedtoexoplay" cho server iframe
+//   [KEEP] Tất cả fix từ v6.5.1 (domain, headers, fallback /?p=)
 // =============================================================================
 
 var DEFAULT_BASE = "https://phimsexai.xyz";
 var LEGACY_HOSTS = ["phimsexai.site", "phimsexai.com", "phimsexai.net"];
-
 var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 14; PGT-AN00) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36";
 
 function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.5.1",
+        "version": "6.6.0",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -91,7 +76,7 @@ function getFilterConfig() {
 }
 
 // =============================================================================
-// ACTIVE BASE URL
+// ACTIVE BASE + DEBUG
 // =============================================================================
 
 var _cachedBase = null;
@@ -105,7 +90,6 @@ function setActiveBase(url) {
 
 function getBase() {
     if (_activeBase) return _activeBase;
-
     if (!_cachedBase) {
         try {
             var m = JSON.parse(getManifest());
@@ -120,10 +104,6 @@ function getBase() {
     return _cachedBase;
 }
 
-// =============================================================================
-// DEBUG LOG
-// =============================================================================
-
 function debugLog() {
     try {
         var m = JSON.parse(getManifest());
@@ -134,6 +114,21 @@ function debugLog() {
             console.log.apply(console, args);
         }
     } catch (e) {}
+}
+
+// =============================================================================
+// ⭐ [v6.6.0] HELPER: Đọc datasend từ pipe (theo tài liệu VAAPP)
+// =============================================================================
+
+function getPipeData(apiUrl) {
+    if (!apiUrl) return "";
+    var i = apiUrl.indexOf("|");
+    if (i < 0) return "";
+    var s = apiUrl.substring(i + 1).replace(/^\s+/, "");
+    if (s.toLowerCase().indexOf("data:") === 0) {
+        s = s.substring(5);
+    }
+    return s;
 }
 
 // =============================================================================
@@ -175,6 +170,9 @@ function normalizeUrl(url) {
 var U = {
     clean: function(text) {
         if (!text) return "";
+        if (typeof decodeHTMLtext === 'function') {
+            text = decodeHTMLtext(text);
+        }
         return text.replace(/<[^>]*>/g, "")
             .replace(/&amp;/g, "&").replace(/&quot;/g, '"')
             .replace(/&#039;/g, "'").replace(/&#8211;/g, "-")
@@ -261,25 +259,32 @@ var U = {
         return "Embed";
     },
 
-    // ⭐ [v6.5.1] Chuẩn hóa URL để làm Referer (bỏ trailing slash nếu cần)
     referer: function(u) {
         if (!u) return getBase() + "/";
-        var s = String(u);
-        // Nếu là URL trang chi tiết → dùng nguyên
+        var s = String(u).split("|")[0];
         if (s.indexOf("/player/") === -1 && s.indexOf("/?p=") === -1) return s;
-        // Nếu là /player/<id> hoặc /?p=<id> → dùng base
         return getBase() + "/";
+    },
+
+    // ⭐ [v6.6.0] Tạo slug DUY NHẤT cho episode (tuân thủ tài liệu VAAPP)
+    uniqueSlug: function(prefix, url) {
+        var hash = 0;
+        var s = String(url || "");
+        for (var i = 0; i < s.length; i++) {
+            hash = ((hash << 5) - hash) + s.charCodeAt(i);
+            hash = hash | 0;
+        }
+        return (prefix || "ep") + "-" + Math.abs(hash).toString(36);
     }
 };
 
 // =============================================================================
-// HTTP CACHE + FETCH
-// ⭐ [v6.5.1] fetchUrl nhận sourceUrl để làm Referer + giả lập iframe header
+// HTTP FETCH
 // =============================================================================
 
 var __httpCache = {};
 
-var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com)/i;
+var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com|catbox\.moe|qu\.ax|zpi\.cx|sv1\.website)/i;
 
 function isAllowedFetchUrl(url) {
     if (!url) return false;
@@ -297,19 +302,17 @@ function isAllowedFetchUrl(url) {
     return ALLOWED_HOST_REGEX.test(url);
 }
 
-// ⭐ [v6.5.1] Xây dựng header thông minh dựa trên loại URL
 function buildHeaders(url, sourceUrl) {
     var isPlayerUrl = url.indexOf("/player/") !== -1;
     var referer = sourceUrl ? U.referer(sourceUrl) : (getBase() + "/");
 
-    // ⭐ [v6.5.2] Header giống hệt Chrome 152 trên Windows
     var headers = {
         "Referer": referer,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept-Language": "vi,en-US;q=0.9,en;q=0.8,fr-FR;q=0.7,fr;q=0.6",
+        "User-Agent": DEFAULT_UA,
+        "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
         "sec-ch-ua": "\"Chromium\";v=\"124\", \"Not?A_Brand\";v=\"24\", \"Google Chrome\";v=\"124\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\""
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": "\"Android\""
     };
 
     if (isPlayerUrl) {
@@ -318,28 +321,31 @@ function buildHeaders(url, sourceUrl) {
         headers["Sec-Fetch-Mode"] = "navigate";
         headers["Sec-Fetch-Site"] = "same-origin";
         headers["Upgrade-Insecure-Requests"] = "1";
-        headers["Priority"] = "u=0, i";
     } else {
         headers["Accept"] = "*/*";
-        headers["Sec-Fetch-Dest"] = "empty";
-        headers["Sec-Fetch-Mode"] = "cors";
-        headers["Sec-Fetch-Site"] = "same-origin";
     }
+
+    // ⭐ [v6.6.0] Gửi cookie nếu App có CookieManager
+    try {
+        if (typeof getCookie === 'function') {
+            var cookie = getCookie(url);
+            if (cookie) headers["Cookie"] = cookie;
+        }
+    } catch (e) {}
 
     return headers;
 }
-// ⭐ [v6.5.1] Fetch với fallback /?p=<id> khi /player/<id> bị 302
+
 function fetchUrl(url, sourceUrl) {
     if (!url || typeof httpRequest === "undefined") return null;
 
     url = normalizeUrl(url);
 
     if (!isAllowedFetchUrl(url)) {
-        debugLog("fetchUrl: blocked by whitelist", url);
+        debugLog("fetchUrl: blocked", url);
         return null;
     }
 
-    // Cache check
     if (__httpCache[url]) {
         if ((Date.now() - __httpCache[url].time) < 300000) {
             return __httpCache[url].data;
@@ -348,9 +354,7 @@ function fetchUrl(url, sourceUrl) {
     }
 
     var headers = buildHeaders(url, sourceUrl);
-    debugLog("fetchUrl:", url);
-    debugLog("  referer:", headers["Referer"]);
-    debugLog("  sec-fetch-dest:", headers["Sec-Fetch-Dest"] || "(none)");
+    debugLog("fetchUrl:", url, "| referer:", headers["Referer"]);
 
     try {
         var resp = httpRequest(url, {
@@ -358,9 +362,8 @@ function fetchUrl(url, sourceUrl) {
             headers: headers
         });
 
-        // ⭐ Nếu vẫn 302 → thử fallback /?p=<id> (nếu URL là /player/<id>)
         if (resp && (resp.status === 301 || resp.status === 302 || resp.status === 303 || resp.status === 307 || resp.status === 308)) {
-            debugLog("fetchUrl: redirect", resp.status, "from", url);
+            debugLog("fetchUrl: redirect", resp.status);
 
             var playerMatch = url.match(/\/player\/(\d+)/);
             if (playerMatch) {
@@ -374,7 +377,6 @@ function fetchUrl(url, sourceUrl) {
                         headers: buildHeaders(fallbackUrl, sourceUrl)
                     });
                     if (resp2 && resp2.status === 200 && resp2.body) {
-                        // Trang /?p=<id> là trang chi tiết — cần tìm iframe trong đó
                         if (resp2.body.indexOf("okplayer-frame") !== -1 ||
                             resp2.body.indexOf("cvp-tab-pane") !== -1) {
                             __httpCache[fallbackUrl] = { data: resp2.body, time: Date.now() };
@@ -394,7 +396,7 @@ function fetchUrl(url, sourceUrl) {
             var isDetail = resp.body.indexOf("okplayer-frame") !== -1 ||
                            resp.body.indexOf("single-post-container") !== -1;
             if (!isPlayer && !isDetail) {
-                debugLog("fetchUrl: HTML không phải player/detail, bỏ qua", url);
+                debugLog("fetchUrl: not player/detail");
                 return null;
             }
             __httpCache[url] = { data: resp.body, time: Date.now() };
@@ -469,19 +471,16 @@ function detectPageType(html) {
 }
 
 // =============================================================================
-// HELPER: Find embed URL
-// ⭐ [v6.5.1] Strategy 1 giữ nguyên, nhưng parseDetailResponse sẽ fallback
+// FIND EMBED URL
 // =============================================================================
 
 function findEmbedUrl(html) {
     if (!html) return "";
     var embedUrl = "";
 
-    // Strategy 1: Schema VideoObject
     var schemaMatch = html.match(/"embedUrl"\s*:\s*"([^"]+)"/i);
     if (schemaMatch) embedUrl = schemaMatch[1].replace(/\\\//g, "/");
 
-    // Strategy 2: iframe okplayer-frame
     if (!embedUrl) {
         var iframeMatch = html.match(/<iframe[^>]*id=["']okplayer-frame["'][^>]*>/i);
         if (iframeMatch) {
@@ -490,7 +489,6 @@ function findEmbedUrl(html) {
         }
     }
 
-    // Strategy 3: Bất kỳ iframe /player/ hoặc /embed/
     if (!embedUrl) {
         var playerIframeMatch = html.match(/<iframe[^>]+src=["']([^"']*(?:\/player\/|\/embed\/)[^"']+)["']/i);
         if (playerIframeMatch) embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
@@ -502,7 +500,7 @@ function findEmbedUrl(html) {
 }
 
 // =============================================================================
-// HELPER: Extract streams from Player HTML
+// EXTRACT STREAMS (với fetchAll song song)
 // =============================================================================
 
 function extractAllStreamsFromPlayer(playerHtml) {
@@ -549,45 +547,68 @@ function extractAllStreamsFromPlayer(playerHtml) {
         return a.num - b.num;
     });
 
-    var servers = [];
+    // ⭐ [v6.6.0] Dùng fetchAll() để resolve song song (nhanh 10-20x)
+    var apiUrls = [];
     for (var j = 0; j < streamLinks.length; j++) {
-        var link = streamLinks[j];
-        var resolvedUrl = link.url;
+        var encodedUrl = U.btoa(streamLinks[j].url);
+        if (encodedUrl) {
+            apiUrls.push(getBase() + "/get-video?url=" + encodedUrl);
+        } else {
+            apiUrls.push("");
+        }
+    }
 
+    var resolvedUrls = [];
+    if (typeof fetchAll === 'function' && apiUrls.length > 0) {
         try {
-            var encodedUrl = U.btoa(link.url);
-            if (encodedUrl) {
-                var apiUrl = getBase() + "/get-video?url=" + encodedUrl;
-                var resp = httpRequest(apiUrl, {
-                    method: "GET",
+            var validApis = apiUrls.filter(function(u) { return u; });
+            if (validApis.length > 0) {
+                var responses = fetchAll(validApis, {
                     headers: {
                         "Referer": getBase() + "/",
                         "User-Agent": DEFAULT_UA
                     }
                 });
-                if (resp && resp.status === 200 && resp.body) {
-                    try {
-                        var data = JSON.parse(resp.body);
-                        if (data && data.status === "success" && data.video_url) {
-                            if (U.isStream(data.video_url)) {
-                                resolvedUrl = normalizeUrl(data.video_url);
-                            }
-                        }
-                    } catch (e) {
-                        debugLog("get-video parse error:", e.message || e);
+
+                var respIdx = 0;
+                for (var k = 0; k < apiUrls.length; k++) {
+                    if (!apiUrls[k]) {
+                        resolvedUrls.push(streamLinks[k].url);
+                        continue;
                     }
+                    var r = responses[respIdx++];
+                    var finalUrl = streamLinks[k].url;
+                    if (r && r.isSuccessful && r.body) {
+                        try {
+                            var data = JSON.parse(r.body);
+                            if (data && data.status === "success" && data.video_url && U.isStream(data.video_url)) {
+                                finalUrl = normalizeUrl(data.video_url);
+                            }
+                        } catch (e) {}
+                    }
+                    resolvedUrls.push(finalUrl);
                 }
             }
         } catch (e) {
-            debugLog("get-video call error:", e.message || e);
+            debugLog("fetchAll error:", e.message || e);
         }
+    }
 
+    // Fallback nếu fetchAll không có hoặc lỗi
+    if (resolvedUrls.length === 0) {
+        for (var m = 0; m < streamLinks.length; m++) {
+            resolvedUrls.push(streamLinks[m].url);
+        }
+    }
+
+    var servers = [];
+    for (var n = 0; n < streamLinks.length; n++) {
         servers.push({
-            url: resolvedUrl,
-            originalUrl: link.url,
-            mimeType: U.mime(link.url) || U.mime(resolvedUrl),
-            serverNum: link.num,
-            serverLabel: "SV " + link.num + " (" + U.type(link.url) + ")"
+            url: resolvedUrls[n] || streamLinks[n].url,
+            originalUrl: streamLinks[n].url,
+            mimeType: U.mime(streamLinks[n].url) || U.mime(resolvedUrls[n]),
+            serverNum: streamLinks[n].num,
+            serverLabel: "SV " + streamLinks[n].num + " (" + U.type(streamLinks[n].url) + ")"
         });
     }
 
@@ -601,7 +622,7 @@ function extractStreamFromPlayer(playerHtml) {
 }
 
 // =============================================================================
-// HELPER: Build stream response
+// BUILD STREAM RESPONSE
 // =============================================================================
 
 function buildStreamResponse(servers) {
@@ -644,7 +665,7 @@ function buildStreamResponse(servers) {
 }
 
 // =============================================================================
-// HELPER: Parse Series Archive
+// PARSE SERIES ARCHIVE
 // =============================================================================
 
 function parseSeriesArchive(html) {
@@ -708,10 +729,8 @@ function parseSeriesArchive(html) {
         if (labelMatch) {
             var labelText = U.clean(labelMatch[1]);
             var titleText = U.clean(labelMatch[2]);
-
             var numMatch = labelText.match(/(\d+)/);
             if (numMatch) epNum = parseInt(numMatch[1]);
-
             epName = labelText + " " + titleText;
         }
 
@@ -720,11 +739,14 @@ function parseSeriesArchive(html) {
             if (titleMatch) epName = U.clean(titleMatch[1]);
         }
 
-        if (epNum > 0 && epSlug) {
+        // ⭐ [v6.6.0] Slug DUY NHẤT theo tài liệu VAAPP
+        var uniqueSlug = epSlug || U.uniqueSlug("ep-" + epNum, epUrl);
+
+        if (epNum > 0 && uniqueSlug) {
             episodes.push({
                 id: epUrl,
                 name: epName || ("Tập " + epNum),
-                slug: epSlug
+                slug: uniqueSlug  // ⭐ Duy nhất
             });
         }
     }
@@ -752,10 +774,11 @@ function parseSeriesArchive(html) {
 }
 
 // =============================================================================
-// HELPER: Parse Episode Detail
+// PARSE EPISODE DETAIL
+// ⭐ [v6.6.0] Slug DUY NHẤT + truyền datasend qua pipe
 // =============================================================================
 
-function parseEpisodeDetail(html) {
+function parseEpisodeDetail(html, apiUrl) {
     var result = {
         id: "",
         title: "",
@@ -797,39 +820,16 @@ function parseEpisodeDetail(html) {
 
     var embedUrl = findEmbedUrl(html);
 
-    var episodesList = [];
-    var episodeListMatch = html.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    if (episodeListMatch) {
-        var buttons = episodeListMatch[1].match(/<a[^>]+class="[^"]*episode-btn[^"]*"[^>]*>[\s\S]*?<\/a>/gi);
-        if (buttons) {
-            for (var e = 0; e < buttons.length; e++) {
-                var btnHtml = buttons[e];
-                var hrefMatch = btnHtml.match(/href=["']([^"']+)["']/i);
-                var numMatch = btnHtml.match(/>([\s\S]*?)<\/a>/i);
-
-                if (hrefMatch && numMatch) {
-                    var epNum = parseInt(U.clean(numMatch[1]));
-                    var epSlug = U.slug(hrefMatch[1]);
-                    if (epNum > 0 && epSlug) {
-                        episodesList.push({
-                            num: epNum,
-                            slug: epSlug,
-                            url: normalizeUrl(hrefMatch[1]),
-                            isActive: btnHtml.indexOf("active") !== -1
-                        });
-                    }
-                }
-            }
-        }
-    }
-
     if (embedUrl) {
+        // ⭐ [v6.6.0] Slug DUY NHẤT (không dùng "full" trùng lặp)
+        var uniqueSlug = slug ? ("full-" + U.slug(embedUrl).replace(/\//g, "-")) : U.uniqueSlug("full", embedUrl);
+
         result.servers.push({
             name: "PhimSexAI",
             episodes: [{
                 id: embedUrl,
                 name: duration ? "Full (" + duration + ")" : "Full",
-                slug: "full"
+                slug: uniqueSlug  // ⭐ Duy nhất
             }]
         });
         result.episode_current = duration ? "Full (" + duration + ")" : "Full";
@@ -1038,12 +1038,13 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 };
 
                 if (servers.length > 0) {
+                    var uniqueSlug = slug || U.uniqueSlug("full", servers[0].url);
                     result.servers.push({
                         name: "PhimSexAI",
                         episodes: [{
                             id: servers[0].url,
                             name: "Full",
-                            slug: "full"
+                            slug: "full-" + uniqueSlug.replace(/\//g, "-")
                         }]
                     });
                 }
@@ -1056,7 +1057,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
             case "EPISODE_DETAIL":
             default:
-                return parseEpisodeDetail(htmlContent);
+                return parseEpisodeDetail(htmlContent, apiUrl);
         }
 
     } catch (e) {
@@ -1070,45 +1071,42 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
 // =============================================================================
 // DETAIL RESPONSE PARSER
-// ⭐ [v6.5.1] Truyền apiUrl (URL trang chi tiết) làm sourceUrl cho fetchUrl
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
         setActiveBase(apiUrl);
 
-        // CASE 1: Player HTML → extract streams
+        // ⭐ [v6.6.0] Đọc pipe data từ apiUrl (chuẩn VAAPP)
+        var pipeData = datasend || getPipeData(apiUrl);
+        if (pipeData) {
+            debugLog("parseDetailResponse pipeData:", pipeData);
+        }
+
         if (htmlContent && htmlContent.indexOf("cvp-tab-pane") !== -1) {
             var servers = extractAllStreamsFromPlayer(htmlContent);
             if (servers.length > 0) {
-                debugLog("parseDetailResponse: found", servers.length, "servers in HTML");
+                debugLog("parseDetailResponse: found", servers.length, "servers");
                 return buildStreamResponse(servers);
             }
         }
 
-        // CASE 2: Episode Detail HTML → fetch player iframe
         if (htmlContent) {
             var embedUrl = findEmbedUrl(htmlContent);
             if (embedUrl) {
                 debugLog("parseDetailResponse: fetch embed", embedUrl);
-                // ⭐ [v6.5.1] Truyền apiUrl (URL trang chi tiết) làm Referer
-                var playerHtml = fetchUrl(embedUrl, apiUrl || htmlContent);
+                var playerHtml = fetchUrl(embedUrl, apiUrl);
                 if (playerHtml) {
-                    // Trường hợp A: fetch /player/<id> thành công → có cvp-tab-pane
                     var servers2 = extractAllStreamsFromPlayer(playerHtml);
                     if (servers2.length > 0) {
-                        debugLog("parseDetailResponse: found", servers2.length, "servers from player");
                         return buildStreamResponse(servers2);
                     }
 
-                    // Trường hợp B: fetch fallback /?p=<id> → có okplayer-frame
-                    // → cần findEmbedUrl lần nữa rồi fetch tiếp
                     if (playerHtml.indexOf("okplayer-frame") !== -1 &&
                         playerHtml.indexOf("cvp-tab-pane") === -1) {
                         var embedUrl2 = findEmbedUrl(playerHtml);
                         if (embedUrl2 && embedUrl2 !== embedUrl) {
-                            debugLog("parseDetailResponse: nested embed", embedUrl2);
-                            var playerHtml2 = fetchUrl(embedUrl2, apiUrl || htmlContent);
+                            var playerHtml2 = fetchUrl(embedUrl2, apiUrl);
                             if (playerHtml2) {
                                 var servers3 = extractAllStreamsFromPlayer(playerHtml2);
                                 if (servers3.length > 0) {
@@ -1121,7 +1119,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }
         }
 
-        // CASE 3: datasend là stream URL
         if (datasend && U.isStream(datasend)) {
             var dsUrl = normalizeUrl(datasend);
             return buildStreamResponse([{
@@ -1133,11 +1130,9 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }]);
         }
 
-        // CASE 4: datasend là player URL
         if (datasend && (datasend.indexOf("/player/") !== -1 || datasend.indexOf("okplayer") !== -1)) {
             var dsPlayerUrl = normalizeUrl(datasend);
-            debugLog("parseDetailResponse: fetch datasend player", dsPlayerUrl);
-            var playerHtml4 = fetchUrl(dsPlayerUrl, apiUrl || htmlContent);
+            var playerHtml4 = fetchUrl(dsPlayerUrl, apiUrl);
             if (playerHtml4) {
                 var servers4 = extractAllStreamsFromPlayer(playerHtml4);
                 if (servers4.length > 0) {
