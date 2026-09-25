@@ -1,13 +1,13 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.4.0 - NORMALIZE URL + FIX BTOA
-// Base: https://phimsexai.site
+// Version: 6.4.1 - DOMAIN UPDATE: phimsexai.site -> phimsexai.xyz
+// Base: https://phimsexai.xyz
 //
 // CHANGELOG:
+//   v6.4.1 - [UPDATE] Đổi DEFAULT_BASE từ phimsexai.site -> phimsexai.xyz.
 //   v6.4.0 - [FIX] normalizeUrl(): thay domain cũ -> activeBase trong MỌI URL
 //            trích từ HTML (poster, embedUrl, data-link, m3u8...).
 //          - [FIX] U.btoa() dùng BASE64.encode (QuickJS) thay vì btoa() browser.
-//            Trước đây U.btoa() luôn trả "" -> API /get-video không bao giờ gọi.
 //          - [FIX] U.url() normalize cả URL tuyệt đối, không chỉ URL tương đối.
 //   v6.3.0 - setActiveBase(apiUrl): nhận domain thực tế App đã fetch.
 //   v6.2.0 - Gom domain vào getBase(), whitelist domain trong fetchUrl().
@@ -18,13 +18,13 @@
 // CONFIGURATION & METADATA
 // =============================================================================
 
-var DEFAULT_BASE = "https://phimsexai.site";
+var DEFAULT_BASE = "https://phimsexai.xyz";
 
 function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.4.0",
+        "version": "6.4.1",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -121,7 +121,7 @@ function normalizeUrl(url) {
     if (defaultHost === activeHost) return url;
 
     // Chỉ thay khi "//<defaultHost>" được theo sau bởi "/", ":", "?", "#" hoặc hết chuỗi.
-    // Tránh nhầm với "//phimsexai.site.evil.com" hoặc "//cdn.phimsexai.site".
+    // Tránh nhầm với "//phimsexai.xyz.evil.com" hoặc "//cdn.phimsexai.xyz".
     var re = new RegExp("\\/\\/" + escapeRegex(defaultHost) + "(?=[\\/\\:?#]|$)", "gi");
     return String(url).replace(re, "//" + activeHost);
 }
