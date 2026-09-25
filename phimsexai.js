@@ -1,11 +1,15 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.2.0 - GOM DOMAIN + WHITELIST FETCH
+// Version: 6.3.0 - ACTIVE BASE URL
 // Base: https://phimsexai.site
-// 
-// CHANGELOG 6.2.0:
-//   - [FIX #5] Gom toàn bộ domain vào getBase() đọc từ manifest.baseUrl
-//   - [FIX #6] fetchUrl() whitelist nhiều domain player/CDN thay vì chỉ site
+//
+// CHANGELOG:
+//   v6.3.0 - Thêm setActiveBase(apiUrl): plugin tự nhận domain thực tế mà App
+//            đã fetch, thay vì chỉ đọc baseUrl từ manifest. Khắc phục lỗi khi
+//            user đổi Base URL tùy chỉnh (VD: .site -> .xyz) thì bấm vào phim
+//            không load được.
+//   v6.2.0 - Gom domain vào getBase(), whitelist domain trong fetchUrl()
+//   v6.1.0 - Tối ưu tốc độ, không fetch trong parseMovieDetail
 // =============================================================================
 
 // =============================================================================
@@ -18,7 +22,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.2.0",
+        "version": "6.3.0",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -33,39 +37,6 @@ function getManifest() {
         "debug": false,
         "adblock": false
     });
-}
-
-// ⭐ [FIX #5] Helper lấy base URL động từ manifest
-var _cachedBase = null;
-function getBase() {
-    if (_cachedBase) return _cachedBase;
-    try {
-        var m = JSON.parse(getManifest());
-        _cachedBase = m.baseUrl || DEFAULT_BASE;
-    } catch (e) {
-        _cachedBase = DEFAULT_BASE;
-    }
-    // Bỏ dấu / cuối
-    if (_cachedBase.charAt(_cachedBase.length - 1) === "/") {
-        _cachedBase = _cachedBase.substring(0, _cachedBase.length - 1);
-    }
-    return _cachedBase;
-}
-
-// ⭐ [FIX #6] Whitelist domain được phép fetch
-var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com)/i;
-
-function isAllowedFetchUrl(url) {
-    if (!url) return false;
-
-    // Luôn cho phép baseUrl hiện tại (kể cả fallback domain)
-    try {
-        var baseHost = getBase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-        if (baseHost && url.indexOf(baseHost) !== -1) return true;
-    } catch (e) {}
-
-    // Cho phép whitelist player/CDN phổ biến
-    return ALLOWED_HOST_REGEX.test(url);
 }
 
 function getHomeSections() {
@@ -104,6 +75,38 @@ function getFilterConfig() {
 }
 
 // =============================================================================
+// ACTIVE BASE URL (ưu tiên domain thực tế mà App đã fetch)
+// =============================================================================
+
+var _cachedBase = null;
+var _activeBase = null;
+
+// Gọi ở đầu mỗi parseXxx để ghi nhận domain App đã fetch (có thể đã đổi)
+function setActiveBase(url) {
+    if (!url) return;
+    var m = String(url).match(/^https?:\/\/[^\/]+/i);
+    if (m && m[0]) _activeBase = m[0];
+}
+
+// Trả về base URL đang hoạt động: ưu tiên activeBase > manifest.baseUrl
+function getBase() {
+    if (_activeBase) return _activeBase;
+
+    if (!_cachedBase) {
+        try {
+            var m = JSON.parse(getManifest());
+            _cachedBase = (m.baseUrl || DEFAULT_BASE);
+        } catch (e) {
+            _cachedBase = DEFAULT_BASE;
+        }
+        if (_cachedBase.charAt(_cachedBase.length - 1) === "/") {
+            _cachedBase = _cachedBase.substring(0, _cachedBase.length - 1);
+        }
+    }
+    return _cachedBase;
+}
+
+// =============================================================================
 // UTILITY FUNCTIONS
 // =============================================================================
 
@@ -125,7 +128,6 @@ var U = {
         return m ? m[2] : "";
     },
 
-    // ⭐ [FIX #5] Dùng getBase() thay vì hardcode
     url: function(u) {
         if (!u) return "";
         if (u.indexOf('//') === 0) return "https:" + u;
@@ -180,18 +182,37 @@ var U = {
 };
 
 // =============================================================================
-// HTTP CACHE (tối ưu tốc độ)
+// HTTP CACHE
 // =============================================================================
 
 var __httpCache = {};
 
+// Whitelist domain CDN/player phổ biến (mở rộng khi cần)
+var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com)/i;
+
+function isAllowedFetchUrl(url) {
+    if (!url) return false;
+
+    // 1. Domain đang hoạt động (có thể đã được user đổi Base URL)
+    if (_activeBase) {
+        var activeHost = _activeBase.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        if (activeHost && url.indexOf(activeHost) !== -1) return true;
+    }
+
+    // 2. Domain baseUrl trong manifest
+    try {
+        var baseHost = getBase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        if (baseHost && url.indexOf(baseHost) !== -1) return true;
+    } catch (e) {}
+
+    // 3. Whitelist CDN/player phổ biến
+    return ALLOWED_HOST_REGEX.test(url);
+}
+
 function fetchUrl(url) {
     if (!url || typeof httpRequest === "undefined") return null;
-
-    // ⭐ [FIX #6] Whitelist nhiều domain thay vì chỉ site gốc
     if (!isAllowedFetchUrl(url)) return null;
 
-    // Check cache (5 phút)
     if (__httpCache[url]) {
         if ((Date.now() - __httpCache[url].time) < 300000) {
             return __httpCache[url].data;
@@ -203,7 +224,6 @@ function fetchUrl(url) {
         var resp = httpRequest(url, {
             method: "GET",
             headers: {
-                // ⭐ [FIX #5] Referer động theo baseUrl
                 "Referer": getBase() + "/",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
@@ -226,7 +246,6 @@ function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var path = slug || "";
-    // ⭐ [FIX #5]
     var base = getBase();
 
     if ((path === "home" || path === "") && page === 1) return base + "/";
@@ -238,7 +257,6 @@ function getUrlList(slug, filtersJson) {
 function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    // ⭐ [FIX #5]
     var base = getBase();
     return page === 1
         ? base + "/?s=" + encodeURIComponent(keyword)
@@ -248,7 +266,6 @@ function getUrlSearch(keyword, filtersJson) {
 function getUrlDetail(slug, datasend) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
-    // ⭐ [FIX #5]
     if (slug.indexOf("/") === 0) return getBase() + slug;
     return getBase() + "/" + slug + "/";
 }
@@ -314,7 +331,6 @@ function findEmbedUrl(html) {
         var postIdMatch = html.match(/postid-(\d+)/i) ||
                          html.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
                          html.match(/\?p=(\d+)/i);
-        // ⭐ [FIX #5] Dùng getBase()
         if (postIdMatch) embedUrl = getBase() + "/player/" + postIdMatch[1];
     }
 
@@ -370,12 +386,11 @@ function extractStreamFromPlayer(playerHtml) {
     }
     if (!best) best = streamLinks[0];
 
-    // Resolve qua API
+    // Resolve qua API get-video
     var resolvedUrl = best.url;
     try {
         var encodedUrl = U.btoa(best.url);
         if (encodedUrl) {
-            // ⭐ [FIX #5] Dùng getBase()
             var apiUrl = getBase() + "/get-video?url=" + encodedUrl;
             var resp = httpRequest(apiUrl, {
                 method: "GET",
@@ -457,7 +472,6 @@ function parseSeriesArchive(html) {
 
         var epUrl = urlMatch[1];
         if (epUrl.indexOf("http") !== 0) {
-            // ⭐ [FIX #5] Dùng getBase()
             epUrl = getBase() + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
         }
 
@@ -618,6 +632,8 @@ function parseEpisodeDetail(html) {
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
+    setActiveBase(apiUrl);
+
     var movies = [];
     var match;
 
@@ -760,6 +776,8 @@ function parseSearchResponse(html, apiUrl, datasend) {
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
     try {
+        setActiveBase(apiUrl);
+
         var pageType = detectPageType(htmlContent);
 
         switch (pageType) {
@@ -787,6 +805,8 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
+        setActiveBase(apiUrl);
+
         // CASE 1: Player HTML → extract stream
         if (htmlContent && htmlContent.indexOf("cvp-tab-pane") !== -1) {
             var stream = extractStreamFromPlayer(htmlContent);
@@ -796,7 +816,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                     isEmbed: false,
                     mimeType: stream.mimeType,
                     headers: {
-                        // ⭐ [FIX #5]
                         "Referer": getBase() + "/",
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     },
@@ -880,13 +899,14 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 
 function parseEmbedResponse(html, sourceUrl) {
     try {
+        setActiveBase(sourceUrl);
+
         var stream = extractStreamFromPlayer(html);
         if (stream) {
             return JSON.stringify({
                 url: stream.url,
                 isEmbed: false,
                 headers: {
-                    // ⭐ [FIX #5]
                     "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
@@ -930,6 +950,8 @@ function parseEmbedResponse(html, sourceUrl) {
 // =============================================================================
 
 function parseCategoriesResponse(html, apiUrl) {
+    setActiveBase(apiUrl);
+
     var categories = [];
     var tagCloudMatch = html.match(/<div[^>]+class="[^"]*tag-cloud[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
     if (tagCloudMatch) {
