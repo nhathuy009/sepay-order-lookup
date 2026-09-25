@@ -1,30 +1,29 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.1.0 - TỐI ƯU TỐC ĐỘ
+// Version: 6.2.0 - GOM DOMAIN + WHITELIST FETCH
 // Base: https://phimsexai.site
 // 
-// FEATURES:
-//   - Type: MOVIE (có trang chi tiết)
-//   - Load nhanh: KHÔNG fetch trong parseMovieDetail
-//   - Cache HTTP: tránh fetch lại
-//   - Nhận diện 5 page types tự động
-//   - 7 servers fallback (không có overlay)
+// CHANGELOG 6.2.0:
+//   - [FIX #5] Gom toàn bộ domain vào getBase() đọc từ manifest.baseUrl
+//   - [FIX #6] fetchUrl() whitelist nhiều domain player/CDN thay vì chỉ site
 // =============================================================================
 
 // =============================================================================
 // CONFIGURATION & METADATA
 // =============================================================================
 
+var DEFAULT_BASE = "https://phimsexai.site";
+
 function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.1.0",
-        "baseUrl": "https://phimsexai.site",
+        "version": "6.2.0",
+        "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
-        "referrer": "https://phimsexai.site/",
-        "imageReferer": "https://phimsexai.site/",
-        "iconUrl": "https://phimsexai.site/wp-content/uploads/cropped-icon-192x192.jpg",
+        "referrer": DEFAULT_BASE + "/",
+        "imageReferer": DEFAULT_BASE + "/",
+        "iconUrl": DEFAULT_BASE + "/wp-content/uploads/cropped-icon-192x192.jpg",
         "isEnabled": true,
         "isAdult": true,
         "type": "MOVIE",
@@ -34,6 +33,39 @@ function getManifest() {
         "debug": false,
         "adblock": false
     });
+}
+
+// ⭐ [FIX #5] Helper lấy base URL động từ manifest
+var _cachedBase = null;
+function getBase() {
+    if (_cachedBase) return _cachedBase;
+    try {
+        var m = JSON.parse(getManifest());
+        _cachedBase = m.baseUrl || DEFAULT_BASE;
+    } catch (e) {
+        _cachedBase = DEFAULT_BASE;
+    }
+    // Bỏ dấu / cuối
+    if (_cachedBase.charAt(_cachedBase.length - 1) === "/") {
+        _cachedBase = _cachedBase.substring(0, _cachedBase.length - 1);
+    }
+    return _cachedBase;
+}
+
+// ⭐ [FIX #6] Whitelist domain được phép fetch
+var ALLOWED_HOST_REGEX = /(abyss\.to|abysscdn\.com|ok\.ru|streamtape\.com|dood\.|doodstream|ds2play|streamsb|streamhide|voe\.sx|mixdrop|filemoon|mp4upload|player\.|embed\.|cdn\.|video\.|stream\.|hls\.|\.m3u8|googlevideo\.com|blogspot\.com|googleusercontent\.com)/i;
+
+function isAllowedFetchUrl(url) {
+    if (!url) return false;
+
+    // Luôn cho phép baseUrl hiện tại (kể cả fallback domain)
+    try {
+        var baseHost = getBase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        if (baseHost && url.indexOf(baseHost) !== -1) return true;
+    } catch (e) {}
+
+    // Cho phép whitelist player/CDN phổ biến
+    return ALLOWED_HOST_REGEX.test(url);
 }
 
 function getHomeSections() {
@@ -93,10 +125,11 @@ var U = {
         return m ? m[2] : "";
     },
 
+    // ⭐ [FIX #5] Dùng getBase() thay vì hardcode
     url: function(u) {
         if (!u) return "";
         if (u.indexOf('//') === 0) return "https:" + u;
-        if (u.indexOf('/') === 0) return "https://phimsexai.site" + u;
+        if (u.indexOf('/') === 0) return getBase() + u;
         return u;
     },
 
@@ -154,10 +187,10 @@ var __httpCache = {};
 
 function fetchUrl(url) {
     if (!url || typeof httpRequest === "undefined") return null;
-    
-    // Chỉ fetch URL cùng domain (tránh fetch lạ)
-    if (url.indexOf("phimsexai.site") === -1) return null;
-    
+
+    // ⭐ [FIX #6] Whitelist nhiều domain thay vì chỉ site gốc
+    if (!isAllowedFetchUrl(url)) return null;
+
     // Check cache (5 phút)
     if (__httpCache[url]) {
         if ((Date.now() - __httpCache[url].time) < 300000) {
@@ -165,22 +198,23 @@ function fetchUrl(url) {
         }
         delete __httpCache[url];
     }
-    
+
     try {
         var resp = httpRequest(url, {
             method: "GET",
             headers: {
-                "Referer": "https://phimsexai.site/",
+                // ⭐ [FIX #5] Referer động theo baseUrl
+                "Referer": getBase() + "/",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
         });
-        
+
         if (resp && resp.status === 200 && resp.body) {
             __httpCache[url] = { data: resp.body, time: Date.now() };
             return resp.body;
         }
     } catch (e) {}
-    
+
     return null;
 }
 
@@ -192,7 +226,8 @@ function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var path = slug || "";
-    var base = "https://phimsexai.site";
+    // ⭐ [FIX #5]
+    var base = getBase();
 
     if ((path === "home" || path === "") && page === 1) return base + "/";
     if (path === "home" || path === "") return base + "/page/" + page + "/";
@@ -203,7 +238,8 @@ function getUrlList(slug, filtersJson) {
 function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    var base = "https://phimsexai.site";
+    // ⭐ [FIX #5]
+    var base = getBase();
     return page === 1
         ? base + "/?s=" + encodeURIComponent(keyword)
         : base + "/page/" + page + "/?s=" + encodeURIComponent(keyword);
@@ -212,11 +248,12 @@ function getUrlSearch(keyword, filtersJson) {
 function getUrlDetail(slug, datasend) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
-    if (slug.indexOf("/") === 0) return "https://phimsexai.site" + slug;
-    return "https://phimsexai.site/" + slug + "/";
+    // ⭐ [FIX #5]
+    if (slug.indexOf("/") === 0) return getBase() + slug;
+    return getBase() + "/" + slug + "/";
 }
 
-function getUrlCategories() { return "https://phimsexai.site/"; }
+function getUrlCategories() { return getBase() + "/"; }
 function getUrlCountries() { return ""; }
 function getUrlYears() { return ""; }
 
@@ -227,19 +264,16 @@ function getUrlYears() { return ""; }
 function detectPageType(html) {
     if (!html) return "UNKNOWN";
 
-    // 1. PLAYER PAGE
     if (html.indexOf("cvp-tab-pane") !== -1 && html.indexOf("data-link") !== -1) {
         return "PLAYER";
     }
 
-    // 2. SERIES ARCHIVE
     if (html.indexOf("archive-header") !== -1 &&
         html.indexOf("organic-masonry-grid video-list") !== -1 &&
         html.indexOf("episode-label") !== -1) {
         return "SERIES_ARCHIVE";
     }
 
-    // 3. EPISODE DETAIL / SINGLE MOVIE
     if (html.indexOf("okplayer-frame") !== -1 ||
         html.indexOf("single-post-container") !== -1) {
         return "EPISODE_DETAIL";
@@ -280,7 +314,8 @@ function findEmbedUrl(html) {
         var postIdMatch = html.match(/postid-(\d+)/i) ||
                          html.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
                          html.match(/\?p=(\d+)/i);
-        if (postIdMatch) embedUrl = "https://phimsexai.site/player/" + postIdMatch[1];
+        // ⭐ [FIX #5] Dùng getBase()
+        if (postIdMatch) embedUrl = getBase() + "/player/" + postIdMatch[1];
     }
 
     if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
@@ -297,14 +332,12 @@ function extractStreamFromPlayer(playerHtml) {
     var allLinks = [];
     var match;
 
-    // Parse data-link từ cvp-tab-pane
     var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]+class="[^"]*cvp-tab-pane[^"]*"[^>]+data-link="([^"]+)"/gi;
     while ((match = tabRegex.exec(playerHtml)) !== null) {
         var num = parseInt(match[1].replace("cvp-tab-", ""));
         allLinks.push({ num: num, url: match[2].replace(/\\\//g, "/") });
     }
 
-    // Fallback
     if (allLinks.length === 0) {
         var idx = 0;
         var regex2 = /data-link="([^"]+)"/gi;
@@ -314,13 +347,11 @@ function extractStreamFromPlayer(playerHtml) {
         }
     }
 
-    // Fallback m3u8/mp4
     if (allLinks.length === 0) {
         var m3u8Match = playerHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
         if (m3u8Match) allLinks.push({ num: 1, url: m3u8Match[0].replace(/\\\//g, "/") });
     }
 
-    // CHỈ giữ m3u8/mp4
     var streamLinks = [];
     for (var i = 0; i < allLinks.length; i++) {
         if (U.isStream(allLinks[i].url)) {
@@ -330,7 +361,6 @@ function extractStreamFromPlayer(playerHtml) {
 
     if (streamLinks.length === 0) return null;
 
-    // Ưu tiên m3u8 > mp4
     var best = null;
     for (var j = 0; j < streamLinks.length; j++) {
         if (streamLinks[j].url.indexOf(".m3u8") !== -1) {
@@ -345,11 +375,12 @@ function extractStreamFromPlayer(playerHtml) {
     try {
         var encodedUrl = U.btoa(best.url);
         if (encodedUrl) {
-            var apiUrl = "https://phimsexai.site/get-video?url=" + encodedUrl;
+            // ⭐ [FIX #5] Dùng getBase()
+            var apiUrl = getBase() + "/get-video?url=" + encodedUrl;
             var resp = httpRequest(apiUrl, {
                 method: "GET",
                 headers: {
-                    "Referer": "https://phimsexai.site/",
+                    "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
             });
@@ -375,7 +406,7 @@ function extractStreamFromPlayer(playerHtml) {
 }
 
 // =============================================================================
-// HELPER: Parse Series Archive (KHÔNG FETCH)
+// HELPER: Parse Series Archive
 // =============================================================================
 
 function parseSeriesArchive(html) {
@@ -398,7 +429,6 @@ function parseSeriesArchive(html) {
         previewUrl: ""
     };
 
-    // Metadata
     var title = U.meta(html, "og:title");
     var poster = U.meta(html, "og:image");
     var desc = U.meta(html, "og:description");
@@ -415,7 +445,6 @@ function parseSeriesArchive(html) {
     result.backdropUrl = poster;
     result.description = U.clean(desc);
 
-    // ⚡ Parse danh sách tập KHÔNG FETCH - trả URL cho VAAPP
     var episodes = [];
     var epRegex = /<article[^>]+id="(post-\d+)"[^>]*class="[^"]*organic-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     var match;
@@ -423,16 +452,15 @@ function parseSeriesArchive(html) {
     while ((match = epRegex.exec(html)) !== null) {
         var epHtml = match[2];
 
-        // URL tập
         var urlMatch = epHtml.match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*organic-thumb-link[^"]*"/i);
         if (!urlMatch) continue;
 
         var epUrl = urlMatch[1];
         if (epUrl.indexOf("http") !== 0) {
-            epUrl = "https://phimsexai.site" + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
+            // ⭐ [FIX #5] Dùng getBase()
+            epUrl = getBase() + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
         }
 
-        // Số tập + tên tập
         var epNum = 0;
         var epName = "";
         var epSlug = U.slug(epUrl);
@@ -455,7 +483,7 @@ function parseSeriesArchive(html) {
 
         if (epNum > 0 && epSlug) {
             episodes.push({
-                id: epUrl,          // ⚡ URL trang chi tiết tập (KHÔNG FETCH)
+                id: epUrl,
                 name: epName || ("Tập " + epNum),
                 slug: epSlug
             });
@@ -469,7 +497,6 @@ function parseSeriesArchive(html) {
 
     result.episode_current = episodes.length + " tập";
 
-    // Tags
     var tags = [];
     var tagsSection = html.match(/<div[^>]+class="[^"]*tag-cloud[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
     if (tagsSection) {
@@ -486,7 +513,7 @@ function parseSeriesArchive(html) {
 }
 
 // =============================================================================
-// HELPER: Parse Episode Detail (KHÔNG FETCH player - trả embed URL)
+// HELPER: Parse Episode Detail
 // =============================================================================
 
 function parseEpisodeDetail(html) {
@@ -509,7 +536,6 @@ function parseEpisodeDetail(html) {
         previewUrl: ""
     };
 
-    // Metadata
     var title = U.meta(html, "og:title");
     var poster = U.meta(html, "og:image");
     var desc = U.meta(html, "og:description");
@@ -526,15 +552,12 @@ function parseEpisodeDetail(html) {
     result.backdropUrl = poster;
     result.description = U.clean(desc);
 
-    // Duration
     var duration = "";
     var durMatch = html.match(/"duration"\s*:\s*"([^"]+)"/i);
     if (durMatch) duration = U.duration(durMatch[1]);
 
-    // ⚡ Tìm embed URL - KHÔNG fetch player
     var embedUrl = findEmbedUrl(html);
 
-    // Parse danh sách tập (nếu có) - để VAAPP biết có thể chuyển tập
     var episodesList = [];
     var episodeListMatch = html.match(/<div[^>]+class="[^"]*episode-list[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
     if (episodeListMatch) {
@@ -562,11 +585,10 @@ function parseEpisodeDetail(html) {
     }
 
     if (embedUrl) {
-        // ⚡ Trả về embed URL - VAAPP sẽ tự fetch khi bấm play
         result.servers.push({
             name: "PhimSexAI",
             episodes: [{
-                id: embedUrl,        // ← URL player
+                id: embedUrl,
                 name: duration ? "Full (" + duration + ")" : "Full",
                 slug: "full"
             }]
@@ -576,7 +598,6 @@ function parseEpisodeDetail(html) {
         result.episode_current = "No Source";
     }
 
-    // Tags
     var tags = [];
     var tagsSection = html.match(/<div[^>]+class="[^"]*post-tags[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
     if (tagsSection) {
@@ -734,7 +755,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER - VERSION 6.1.0 (TỐI ƯU)
+// MOVIE DETAIL PARSER
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -761,7 +782,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// DETAIL RESPONSE PARSER (fetch player khi user bấm play)
+// DETAIL RESPONSE PARSER
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
@@ -775,7 +796,8 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                     isEmbed: false,
                     mimeType: stream.mimeType,
                     headers: {
-                        "Referer": "https://phimsexai.site/",
+                        // ⭐ [FIX #5]
+                        "Referer": getBase() + "/",
                         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     },
                     subtitles: []
@@ -796,7 +818,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                             isEmbed: false,
                             mimeType: stream2.mimeType,
                             headers: {
-                                "Referer": "https://phimsexai.site/",
+                                "Referer": getBase() + "/",
                                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                             },
                             subtitles: []
@@ -813,7 +835,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                 isEmbed: false,
                 mimeType: U.mime(datasend),
                 headers: {
-                    "Referer": "https://phimsexai.site/",
+                    "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
                 subtitles: []
@@ -831,7 +853,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                         isEmbed: false,
                         mimeType: stream4.mimeType,
                         headers: {
-                            "Referer": "https://phimsexai.site/",
+                            "Referer": getBase() + "/",
                             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                         },
                         subtitles: []
@@ -864,7 +886,8 @@ function parseEmbedResponse(html, sourceUrl) {
                 url: stream.url,
                 isEmbed: false,
                 headers: {
-                    "Referer": "https://phimsexai.site/",
+                    // ⭐ [FIX #5]
+                    "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 },
                 subtitles: []
@@ -881,7 +904,7 @@ function parseEmbedResponse(html, sourceUrl) {
                         url: stream2.url,
                         isEmbed: false,
                         headers: {
-                            "Referer": "https://phimsexai.site/",
+                            "Referer": getBase() + "/",
                             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                         },
                         subtitles: []
