@@ -1,17 +1,20 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.4.1 - DOMAIN UPDATE: phimsexai.site -> phimsexai.xyz
+// Version: 6.5.0 - FULL FIX RELEASE
 // Base: https://phimsexai.xyz
 //
-// CHANGELOG:
-//   v6.4.1 - [UPDATE] Đổi DEFAULT_BASE từ phimsexai.site -> phimsexai.xyz.
-//   v6.4.0 - [FIX] normalizeUrl(): thay domain cũ -> activeBase trong MỌI URL
-//            trích từ HTML (poster, embedUrl, data-link, m3u8...).
-//          - [FIX] U.btoa() dùng BASE64.encode (QuickJS) thay vì btoa() browser.
-//          - [FIX] U.url() normalize cả URL tuyệt đối, không chỉ URL tương đối.
-//   v6.3.0 - setActiveBase(apiUrl): nhận domain thực tế App đã fetch.
-//   v6.2.0 - Gom domain vào getBase(), whitelist domain trong fetchUrl().
-//   v6.1.0 - Tối ưu tốc độ, không fetch trong parseMovieDetail.
+// CHANGELOG v6.5.0:
+//   [FIX] Domain: phimsexai.site -> phimsexai.xyz (DEFAULT_BASE + LEGACY_HOSTS)
+//   [FIX] normalizeUrl(): hỗ trợ cả domain legacy (.site, .com, .net)
+//   [FIX] findEmbedUrl(): XÓA Strategy 4 (/player/<id>) vì server trả 302.
+//   [FIX] parseEpisodeDetail(): fallback data-poster + <title> khi thiếu og:*.
+//   [FIX] parseMovieDetail(): nhận diện PLAYER, trích stream trực tiếp.
+//   [FIX] fetchUrl(): không theo redirect, kiểm tra HTML hợp lệ trước khi cache.
+//   [FIX] tabRegex: không phụ thuộc thứ tự attribute (id ... data-link).
+//   [FIX] extractStreamFromPlayer(): trả về MẢNG servers để App fallback.
+//   [FIX] mimeType: ưu tiên URL gốc thay vì URL resolve.
+//   [ADD] debugLog(): log khi manifest.debug = true.
+//   [ADD] detectNoCache(): phân biệt iframe (data-no-cache=true).
 // =============================================================================
 
 // =============================================================================
@@ -19,12 +22,13 @@
 // =============================================================================
 
 var DEFAULT_BASE = "https://phimsexai.xyz";
+var LEGACY_HOSTS = ["phimsexai.site", "phimsexai.com", "phimsexai.net"];
 
 function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.4.1",
+        "version": "6.5.0",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -36,7 +40,7 @@ function getManifest() {
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
         "subtitleCat": false,
-        "debug": false,
+        "debug": true,
         "adblock": false
     });
 }
@@ -106,24 +110,55 @@ function getBase() {
     return _cachedBase;
 }
 
-// ⭐ [v6.4.0] Chuẩn hóa URL: thay domain cũ (DEFAULT_BASE) -> domain đang active
+// =============================================================================
+// DEBUG LOG
+// =============================================================================
+
+function debugLog() {
+    try {
+        var m = JSON.parse(getManifest());
+        if (!m.debug) return;
+        var args = Array.prototype.slice.call(arguments);
+        args.unshift("[phimsexai]");
+        if (typeof console !== "undefined" && console.log) {
+            console.log.apply(console, args);
+        }
+    } catch (e) {}
+}
+
+// =============================================================================
+// URL NORMALIZATION
+// =============================================================================
+
 function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// ⭐ [v6.5.0] Normalize cả DEFAULT_BASE mới và LEGACY_HOSTS cũ
 function normalizeUrl(url) {
     if (!url) return url;
-    if (!_activeBase) return url;
 
+    var s = String(url);
+    var activeHost = _activeBase
+        ? _activeBase.replace(/^https?:\/\//, "")
+        : DEFAULT_BASE.replace(/^https?:\/\//, "");
+
+    // Replace DEFAULT_BASE (nếu active khác)
     var defaultHost = DEFAULT_BASE.replace(/^https?:\/\//, "");
-    var activeHost = _activeBase.replace(/^https?:\/\//, "");
+    if (defaultHost !== activeHost) {
+        var re = new RegExp("\\/\\/" + escapeRegex(defaultHost) + "(?=[\\/\\:?#]|$)", "gi");
+        s = s.replace(re, "//" + activeHost);
+    }
 
-    if (defaultHost === activeHost) return url;
+    // ⭐ Replace LEGACY_HOSTS → active
+    for (var i = 0; i < LEGACY_HOSTS.length; i++) {
+        var legacyHost = LEGACY_HOSTS[i];
+        if (legacyHost === activeHost) continue;
+        var reLegacy = new RegExp("\\/\\/" + escapeRegex(legacyHost) + "(?=[\\/\\:?#]|$)", "gi");
+        s = s.replace(reLegacy, "//" + activeHost);
+    }
 
-    // Chỉ thay khi "//<defaultHost>" được theo sau bởi "/", ":", "?", "#" hoặc hết chuỗi.
-    // Tránh nhầm với "//phimsexai.xyz.evil.com" hoặc "//cdn.phimsexai.xyz".
-    var re = new RegExp("\\/\\/" + escapeRegex(defaultHost) + "(?=[\\/\\:?#]|$)", "gi");
-    return String(url).replace(re, "//" + activeHost);
+    return s;
 }
 
 // =============================================================================
@@ -148,7 +183,22 @@ var U = {
         return m ? m[2] : "";
     },
 
-    // ⭐ [v6.4.0] Normalize MỌI URL (kể cả tuyệt đối) qua normalizeUrl
+    // ⭐ [v6.5.0] Fallback title từ <title> khi thiếu og:title
+    pageTitle: function(html) {
+        var m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (!m) return "";
+        return U.clean(m[1])
+            .replace(/\s*-\s*Player\s*$/i, "")
+            .replace(/\s*-\s*Phim Sex AI\s*$/i, "")
+            .trim();
+    },
+
+    // ⭐ [v6.5.0] Fallback poster từ data-poster
+    dataPoster: function(html) {
+        var m = html.match(/data-poster=["']([^"']+)["']/i);
+        return m ? m[1] : "";
+    },
+
     url: function(u) {
         if (!u) return "";
         var s = String(u);
@@ -174,14 +224,12 @@ var U = {
         return min + ":" + String(s).padStart(2, "0");
     },
 
-    // ⭐ [v6.4.0] FIX: QuickJS không có btoa() -> dùng BASE64.encode
     btoa: function(str) {
         try {
             if (typeof BASE64 !== 'undefined' && BASE64 && typeof BASE64.encode === 'function') {
                 return BASE64.encode(str)
                     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
             }
-            // Fallback (chỉ chạy trong môi trường browser test)
             return btoa(unescape(encodeURIComponent(str)))
                 .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         } catch (e) { return ""; }
@@ -210,7 +258,7 @@ var U = {
 };
 
 // =============================================================================
-// HTTP CACHE
+// HTTP CACHE + FETCH
 // =============================================================================
 
 var __httpCache = {};
@@ -233,13 +281,16 @@ function isAllowedFetchUrl(url) {
     return ALLOWED_HOST_REGEX.test(url);
 }
 
+// ⭐ [v6.5.0] Không theo redirect, chỉ nhận HTML player hợp lệ
 function fetchUrl(url) {
     if (!url || typeof httpRequest === "undefined") return null;
 
-    // Normalize trước khi fetch (tránh gọi domain cũ)
     url = normalizeUrl(url);
 
-    if (!isAllowedFetchUrl(url)) return null;
+    if (!isAllowedFetchUrl(url)) {
+        debugLog("fetchUrl: blocked by whitelist", url);
+        return null;
+    }
 
     if (__httpCache[url]) {
         if ((Date.now() - __httpCache[url].time) < 300000) {
@@ -257,11 +308,27 @@ function fetchUrl(url) {
             }
         });
 
+        // ⭐ Không chấp nhận redirect
+        if (resp && (resp.status === 301 || resp.status === 302 || resp.status === 303 || resp.status === 307 || resp.status === 308)) {
+            debugLog("fetchUrl: redirect", resp.status, "→", resp.headers && resp.headers.location);
+            return null;
+        }
+
         if (resp && resp.status === 200 && resp.body) {
+            // ⭐ Chỉ cache nếu là HTML player hoặc trang chi tiết
+            var isPlayer = resp.body.indexOf("cvp-tab-pane") !== -1;
+            var isDetail = resp.body.indexOf("okplayer-frame") !== -1 ||
+                           resp.body.indexOf("single-post-container") !== -1;
+            if (!isPlayer && !isDetail) {
+                debugLog("fetchUrl: HTML không phải player/detail, bỏ qua", url);
+                return null;
+            }
             __httpCache[url] = { data: resp.body, time: Date.now() };
             return resp.body;
         }
-    } catch (e) {}
+    } catch (e) {
+        debugLog("fetchUrl error:", e.message || e);
+    }
 
     return null;
 }
@@ -329,6 +396,7 @@ function detectPageType(html) {
 
 // =============================================================================
 // HELPER: Find embed URL
+// ⭐ [v6.5.0] XÓA Strategy 4 (/player/<id>) vì server trả 302.
 // =============================================================================
 
 function findEmbedUrl(html) {
@@ -348,61 +416,56 @@ function findEmbedUrl(html) {
         }
     }
 
-    // Strategy 3: Bất kỳ iframe /player/
+    // Strategy 3: Bất kỳ iframe /player/ hoặc /embed/
     if (!embedUrl) {
-        var playerIframeMatch = html.match(/<iframe[^>]+src=["']([^"']*\/player\/[^"']+)["']/i);
+        var playerIframeMatch = html.match(/<iframe[^>]+src=["']([^"']*(?:\/player\/|\/embed\/)[^"']+)["']/i);
         if (playerIframeMatch) embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
     }
 
-    // Strategy 4: Post ID
-    if (!embedUrl) {
-        var postIdMatch = html.match(/postid-(\d+)/i) ||
-                         html.match(/wp-json\/wp\/v2\/posts\/(\d+)/i) ||
-                         html.match(/\?p=(\d+)/i);
-        if (postIdMatch) embedUrl = getBase() + "/player/" + postIdMatch[1];
-    }
+    // ❌ [v6.5.0] Strategy 4 ĐÃ XÓA: /player/<postid> → server trả 302 về /?p=<id>
 
     if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
 
-    // ⭐ [v6.4.0] Normalize: HTML có thể chứa URL domain cũ
     return normalizeUrl(embedUrl);
 }
 
 // =============================================================================
-// HELPER: Extract stream URL from Player HTML
+// HELPER: Extract streams from Player HTML
+// ⭐ [v6.5.0] Trả về MẢNG servers (tất cả link stream đã resolve)
 // =============================================================================
 
-function extractStreamFromPlayer(playerHtml) {
-    if (!playerHtml) return null;
+function extractAllStreamsFromPlayer(playerHtml) {
+    if (!playerHtml) return [];
 
     var allLinks = [];
     var match;
 
-    var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]+class="[^"]*cvp-tab-pane[^"]*"[^>]+data-link="([^"]+)"/gi;
+    // ⭐ [v6.5.0] Regex đơn giản hơn — chỉ cần id + data-link, không quan tâm thứ tự
+    var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]*?data-link="([^"]+)"/gi;
     while ((match = tabRegex.exec(playerHtml)) !== null) {
         var num = parseInt(match[1].replace("cvp-tab-", ""));
-        // ⭐ Normalize
         allLinks.push({ num: num, url: normalizeUrl(match[2].replace(/\\\//g, "/")) });
     }
 
+    // Fallback: lấy mọi data-link
     if (allLinks.length === 0) {
         var idx = 0;
         var regex2 = /data-link="([^"]+)"/gi;
         while ((match = regex2.exec(playerHtml)) !== null) {
             idx++;
-            // ⭐ Normalize
             allLinks.push({ num: idx, url: normalizeUrl(match[1].replace(/\\\//g, "/")) });
         }
     }
 
+    // Fallback cuối: m3u8 raw
     if (allLinks.length === 0) {
         var m3u8Match = playerHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
         if (m3u8Match) {
-            // ⭐ Normalize
             allLinks.push({ num: 1, url: normalizeUrl(m3u8Match[0].replace(/\\\//g, "/")) });
         }
     }
 
+    // Lọc chỉ giữ link stream
     var streamLinks = [];
     for (var i = 0; i < allLinks.length; i++) {
         if (U.isStream(allLinks[i].url)) {
@@ -410,50 +473,113 @@ function extractStreamFromPlayer(playerHtml) {
         }
     }
 
-    if (streamLinks.length === 0) return null;
+    if (streamLinks.length === 0) return [];
 
-    var best = null;
+    // Sắp xếp: m3u8 trước, mp4 sau
+    streamLinks.sort(function(a, b) {
+        var aM3u8 = a.url.indexOf(".m3u8") !== -1 ? 0 : 1;
+        var bM3u8 = b.url.indexOf(".m3u8") !== -1 ? 0 : 1;
+        if (aM3u8 !== bM3u8) return aM3u8 - bM3u8;
+        return a.num - b.num;
+    });
+
+    // Resolve TẤT CẢ qua API /get-video
+    var servers = [];
     for (var j = 0; j < streamLinks.length; j++) {
-        if (streamLinks[j].url.indexOf(".m3u8") !== -1) {
-            best = streamLinks[j];
-            break;
-        }
-    }
-    if (!best) best = streamLinks[0];
+        var link = streamLinks[j];
+        var resolvedUrl = link.url;
 
-    // Resolve qua API get-video
-    var resolvedUrl = best.url;
-    try {
-        var encodedUrl = U.btoa(best.url);
-        if (encodedUrl) {
-            var apiUrl = getBase() + "/get-video?url=" + encodedUrl;
-            var resp = httpRequest(apiUrl, {
-                method: "GET",
+        try {
+            var encodedUrl = U.btoa(link.url);
+            if (encodedUrl) {
+                var apiUrl = getBase() + "/get-video?url=" + encodedUrl;
+                var resp = httpRequest(apiUrl, {
+                    method: "GET",
+                    headers: {
+                        "Referer": getBase() + "/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+                });
+                if (resp && resp.status === 200 && resp.body) {
+                    try {
+                        var data = JSON.parse(resp.body);
+                        if (data && data.status === "success" && data.video_url) {
+                            if (U.isStream(data.video_url)) {
+                                resolvedUrl = normalizeUrl(data.video_url);
+                            }
+                        }
+                    } catch (e) {
+                        debugLog("get-video parse error:", e.message || e);
+                    }
+                }
+            }
+        } catch (e) {
+            debugLog("get-video call error:", e.message || e);
+        }
+
+        servers.push({
+            url: resolvedUrl,
+            originalUrl: link.url,
+            // ⭐ mimeType ưu tiên URL GỐC (đuôi thật), fallback URL resolve
+            mimeType: U.mime(link.url) || U.mime(resolvedUrl),
+            serverNum: link.num,
+            serverLabel: "SV " + link.num + " (" + U.type(link.url) + ")"
+        });
+    }
+
+    return servers;
+}
+
+// Backward-compat: hàm cũ trả về 1 server (best)
+function extractStreamFromPlayer(playerHtml) {
+    var servers = extractAllStreamsFromPlayer(playerHtml);
+    if (servers.length === 0) return null;
+    return servers[0];
+}
+
+// =============================================================================
+// HELPER: Build stream response JSON
+// ⭐ [v6.5.0] Trả về cả `url` (best) và `servers` (toàn bộ)
+// =============================================================================
+
+function buildStreamResponse(servers) {
+    if (!servers || servers.length === 0) {
+        return JSON.stringify({
+            url: "",
+            isEmbed: false,
+            error: true,
+            message: "Không tìm thấy stream URL"
+        });
+    }
+
+    var best = servers[0];
+    var response = {
+        url: best.url,
+        isEmbed: false,
+        mimeType: best.mimeType,
+        headers: {
+            "Referer": getBase() + "/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        },
+        subtitles: []
+    };
+
+    // ⭐ Nếu có nhiều server, thêm mảng servers để App fallback
+    if (servers.length > 1) {
+        response.servers = servers.map(function(s) {
+            return {
+                url: s.url,
+                mimeType: s.mimeType,
+                label: s.serverLabel,
                 headers: {
                     "Referer": getBase() + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
-            });
-            if (resp && resp.status === 200 && resp.body) {
-                try {
-                    var data = JSON.parse(resp.body);
-                    if (data && data.status === "success" && data.video_url) {
-                        if (U.isStream(data.video_url)) {
-                            // ⭐ Normalize URL trả về từ API
-                            resolvedUrl = normalizeUrl(data.video_url);
-                        }
-                    }
-                } catch (e) {}
-            }
-        }
-    } catch (e) {}
+            };
+        });
+    }
 
-    return {
-        url: resolvedUrl,
-        mimeType: U.mime(resolvedUrl),
-        serverNum: best.num,
-        serverLabel: "SV " + best.num + " (" + U.type(resolvedUrl) + ")"
-    };
+    return JSON.stringify(response);
 }
 
 // =============================================================================
@@ -480,8 +606,8 @@ function parseSeriesArchive(html) {
         previewUrl: ""
     };
 
-    var title = U.meta(html, "og:title");
-    var poster = U.meta(html, "og:image");
+    var title = U.meta(html, "og:title") || U.pageTitle(html);
+    var poster = U.meta(html, "og:image") || U.dataPoster(html);
     var desc = U.meta(html, "og:description");
 
     if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
@@ -510,7 +636,6 @@ function parseSeriesArchive(html) {
         if (epUrl.indexOf("http") !== 0) {
             epUrl = getBase() + (epUrl.indexOf("/") === 0 ? epUrl : "/" + epUrl);
         } else {
-            // ⭐ Normalize URL tuyệt đối với domain cũ
             epUrl = normalizeUrl(epUrl);
         }
 
@@ -567,6 +692,7 @@ function parseSeriesArchive(html) {
 
 // =============================================================================
 // HELPER: Parse Episode Detail
+// ⭐ [v6.5.0] Fallback title/poster từ <title> và data-poster
 // =============================================================================
 
 function parseEpisodeDetail(html) {
@@ -589,8 +715,9 @@ function parseEpisodeDetail(html) {
         previewUrl: ""
     };
 
-    var title = U.meta(html, "og:title");
-    var poster = U.meta(html, "og:image");
+    // ⭐ Fallback chain: og:* → <title> / data-poster
+    var title = U.meta(html, "og:title") || U.pageTitle(html);
+    var poster = U.meta(html, "og:image") || U.dataPoster(html);
     var desc = U.meta(html, "og:description");
 
     if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
@@ -733,7 +860,6 @@ function parseStandardPost(itemHtml) {
         var poster = "";
         var imgMatch = itemHtml.match(/<img[^>]+class="[^"]*organic-img[^"]*"[^>]+src="([^"]+)"/i) ||
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*organic-img[^"]*"/i);
-        // ⭐ U.url() đã normalize
         if (imgMatch) poster = U.url(imgMatch[1]);
 
         var badges = [];
@@ -777,7 +903,6 @@ function parseSeriesPost(itemHtml) {
         var poster = "";
         var imgMatch = itemHtml.match(/<img[^>]+class="[^"]*series-slide-img[^"]*"[^>]+src="([^"]+)"/i) ||
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*series-slide-img[^"]*"/i);
-        // ⭐ U.url() đã normalize
         if (imgMatch) poster = U.url(imgMatch[1]);
 
         var episodeCount = 0;
@@ -813,6 +938,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 
 // =============================================================================
 // MOVIE DETAIL PARSER
+// ⭐ [v6.5.0] Xử lý PLAYER: trích stream trực tiếp
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -820,48 +946,86 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         setActiveBase(apiUrl);
 
         var pageType = detectPageType(htmlContent);
+        debugLog("parseMovieDetail pageType:", pageType);
 
         switch (pageType) {
+            case "PLAYER": {
+                // ⭐ HTML chi tiết đã có sẵn player → trích stream luôn
+                var servers = extractAllStreamsFromPlayer(htmlContent);
+                var title = U.meta(htmlContent, "og:title") || U.pageTitle(htmlContent);
+                var poster = U.meta(htmlContent, "og:image") || U.dataPoster(htmlContent);
+
+                if (title) title = title.replace(/\s*-\s*Phim Sex AI\s*$/i, "").trim();
+
+                var slug = "";
+                var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
+                if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
+
+                var result = {
+                    id: slug,
+                    title: title,
+                    posterUrl: U.url(poster),
+                    backdropUrl: U.url(poster),
+                    description: U.clean(U.meta(htmlContent, "og:description")),
+                    year: 0,
+                    rating: 0,
+                    quality: "HD",
+                    servers: [],
+                    episode_current: servers.length > 0 ? "Full" : "No Source",
+                    lang: "Vietsub",
+                    category: "",
+                    country: "",
+                    director: "",
+                    casts: "",
+                    previewUrl: ""
+                };
+
+                if (servers.length > 0) {
+                    result.servers.push({
+                        name: "PhimSexAI",
+                        episodes: [{
+                            id: servers[0].url,
+                            name: "Full",
+                            slug: "full"
+                        }]
+                    });
+                }
+
+                return JSON.stringify(result);
+            }
+
             case "SERIES_ARCHIVE":
                 return parseSeriesArchive(htmlContent);
 
             case "EPISODE_DETAIL":
-                return parseEpisodeDetail(htmlContent);
-
             default:
                 return parseEpisodeDetail(htmlContent);
         }
 
     } catch (e) {
+        debugLog("parseMovieDetail error:", e.message || e);
         return JSON.stringify({
             error: true,
-            message: "parseMovieDetail error: " + e.message
+            message: "parseMovieDetail error: " + (e.message || e)
         });
     }
 }
 
 // =============================================================================
 // DETAIL RESPONSE PARSER
+// ⭐ [v6.5.0] Dùng buildStreamResponse (trả về cả servers[])
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
         setActiveBase(apiUrl);
 
-        // CASE 1: Player HTML → extract stream
+        // CASE 1: Player HTML → extract streams
         if (htmlContent && htmlContent.indexOf("cvp-tab-pane") !== -1) {
-            var stream = extractStreamFromPlayer(htmlContent);
-            if (stream) {
-                return JSON.stringify({
-                    url: stream.url,
-                    isEmbed: false,
-                    mimeType: stream.mimeType,
-                    headers: {
-                        "Referer": getBase() + "/",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    },
-                    subtitles: []
-                });
+            var servers = extractAllStreamsFromPlayer(htmlContent);
+            if (servers.length > 0) {
+                debugLog("parseDetailResponse: found", servers.length, "servers");
+                return buildStreamResponse(servers);
             }
         }
 
@@ -869,20 +1033,12 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         if (htmlContent) {
             var embedUrl = findEmbedUrl(htmlContent);
             if (embedUrl) {
+                debugLog("parseDetailResponse: fetch embed", embedUrl);
                 var playerHtml = fetchUrl(embedUrl);
                 if (playerHtml) {
-                    var stream2 = extractStreamFromPlayer(playerHtml);
-                    if (stream2) {
-                        return JSON.stringify({
-                            url: stream2.url,
-                            isEmbed: false,
-                            mimeType: stream2.mimeType,
-                            headers: {
-                                "Referer": getBase() + "/",
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                            },
-                            subtitles: []
-                        });
+                    var servers2 = extractAllStreamsFromPlayer(playerHtml);
+                    if (servers2.length > 0) {
+                        return buildStreamResponse(servers2);
                     }
                 }
             }
@@ -891,35 +1047,24 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         // CASE 3: datasend là stream URL
         if (datasend && U.isStream(datasend)) {
             var dsUrl = normalizeUrl(datasend);
-            return JSON.stringify({
+            return buildStreamResponse([{
                 url: dsUrl,
-                isEmbed: false,
+                originalUrl: dsUrl,
                 mimeType: U.mime(dsUrl),
-                headers: {
-                    "Referer": getBase() + "/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                subtitles: []
-            });
+                serverNum: 1,
+                serverLabel: "Direct"
+            }]);
         }
 
-        // CASE 4: datasend là player URL
+        // CASE 4: datasend là player URL (không phải /player/<id> đã bị chặn)
         if (datasend && datasend.indexOf("/player/") !== -1) {
             var dsPlayerUrl = normalizeUrl(datasend);
+            debugLog("parseDetailResponse: fetch datasend player", dsPlayerUrl);
             var playerHtml4 = fetchUrl(dsPlayerUrl);
             if (playerHtml4) {
-                var stream4 = extractStreamFromPlayer(playerHtml4);
-                if (stream4) {
-                    return JSON.stringify({
-                        url: stream4.url,
-                        isEmbed: false,
-                        mimeType: stream4.mimeType,
-                        headers: {
-                            "Referer": getBase() + "/",
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        },
-                        subtitles: []
-                    });
+                var servers4 = extractAllStreamsFromPlayer(playerHtml4);
+                if (servers4.length > 0) {
+                    return buildStreamResponse(servers4);
                 }
             }
         }
@@ -932,7 +1077,8 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         });
 
     } catch (e) {
-        return JSON.stringify({ url: "", isEmbed: false, error: true, message: e.message });
+        debugLog("parseDetailResponse error:", e.message || e);
+        return JSON.stringify({ url: "", isEmbed: false, error: true, message: e.message || e });
     }
 }
 
@@ -944,34 +1090,18 @@ function parseEmbedResponse(html, sourceUrl) {
     try {
         setActiveBase(sourceUrl);
 
-        var stream = extractStreamFromPlayer(html);
-        if (stream) {
-            return JSON.stringify({
-                url: stream.url,
-                isEmbed: false,
-                headers: {
-                    "Referer": getBase() + "/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                subtitles: []
-            });
+        var servers = extractAllStreamsFromPlayer(html);
+        if (servers.length > 0) {
+            return buildStreamResponse(servers);
         }
 
         var embedUrl = findEmbedUrl(html);
         if (embedUrl) {
             var playerHtml = fetchUrl(embedUrl);
             if (playerHtml) {
-                var stream2 = extractStreamFromPlayer(playerHtml);
-                if (stream2) {
-                    return JSON.stringify({
-                        url: stream2.url,
-                        isEmbed: false,
-                        headers: {
-                            "Referer": getBase() + "/",
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        },
-                        subtitles: []
-                    });
+                var servers2 = extractAllStreamsFromPlayer(playerHtml);
+                if (servers2.length > 0) {
+                    return buildStreamResponse(servers2);
                 }
             }
         }
@@ -984,7 +1114,7 @@ function parseEmbedResponse(html, sourceUrl) {
         });
 
     } catch (e) {
-        return JSON.stringify({ url: "", isEmbed: false, error: true, message: e.message });
+        return JSON.stringify({ url: "", isEmbed: false, error: true, message: e.message || e });
     }
 }
 
