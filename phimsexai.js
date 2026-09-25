@@ -1,20 +1,28 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.5.0 - FULL FIX RELEASE
+// Version: 6.5.1 - FIX 302 REDIRECT + IFRAME HEADERS
 // Base: https://phimsexai.xyz
+//
+// CHANGELOG v6.5.1:
+//   [FIX] fetchUrl(url, sourceUrl): nhận sourceUrl làm Referer đúng path,
+//         giúp bypass kiểm tra Referer của server /player/<id>.
+//   [FIX] Thêm header giả lập iframe khi fetch /player/<id>:
+//         Accept, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site,
+//         Upgrade-Insecure-Requests.
+//   [FIX] parseDetailResponse(): truyền apiUrl (URL trang chi tiết) vào
+//         fetchUrl thay vì dùng getBase() + "/".
+//   [ADD] fetchUrl(): fallback thử /?p=<id> nếu /player/<id> trả 302.
+//   [ADD] debugLog chi tiết header gửi đi khi debug=true.
 //
 // CHANGELOG v6.5.0:
 //   [FIX] Domain: phimsexai.site -> phimsexai.xyz (DEFAULT_BASE + LEGACY_HOSTS)
-//   [FIX] normalizeUrl(): hỗ trợ cả domain legacy (.site, .com, .net)
 //   [FIX] findEmbedUrl(): XÓA Strategy 4 (/player/<id>) vì server trả 302.
 //   [FIX] parseEpisodeDetail(): fallback data-poster + <title> khi thiếu og:*.
 //   [FIX] parseMovieDetail(): nhận diện PLAYER, trích stream trực tiếp.
 //   [FIX] fetchUrl(): không theo redirect, kiểm tra HTML hợp lệ trước khi cache.
-//   [FIX] tabRegex: không phụ thuộc thứ tự attribute (id ... data-link).
+//   [FIX] tabRegex: không phụ thuộc thứ tự attribute.
 //   [FIX] extractStreamFromPlayer(): trả về MẢNG servers để App fallback.
 //   [FIX] mimeType: ưu tiên URL gốc thay vì URL resolve.
-//   [ADD] debugLog(): log khi manifest.debug = true.
-//   [ADD] detectNoCache(): phân biệt iframe (data-no-cache=true).
 // =============================================================================
 
 // =============================================================================
@@ -24,11 +32,13 @@
 var DEFAULT_BASE = "https://phimsexai.xyz";
 var LEGACY_HOSTS = ["phimsexai.site", "phimsexai.com", "phimsexai.net"];
 
+var DEFAULT_UA = "Mozilla/5.0 (Linux; Android 14; PGT-AN00) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.82 Mobile Safari/537.36";
+
 function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.5.0",
+        "version": "6.5.1",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -134,7 +144,6 @@ function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// ⭐ [v6.5.0] Normalize cả DEFAULT_BASE mới và LEGACY_HOSTS cũ
 function normalizeUrl(url) {
     if (!url) return url;
 
@@ -143,14 +152,12 @@ function normalizeUrl(url) {
         ? _activeBase.replace(/^https?:\/\//, "")
         : DEFAULT_BASE.replace(/^https?:\/\//, "");
 
-    // Replace DEFAULT_BASE (nếu active khác)
     var defaultHost = DEFAULT_BASE.replace(/^https?:\/\//, "");
     if (defaultHost !== activeHost) {
         var re = new RegExp("\\/\\/" + escapeRegex(defaultHost) + "(?=[\\/\\:?#]|$)", "gi");
         s = s.replace(re, "//" + activeHost);
     }
 
-    // ⭐ Replace LEGACY_HOSTS → active
     for (var i = 0; i < LEGACY_HOSTS.length; i++) {
         var legacyHost = LEGACY_HOSTS[i];
         if (legacyHost === activeHost) continue;
@@ -183,7 +190,6 @@ var U = {
         return m ? m[2] : "";
     },
 
-    // ⭐ [v6.5.0] Fallback title từ <title> khi thiếu og:title
     pageTitle: function(html) {
         var m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         if (!m) return "";
@@ -193,7 +199,6 @@ var U = {
             .trim();
     },
 
-    // ⭐ [v6.5.0] Fallback poster từ data-poster
     dataPoster: function(html) {
         var m = html.match(/data-poster=["']([^"']+)["']/i);
         return m ? m[1] : "";
@@ -254,11 +259,22 @@ var U = {
         if (u.indexOf(".mp4") !== -1) return "MP4";
         if (u.indexOf(".webm") !== -1) return "WebM";
         return "Embed";
+    },
+
+    // ⭐ [v6.5.1] Chuẩn hóa URL để làm Referer (bỏ trailing slash nếu cần)
+    referer: function(u) {
+        if (!u) return getBase() + "/";
+        var s = String(u);
+        // Nếu là URL trang chi tiết → dùng nguyên
+        if (s.indexOf("/player/") === -1 && s.indexOf("/?p=") === -1) return s;
+        // Nếu là /player/<id> hoặc /?p=<id> → dùng base
+        return getBase() + "/";
     }
 };
 
 // =============================================================================
 // HTTP CACHE + FETCH
+// ⭐ [v6.5.1] fetchUrl nhận sourceUrl để làm Referer + giả lập iframe header
 // =============================================================================
 
 var __httpCache = {};
@@ -281,8 +297,35 @@ function isAllowedFetchUrl(url) {
     return ALLOWED_HOST_REGEX.test(url);
 }
 
-// ⭐ [v6.5.0] Không theo redirect, chỉ nhận HTML player hợp lệ
-function fetchUrl(url) {
+// ⭐ [v6.5.1] Xây dựng header thông minh dựa trên loại URL
+function buildHeaders(url, sourceUrl) {
+    var isPlayerUrl = url.indexOf("/player/") !== -1;
+    var referer = sourceUrl ? U.referer(sourceUrl) : (getBase() + "/");
+
+    var headers = {
+        "Referer": referer,
+        "User-Agent": DEFAULT_UA,
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache"
+    };
+
+    if (isPlayerUrl) {
+        // ⭐ [v6.5.1] Giả lập request iframe từ browser
+        headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+        headers["Sec-Fetch-Dest"] = "iframe";
+        headers["Sec-Fetch-Mode"] = "navigate";
+        headers["Sec-Fetch-Site"] = "same-origin";
+        headers["Upgrade-Insecure-Requests"] = "1";
+    } else {
+        headers["Accept"] = "*/*";
+    }
+
+    return headers;
+}
+
+// ⭐ [v6.5.1] Fetch với fallback /?p=<id> khi /player/<id> bị 302
+function fetchUrl(url, sourceUrl) {
     if (!url || typeof httpRequest === "undefined") return null;
 
     url = normalizeUrl(url);
@@ -292,6 +335,7 @@ function fetchUrl(url) {
         return null;
     }
 
+    // Cache check
     if (__httpCache[url]) {
         if ((Date.now() - __httpCache[url].time) < 300000) {
             return __httpCache[url].data;
@@ -299,23 +343,49 @@ function fetchUrl(url) {
         delete __httpCache[url];
     }
 
+    var headers = buildHeaders(url, sourceUrl);
+    debugLog("fetchUrl:", url);
+    debugLog("  referer:", headers["Referer"]);
+    debugLog("  sec-fetch-dest:", headers["Sec-Fetch-Dest"] || "(none)");
+
     try {
         var resp = httpRequest(url, {
             method: "GET",
-            headers: {
-                "Referer": getBase() + "/",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }
+            headers: headers
         });
 
-        // ⭐ Không chấp nhận redirect
+        // ⭐ Nếu vẫn 302 → thử fallback /?p=<id> (nếu URL là /player/<id>)
         if (resp && (resp.status === 301 || resp.status === 302 || resp.status === 303 || resp.status === 307 || resp.status === 308)) {
-            debugLog("fetchUrl: redirect", resp.status, "→", resp.headers && resp.headers.location);
+            debugLog("fetchUrl: redirect", resp.status, "from", url);
+
+            var playerMatch = url.match(/\/player\/(\d+)/);
+            if (playerMatch) {
+                var postId = playerMatch[1];
+                var fallbackUrl = getBase() + "/?p=" + postId;
+                debugLog("fetchUrl: fallback →", fallbackUrl);
+
+                try {
+                    var resp2 = httpRequest(fallbackUrl, {
+                        method: "GET",
+                        headers: buildHeaders(fallbackUrl, sourceUrl)
+                    });
+                    if (resp2 && resp2.status === 200 && resp2.body) {
+                        // Trang /?p=<id> là trang chi tiết — cần tìm iframe trong đó
+                        if (resp2.body.indexOf("okplayer-frame") !== -1 ||
+                            resp2.body.indexOf("cvp-tab-pane") !== -1) {
+                            __httpCache[fallbackUrl] = { data: resp2.body, time: Date.now() };
+                            return resp2.body;
+                        }
+                    }
+                } catch (e) {
+                    debugLog("fetchUrl fallback error:", e.message || e);
+                }
+            }
+
             return null;
         }
 
         if (resp && resp.status === 200 && resp.body) {
-            // ⭐ Chỉ cache nếu là HTML player hoặc trang chi tiết
             var isPlayer = resp.body.indexOf("cvp-tab-pane") !== -1;
             var isDetail = resp.body.indexOf("okplayer-frame") !== -1 ||
                            resp.body.indexOf("single-post-container") !== -1;
@@ -396,7 +466,7 @@ function detectPageType(html) {
 
 // =============================================================================
 // HELPER: Find embed URL
-// ⭐ [v6.5.0] XÓA Strategy 4 (/player/<id>) vì server trả 302.
+// ⭐ [v6.5.1] Strategy 1 giữ nguyên, nhưng parseDetailResponse sẽ fallback
 // =============================================================================
 
 function findEmbedUrl(html) {
@@ -422,8 +492,6 @@ function findEmbedUrl(html) {
         if (playerIframeMatch) embedUrl = playerIframeMatch[1].replace(/\\\//g, "/");
     }
 
-    // ❌ [v6.5.0] Strategy 4 ĐÃ XÓA: /player/<postid> → server trả 302 về /?p=<id>
-
     if (embedUrl && embedUrl.indexOf("//") === 0) embedUrl = "https:" + embedUrl;
 
     return normalizeUrl(embedUrl);
@@ -431,7 +499,6 @@ function findEmbedUrl(html) {
 
 // =============================================================================
 // HELPER: Extract streams from Player HTML
-// ⭐ [v6.5.0] Trả về MẢNG servers (tất cả link stream đã resolve)
 // =============================================================================
 
 function extractAllStreamsFromPlayer(playerHtml) {
@@ -440,14 +507,12 @@ function extractAllStreamsFromPlayer(playerHtml) {
     var allLinks = [];
     var match;
 
-    // ⭐ [v6.5.0] Regex đơn giản hơn — chỉ cần id + data-link, không quan tâm thứ tự
     var tabRegex = /<div[^>]+id="(cvp-tab-\d+)"[^>]*?data-link="([^"]+)"/gi;
     while ((match = tabRegex.exec(playerHtml)) !== null) {
         var num = parseInt(match[1].replace("cvp-tab-", ""));
         allLinks.push({ num: num, url: normalizeUrl(match[2].replace(/\\\//g, "/")) });
     }
 
-    // Fallback: lấy mọi data-link
     if (allLinks.length === 0) {
         var idx = 0;
         var regex2 = /data-link="([^"]+)"/gi;
@@ -457,7 +522,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         }
     }
 
-    // Fallback cuối: m3u8 raw
     if (allLinks.length === 0) {
         var m3u8Match = playerHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
         if (m3u8Match) {
@@ -465,7 +529,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         }
     }
 
-    // Lọc chỉ giữ link stream
     var streamLinks = [];
     for (var i = 0; i < allLinks.length; i++) {
         if (U.isStream(allLinks[i].url)) {
@@ -475,7 +538,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
 
     if (streamLinks.length === 0) return [];
 
-    // Sắp xếp: m3u8 trước, mp4 sau
     streamLinks.sort(function(a, b) {
         var aM3u8 = a.url.indexOf(".m3u8") !== -1 ? 0 : 1;
         var bM3u8 = b.url.indexOf(".m3u8") !== -1 ? 0 : 1;
@@ -483,7 +545,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         return a.num - b.num;
     });
 
-    // Resolve TẤT CẢ qua API /get-video
     var servers = [];
     for (var j = 0; j < streamLinks.length; j++) {
         var link = streamLinks[j];
@@ -497,7 +558,7 @@ function extractAllStreamsFromPlayer(playerHtml) {
                     method: "GET",
                     headers: {
                         "Referer": getBase() + "/",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        "User-Agent": DEFAULT_UA
                     }
                 });
                 if (resp && resp.status === 200 && resp.body) {
@@ -520,7 +581,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         servers.push({
             url: resolvedUrl,
             originalUrl: link.url,
-            // ⭐ mimeType ưu tiên URL GỐC (đuôi thật), fallback URL resolve
             mimeType: U.mime(link.url) || U.mime(resolvedUrl),
             serverNum: link.num,
             serverLabel: "SV " + link.num + " (" + U.type(link.url) + ")"
@@ -530,7 +590,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
     return servers;
 }
 
-// Backward-compat: hàm cũ trả về 1 server (best)
 function extractStreamFromPlayer(playerHtml) {
     var servers = extractAllStreamsFromPlayer(playerHtml);
     if (servers.length === 0) return null;
@@ -538,8 +597,7 @@ function extractStreamFromPlayer(playerHtml) {
 }
 
 // =============================================================================
-// HELPER: Build stream response JSON
-// ⭐ [v6.5.0] Trả về cả `url` (best) và `servers` (toàn bộ)
+// HELPER: Build stream response
 // =============================================================================
 
 function buildStreamResponse(servers) {
@@ -559,12 +617,11 @@ function buildStreamResponse(servers) {
         mimeType: best.mimeType,
         headers: {
             "Referer": getBase() + "/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent": DEFAULT_UA
         },
         subtitles: []
     };
 
-    // ⭐ Nếu có nhiều server, thêm mảng servers để App fallback
     if (servers.length > 1) {
         response.servers = servers.map(function(s) {
             return {
@@ -573,7 +630,7 @@ function buildStreamResponse(servers) {
                 label: s.serverLabel,
                 headers: {
                     "Referer": getBase() + "/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    "User-Agent": DEFAULT_UA
                 }
             };
         });
@@ -692,7 +749,6 @@ function parseSeriesArchive(html) {
 
 // =============================================================================
 // HELPER: Parse Episode Detail
-// ⭐ [v6.5.0] Fallback title/poster từ <title> và data-poster
 // =============================================================================
 
 function parseEpisodeDetail(html) {
@@ -715,7 +771,6 @@ function parseEpisodeDetail(html) {
         previewUrl: ""
     };
 
-    // ⭐ Fallback chain: og:* → <title> / data-poster
     var title = U.meta(html, "og:title") || U.pageTitle(html);
     var poster = U.meta(html, "og:image") || U.dataPoster(html);
     var desc = U.meta(html, "og:description");
@@ -938,7 +993,6 @@ function parseSearchResponse(html, apiUrl, datasend) {
 
 // =============================================================================
 // MOVIE DETAIL PARSER
-// ⭐ [v6.5.0] Xử lý PLAYER: trích stream trực tiếp
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -950,7 +1004,6 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
         switch (pageType) {
             case "PLAYER": {
-                // ⭐ HTML chi tiết đã có sẵn player → trích stream luôn
                 var servers = extractAllStreamsFromPlayer(htmlContent);
                 var title = U.meta(htmlContent, "og:title") || U.pageTitle(htmlContent);
                 var poster = U.meta(htmlContent, "og:image") || U.dataPoster(htmlContent);
@@ -1013,7 +1066,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 
 // =============================================================================
 // DETAIL RESPONSE PARSER
-// ⭐ [v6.5.0] Dùng buildStreamResponse (trả về cả servers[])
+// ⭐ [v6.5.1] Truyền apiUrl (URL trang chi tiết) làm sourceUrl cho fetchUrl
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
@@ -1024,21 +1077,41 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         if (htmlContent && htmlContent.indexOf("cvp-tab-pane") !== -1) {
             var servers = extractAllStreamsFromPlayer(htmlContent);
             if (servers.length > 0) {
-                debugLog("parseDetailResponse: found", servers.length, "servers");
+                debugLog("parseDetailResponse: found", servers.length, "servers in HTML");
                 return buildStreamResponse(servers);
             }
         }
 
-        // CASE 2: Episode Detail HTML → fetch player
+        // CASE 2: Episode Detail HTML → fetch player iframe
         if (htmlContent) {
             var embedUrl = findEmbedUrl(htmlContent);
             if (embedUrl) {
                 debugLog("parseDetailResponse: fetch embed", embedUrl);
-                var playerHtml = fetchUrl(embedUrl);
+                // ⭐ [v6.5.1] Truyền apiUrl (URL trang chi tiết) làm Referer
+                var playerHtml = fetchUrl(embedUrl, apiUrl || htmlContent);
                 if (playerHtml) {
+                    // Trường hợp A: fetch /player/<id> thành công → có cvp-tab-pane
                     var servers2 = extractAllStreamsFromPlayer(playerHtml);
                     if (servers2.length > 0) {
+                        debugLog("parseDetailResponse: found", servers2.length, "servers from player");
                         return buildStreamResponse(servers2);
+                    }
+
+                    // Trường hợp B: fetch fallback /?p=<id> → có okplayer-frame
+                    // → cần findEmbedUrl lần nữa rồi fetch tiếp
+                    if (playerHtml.indexOf("okplayer-frame") !== -1 &&
+                        playerHtml.indexOf("cvp-tab-pane") === -1) {
+                        var embedUrl2 = findEmbedUrl(playerHtml);
+                        if (embedUrl2 && embedUrl2 !== embedUrl) {
+                            debugLog("parseDetailResponse: nested embed", embedUrl2);
+                            var playerHtml2 = fetchUrl(embedUrl2, apiUrl || htmlContent);
+                            if (playerHtml2) {
+                                var servers3 = extractAllStreamsFromPlayer(playerHtml2);
+                                if (servers3.length > 0) {
+                                    return buildStreamResponse(servers3);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1056,11 +1129,11 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             }]);
         }
 
-        // CASE 4: datasend là player URL (không phải /player/<id> đã bị chặn)
-        if (datasend && datasend.indexOf("/player/") !== -1) {
+        // CASE 4: datasend là player URL
+        if (datasend && (datasend.indexOf("/player/") !== -1 || datasend.indexOf("okplayer") !== -1)) {
             var dsPlayerUrl = normalizeUrl(datasend);
             debugLog("parseDetailResponse: fetch datasend player", dsPlayerUrl);
-            var playerHtml4 = fetchUrl(dsPlayerUrl);
+            var playerHtml4 = fetchUrl(dsPlayerUrl, apiUrl || htmlContent);
             if (playerHtml4) {
                 var servers4 = extractAllStreamsFromPlayer(playerHtml4);
                 if (servers4.length > 0) {
@@ -1097,7 +1170,7 @@ function parseEmbedResponse(html, sourceUrl) {
 
         var embedUrl = findEmbedUrl(html);
         if (embedUrl) {
-            var playerHtml = fetchUrl(embedUrl);
+            var playerHtml = fetchUrl(embedUrl, sourceUrl);
             if (playerHtml) {
                 var servers2 = extractAllStreamsFromPlayer(playerHtml);
                 if (servers2.length > 0) {
