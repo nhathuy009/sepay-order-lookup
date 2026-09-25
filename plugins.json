@@ -11,7 +11,7 @@
         {
             "id": "phimsexai",
             "name": "Phim Sex AI",
-            "version": "6.1.0",
+            "version": "6.2.0",
             "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/phimsexai.js",
             "iconUrl": "https://phimsexai.site/wp-content/uploads/cropped-icon-192x192.jpg"
         }
