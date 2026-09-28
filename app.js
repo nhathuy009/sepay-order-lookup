@@ -837,10 +837,21 @@ function formatTxDate(dateString) {
 // Chuẩn hóa ngày về dạng dd/mm/yyyy (luôn 2 chữ số ngày/tháng, bỏ giờ) - dùng khi copy sang Excel/Sheets
 function formatDateOnly(dateString) {
   if (!dateString) return "";
-  const [date] = dateString.split(" ");
-  const [y, m, d] = date.split("-");
+  // Bỏ phần giờ nếu có ("YYYY-MM-DD HH:mm:ss" hoặc "dd/MM/yyyy HH:mm")
+  const date = String(dateString).trim().split(/[\sT]/)[0];
   const pad2 = (v) => String(v).padStart(2, "0");
-  return `${pad2(d)}/${pad2(m)}/${y}`;
+
+  // Đã là dd/MM/yyyy (API eInvoice v1 trả arisingDate dạng này)
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
+    const [d, m, y] = date.split("/");
+    return `${pad2(d)}/${pad2(m)}/${y}`;
+  }
+  // ISO YYYY-MM-DD (transaction_date từ SePay)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split("-");
+    return `${pad2(d)}/${pad2(m)}/${y}`;
+  }
+  return date;
 }
 
 function timeAgo(dateString) {
