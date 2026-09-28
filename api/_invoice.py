@@ -1,23 +1,25 @@
-"""Tra cứu hóa đơn điện tử (ASP.NET WebForms) - bản serverless cho Vercel.
+"""Tra cứu hóa đơn điện tử SePay eInvoice (API v1) - bản serverless cho Vercel.
 
-Đăng nhập bằng cách bóc __VIEWSTATE / __VIEWSTATEGENERATOR / __EVENTVALIDATION
-rồi POST lại form đăng nhập, sau đó gọi API nội bộ (ajax/Envoice/method.aspx)
-kèm cookie đã đăng nhập, lọc theo invNo để lấy đúng 1 hóa đơn.
+SePay đã chuyển sang API REST:
+  POST /api/v1/auth/login          → JWT Bearer token
+  GET  /api/v1/invoices?...        → danh sách / tra cứu theo số HĐ
 
-Cookie được cache trong bộ nhớ (module-global) thay vì ghi ra file, vì
-filesystem của Vercel là read-only và mỗi lần gọi function là stateless
-(giống cơ chế cache token trong _core.py).
+Token được cache in-memory (module-global) vì filesystem Vercel read-only
+và mỗi lần gọi function là stateless.
 
 Thông tin đăng nhập lấy từ Environment Variables — KHÔNG hardcode trong code:
   EINVOICE_BASE_URL  vd: https://0319353578.sepay-einvoice.com
   EINVOICE_USERNAME
-  EINVOICE_PASSWORD
-  EINVOICE_SERIAL    (tùy chọn) ký hiệu mẫu hóa đơn dùng để lọc, mặc định "C26MSL"
+  EINVOICE_PASSWORD  (plain text; code sẽ MD5 nếu cần, giống UI web)
+  EINVOICE_SERIAL    (tùy chọn) ký hiệu mẫu HĐ, mặc định "C26MSL"
+  EINVOICE_ID_PUB    (tùy chọn) idPub trên API list, có thể để trống
 """
+import hashlib
 import os
 import re
 import threading
 from datetime import datetime
+from urllib.parse import urlparse
 
 import requests
 
@@ -27,6 +29,7 @@ EINVOICE_BASE_URL = os.environ.get("EINVOICE_BASE_URL", "").rstrip("/")
 EINVOICE_USERNAME = os.environ.get("EINVOICE_USERNAME", "")
 EINVOICE_PASSWORD = os.environ.get("EINVOICE_PASSWORD", "")
 EINVOICE_SERIAL = os.environ.get("EINVOICE_SERIAL", "C26MSL")
+EINVOICE_ID_PUB = os.environ.get("EINVOICE_ID_PUB", "").strip()
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -83,13 +86,28 @@ def empty_details():
     return {f: "" for f in FIELD_ORDER}
 
 
+def _host_from_base_url():
+    """Lấy hostname từ EINVOICE_BASE_URL (vd: 0319353578.sepay-einvoice.com)."""
+    if not EINVOICE_BASE_URL:
+        return ""
+    parsed = urlparse(EINVOICE_BASE_URL if "://" in EINVOICE_BASE_URL else f"https://{EINVOICE_BASE_URL}")
+    return parsed.hostname or ""
+
+
+def _password_for_login(raw_password):
+    """UI web gửi password dạng MD5 hex 32 ký tự.
+    Nếu env đã là MD5 (32 hex) thì giữ nguyên; ngược lại hash MD5 plain text.
+    """
+    pw = (raw_password or "").strip()
+    if re.fullmatch(r"[0-9a-fA-F]{32}", pw):
+        return pw.lower()
+    return hashlib.md5(pw.encode("utf-8")).hexdigest()
+
+
 def _extract_adjusted_invoice_no(process_note):
-    """Trích số hóa đơn GỐC bị điều chỉnh/thay thế từ trường ProcessInvNote, dạng:
+    """Trích số hóa đơn GỐC bị điều chỉnh/thay thế từ ghi chú, dạng:
     "Điều chỉnh cho hóa đơn điện tử  Mẫu số 1, ký hiệu C26MSL, số 1071, ngày..."
     "Thay thế cho hóa đơn điện tử  Mẫu số 1, ký hiệu C26MSL, số 1071, ngày..."
-
-    Chỉ khớp số đứng ngay sau "ký hiệu <ký hiệu>, số " để tránh nhầm với
-    "Mẫu số 1" (số mẫu hóa đơn - luôn là "1", không phải số hóa đơn gốc).
     """
     if not process_note:
         return ""
@@ -98,28 +116,30 @@ def _extract_adjusted_invoice_no(process_note):
 
 
 def _extract_adjusted_invoice_date(process_note):
-    """Trích ngày phát hành của hóa đơn GỐC bị điều chỉnh/thay thế từ ProcessInvNote,
-    dạng: "...ký hiệu C26MSL, số 1071, ngày 05/06/2026" -> trả về "05/06/2026".
-
-    Dùng để giới hạn khoảng ngày khi tra ngược đơn hàng cho hóa đơn gốc (thay vì
-    quét toàn bộ lịch sử đơn hàng). Trả về "" nếu ProcessInvNote không có phần
-    "ngày dd/mm/yyyy" (một số bản ghi có thể không ghi ngày trong ghi chú).
+    """Trích ngày phát hành HĐ gốc từ ghi chú.
+    Hỗ trợ cả:
+      - "ngày 05/06/2026"
+      - "ngày 16 tháng 08 năm 2026"
+    Trả về "dd/mm/yyyy" hoặc "".
     """
     if not process_note:
         return ""
     match = re.search(r"ngày\s+(\d{1,2}/\d{1,2}/\d{4})", process_note, re.IGNORECASE)
-    return match.group(1) if match else ""
+    if match:
+        return match.group(1)
+    match = re.search(
+        r"ngày\s+(\d{1,2})\s+tháng\s+(\d{1,2})\s+năm\s+(\d{4})",
+        process_note,
+        re.IGNORECASE,
+    )
+    if match:
+        dd, mm, yyyy = match.group(1), match.group(2), match.group(3)
+        return f"{int(dd):02d}/{int(mm):02d}/{yyyy}"
+    return ""
 
 
 def _detect_adjustment_type(process_note):
-    """Phân loại hóa đơn số tiền âm dựa vào tiền tố của ProcessInvNote:
-    - "dieu_chinh": "Điều chỉnh cho hóa đơn điện tử..." -> hóa đơn điều chỉnh giảm
-      (thường là hoàn tiền cho khách, tiền không còn giá trị thật ở hóa đơn gốc).
-    - "thay_the": "Thay thế cho hóa đơn điện tử..." -> hóa đơn thay thế (thường do
-      đổi thông tin xuất hóa đơn, VD khách đổi từ cá nhân sang công ty; tiền ở
-      hóa đơn gốc vẫn là tiền thật, không nên xóa).
-    - "": không khớp mẫu nào (không phải hóa đơn điều chỉnh/thay thế đã biết).
-    """
+    """Phân loại hóa đơn số tiền âm dựa vào tiền tố ghi chú."""
     if not process_note:
         return ""
     note = process_note.strip()
@@ -130,18 +150,41 @@ def _detect_adjustment_type(process_note):
     return ""
 
 
-def _extract_hidden(field_id, html_text):
-    match = re.search(rf'id="{field_id}"[^>]*value="([^"]*)"', html_text)
-    if not match:
-        match = re.search(rf'name="{field_id}"[^>]*value="([^"]*)"', html_text)
-    return match.group(1) if match else ""
+def _dmy_to_api_from(dmy_or_iso):
+    """Chuẩn hoá ngày bắt đầu → 'YYYY-MM-DD' cho query API v1."""
+    s = (dmy_or_iso or "").strip()
+    if not s:
+        return "2020-01-01"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        return s
+    parts = s.split("/")
+    if len(parts) == 3:
+        dd, mm, yyyy = parts
+        return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}"
+    return s
+
+
+def _dmy_to_api_to(dmy_or_iso):
+    """Chuẩn hoá ngày kết thúc → 'YYYY-MM-DDTHH:MM:SS' cho query API v1."""
+    s = (dmy_or_iso or "").strip()
+    if not s:
+        return datetime.now().strftime("%Y-%m-%dT23:59:59")
+    if "T" in s:
+        return s
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+        return f"{s}T23:59:59"
+    parts = s.split("/")
+    if len(parts) == 3:
+        dd, mm, yyyy = parts
+        return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}T23:59:59"
+    return s
 
 
 class InvoiceClient:
-    """Client dùng chung, tái sử dụng session và cache cookie in-memory."""
+    """Client API v1: login lấy JWT, cache token, gọi /api/v1/invoices."""
 
     def __init__(self):
-        self.cookies = None
+        self.token = None
         self.last_error = ""
         self._lock = threading.Lock()
         self.session = requests.Session()
@@ -160,103 +203,211 @@ class InvoiceClient:
             print(f"[einvoice] {self.last_error}")
             return False
 
-        login_url = EINVOICE_BASE_URL + "/"
+        host = _host_from_base_url()
+        login_url = EINVOICE_BASE_URL + "/api/v1/auth/login"
+        payload = {
+            "username": EINVOICE_USERNAME,
+            "password": _password_for_login(EINVOICE_PASSWORD),
+            "host": host,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "*/*",
+            "Origin": EINVOICE_BASE_URL,
+            "Referer": EINVOICE_BASE_URL + "/login",
+        }
         try:
-            resp_get = self.session.get(login_url, timeout=REQUEST_TIMEOUT)
-            print(f"[einvoice] GET {login_url} -> {resp_get.status_code}, final_url={resp_get.url}")
-            resp_get.raise_for_status()
-            html = resp_get.text
-
-            viewstate = _extract_hidden("__VIEWSTATE", html)
-            viewstate_gen = _extract_hidden("__VIEWSTATEGENERATOR", html)
-            event_validation = _extract_hidden("__EVENTVALIDATION", html)
-            print(f"[einvoice] hidden fields lengths: VIEWSTATE={len(viewstate)}, "
-                  f"GENERATOR={len(viewstate_gen)}, EVENTVALIDATION={len(event_validation)}")
-            if not viewstate or not event_validation:
-                self.last_error = ("Không đọc được __VIEWSTATE/__EVENTVALIDATION từ trang đăng nhập "
-                                    "(có thể trang bị chặn bot/Cloudflare, hoặc EINVOICE_BASE_URL sai)")
-                print(f"[einvoice] {self.last_error}. HTML preview: {html[:300]!r}")
-                return False
-
-            payload = {
-                "__VIEWSTATE": viewstate,
-                "__VIEWSTATEGENERATOR": viewstate_gen,
-                "__EVENTVALIDATION": event_validation,
-                "txtUserName": EINVOICE_USERNAME,
-                "txtPassword": EINVOICE_PASSWORD,
-                "btnLogin": "Đăng nhập",
-                "tenDangNhap": "",
-            }
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Referer": login_url,
-                "Origin": EINVOICE_BASE_URL,
-            }
-            resp_post = self.session.post(
-                login_url, data=payload, headers=headers,
-                timeout=REQUEST_TIMEOUT, allow_redirects=True,
+            resp = self.session.post(
+                login_url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT
             )
-            print(f"[einvoice] POST {login_url} -> {resp_post.status_code}, final_url={resp_post.url}")
-            resp_post.raise_for_status()
-
-            cookies_dict = self.session.cookies.get_dict()
-            print(f"[einvoice] cookies after login: {list(cookies_dict.keys())}")
-            if ".ASPXAUTH" not in cookies_dict:
-                self.last_error = ("Đăng nhập thất bại: không có cookie .ASPXAUTH sau khi POST "
-                                    "(sai EINVOICE_USERNAME/EINVOICE_PASSWORD, hoặc trang chặn IP server)")
+            print(f"[einvoice] POST {login_url} -> {resp.status_code}")
+            if resp.status_code != 200:
+                self.last_error = (
+                    f"Đăng nhập thất bại HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+                print(f"[einvoice] {self.last_error}")
                 return False
-            self.cookies = cookies_dict
+            data = resp.json()
+            token = data.get("token") or ""
+            if not token:
+                self.last_error = "Đăng nhập thất bại: response không có token"
+                print(f"[einvoice] {self.last_error}. body={data!r}")
+                return False
+            self.token = token
             self.last_error = ""
+            print(f"[einvoice] login OK, userId={data.get('userId')}, comId={data.get('comId')}")
             return True
         except requests.exceptions.RequestException as e:
             self.last_error = f"Lỗi mạng khi đăng nhập: {type(e).__name__}: {e}"
             print(f"[einvoice] {self.last_error}")
             return False
+        except ValueError as e:
+            self.last_error = f"Lỗi parse JSON login: {e}"
+            print(f"[einvoice] {self.last_error}")
+            return False
 
-    def _fetch(self, invoice_no):
-        url = EINVOICE_BASE_URL + "/ajax/Envoice/method.aspx"
-        today = datetime.now().strftime("%d/%m/%Y")
+    def _auth_headers(self):
+        return {
+            "Accept": "*/*",
+            "Accept-Language": "vi",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}",
+            "Referer": EINVOICE_BASE_URL + "/invoices",
+        }
+
+    def _fetch(self, invoice_no, from_date=None, to_date=None):
+        """Gọi GET /api/v1/invoices, lọc theo invNo (và khoảng ngày nếu có).
+
+        Trả về: list[dict] | [] | None (lỗi mạng) | UNAUTHORIZED
+        """
+        url = EINVOICE_BASE_URL + "/api/v1/invoices"
         params = {
-            "r": "0." + str(int(datetime.now().timestamp() * 1000) % 10**8),
-            "type": "GetListInvoice",
-            "fromDate": "01/01/2020",
-            "toDate": today,
+            "fromDate": _dmy_to_api_from(from_date) if from_date else "2020-01-01",
+            "toDate": _dmy_to_api_to(to_date) if to_date else datetime.now().strftime("%Y-%m-%dT23:59:59"),
             "pattern": "1",
             "serial": EINVOICE_SERIAL,
-            "nameCus": "",
-            "invNo": invoice_no,
-            "typeInvoice": "-1",
             "status": "-1",
             "paymentMethod": "-1",
-            "pageSizeSelect": "0",
+            "pageSizeSelect": "50",
         }
-        headers = {
-            "Accept": "*/*",
-            "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": EINVOICE_BASE_URL + "/Pages/IndexVatInvoice.aspx",
-        }
+        if EINVOICE_ID_PUB:
+            params["idPub"] = EINVOICE_ID_PUB
+        if invoice_no:
+            params["invNo"] = str(invoice_no).strip()
+
         try:
             resp = self.session.get(
-                url, params=params, headers=headers,
-                cookies=self.cookies, timeout=REQUEST_TIMEOUT,
+                url, params=params, headers=self._auth_headers(), timeout=REQUEST_TIMEOUT
             )
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            print(f"[einvoice] GET invoices network error: {e}")
             return None
 
-        if resp.status_code != 200:
-            return None
-        raw_text = resp.text.strip()
-        if not raw_text:
-            return None
-        if "<html" in raw_text.lower() or "login" in resp.url.lower():
+        if resp.status_code in (401, 403):
             return UNAUTHORIZED
-        if raw_text == "Không có dữ liệu":
+        if resp.status_code != 200:
+            print(f"[einvoice] GET invoices HTTP {resp.status_code}: {resp.text[:200]}")
+            return None
+
+        raw_text = (resp.text or "").strip()
+        if not raw_text:
             return []
         try:
-            return resp.json()
+            data = resp.json()
+        except ValueError:
+            print(f"[einvoice] invoices response not JSON: {raw_text[:200]!r}")
+            return None
+
+        if isinstance(data, list):
+            return data
+        # Một số bản API bọc trong object
+        if isinstance(data, dict):
+            for key in ("data", "items", "invoices", "result"):
+                if isinstance(data.get(key), list):
+                    return data[key]
+        return []
+
+    def _fetch_batch(self, from_date, to_date, invoice_kind="-1"):
+        """Lấy danh sách HĐ theo khoảng ngày (không lọc invNo).
+
+        invoice_kind map sang paymentMethod trên API UI:
+          "-1" = tất cả
+          "2"  = chỉ HĐ gốc (nếu API còn hỗ trợ; UI mới dùng -1)
+        """
+        url = EINVOICE_BASE_URL + "/api/v1/invoices"
+        params = {
+            "fromDate": _dmy_to_api_from(from_date),
+            "toDate": _dmy_to_api_to(to_date),
+            "pattern": "1",
+            "serial": EINVOICE_SERIAL,
+            "status": "-1",
+            "paymentMethod": invoice_kind if invoice_kind else "-1",
+            "pageSizeSelect": "0",
+        }
+        if EINVOICE_ID_PUB:
+            params["idPub"] = EINVOICE_ID_PUB
+
+        try:
+            resp = self.session.get(
+                url, params=params, headers=self._auth_headers(), timeout=REQUEST_TIMEOUT
+            )
+        except requests.exceptions.RequestException as e:
+            print(f"[einvoice] GET invoices batch network error: {e}")
+            return None
+
+        if resp.status_code in (401, 403):
+            return UNAUTHORIZED
+        if resp.status_code != 200:
+            print(f"[einvoice] GET invoices batch HTTP {resp.status_code}: {resp.text[:200]}")
+            return None
+
+        raw_text = (resp.text or "").strip()
+        if not raw_text:
+            return []
+        try:
+            data = resp.json()
         except ValueError:
             return None
+
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("data", "items", "invoices", "result"):
+                if isinstance(data.get(key), list):
+                    return data[key]
+        return []
+
+    def _parse_invoice(self, inv):
+        """Chuẩn hoá 1 bản ghi API v1 (camelCase) → dict FIELD_ORDER."""
+        details = empty_details()
+        arising = inv.get("arisingDate") or inv.get("ArisingDate") or ""
+        # API trả "25/08/2026" — giữ nguyên cho hiển thị
+        details["arising_date"] = str(arising)[:10] if arising else ""
+        details["pattern_serial"] = (
+            inv.get("patternSerial")
+            or inv.get("PatternSerial")
+            or ""
+        )
+        details["customer_name"] = inv.get("cusName") or inv.get("CusName") or ""
+        details["customer_id"] = (
+            inv.get("canCuocCD")
+            or inv.get("CMND")
+            or inv.get("cusTaxCode")
+            or ""
+        )
+        details["customer_address"] = inv.get("cusAddress") or inv.get("CusAddress") or ""
+        # total = tiền hàng (trước thuế), vatAmount = thuế, amount = tổng tiền
+        total_val = inv.get("total", inv.get("Total", ""))
+        vat_val = inv.get("vatAmount", inv.get("VATAmount", ""))
+        amount_val = inv.get("amount", inv.get("Amount", ""))
+        details["amount_before_tax"] = total_val if total_val is not None else ""
+        details["vat_amount"] = vat_val if vat_val is not None else ""
+        details["total_amount"] = amount_val if amount_val is not None else ""
+        details["payment_method"] = inv.get("paymentMethod") or inv.get("PaymentMethod") or ""
+        details["invoice_type"] = (
+            inv.get("loaiHoaDon")
+            or inv.get("LoaiHoaDon")
+            or "Hóa đơn thông thường"
+        )
+        details["status_msg"] = "Thành công"
+        no_raw = inv.get("no", inv.get("No", ""))
+        details["invoice_no"] = str(no_raw).split(".")[0] if no_raw is not None else ""
+
+        # API v1 đưa ghi chú điều chỉnh vào invLinkID (thay ProcessInvNote cũ)
+        process_note = (
+            inv.get("invLinkID")
+            or inv.get("ProcessInvNote")
+            or inv.get("extra")
+            or ""
+        )
+        if not isinstance(process_note, str):
+            process_note = str(process_note or "")
+        details["process_note"] = process_note
+        details["adjusts_invoice_no"] = _extract_adjusted_invoice_no(process_note)
+        details["adjusts_invoice_date"] = _extract_adjusted_invoice_date(process_note)
+        details["adjustment_type"] = _detect_adjustment_type(process_note)
+        details["note"] = ""
+        return details
 
     def _build_details(self, invoice_no):
         details = empty_details()
@@ -271,117 +422,26 @@ class InvoiceClient:
             return details
 
         target = None
+        inv_no_str = str(invoice_no).strip()
         for inv in data:
-            no_str = str(inv.get("No", "")).split(".")[0]
-            if no_str == str(invoice_no).strip():
+            no_str = str(inv.get("no") or inv.get("No") or "").split(".")[0]
+            if no_str == inv_no_str:
                 target = inv
                 break
         if target is None:
             target = data[0]
 
-        arising = target.get("ArisingDate", "") or ""
-        details["pattern_serial"] = target.get("PatternSerial", "")
-        details["arising_date"] = arising[:10]
-        details["customer_name"] = target.get("CusName", "")
-        details["customer_id"] = target.get("CMND", "")
-        details["customer_address"] = target.get("CusAddress", "")
-        details["amount_before_tax"] = target.get("Total", "")
-        details["vat_amount"] = target.get("VATAmount", "")
-        details["total_amount"] = target.get("Amount", "")
-        details["payment_method"] = target.get("PaymentMethod", "")
-        details["invoice_type"] = target.get("LoaiHoaDon") or "Hóa đơn thông thường"
-        details["status_msg"] = "Thành công"
-        return details
-
-    def _parse_invoice(self, inv):
-        """Chuẩn hoá 1 bản ghi hóa đơn thô từ API thành dict theo FIELD_ORDER."""
-        details = empty_details()
-        arising = inv.get("ArisingDate", "") or ""
-        details["pattern_serial"] = inv.get("PatternSerial", "")
-        details["arising_date"] = arising[:10]
-        details["customer_name"] = inv.get("CusName", "")
-        details["customer_id"] = inv.get("CMND", "")
-        details["customer_address"] = inv.get("CusAddress", "")
-        details["amount_before_tax"] = inv.get("Total", "")
-        details["vat_amount"] = inv.get("VATAmount", "")
-        details["total_amount"] = inv.get("Amount", "")
-        details["payment_method"] = inv.get("PaymentMethod", "")
-        details["invoice_type"] = inv.get("LoaiHoaDon") or "Hóa đơn thông thường"
-        details["status_msg"] = "Thành công"
-        details["invoice_no"] = str(inv.get("No", "")).split(".")[0]
-        # Hóa đơn điều chỉnh giảm (số tiền âm) có ProcessInvNote ghi rõ số hóa đơn
-        # gốc bị điều chỉnh - trích ra để phía gọi hàm (index.py) tự tra cứu ngược
-        # xem hóa đơn gốc đó có nằm trong cùng đợt tra cứu không.
-        process_note = inv.get("ProcessInvNote", "") or ""
-        details["process_note"] = process_note
-        details["adjusts_invoice_no"] = _extract_adjusted_invoice_no(process_note)
-        details["adjusts_invoice_date"] = _extract_adjusted_invoice_date(process_note)
-        details["adjustment_type"] = _detect_adjustment_type(process_note)
-        details["note"] = ""
-        return details
-
-    def _fetch_batch(self, from_date, to_date, invoice_kind="2"):
-        """Gọi API 1 lần, lấy toàn bộ hóa đơn trong khoảng ngày (không lọc theo invNo).
-
-        invoice_kind: mã lọc loại hóa đơn (tham số 'paymentMethod' trên API,
-        tên gọi gây hiểu nhầm nhưng thực chất đây là loại hóa đơn):
-          "-1" = tất cả (gốc + điều chỉnh + thay thế)
-          "2"  = chỉ hóa đơn gốc (mới), loại trừ điều chỉnh/thay thế
-          Các mã khác cần xác nhận thêm qua giao diện web trước khi dùng.
-        """
-        url = EINVOICE_BASE_URL + "/ajax/Envoice/method.aspx"
-        params = {
-            "r": "0." + str(int(datetime.now().timestamp() * 1000) % 10**8),
-            "type": "GetListInvoice",
-            "fromDate": from_date,
-            "toDate": to_date,
-            "pattern": "1",
-            "serial": EINVOICE_SERIAL,
-            "nameCus": "",
-            "invNo": "",
-            "typeInvoice": "-1",
-            "status": "-1",
-            "paymentMethod": invoice_kind,
-            "pageSizeSelect": "0",
-        }
-        headers = {
-            "Accept": "*/*",
-            "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": EINVOICE_BASE_URL + "/Pages/IndexVatInvoice.aspx",
-        }
-        try:
-            resp = self.session.get(
-                url, params=params, headers=headers,
-                cookies=self.cookies, timeout=REQUEST_TIMEOUT,
-            )
-        except requests.exceptions.RequestException:
-            return None
-
-        if resp.status_code != 200:
-            return None
-        raw_text = resp.text.strip()
-        if not raw_text:
-            return None
-        if "<html" in raw_text.lower() or "login" in resp.url.lower():
-            return UNAUTHORIZED
-        if raw_text == "Không có dữ liệu":
-            return []
-        try:
-            return resp.json()
-        except ValueError:
-            return None
+        return self._parse_invoice(target)
 
     def fetch_all_invoices(self, from_date, to_date, invoice_kind="2"):
         """Lấy toàn bộ hóa đơn trong khoảng ngày, tự re-login khi session hết hạn.
 
-        from_date, to_date: chuỗi định dạng "dd/MM/yyyy" (giống UI, VD "01/07/2026")
-        invoice_kind: "-1" tất cả | "2" chỉ hóa đơn gốc, xem docstring _fetch_batch
-        Trả về: list[dict] đã chuẩn hoá theo FIELD_ORDER (kèm invoice_no),
-                 [] nếu không có dữ liệu, hoặc None nếu lỗi kết nối/không đăng nhập được.
+        from_date, to_date: "dd/MM/yyyy" hoặc "YYYY-MM-DD"
+        invoice_kind: "-1" tất cả | "2" chỉ HĐ gốc (map paymentMethod)
+        Trả về list[dict] đã chuẩn hoá, [] nếu không có dữ liệu, None nếu lỗi.
         """
         with self._lock:
-            if not self.cookies and not self.login():
+            if not self.token and not self.login():
                 self.last_error = self.last_error or "Không đăng nhập được"
                 return None
 
@@ -404,7 +464,7 @@ class InvoiceClient:
     def lookup(self, invoice_no):
         """Tra cứu 1 hóa đơn, tự đăng nhập và re-login khi cần (thread-safe)."""
         with self._lock:
-            if not self.cookies and not self.login():
+            if not self.token and not self.login():
                 d = empty_details()
                 d["status_msg"] = self.last_error or "Không đăng nhập được"
                 return d
@@ -417,16 +477,16 @@ class InvoiceClient:
                 result = self._build_details(invoice_no)
             else:
                 d = empty_details()
-                d["status_msg"] = self.last_error or "Không thể đăng nhập lại (session hết hạn)"
+                d["status_msg"] = self.last_error or "Không thể đăng nhập lại (token hết hạn)"
                 return d
         if result == UNAUTHORIZED:
             d = empty_details()
-            d["status_msg"] = "Session hết hạn"
+            d["status_msg"] = "Token hết hạn"
             return d
         return result
 
 
-# Cache client giữa các lần gọi warm invocation (giống get_client trong _core.py).
+# Cache client giữa các lần gọi warm invocation.
 _client = None
 _client_lock = threading.Lock()
 
@@ -453,11 +513,10 @@ def lookup_invoice(invoice_no):
 
 
 def fetch_invoices_by_date(from_date, to_date, invoice_kind="2"):
-    """Điểm vào chính cho tra cứu hàng loạt theo khoảng ngày (1 request, không lặp invNo).
+    """Điểm vào chính cho tra cứu hàng loạt theo khoảng ngày.
 
-    from_date, to_date: chuỗi "dd/MM/yyyy", VD "01/07/2026"
+    from_date, to_date: "dd/MM/yyyy" hoặc "YYYY-MM-DD"
     invoice_kind: "-1" tất cả | "2" chỉ hóa đơn gốc (mặc định)
-    Trả về: list[dict] hoặc [] (không có dữ liệu); None nghĩa là lỗi kết nối/đăng nhập,
-             kiểm tra get_client().last_error để biết chi tiết.
+    Trả về: list[dict] hoặc [] ; None = lỗi kết nối/đăng nhập
     """
     return get_client().fetch_all_invoices(from_date, to_date, invoice_kind)
