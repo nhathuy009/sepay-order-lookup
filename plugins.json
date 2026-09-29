@@ -16,8 +16,8 @@
             "iconUrl": "https://phimsexai.site/wp-content/uploads/cropped-icon-192x192.jpg"
         },
         {
-            "id": "huangguoaiself",
-            "name": "Huangguo AI SELF",
+            "id": "huangguo_ai",
+            "name": "黄果短剧",
             "version": "1.4.0",
             "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/huangguoai.js",
             "iconUrl": "https://huangguoai.com/static/web/images/logo-huangguo.png"
