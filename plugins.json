@@ -16,9 +16,9 @@
             "iconUrl": "https://phimsexai.site/wp-content/uploads/cropped-icon-192x192.jpg"
         },
         {
-            "id": "huanguoaiself",
-            "name": "Huanguo AI SELF",
-            "version": "1.3.0",
+            "id": "huangguoaiself",
+            "name": "Huangguo AI SELF",
+            "version": "1.4.0",
             "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/huangguoai.js",
             "iconUrl": "https://huangguoai.com/static/web/images/logo-huangguo.png"
         }
