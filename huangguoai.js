@@ -1,20 +1,19 @@
 // =============================================================================
-// VAAPP PLUGIN — Huangguo Short Drama (v3.1 - AES-IMG-DECODE + UI DEBUG)
+// VAAPP PLUGIN — Huangguo Short Drama (v3.2 - REGEX + AES + UI DEBUG)
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc)
-// Version : 3.1.0
+// Version : 3.2.0
 //
-// ⭐ ĐẶC ĐIỂM v3.1:
-//   ✅ AES-128-CBC decrypt ảnh thuần JS (không cần CryptoJS)
+// ⭐ ĐẶC ĐIỂM v3.2:
+//   ✅ BỎ MiniJQ (_$) — nguyên nhân gây EMPTY_URL
+//   ✅ Dùng regex trực tiếp extract HTML
+//   ✅ AES-128-CBC decrypt ảnh thuần JS
 //   ✅ Key/IV: f5d965df75336270 / 97b60394abc2fbe1
-//   ✅ Auto-detect MIME (jpg/png/gif/webp/bmp)
-//   ✅ Auto-detect plaintext: raw bytes / base64 string
+//   ✅ Auto-detect MIME + plaintext (raw/base64)
 //   ✅ Batch fetch song song qua fetchAll()
-//   ✅ Cache localStorage (lần 2 instant)
-//   ✅ 🆕 UI DEBUG: Item debug đầu list hiển thị OK/FAIL count
-//   ✅ 🆕 UI DEBUG: Ảnh fail hiển thị SVG đỏ với magic bytes
-//   ✅ 🆕 UI DEBUG: Toast nổi hiển thị log
+//   ✅ Cache localStorage
+//   ✅ UI DEBUG: item debug đầu list + SVG lỗi + toast
 // =============================================================================
 
 var BASE = "https://huangguoai.com";
@@ -28,15 +27,15 @@ var HG_AES_IV  = "97b60394abc2fbe1";
 
 var HG_IMG_CACHE_PREFIX = "hgi_";
 
-// ⭐ Bật/tắt debug UI (đặt false khi phát hành chính thức)
+// ⭐ Bật/tắt debug UI
 var HG_DEBUG = true;
 
-// ⭐ Log buffer để đọc qua UI
+// ⭐ Log buffer
 var HG_DEBUG_LOG = [];
 
 
 // =============================================================================
-// DEBUG HELPERS — Hiển thị log qua UI
+// DEBUG HELPERS
 // =============================================================================
 
 function dbgLog(msg) {
@@ -44,21 +43,15 @@ function dbgLog(msg) {
     if (!HG_DEBUG) return;
     HG_DEBUG_LOG.push(msg);
     if (HG_DEBUG_LOG.length > 50) HG_DEBUG_LOG.shift();
-    try { toast("[HG] " + msg.substring(0, 60)); } catch (e) {}
+    try { toast("[HG] " + String(msg).substring(0, 60)); } catch (e) {}
 }
 
-/**
- * Tạo ảnh SVG đỏ hiển thị text lỗi (thay vì ảnh trắng khi decode fail).
- * Dùng BASE64.encode() native của VAAPP.
- */
 function makeErrorPlaceholder(msg) {
     var safeMsg = String(msg || "error").substring(0, 60).replace(/[<>&"']/g, "_");
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160" viewBox="0 0 280 160">' +
         '<rect width="280" height="160" fill="#c00"/>' +
         '<text x="10" y="28" fill="#fff" font-family="monospace" font-size="14" font-weight="bold">DECODE FAIL</text>' +
         '<text x="10" y="56" fill="#ff0" font-family="monospace" font-size="11">' + safeMsg + '</text>' +
-        '<text x="10" y="86" fill="#fff" font-family="monospace" font-size="10">Check UI Debug Item</text>' +
-        '<text x="10" y="110" fill="#fff" font-family="monospace" font-size="10">at top of list</text>' +
         '</svg>';
     try {
         return "data:image/svg+xml;base64," + BASE64.encode(svg);
@@ -76,7 +69,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "3.1.0",
+        "version": "3.2.0",
         "description": "Phim ngắn AI, hoạt hình người lớn, AI hoán đổi khuôn mặt — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -136,7 +129,6 @@ function getUrlList(slug, filtersJson) {
     if (page < 1) page = 1;
     var B = BASE;
 
-    // Author page: /author/{id}/video/{N}/
     if (slug && (slug.indexOf("/author/") === 0 || slug.indexOf("author/") === 0)) {
         var cleanAuthorSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanAuthorSlug = cleanAuthorSlug.replace(/\/(video|post)\/\d+$/, "");
@@ -149,7 +141,6 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Tag page: /tag/{slug}/page/{N}/
     if (slug && (slug.indexOf("/tag/") === 0 || slug.indexOf("tag/") === 0)) {
         var cleanTagSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanTagSlug = cleanTagSlug.replace(/\/page\/\d+$/, "");
@@ -161,7 +152,6 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Topic page: /topics/{slug}/{N}/
     if (slug && (slug.indexOf("/topics/") === 0 || slug.indexOf("topics/") === 0)) {
         var cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         var topicMatch = cleanSlug.match(/^(topics\/[^\/]+)/);
@@ -224,10 +214,6 @@ function getUrlDetail(slug) {
 
 // =============================================================================
 // ==================== AES-128-CBC DECRYPT PURE JS ============================
-// Port từ crypto-worker.js của huangguoai.com
-// Key : "f5d965df75336270" (ASCII → 16 bytes)
-// IV  : "97b60394abc2fbe1" (ASCII → 16 bytes)
-// Mode: CBC, Padding: NoPadding
 // =============================================================================
 
 var AES_SBOX = new Array(256);
@@ -384,10 +370,6 @@ function aes128CbcDecrypt(cipherBytes, keyStr, ivStr) {
     return plainBytes;
 }
 
-// =============================================================================
-// Base64 encoder thuần JS
-// =============================================================================
-
 function hgBytesToBase64(bytes) {
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var out = "";
@@ -406,7 +388,7 @@ function hgBytesToBase64(bytes) {
 
 
 // =============================================================================
-// detectMimeType — phát hiện MIME từ extension URL
+// detectMimeType
 // =============================================================================
 
 function detectMimeType(url) {
@@ -416,7 +398,6 @@ function detectMimeType(url) {
     if (cleanUrl.lastIndexOf(".gif") !== -1 && cleanUrl.lastIndexOf(".gif") >= cleanUrl.length - 5) return "image/gif";
     if (cleanUrl.lastIndexOf(".webp") !== -1 && cleanUrl.lastIndexOf(".webp") >= cleanUrl.length - 6) return "image/webp";
     if (cleanUrl.lastIndexOf(".bmp") !== -1 && cleanUrl.lastIndexOf(".bmp") >= cleanUrl.length - 5) return "image/bmp";
-    if (cleanUrl.lastIndexOf(".svg") !== -1 && cleanUrl.lastIndexOf(".svg") >= cleanUrl.length - 5) return "image/svg+xml";
     return "image/jpeg";
 }
 
@@ -427,7 +408,6 @@ function detectMimeType(url) {
 
 function decodeHuangguoImage(imgUrl, referer, ua) {
     try {
-        // 1. Fetch ciphertext
         var res = httpRequest(imgUrl, {
             method: "GET",
             headers: {
@@ -441,22 +421,18 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
             return "";
         }
 
-        // 2. Convert binary string → bytes
         var len = res.body.length;
         var cipherBytes = new Uint8Array(len);
         for (var i = 0; i < len; i++) cipherBytes[i] = res.body.charCodeAt(i) & 0xFF;
 
-        // 3. AES decrypt
         var plainBytes = aes128CbcDecrypt(cipherBytes, HG_AES_KEY, HG_AES_IV);
 
-        // 4. Strip trailing 0x00
         var end = plainBytes.length;
         while (end > 0 && plainBytes[end - 1] === 0) end--;
         var clean = plainBytes.subarray(0, end);
 
         var mimeType = detectMimeType(imgUrl);
 
-        // Case B: base64 string (JPEG "/9j/", PNG "iVB", GIF "R0l")
         if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||
             (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||
             (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {
@@ -466,7 +442,6 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
             return "data:" + mimeType + ";base64," + str;
         }
 
-        // Case A: raw bytes (JPEG "FF D8", PNG "89 50", GIF "47 49")
         if ((clean[0] === 0xFF && clean[1] === 0xD8) ||
             (clean[0] === 0x89 && clean[1] === 0x50) ||
             (clean[0] === 0x47 && clean[1] === 0x49)) {
@@ -474,7 +449,6 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
             return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
         }
 
-        // Unknown magic
         var magicHex = clean[0].toString(16) + " " + clean[1].toString(16) + " " + clean[2].toString(16);
         dbgLog("UNKNOWN magic=" + magicHex);
         return makeErrorPlaceholder("magic " + magicHex);
@@ -522,7 +496,7 @@ function hgCacheSet(url, dataUri) {
 
 
 // =============================================================================
-// decodeImagesBatch — Batch decode song song + cache
+// decodeImagesBatch — Batch decode + fallback nếu fetchAll không tồn tại
 // =============================================================================
 
 function decodeImagesBatch(urls, referer, ua) {
@@ -551,22 +525,46 @@ function decodeImagesBatch(urls, referer, ua) {
 
     dbgLog("FETCH " + toFetch.length + "/" + urls.length + " (cached " + cachedCount + ")");
 
-    // 2. Batch fetch song song
-    var responses;
-    try {
-        responses = fetchAll(toFetch, {
-            headers: {
-                "Referer": referer || REFERER,
-                "Origin":  referer || ORIGIN,
-                "User-Agent": ua || UA_MOBILE
-            }
-        });
-    } catch (e) {
-        dbgLog("fetchAll FAIL: " + e.message);
-        responses = [];
+    // 2. Fetch song song qua fetchAll (nếu có) hoặc tuần tự httpRequest
+    var responses = [];
+    var useFetchAll = (typeof fetchAll === "function");
+
+    if (useFetchAll) {
+        try {
+            responses = fetchAll(toFetch, {
+                headers: {
+                    "Referer": referer || REFERER,
+                    "Origin":  referer || ORIGIN,
+                    "User-Agent": ua || UA_MOBILE
+                }
+            });
+        } catch (e) {
+            dbgLog("fetchAll EX: " + e.message + " → fallback");
+            useFetchAll = false;
+            responses = [];
+        }
     }
 
-    // 3. Decode tuần tự
+    if (!useFetchAll) {
+        // Fallback: dùng httpRequest tuần tự
+        for (var fi = 0; fi < toFetch.length; fi++) {
+            try {
+                var r = httpRequest(toFetch[fi], {
+                    method: "GET",
+                    headers: {
+                        "Referer": referer || REFERER,
+                        "Origin":  referer || ORIGIN,
+                        "User-Agent": ua || UA_MOBILE
+                    }
+                });
+                responses.push(r);
+            } catch (e) {
+                responses.push(null);
+            }
+        }
+    }
+
+    // 3. Decode
     var okCount = 0, failCount = 0, unknownMagic = "";
     for (var j = 0; j < responses.length; j++) {
         var r = responses[j];
@@ -591,7 +589,6 @@ function decodeImagesBatch(urls, referer, ua) {
             var dataUri = "";
             var isOk = false;
 
-            // Case B: base64 string
             if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||
                 (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||
                 (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {
@@ -600,14 +597,12 @@ function decodeImagesBatch(urls, referer, ua) {
                 dataUri = "data:" + mimeType + ";base64," + str;
                 isOk = true;
             }
-            // Case A: raw bytes
             else if ((clean[0] === 0xFF && clean[1] === 0xD8) ||
                      (clean[0] === 0x89 && clean[1] === 0x50) ||
                      (clean[0] === 0x47 && clean[1] === 0x49)) {
                 dataUri = "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
                 isOk = true;
             }
-            // Unknown
             else {
                 var magicHex = clean[0].toString(16) + " " + clean[1].toString(16) + " " + clean[2].toString(16);
                 unknownMagic = magicHex;
@@ -627,7 +622,6 @@ function decodeImagesBatch(urls, referer, ua) {
         }
     }
 
-    // Lưu summary để hiển thị UI Debug
     try {
         localStorage.setItem("hg_dbg_summary", JSON.stringify({
             ok: okCount,
@@ -645,7 +639,181 @@ function decodeImagesBatch(urls, referer, ua) {
 
 
 // =============================================================================
-// 4. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC
+// 4. REGEX-BASED EXTRACTION
+// =============================================================================
+
+function normalizePosterUrl(poster) {
+    if (!poster || typeof poster !== "string") return "";
+    if (poster.indexOf("cover-placeholder") !== -1) return "";
+    if (poster.indexOf("//") === 0) return "https:" + poster;
+    if (poster.indexOf("http") !== 0) {
+        return BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+    }
+    return poster;
+}
+
+/**
+ * Extract 1 drama card từ HTML chunk bằng regex.
+ * KHÔNG dùng MiniJQ.
+ */
+function extractDramaCardRegex(chunk, seen) {
+    // href
+    var mHref = chunk.match(/class="hg-drama-card__cover-link"[^>]*href="([^"]+)"/);
+    if (!mHref) mHref = chunk.match(/href="([^"]+)"[^>]*class="hg-drama-card__cover-link"/);
+    if (!mHref) return null;
+    var href = mHref[1];
+    if (seen[href]) return null;
+    seen[href] = true;
+
+    // poster: ưu tiên data-src, fallback src
+    var poster = "";
+    var mDataSrc = chunk.match(/<img[^>]+data-src="([^"]+)"/);
+    if (mDataSrc && mDataSrc[1].indexOf("cover-placeholder") === -1) {
+        poster = mDataSrc[1];
+    } else {
+        var mSrc = chunk.match(/<img[^>]+src="([^"]+)"/);
+        if (mSrc && mSrc[1].indexOf("cover-placeholder") === -1) {
+            poster = mSrc[1];
+        }
+    }
+    poster = normalizePosterUrl(poster);
+
+    // title
+    var mTitle = chunk.match(/class="hg-drama-card__title"[^>]*>[\s\S]*?<a[^>]*>([^<]+)/);
+    if (!mTitle) mTitle = chunk.match(/class="hg-drama-card__title"[^>]*>\s*<a[^>]*>([^<]+)/);
+    var title = mTitle ? mTitle[1].trim() : "";
+
+    // desc
+    var mDesc = chunk.match(/class="hg-drama-card__desc"[^>]*>([^<]+)/);
+    var desc = mDesc ? mDesc[1].trim() : "";
+
+    // episode
+    var mEp = chunk.match(/class="hg-drama-card__episode"[^>]*>([\s\S]*?)<\/span>/);
+    var episodeRaw = "";
+    if (mEp) {
+        episodeRaw = mEp[1].replace(/<[^>]+>/g, "").trim();
+    }
+
+    // score
+    var mScore = chunk.match(/class="hg-drama-card__score"[^>]*>([^<]+)/);
+    var score = mScore ? mScore[1].replace("分", "").trim() : "";
+
+    return {
+        id: href,
+        title: title,
+        posterUrl: "",
+        _rawPoster: poster,
+        description: desc,
+        episode_current: episodeRaw,
+        quality: score ? (score + "分") : "",
+        year: 0,
+        lang: "Vietsub",
+        isCategory: false
+    };
+}
+
+/**
+ * Parse toàn bộ drama grid bằng regex.
+ * Tách HTML thành từng chunk theo class "hg-drama-card".
+ */
+function parseDramaGridByRegex(html, seen) {
+    var items = [];
+
+    // Tìm tất cả vị trí bắt đầu của card
+    var parts = html.split('<div class="hg-drama-card"');
+    // Nếu không tách được (do attribute order khác) → thử pattern khác
+    if (parts.length < 2) {
+        parts = html.split(/<div[^>]*class="[^"]*hg-drama-card[^"]*"/);
+    }
+    if (parts.length < 2) {
+        parts = html.split(/<div[^>]*data-track-id=/);
+    }
+
+    // parts[0] là phần đầu, các phần sau là từng card (thiếu thẻ mở)
+    for (var i = 1; i < parts.length; i++) {
+        // Cắt tối đa 4000 ký tự cho mỗi card để tránh lẫn sang card khác
+        var chunk = parts[i].substring(0, 4000);
+        var item = extractDramaCardRegex(chunk, seen);
+        if (item) items.push(item);
+    }
+
+    return items;
+}
+
+
+// =============================================================================
+// assignDecodedPosters — Batch decode + debug item
+// =============================================================================
+
+function assignDecodedPosters(rawItems) {
+    var rawPosters = [];
+    var emptyCount = 0;
+    for (var i = 0; i < rawItems.length; i++) {
+        var rp = rawItems[i]._rawPoster || "";
+        rawPosters.push(rp);
+        if (!rp) emptyCount++;
+    }
+
+    dbgLog("RAW " + rawItems.length + " items, " + emptyCount + " empty URL");
+    if (rawItems.length > 0 && rawPosters[0]) {
+        dbgLog("URL[0]=" + rawPosters[0].substring(0, 60));
+    }
+
+    var decoded = [];
+    if (rawPosters.length === 0 || emptyCount === rawPosters.length) {
+        dbgLog("ALL EMPTY - skip decode");
+        for (var e = 0; e < rawPosters.length; e++) decoded.push("");
+    } else {
+        decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
+    }
+
+    var okCount = 0, failCount = 0;
+    for (var j = 0; j < decoded.length; j++) {
+        if (decoded[j] && decoded[j].indexOf("data:image/") === 0 &&
+            decoded[j].indexOf("svg+xml") === -1) okCount++;
+        else failCount++;
+    }
+
+    var items = [];
+    for (var k = 0; k < rawItems.length; k++) {
+        var it = rawItems[k];
+        delete it._rawPoster;
+        it.posterUrl = decoded[k] || it.posterUrl || "";
+        items.push(it);
+    }
+
+    // ⭐ Debug item đầu list
+    if (HG_DEBUG) {
+        var summary = null;
+        try { summary = JSON.parse(localStorage.getItem("hg_dbg_summary") || "null"); } catch (e) {}
+
+        var dbgTitle = "🔍 " + okCount + "OK/" + failCount + "FAIL";
+        if (emptyCount > 0) dbgTitle += " | " + emptyCount + " EMPTY";
+        if (summary && summary.unknownMagic) dbgTitle += " magic=" + summary.unknownMagic;
+        if (summary && summary.cached > 0) dbgTitle += " cache=" + summary.cached;
+
+        var dbgDesc = "RAW=" + rawItems.length;
+        if (HG_DEBUG_LOG.length > 0) {
+            dbgDesc += " | " + HG_DEBUG_LOG[HG_DEBUG_LOG.length - 1].substring(0, 80);
+        }
+
+        items.unshift({
+            id: "/video/0/",
+            title: dbgTitle,
+            posterUrl: "",
+            description: dbgDesc,
+            isCategory: true,
+            type: "folder",
+            quality: "DEBUG"
+        });
+    }
+
+    return items;
+}
+
+
+// =============================================================================
+// 5. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC
 // =============================================================================
 
 function parseListResponse(html, apiUrl) {
@@ -668,163 +836,11 @@ function parseSearchResponse(html, apiUrl) {
 }
 
 
-// ---- Extract drama card ----
-
-function normalizePosterUrl(poster) {
-    if (!poster || typeof poster !== "string") return "";
-    if (poster.indexOf("cover-placeholder") !== -1) return "";
-    if (poster.indexOf("//") === 0) return "https:" + poster;
-    if (poster.indexOf("http") !== 0) {
-        return BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
-    }
-    return poster;
-}
-
-function extractDramaCard(cardEl, seen) {
-    var $link = cardEl.find(".hg-drama-card__cover-link");
-    var href = $link.attr("href") || "";
-    if (!href) return null;
-    if (seen[href]) return null;
-    seen[href] = true;
-
-    var $img = $link.find("img");
-    var poster = $img.attr("data-src") || $img.attr("src") || "";
-    poster = normalizePosterUrl(poster);
-
-    var title = cardEl.find(".hg-drama-card__title").text().trim();
-    if (!title) title = cardEl.find("h3.hg-drama-card__title a").text().trim();
-    title = title.replace(/全集在线观看\s*$/, "").trim();
-
-    var desc = cardEl.find(".hg-drama-card__desc").text().trim();
-
-    var episodeRaw = "";
-    var $ep = cardEl.find(".hg-drama-card__episode");
-    if ($ep.length > 0) {
-        var $clone = $ep.clone();
-        $clone.find("i").remove();
-        episodeRaw = $clone.text().trim();
-    }
-
-    var score = cardEl.find(".hg-drama-card__score").text().trim().replace("分", "").trim();
-
-    return {
-        id: href,
-        title: title,
-        posterUrl: "",
-        _rawPoster: poster,
-        description: desc,
-        episode_current: episodeRaw,
-        quality: score ? (score + "分") : "",
-        year: 0,
-        lang: "Vietsub",
-        isCategory: false
-    };
-}
-
-function parseDramaGridByRegex(html, seen) {
-    var items = [];
-    var reLink = /<a[^>]*class="hg-drama-card__cover-link"[^>]*href="(\/video\/\d+\/)"[^>]*>([\s\S]*?)<\/a>/g;
-    var m;
-    while ((m = reLink.exec(html)) !== null) {
-        var id = m[1];
-        if (seen[id]) continue;
-        seen[id] = true;
-
-        var inner = m[2];
-        var imgMatch = inner.match(/<img[^>]+(?:data-src|src)="([^"]+)"/);
-        var poster = imgMatch ? imgMatch[1] : "";
-        if (poster.indexOf("cover-placeholder") !== -1) {
-            var dsMatch = inner.match(/data-src="([^"]+)"/);
-            poster = dsMatch ? dsMatch[1] : "";
-        }
-        poster = normalizePosterUrl(poster);
-
-        var titleRe = new RegExp('<h3[^>]+class="hg-drama-card__title"[^>]*>\\s*<a[^>]+href="' + id.replace(/\//g, "\\/") + '"[^>]*>([^<]+)', "i");
-        var tm = html.match(titleRe);
-        var title = tm ? tm[1].trim() : "";
-
-        items.push({
-            id: id,
-            title: title,
-            posterUrl: "",
-            _rawPoster: poster,
-            isCategory: false
-        });
-    }
-    return items;
-}
-
-
-// ---- ⭐ Batch decode + chèn Debug Item đầu list ----
-
-function assignDecodedPosters(rawItems) {
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) {
-        rawPosters.push(rawItems[i]._rawPoster || "");
-    }
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
-
-    var okCount = 0, failCount = 0;
-    for (var j = 0; j < decoded.length; j++) {
-        if (decoded[j] && decoded[j].indexOf("data:image/") === 0 &&
-            decoded[j].indexOf("svg+xml") === -1) okCount++;
-        else failCount++;
-    }
-
-    var items = [];
-    for (var k = 0; k < rawItems.length; k++) {
-        var it = rawItems[k];
-        delete it._rawPoster;
-        it.posterUrl = decoded[k] || it.posterUrl || "";
-        items.push(it);
-    }
-
-    // ⭐ Chèn Debug Item đầu list
-    if (HG_DEBUG) {
-        var summary = null;
-        try { summary = JSON.parse(localStorage.getItem("hg_dbg_summary") || "null"); } catch (e) {}
-
-        var dbgTitle = "🔍 DBG " + okCount + "OK/" + failCount + "FAIL";
-        if (summary && summary.unknownMagic) dbgTitle += " magic=" + summary.unknownMagic;
-        if (summary && summary.cached > 0) dbgTitle += " cached=" + summary.cached;
-        if (HG_DEBUG_LOG.length > 0) {
-            var last = HG_DEBUG_LOG[HG_DEBUG_LOG.length - 1];
-            dbgTitle += " | " + last.substring(0, 40);
-        }
-
-        items.unshift({
-            id: "/video/0/",
-            title: dbgTitle,
-            posterUrl: "",
-            description: "DEBUG ITEM — không bấm vào. Thông tin decode ảnh ở title và quality.",
-            isCategory: true,
-            type: "folder",
-            quality: "LOG: " + (HG_DEBUG_LOG.length > 0 ? HG_DEBUG_LOG[HG_DEBUG_LOG.length - 1].substring(0, 60) : "empty")
-        });
-    }
-
-    return items;
-}
-
-
 // ---- Parse lưới phim ----
 
 function parseDramaGrid(html, apiUrl) {
-    var rawItems = [];
     var seen = {};
-
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-    } catch (e) {
-        console.error("[HG] MiniJQ parse fail: " + e.message);
-    }
-
-    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
-
+    var rawItems = parseDramaGridByRegex(html, seen);
     var items = assignDecodedPosters(rawItems);
 
     var currentPage = 1;
@@ -837,13 +853,8 @@ function parseDramaGrid(html, apiUrl) {
     }
 
     var totalPages = 1;
-    try {
-        var $p = _$(html).find("[data-hg-pager-jump]");
-        if ($p.length > 0) {
-            var dp = $p.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-    } catch (e) {}
+    var mp = html.match(/data-pages="(\d+)"/);
+    if (mp) totalPages = parseInt(mp[1], 10) || 1;
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     console.log("[HG] parseDramaGrid → " + items.length + " items, page " + currentPage + "/" + totalPages);
@@ -859,63 +870,51 @@ function parseDramaGrid(html, apiUrl) {
 }
 
 
-// ---- Parse danh sách chủ đề ----
+// ---- Parse topics ----
 
 function parseTopicsList(html, apiUrl) {
     var rawItems = [];
     var seen = {};
 
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-topic-card").each(function () {
-            var $card = this;
-            var href = $card.attr("href") || "";
-            if (!href || seen[href]) return;
-            seen[href] = true;
+    var re = /<a[^>]*class="hg-topic-card"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        var href = m[1];
+        if (seen[href]) continue;
+        seen[href] = true;
+        var inner = m[2];
 
-            var $img = $card.find("img");
-            var poster = $img.attr("data-src") || $img.attr("src") || "";
-            poster = normalizePosterUrl(poster);
-
-            rawItems.push({
-                id: href,
-                title: $card.find(".hg-topic-card__title").text().trim(),
-                posterUrl: "",
-                _rawPoster: poster,
-                description: "",
-                episode_current: $card.find(".hg-topic-card__meta").text().trim(),
-                quality: "",
-                year: 0,
-                lang: "",
-                isCategory: true,
-                type: "folder"
-            });
-        });
-    } catch (e) {
-        console.error("[HG] parseTopicsList fail: " + e.message);
-    }
-
-    if (rawItems.length === 0) {
-        var re = /<a[^>]*class="hg-topic-card"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"[\s\S]*?<h3[^>]*class="hg-topic-card__title"[^>]*>([^<]+)<\/h3>/g;
-        var m;
-        while ((m = re.exec(html)) !== null) {
-            var href = m[1];
-            if (seen[href]) continue;
-            seen[href] = true;
-            var poster = normalizePosterUrl(m[2]);
-            rawItems.push({
-                id: href,
-                title: m[3].trim(),
-                posterUrl: "",
-                _rawPoster: poster,
-                isCategory: true,
-                type: "folder"
-            });
+        var poster = "";
+        var mP = inner.match(/data-src="([^"]+)"/);
+        if (mP && mP[1].indexOf("cover-placeholder") === -1) poster = mP[1];
+        else {
+            mP = inner.match(/src="([^"]+)"/);
+            if (mP && mP[1].indexOf("cover-placeholder") === -1) poster = mP[1];
         }
+        poster = normalizePosterUrl(poster);
+
+        var mTitle = inner.match(/class="hg-topic-card__title"[^>]*>([^<]+)/);
+        var title = mTitle ? mTitle[1].trim() : "";
+
+        var mMeta = inner.match(/class="hg-topic-card__meta"[^>]*>([\s\S]*?)<\/p>/);
+        var meta = mMeta ? mMeta[1].replace(/<[^>]+>/g, "").trim() : "";
+
+        rawItems.push({
+            id: href,
+            title: title,
+            posterUrl: "",
+            _rawPoster: poster,
+            description: "",
+            episode_current: meta,
+            quality: "",
+            year: 0,
+            lang: "",
+            isCategory: true,
+            type: "folder"
+        });
     }
 
     var items = assignDecodedPosters(rawItems);
-
     console.log("[HG] parseTopicsList → " + items.length + " folders");
     return JSON.stringify({
         items: items,
@@ -924,28 +923,9 @@ function parseTopicsList(html, apiUrl) {
 }
 
 
-// ---- Parse chi tiết chủ đề ----
-
 function parseTopicDetail(html, apiUrl) {
-    var rawItems = [];
     var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-card-grid .hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-        if (rawItems.length === 0) {
-            $doc.find(".hg-drama-card").each(function () {
-                var item = extractDramaCard(this, seen);
-                if (item) rawItems.push(item);
-            });
-        }
-    } catch (e) {
-        console.error("[HG] parseTopicDetail fail: " + e.message);
-    }
-    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
-
+    var rawItems = parseDramaGridByRegex(html, seen);
     var items = assignDecodedPosters(rawItems);
 
     var currentPage = 1;
@@ -954,64 +934,26 @@ function parseTopicDetail(html, apiUrl) {
     if (mPage) currentPage = parseInt(mPage[1], 10);
 
     var totalPages = 1;
-    try {
-        var $pager = _$(html).find("[data-hg-pager-jump]");
-        if ($pager.length > 0) {
-            var dp = $pager.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-        if (totalPages === 1) {
-            var pageCount = _$(html).find(".hg-pager__page").length;
-            if (pageCount > 0) totalPages = pageCount;
-        }
-    } catch (e) {}
+    var mp = html.match(/data-pages="(\d+)"/);
+    if (mp) totalPages = parseInt(mp[1], 10) || 1;
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
-    console.log("[HG] parseTopicDetail → " + items.length + " items, page " + currentPage + "/" + totalPages);
+    console.log("[HG] parseTopicDetail → " + items.length + " items");
     return JSON.stringify({
         items: items,
-        pagination: {
-            currentPage: currentPage,
-            totalPages: totalPages,
-            totalItems: items.length,
-            itemsPerPage: 24
-        }
+        pagination: { currentPage: currentPage, totalPages: totalPages, totalItems: items.length, itemsPerPage: 24 }
     });
 }
 
 
-// ---- Parse kết quả tìm kiếm ----
-
 function parseSearchResults(html, apiUrl) {
-    var rawItems = [];
     var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-search-results .hg-card-grid .hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-        if (rawItems.length === 0) {
-            $doc.find(".hg-drama-card").each(function () {
-                var item = extractDramaCard(this, seen);
-                if (item) rawItems.push(item);
-            });
-        }
-    } catch (e) {
-        console.error("[HG] parseSearchResults fail: " + e.message);
-    }
-    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
-
+    var rawItems = parseDramaGridByRegex(html, seen);
     var items = assignDecodedPosters(rawItems);
 
     var totalItems = items.length;
-    try {
-        var $page = _$(html).find(".hg-search-page");
-        if ($page.length > 0) {
-            var t = $page.attr("data-track-search-total");
-            if (t) totalItems = parseInt(t, 10) || items.length;
-        }
-    } catch (e) {}
+    var mTotal = html.match(/共\s*<strong>(\d+)<\/strong>\s*个结果/);
+    if (mTotal) totalItems = parseInt(mTotal[1], 10) || items.length;
 
     var currentPage = 1;
     var cleanUrl = apiUrl.split("|")[0].split("?")[0];
@@ -1019,78 +961,65 @@ function parseSearchResults(html, apiUrl) {
     if (mPage) currentPage = parseInt(mPage[1], 10);
 
     var totalPages = 1;
-    try {
-        var $pager = _$(html).find("[data-hg-pager-jump]");
-        if ($pager.length > 0) {
-            var dp = $pager.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-    } catch (e) {}
+    var mp = html.match(/data-pages="(\d+)"/);
+    if (mp) totalPages = parseInt(mp[1], 10) || 1;
 
-    console.log("[HG] parseSearchResults → " + items.length + " items (total " + totalItems + ")");
+    console.log("[HG] parseSearchResults → " + items.length + " items");
     return JSON.stringify({
         items: items,
-        pagination: {
-            currentPage: currentPage,
-            totalPages: totalPages,
-            totalItems: totalItems,
-            itemsPerPage: items.length || 20
-        }
+        pagination: { currentPage: currentPage, totalPages: totalPages, totalItems: totalItems, itemsPerPage: 20 }
     });
 }
 
 
-// ---- Parse bảng xếp hạng ----
-
 function parseRankList(html, apiUrl) {
     var rawItems = [];
     var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-rank-item").each(function () {
-            var $item = this;
-            var $link = $item.find(".hg-rank-item__title a").first();
-            var href = $link.attr("href") || "";
-            if (!href) {
-                $link = $item.find(".hg-rank-item__cover");
-                href = $link.attr("href") || "";
-            }
-            if (!href || seen[href]) return;
-            seen[href] = true;
 
-            var rankNum = $item.find(".hg-rank-num").text().trim();
-            var rank = parseInt(rankNum, 10) || (rawItems.length + 1);
+    var re = /<div[^>]*class="hg-rank-item"[^>]*>([\s\S]*?)(?=<div[^>]*class="hg-rank-item"|$)/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+        var chunk = m[1].substring(0, 3000);
 
-            var $img = $item.find(".hg-rank-item__cover img, .hg-rank-item__main img");
-            var poster = normalizePosterUrl($img.attr("data-src") || $img.attr("src") || "");
+        var mHref = chunk.match(/href="(\/video\/\d+\/)"/);
+        if (!mHref) continue;
+        var href = mHref[1];
+        if (seen[href]) continue;
+        seen[href] = true;
 
-            var tagsText = $item.find(".hg-rank-item__tags").text();
-            var mScore = tagsText.match(/(\d+\.\d+)分/);
-            var score = mScore ? mScore[1] : "";
+        var poster = "";
+        var mP = chunk.match(/data-src="([^"]+)"/);
+        if (mP && mP[1].indexOf("cover-placeholder") === -1) poster = mP[1];
+        poster = normalizePosterUrl(poster);
 
-            var heat = $item.find(".hg-rank-item__heat-value").text().trim()
-                    || $item.find(".hg-rank-metric-value").text().trim();
+        var mTitle = chunk.match(/class="hg-rank-item__title"[^>]*>[\s\S]*?<a[^>]*>([^<]+)/);
+        var title = mTitle ? mTitle[1].trim() : "";
 
-            rawItems.push({
-                id: href,
-                title: $item.find(".hg-rank-item__title").text().trim(),
-                posterUrl: "",
-                _rawPoster: poster,
-                description: $item.find(".hg-rank-item__desc").text().trim(),
-                episode_current: heat ? ("Nhiệt " + heat) : "",
-                quality: score ? (score + "分") : "",
-                year: 0,
-                lang: "Vietsub",
-                isCategory: false,
-                rank: rank
-            });
+        var mRank = chunk.match(/class="hg-rank-num[^"]*">(\d+)</);
+        var rank = mRank ? parseInt(mRank[1], 10) : (rawItems.length + 1);
+
+        var mDesc = chunk.match(/class="hg-rank-item__desc"[^>]*>([^<]+)/);
+        var desc = mDesc ? mDesc[1].trim() : "";
+
+        var mScore = chunk.match(/(\d+\.\d+)分/);
+        var score = mScore ? mScore[1] : "";
+
+        rawItems.push({
+            id: href,
+            title: title,
+            posterUrl: "",
+            _rawPoster: poster,
+            description: desc,
+            episode_current: "",
+            quality: score ? (score + "分") : "",
+            year: 0,
+            lang: "Vietsub",
+            isCategory: false,
+            rank: rank
         });
-    } catch (e) {
-        console.error("[HG] parseRankList fail: " + e.message);
     }
 
     var items = assignDecodedPosters(rawItems);
-
     console.log("[HG] parseRankList → " + items.length + " items");
     return JSON.stringify({
         items: items,
@@ -1099,26 +1028,9 @@ function parseRankList(html, apiUrl) {
 }
 
 
-// ---- Tag & Author ----
-
 function parseTagPage(html, apiUrl) {
-    var rawItems = [];
     var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-channel-page .hg-card-grid .hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-        if (rawItems.length === 0) {
-            $doc.find(".hg-drama-card").each(function () {
-                var item = extractDramaCard(this, seen);
-                if (item) rawItems.push(item);
-            });
-        }
-    } catch (e) {}
-    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
-
+    var rawItems = parseDramaGridByRegex(html, seen);
     var items = assignDecodedPosters(rawItems);
 
     var currentPage = 1;
@@ -1127,13 +1039,8 @@ function parseTagPage(html, apiUrl) {
     if (mPage) currentPage = parseInt(mPage[1], 10);
 
     var totalPages = 1;
-    try {
-        var $pager = _$(html).find("[data-hg-pager-jump]");
-        if ($pager.length > 0) {
-            var dp = $pager.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-    } catch (e) {}
+    var mp = html.match(/data-pages="(\d+)"/);
+    if (mp) totalPages = parseInt(mp[1], 10) || 1;
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     return JSON.stringify({
@@ -1143,23 +1050,8 @@ function parseTagPage(html, apiUrl) {
 }
 
 function parseAuthorPage(html, apiUrl) {
-    var rawItems = [];
     var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-creator-page .hg-card-grid .hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-        if (rawItems.length === 0) {
-            $doc.find(".hg-drama-card").each(function () {
-                var item = extractDramaCard(this, seen);
-                if (item) rawItems.push(item);
-            });
-        }
-    } catch (e) {}
-    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
-
+    var rawItems = parseDramaGridByRegex(html, seen);
     var items = assignDecodedPosters(rawItems);
 
     var currentPage = 1;
@@ -1168,13 +1060,8 @@ function parseAuthorPage(html, apiUrl) {
     if (mPage) currentPage = parseInt(mPage[1], 10);
 
     var totalPages = 1;
-    try {
-        var $pager = _$(html).find("[data-hg-pager-jump]");
-        if ($pager.length > 0) {
-            var dp = $pager.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-    } catch (e) {}
+    var mp = html.match(/data-pages="(\d+)"/);
+    if (mp) totalPages = parseInt(mp[1], 10) || 1;
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     return JSON.stringify({
@@ -1185,7 +1072,7 @@ function parseAuthorPage(html, apiUrl) {
 
 
 // =============================================================================
-// 5. PARSER — MOVIE DETAIL
+// 6. PARSER — MOVIE DETAIL
 // =============================================================================
 
 function parseMovieDetail(html, apiUrl, datasend) {
@@ -1223,7 +1110,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
     }
     poster = normalizePosterUrl(poster);
 
-    // Decode ảnh poster
     var decodedPoster = "";
     if (poster) {
         decodedPoster = hgCacheGet(poster) || decodeHuangguoImage(poster, REFERER, UA_MOBILE) || "";
@@ -1235,26 +1121,21 @@ function parseMovieDetail(html, apiUrl, datasend) {
     // Episodes
     var episodes = [];
     var seenSlug = {};
-    try {
-        var $doc = _$(html);
-        $doc.find("a.hg-web-play__ep").each(function () {
-            var $a = this;
-            var href = $a.attr("href") || "";
-            var epId = $a.attr("data-ep-id") || "";
-            var epName = $a.text().trim();
-            if (!href) return;
-            var slug = epId ? ("ep-" + epId) : ("ep-" + (episodes.length + 1));
-            if (seenSlug[slug]) return;
-            seenSlug[slug] = true;
-            episodes.push({
-                id: href,
-                name: epName || ("Tập " + epId),
-                slug: slug,
-                datasend: "epId=" + epId
-            });
+    var reEp = /<a[^>]*class="hg-web-play__ep"[^>]*href="([^"]+)"[^>]*data-ep-id="(\d+)"[^>]*>([^<]*)<\/a>/g;
+    var mEp;
+    while ((mEp = reEp.exec(html)) !== null) {
+        var href = mEp[1];
+        var epId = mEp[2];
+        var epName = mEp[3].trim();
+        var slug = "ep-" + epId;
+        if (seenSlug[slug]) continue;
+        seenSlug[slug] = true;
+        episodes.push({
+            id: href,
+            name: epName || ("Tập " + epId),
+            slug: slug,
+            datasend: "epId=" + epId
         });
-    } catch (e) {
-        console.error("[HG] parse episodes fail: " + e.message);
     }
 
     if (episodes.length === 0 && vdata && vdata.epPlaySrcs) {
@@ -1301,7 +1182,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
 
 // =============================================================================
-// 6. PARSER — STREAM LINK
+// 7. PARSER — STREAM LINK
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
@@ -1353,7 +1234,7 @@ function parseDetailResponse(html, apiUrl, datasend) {
 
 
 // =============================================================================
-// 7. PARSER — EMBED FALLBACK
+// 8. PARSER — EMBED
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
@@ -1380,39 +1261,17 @@ function parseEmbedResponse(html, sourceUrl) {
 
 
 // =============================================================================
-// 8. PARSER PHỤ
+// 9. PARSER PHỤ
 // =============================================================================
 
-function parseCategoriesResponse(html, apiUrl) {
-    var items = [];
-    var seen = {};
-    try {
-        var $doc = _$(html);
-        $doc.find("a[href^='/tag/']").each(function () {
-            var href = this.attr("href") || "";
-            var name = this.text().trim();
-            if (!href || !name) return;
-            if (/\/page\/\d+\/?$/.test(href)) return;
-            if (seen[href]) return;
-            seen[href] = true;
-            items.push({
-                slug: href.replace(/^\/+/, "").replace(/\/+$/, ""),
-                name: name,
-                value: href,
-                isCategory: true
-            });
-        });
-    } catch (e) {}
-    return JSON.stringify(items);
-}
-
+function parseCategoriesResponse(html, apiUrl) { return JSON.stringify([]); }
 function parseCountriesResponse(html) { return JSON.stringify([]); }
 function parseYearsResponse(html) { return JSON.stringify([]); }
 function getFilterConfig() { return JSON.stringify({ filters: [] }); }
 
 
 // =============================================================================
-// 9. HELPER
+// 10. HELPER
 // =============================================================================
 
 function getPipeData(apiUrl) {
@@ -1426,9 +1285,9 @@ function getPipeData(apiUrl) {
 
 
 // =============================================================================
-// 10. LOG KHỞI TẠO
+// 11. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin v3.1.0 loaded");
+console.log("[HG] huangguo_plugin v3.2.0 loaded (regex-based)");
 console.log("[HG] AES key=" + HG_AES_KEY + " IV=" + HG_AES_IV);
-console.log("[HG] DEBUG=" + HG_DEBUG + " (UI debug item sẽ hiện đầu list)");
+console.log("[HG] DEBUG=" + HG_DEBUG);
