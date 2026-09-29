@@ -1,27 +1,26 @@
 // =============================================================================
-// VAAPP PLUGIN — 黄果短剧 (HuangguoAI)
+// VAAPP PLUGIN — Huangguo Short Drama
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.4.0 FINAL
+// Version : 1.4.1 VI (Vietnamese)
 // Author  : VAAPP Community
 //
-// Hỗ trợ đầy đủ 100%:
-//   /                       → Trang chủ
-//   /newest                 → 最近上新 (path: /newest/{N}/)
-//   /recommend              → 精选推荐 (path: /recommend/{N}/)
-//   /ai-duanju              → AI成人短剧 (path: /ai-duanju/{N}/)
-//   /ai-manju               → AI成人漫剧 (path: /ai-manju/{N}/)
-//   /ai-huanlian            → AI换脸 (path: /ai-huanlian/{N}/)
-//   /ai-mogai               → AI魔改 (path: /ai-mogai/{N}/)
-//   /ranks/hot/             → 热播榜 (TOP 20)
-//   /ranks/recommend/       → 推荐榜 (TOP 20)
-//   /ranks/potential/       → 潜力榜 (TOP 20)
-//   /topics/                → Danh sách 专题 (folder)
-//   /topics/{slug}/         → Chi tiết 专题 (path: /topics/{slug}/{N}/)
-//   /tag/{slug}/            → Thể loại (path: /tag/{slug}/page/{N}/)
-//   /search/video/{kw}/     → Tìm kiếm (path: /search/video/{kw}/{N}/)
-//   /author/{id}/video/     → Tác giả (path: /author/{id}/video/{N}/)
+// Hỗ trợ đầy đủ:
+//   /newest                 → Mới Cập Nhật      (path: /newest/{N}/)
+//   /recommend              → Tuyển Chọn         (path: /recommend/{N}/)
+//   /ai-duanju              → Phim Ngắn AI       (path: /ai-duanju/{N}/)
+//   /ai-manju               → Hoạt Hình AI       (path: /ai-manju/{N}/)
+//   /ai-huanlian            → AI Hoán Đổi Mặt   (path: /ai-huanlian/{N}/)
+//   /ai-mogai               → AI Chỉnh Sửa       (path: /ai-mogai/{N}/)
+//   /ranks/hot/             → BXH Thịnh Hành     (TOP 20)
+//   /ranks/recommend/       → BXH Đề Xuất        (TOP 20)
+//   /ranks/potential/       → BXH Tiềm Năng      (TOP 20)
+//   /topics/                → Chủ Đề Đặc Biệt
+//   /topics/{slug}/         → Chi tiết chủ đề
+//   /tag/{slug}/            → Thể loại
+//   /search/video/{kw}/     → Tìm kiếm
+//   /author/{id}/video/     → Tác giả
 //   /video/{id}/            → Chi tiết phim
 //   /video/{id}/ep-{N}/     → Tập N
 // =============================================================================
@@ -38,9 +37,9 @@ var REFERER = BASE + "/";
 function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
-        "name": "黄果短剧",
-        "version": "1.4.0",
-        "description": "AI短剧、原创短剧、AI换脸、AI魔改 — 免费在线观看",
+        "name": "Huangguo Short Drama",
+        "version": "1.4.1",
+        "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
         "fallbackUrls": [
@@ -51,7 +50,7 @@ function getManifest() {
         "iconUrl": BASE + "/static/web/images/logo-huangguo.png",
         "referrer": REFERER,
         "imageReferer": REFERER,
-        "info": "Plugin cho web 黄果短剧. Nội dung người lớn 18+.",
+        "info": "Plugin cho web Huangguo Short Drama. Nội dung người lớn 18+.",
         "isEnabled": true,
         "isAdult": true,
         "type": "SHORTFILM",
@@ -70,10 +69,10 @@ function getManifest() {
 
 function getHomeSections() {
     return JSON.stringify([
-        { slug: "recommend",  title: "精选推荐",   type: "Horizontal", path: "" },
-        { slug: "newest",     title: "最近上新",   type: "Horizontal", path: "" },
-        { slug: "ai-duanju",  title: "AI成人短剧", type: "Horizontal", path: "" },
-        { slug: "ai-manju",   title: "AI成人漫剧", type: "Horizontal", path: "" }
+        { slug: "recommend",  title: "Tuyển Chọn",     type: "Horizontal", path: "" },
+        { slug: "newest",     title: "Mới Cập Nhật",   type: "Horizontal", path: "" },
+        { slug: "ai-duanju",  title: "Phim Ngắn AI",   type: "Horizontal", path: "" },
+        { slug: "ai-manju",   title: "Hoạt Hình AI",   type: "Horizontal", path: "" }
     ]);
 }
 
@@ -84,16 +83,16 @@ function getHomeSections() {
 
 function getPrimaryCategories() {
     return JSON.stringify([
-        { name: "AI成人短剧",  slug: "ai-duanju" },
-        { name: "AI成人漫剧",  slug: "ai-manju" },
-        { name: "AI换脸",     slug: "ai-huanlian" },
-        { name: "AI魔改",     slug: "ai-mogai" },
-        { name: "🔥 热播榜",   slug: "ranks/hot" },
-        { name: "⭐ 推荐榜",   slug: "ranks/recommend" },
-        { name: "🚀 潜力榜",   slug: "ranks/potential" },
-        { name: "专题",       slug: "topics" },
-        { name: "最近上新",   slug: "newest" },
-        { name: "精选推荐",   slug: "recommend" }
+        { name: "Phim Ngắn AI",       slug: "ai-duanju" },
+        { name: "Hoạt Hình AI",       slug: "ai-manju" },
+        { name: "AI Hoán Đổi Mặt",    slug: "ai-huanlian" },
+        { name: "AI Chỉnh Sửa",       slug: "ai-mogai" },
+        { name: "🔥 BXH Thịnh Hành",  slug: "ranks/hot" },
+        { name: "⭐ BXH Đề Xuất",     slug: "ranks/recommend" },
+        { name: "🚀 BXH Tiềm Năng",   slug: "ranks/potential" },
+        { name: "Chủ Đề Đặc Biệt",    slug: "topics" },
+        { name: "Mới Cập Nhật",       slug: "newest" },
+        { name: "Tuyển Chọn",         slug: "recommend" }
     ]);
 }
 
@@ -109,7 +108,7 @@ function getUrlList(slug, filtersJson) {
     if (page < 1) page = 1;
     var B = BASE;
 
-    // ⭐ Nhánh AUTHOR — path-style /author/{id}/video/{N}/
+    // Nhánh AUTHOR — path-style /author/{id}/video/{N}/
     if (slug && (slug.indexOf("/author/") === 0 || slug.indexOf("author/") === 0)) {
         var cleanAuthorSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanAuthorSlug = cleanAuthorSlug.replace(/\/(video|post)\/\d+$/, "");
@@ -122,7 +121,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // ⭐ Nhánh TAG — path-style /tag/{slug}/page/{N}/
+    // Nhánh TAG — path-style /tag/{slug}/page/{N}/
     if (slug && (slug.indexOf("/tag/") === 0 || slug.indexOf("tag/") === 0)) {
         var cleanTagSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanTagSlug = cleanTagSlug.replace(/\/page\/\d+$/, "");
@@ -134,7 +133,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // ⭐ Nhánh TOPIC — path-style /topics/{slug}/{N}/
+    // Nhánh TOPIC — path-style /topics/{slug}/{N}/
     if (slug && (slug.indexOf("/topics/") === 0 || slug.indexOf("topics/") === 0)) {
         var cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         var topicMatch = cleanSlug.match(/^(topics\/[^\/]+)/);
@@ -145,8 +144,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // ⭐⭐ ĐÃ SỬA: Các slug dùng PATH-STYLE (không phải ?page=N)
-    // Áp dụng cho: newest, recommend, ai-duanju, ai-manju, ai-huanlian, ai-mogai
+    // Các slug dùng PATH-STYLE
     var pathStyleSlugs = {
         "newest":      "/newest",
         "recommend":   "/recommend",
@@ -164,7 +162,6 @@ function getUrlList(slug, filtersJson) {
         return B + basePath + "/" + page + "/";
     }
 
-    // Các slug khác giữ nguyên
     switch (slug) {
         case "ranks/hot":       return B + "/ranks/hot/";
         case "ranks/recommend": return B + "/ranks/recommend/";
@@ -194,7 +191,7 @@ function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
 
-    // Author: /author/{id}/ → /author/{id}/video/
+    // Tác giả: /author/{id}/ → /author/{id}/video/
     if (/^\/author\/\d+\/?$/.test(slug)) {
         var cleanA = slug.replace(/\/+$/, "");
         return BASE + cleanA + "/video/";
@@ -218,42 +215,19 @@ function getUrlDetail(slug) {
 // =============================================================================
 // 5. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC / TAG / AUTHOR
 // =============================================================================
+// (Toàn bộ logic parse giữ nguyên như v1.4.0)
+// =============================================================================
 
 function parseListResponse(html, apiUrl) {
     console.log("[HG] parseListResponse url=" + apiUrl);
     var cleanUrl = apiUrl.split("|")[0].split("?")[0];
 
-    // ---- Nhánh RANK ----
-    if (/\/ranks\//.test(cleanUrl)) {
-        return parseRankList(html, apiUrl);
-    }
-
-    // ---- Nhánh SEARCH ----
-    if (/\/search\/video\/[^\/]+\//.test(cleanUrl)) {
-        return parseSearchResults(html, apiUrl);
-    }
-
-    // ---- Nhánh AUTHOR ----
-    if (/\/author\/\d+\//.test(cleanUrl)) {
-        return parseAuthorPage(html, apiUrl);
-    }
-
-    // ---- Nhánh TAG ----
-    if (/\/tag\/[^\/]+\//.test(cleanUrl)) {
-        return parseTagPage(html, apiUrl);
-    }
-
-    // ---- Nhánh TOPICS list ----
-    if (/\/topics\/?$/.test(cleanUrl)) {
-        return parseTopicsList(html, apiUrl);
-    }
-
-    // ---- Nhánh TOPIC detail ----
-    if (/\/topics\/[^\/]+\/?/.test(cleanUrl)) {
-        return parseTopicDetail(html, apiUrl);
-    }
-
-    // ---- Nhánh DRAMA grid (default: newest, recommend, ai-*, ...) ----
+    if (/\/ranks\//.test(cleanUrl)) return parseRankList(html, apiUrl);
+    if (/\/search\/video\/[^\/]+\//.test(cleanUrl)) return parseSearchResults(html, apiUrl);
+    if (/\/author\/\d+\//.test(cleanUrl)) return parseAuthorPage(html, apiUrl);
+    if (/\/tag\/[^\/]+\//.test(cleanUrl)) return parseTagPage(html, apiUrl);
+    if (/\/topics\/?$/.test(cleanUrl)) return parseTopicsList(html, apiUrl);
+    if (/\/topics\/[^\/]+\/?/.test(cleanUrl)) return parseTopicDetail(html, apiUrl);
     return parseDramaGrid(html, apiUrl);
 }
 
@@ -266,7 +240,7 @@ function parseSearchResponse(html, apiUrl) {
 }
 
 
-// ---- 5.1. Parse lưới phim (drama-card) — hỗ trợ CẢ query + path pagination ----
+// ---- 5.1. Parse lưới phim ----
 
 function parseDramaGrid(html, apiUrl) {
     var items = [];
@@ -286,21 +260,16 @@ function parseDramaGrid(html, apiUrl) {
         items = parseDramaGridByRegex(html, seen);
     }
 
-    // ---- SỬA: Parse currentPage cho cả query-style và path-style ----
     var currentPage = 1;
     var cleanUrl = apiUrl.split("|")[0].split("?")[0];
     var m = apiUrl.match(/[?&]page=(\d+)/);
     if (m) {
         currentPage = parseInt(m[1], 10);
     } else {
-        // Path-style /{slug}/{N}/ (VD: /newest/2/ hoặc /ai-duanju/3/)
         var mPath = cleanUrl.match(/\/(\d+)\/?$/);
-        if (mPath) {
-            currentPage = parseInt(mPath[1], 10);
-        }
+        if (mPath) currentPage = parseInt(mPath[1], 10);
     }
 
-    // ---- Đọc totalPages từ pager ----
     var totalPages = 1;
     try {
         var $p = _$(html).find("[data-hg-pager-jump]");
@@ -310,9 +279,7 @@ function parseDramaGrid(html, apiUrl) {
         }
     } catch (e) {}
 
-    if (totalPages === 1 && items.length >= 20) {
-        totalPages = currentPage + 1;
-    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     console.log("[HG] parseDramaGrid → " + items.length + " items, page "
         + currentPage + "/" + totalPages);
@@ -348,6 +315,7 @@ function extractDramaCard(cardEl, seen) {
     if (!title) {
         title = cardEl.find("h3.hg-drama-card__title a").text().trim();
     }
+    // ⚠️ GIỮ NGUYÊN: 全集在线观看 (phải match HTML gốc)
     title = title.replace(/全集在线观看\s*$/, "").trim();
 
     var desc = cardEl.find(".hg-drama-card__desc").text().trim();
@@ -413,7 +381,7 @@ function parseDramaGridByRegex(html, seen) {
 }
 
 
-// ---- 5.2. Parse trang /topics/ (danh sách folder) ----
+// ---- 5.2. Parse danh sách chủ đề ----
 
 function parseTopicsList(html, apiUrl) {
     var items = [];
@@ -480,7 +448,7 @@ function parseTopicsList(html, apiUrl) {
 }
 
 
-// ---- 5.3. Parse trang topic detail (/topics/{slug}/ hoặc /topics/{slug}/{N}/) ----
+// ---- 5.3. Parse chi tiết chủ đề ----
 
 function parseTopicDetail(html, apiUrl) {
     console.log("[HG] parseTopicDetail url=" + apiUrl);
@@ -526,9 +494,7 @@ function parseTopicDetail(html, apiUrl) {
         }
     } catch (e) {}
 
-    if (totalPages === 1 && items.length >= 20) {
-        totalPages = currentPage + 1;
-    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     console.log("[HG] parseTopicDetail → " + items.length
         + " items, page " + currentPage + "/" + totalPages);
@@ -545,7 +511,7 @@ function parseTopicDetail(html, apiUrl) {
 }
 
 
-// ---- 5.4. Parse trang search video (/search/video/{kw}/ hoặc /{N}/) ----
+// ---- 5.4. Parse kết quả tìm kiếm ----
 
 function parseSearchResults(html, apiUrl) {
     console.log("[HG] parseSearchResults url=" + apiUrl);
@@ -573,6 +539,7 @@ function parseSearchResults(html, apiUrl) {
         items = parseDramaGridByRegex(html, seen);
     }
 
+    // ⚠️ GIỮ NGUYÊN: 共.*个结果 — phải match HTML gốc
     var totalItems = items.length;
     try {
         var $page = _$(html).find(".hg-search-page");
@@ -619,7 +586,7 @@ function parseSearchResults(html, apiUrl) {
 }
 
 
-// ---- 5.5. Parse trang rank (/ranks/hot/, /ranks/recommend/, /ranks/potential/) ----
+// ---- 5.5. Parse bảng xếp hạng ----
 
 function parseRankList(html, apiUrl) {
     console.log("[HG] parseRankList url=" + apiUrl);
@@ -652,6 +619,7 @@ function parseRankList(html, apiUrl) {
             var title = $item.find(".hg-rank-item__title").text().trim();
             var desc = $item.find(".hg-rank-item__desc").text().trim();
 
+            // ⚠️ GIỮ NGUYÊN: /(\d+\.\d+)分/ — phải match text "9.5分"
             var tagsText = $item.find(".hg-rank-item__tags").text();
             var mScore = tagsText.match(/(\d+\.\d+)分/);
             var score = mScore ? mScore[1] : "";
@@ -664,7 +632,7 @@ function parseRankList(html, apiUrl) {
                 title: title,
                 posterUrl: poster,
                 description: desc,
-                episode_current: heat ? ("热力 " + heat) : "",
+                episode_current: heat ? ("Nhiệt " + heat) : "",  // ← Dịch "热力" → "Nhiệt"
                 quality: score ? (score + "分") : "",
                 year: 0,
                 lang: "Vietsub",
@@ -676,12 +644,8 @@ function parseRankList(html, apiUrl) {
         console.error("[HG] parseRankList fail: " + e.message);
     }
 
-    if (items.length === 0) {
-        items = parseRankFromJsonLd(html, seen);
-    }
-    if (items.length === 0) {
-        items = parseRankByRegex(html, seen);
-    }
+    if (items.length === 0) items = parseRankFromJsonLd(html, seen);
+    if (items.length === 0) items = parseRankByRegex(html, seen);
 
     console.log("[HG] parseRankList → " + items.length + " items");
 
@@ -795,7 +759,7 @@ function parseRankByRegex(html, seen) {
 }
 
 
-// ---- 5.6. Parse trang tag (/tag/{slug}/ hoặc /tag/{slug}/page/{N}/) ----
+// ---- 5.6. Parse trang thể loại (tag) ----
 
 function parseTagPage(html, apiUrl) {
     console.log("[HG] parseTagPage url=" + apiUrl);
@@ -837,12 +801,11 @@ function parseTagPage(html, apiUrl) {
         }
     } catch (e) {}
     if (totalPages === 1) {
+        // ⚠️ GIỮ NGUYÊN: 末页 — phải match text "末页" (Last page)
         var mLast = html.match(/\/tag\/[^\/]+\/page\/(\d+)\/"[^>]*>\s*末页/);
         if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
     }
-    if (totalPages === 1 && items.length >= 20) {
-        totalPages = currentPage + 1;
-    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     console.log("[HG] parseTagPage → " + items.length + " items, page "
         + currentPage + "/" + totalPages);
@@ -859,7 +822,7 @@ function parseTagPage(html, apiUrl) {
 }
 
 
-// ---- 5.7. Parse trang author (/author/{id}/video/ hoặc /author/{id}/video/{N}/) ----
+// ---- 5.7. Parse trang tác giả ----
 
 function parseAuthorPage(html, apiUrl) {
     console.log("[HG] parseAuthorPage url=" + apiUrl);
@@ -904,9 +867,7 @@ function parseAuthorPage(html, apiUrl) {
         var mLast = html.match(/\/author\/\d+\/video\/(\d+)\/"[^>]*>\s*末页/);
         if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
     }
-    if (totalPages === 1 && items.length >= 20) {
-        totalPages = currentPage + 1;
-    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     console.log("[HG] parseAuthorPage → " + items.length + " items, page "
         + currentPage + "/" + totalPages);
@@ -959,7 +920,10 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
     if (!title) {
         var mT = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
-        if (mT) title = mT[1].replace(/\s*[-|]\s*黄果短剧.*$/, "").trim();
+        if (mT) {
+            // ⚠️ GIỮ NGUYÊN: 黄果短剧 trong regex
+            title = mT[1].replace(/\s*[-|]\s*黄果短剧.*$/, "").trim();
+        }
     }
     if (!poster) {
         var mI = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
@@ -989,6 +953,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
             episodes.push({
                 id: href,
+                // ⚠️ Dịch hiển thị: "Tập" thay vì "集"
                 name: epName || ("Tập " + epId),
                 slug: slug,
                 datasend: "epId=" + epId
@@ -1006,6 +971,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
             var epNum = keys[i];
             episodes.push({
                 id: cleanUrl + (parseInt(epNum, 10) > 1 ? "ep-" + epNum + "/" : ""),
+                // ⚠️ Dịch hiển thị: "Tập"
                 name: "Tập " + epNum,
                 slug: "ep-" + epNum,
                 datasend: "epId=" + epNum
@@ -1040,6 +1006,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
         director: author,
         quality: "",
         year: 0,
+        // ⚠️ Dịch hiển thị: "Lượt xem" thay vì "浏览量"
         status: views ? ("Lượt xem: " + views) : "",
         servers: [
             {
@@ -1085,12 +1052,8 @@ function parseDetailResponse(html, apiUrl, datasend) {
         if (vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
             streamUrl = vdata.epPlaySrcs[epId];
         }
-        if (!streamUrl && vdata.videoSrc) {
-            streamUrl = vdata.videoSrc;
-        }
-        if (!streamUrl && vdata.previewSrc) {
-            streamUrl = vdata.previewSrc;
-        }
+        if (!streamUrl && vdata.videoSrc) streamUrl = vdata.videoSrc;
+        if (!streamUrl && vdata.previewSrc) streamUrl = vdata.previewSrc;
     }
 
     if (!streamUrl) {
@@ -1100,10 +1063,7 @@ function parseDetailResponse(html, apiUrl, datasend) {
 
     if (!streamUrl) {
         console.warn("[HG] No stream found for ep=" + epId);
-        return JSON.stringify({
-            url: "",
-            isEmbed: false
-        });
+        return JSON.stringify({ url: "", isEmbed: false });
     }
 
     console.log("[HG] ep=" + epId + " stream=" + streamUrl.substring(0, 80) + "...");
@@ -1208,4 +1168,4 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.4.0 FINAL loaded. BaseUrl=" + BASE);
+console.log("[HG] huangguo_plugin.js v1.4.1 VI loaded. BaseUrl=" + BASE);
