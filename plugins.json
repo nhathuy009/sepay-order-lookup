@@ -19,7 +19,7 @@
             "id": "huanguoaiself",
             "name": "Huanguo AI SELF",
             "version": "1.3.0",
-            "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/huanguoai.js",
+            "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/huangguoai.js",
             "iconUrl": "https://huangguoai.com/static/web/images/logo-huangguo.png"
         }
     ]
