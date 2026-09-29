@@ -1,18 +1,20 @@
 // =============================================================================
-// VAAPP PLUGIN — Huangguo Short Drama (v3.0 - AES-IMG-DECODE FULL)
+// VAAPP PLUGIN — Huangguo Short Drama (v3.1 - AES-IMG-DECODE + UI DEBUG)
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc)
-// Version : 3.0.0
+// Version : 3.1.0
 //
-// ĐẶC ĐIỂM v3.0:
+// ⭐ ĐẶC ĐIỂM v3.1:
 //   ✅ AES-128-CBC decrypt ảnh thuần JS (không cần CryptoJS)
-//   ✅ Key/IV trích từ crypto-worker.js: f5d965df75336270 / 97b60394abc2fbe1
+//   ✅ Key/IV: f5d965df75336270 / 97b60394abc2fbe1
 //   ✅ Auto-detect MIME (jpg/png/gif/webp/bmp)
-//   ✅ Auto-detect plaintext: raw bytes (Case A) hoặc base64 string (Case B)
-//   ✅ Batch fetch song song qua fetchAll() (Native OkHttp Pool)
-//   ✅ Cache localStorage tránh decode lại (lần 2 instant)
-//   ✅ Fallback placeholder khi decode fail
+//   ✅ Auto-detect plaintext: raw bytes / base64 string
+//   ✅ Batch fetch song song qua fetchAll()
+//   ✅ Cache localStorage (lần 2 instant)
+//   ✅ 🆕 UI DEBUG: Item debug đầu list hiển thị OK/FAIL count
+//   ✅ 🆕 UI DEBUG: Ảnh fail hiển thị SVG đỏ với magic bytes
+//   ✅ 🆕 UI DEBUG: Toast nổi hiển thị log
 // =============================================================================
 
 var BASE = "https://huangguoai.com";
@@ -25,7 +27,45 @@ var HG_AES_KEY = "f5d965df75336270";
 var HG_AES_IV  = "97b60394abc2fbe1";
 
 var HG_IMG_CACHE_PREFIX = "hgi_";
-var HG_IMG_CACHE_MAX = 300; // giới hạn số ảnh cache để tránh tràn localStorage
+
+// ⭐ Bật/tắt debug UI (đặt false khi phát hành chính thức)
+var HG_DEBUG = true;
+
+// ⭐ Log buffer để đọc qua UI
+var HG_DEBUG_LOG = [];
+
+
+// =============================================================================
+// DEBUG HELPERS — Hiển thị log qua UI
+// =============================================================================
+
+function dbgLog(msg) {
+    console.log("[HG-DBG] " + msg);
+    if (!HG_DEBUG) return;
+    HG_DEBUG_LOG.push(msg);
+    if (HG_DEBUG_LOG.length > 50) HG_DEBUG_LOG.shift();
+    try { toast("[HG] " + msg.substring(0, 60)); } catch (e) {}
+}
+
+/**
+ * Tạo ảnh SVG đỏ hiển thị text lỗi (thay vì ảnh trắng khi decode fail).
+ * Dùng BASE64.encode() native của VAAPP.
+ */
+function makeErrorPlaceholder(msg) {
+    var safeMsg = String(msg || "error").substring(0, 60).replace(/[<>&"']/g, "_");
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="280" height="160" viewBox="0 0 280 160">' +
+        '<rect width="280" height="160" fill="#c00"/>' +
+        '<text x="10" y="28" fill="#fff" font-family="monospace" font-size="14" font-weight="bold">DECODE FAIL</text>' +
+        '<text x="10" y="56" fill="#ff0" font-family="monospace" font-size="11">' + safeMsg + '</text>' +
+        '<text x="10" y="86" fill="#fff" font-family="monospace" font-size="10">Check UI Debug Item</text>' +
+        '<text x="10" y="110" fill="#fff" font-family="monospace" font-size="10">at top of list</text>' +
+        '</svg>';
+    try {
+        return "data:image/svg+xml;base64," + BASE64.encode(svg);
+    } catch (e) {
+        return "";
+    }
+}
 
 
 // =============================================================================
@@ -36,7 +76,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "3.0.0",
+        "version": "3.1.0",
         "description": "Phim ngắn AI, hoạt hình người lớn, AI hoán đổi khuôn mặt — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -387,7 +427,7 @@ function detectMimeType(url) {
 
 function decodeHuangguoImage(imgUrl, referer, ua) {
     try {
-        // 1. Fetch ciphertext (raw binary string)
+        // 1. Fetch ciphertext
         var res = httpRequest(imgUrl, {
             method: "GET",
             headers: {
@@ -397,7 +437,7 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
             }
         });
         if (!res || !res.isSuccessful) {
-            console.warn("[HG-AES] fetch fail: " + imgUrl.substring(0, 80));
+            dbgLog("FETCH FAIL " + (res ? res.status : "null"));
             return "";
         }
 
@@ -406,59 +446,41 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
         var cipherBytes = new Uint8Array(len);
         for (var i = 0; i < len; i++) cipherBytes[i] = res.body.charCodeAt(i) & 0xFF;
 
-        // 3. AES-128-CBC decrypt (NoPadding)
+        // 3. AES decrypt
         var plainBytes = aes128CbcDecrypt(cipherBytes, HG_AES_KEY, HG_AES_IV);
 
-        // 4. Strip trailing 0x00 padding
+        // 4. Strip trailing 0x00
         var end = plainBytes.length;
         while (end > 0 && plainBytes[end - 1] === 0) end--;
         var clean = plainBytes.subarray(0, end);
 
         var mimeType = detectMimeType(imgUrl);
 
-        // 5. Auto-detect: raw bytes vs base64 string
-        // Case B (worker): plaintext là base64 string, magic "/9j/" (JPEG)
-        if (clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) {
-            console.log("[HG-AES] Case B (base64 string) len=" + clean.length + " mime=" + mimeType);
+        // Case B: base64 string (JPEG "/9j/", PNG "iVB", GIF "R0l")
+        if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||
+            (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||
+            (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {
+            dbgLog("OK CaseB " + mimeType + " len=" + clean.length);
             var str = "";
             for (var j = 0; j < clean.length; j++) str += String.fromCharCode(clean[j]);
             return "data:" + mimeType + ";base64," + str;
         }
 
-        // Case B-mở rộng: base64 string của PNG (iVBORw0KGgo) / GIF (R0lGOD)
-        if ((clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) || // iVB
-            (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) { // R0l
-            console.log("[HG-AES] Case B-ext (base64 PNG/GIF) len=" + clean.length + " mime=" + mimeType);
-            var strExt = "";
-            for (var k = 0; k < clean.length; k++) strExt += String.fromCharCode(clean[k]);
-            return "data:" + mimeType + ";base64," + strExt;
-        }
-
-        // Case A: raw JPEG bytes (FF D8 FF)
-        if (clean[0] === 0xFF && clean[1] === 0xD8) {
-            console.log("[HG-AES] Case A (raw bytes) len=" + clean.length + " mime=" + mimeType);
-            return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
-        }
-
-        // Case A-mở rộng: raw PNG (89 50 4E 47) / GIF (47 49 46)
-        if ((clean[0] === 0x89 && clean[1] === 0x50) ||
+        // Case A: raw bytes (JPEG "FF D8", PNG "89 50", GIF "47 49")
+        if ((clean[0] === 0xFF && clean[1] === 0xD8) ||
+            (clean[0] === 0x89 && clean[1] === 0x50) ||
             (clean[0] === 0x47 && clean[1] === 0x49)) {
-            console.log("[HG-AES] Case A-ext (raw PNG/GIF) len=" + clean.length + " mime=" + mimeType);
+            dbgLog("OK CaseA " + mimeType + " len=" + clean.length);
             return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
         }
 
-        // Fallback: thử base64 trước, không được thì raw
-        console.warn("[HG-AES] Unknown magic: " + clean[0] + " " + clean[1] + " " + clean[2]);
-        var fallbackStr = "";
-        for (var m = 0; m < clean.length; m++) fallbackStr += String.fromCharCode(clean[m]);
-        // Nếu chuỗi toàn ký tự ASCII in được → coi là base64
-        if (/^[A-Za-z0-9+/=\s]+$/.test(fallbackStr.substring(0, 200))) {
-            return "data:" + mimeType + ";base64," + fallbackStr;
-        }
-        return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
+        // Unknown magic
+        var magicHex = clean[0].toString(16) + " " + clean[1].toString(16) + " " + clean[2].toString(16);
+        dbgLog("UNKNOWN magic=" + magicHex);
+        return makeErrorPlaceholder("magic " + magicHex);
     } catch (e) {
-        console.error("[HG-AES] decode error: " + e.message);
-        return "";
+        dbgLog("EXCEPTION: " + e.message);
+        return makeErrorPlaceholder("ex " + e.message.substring(0, 30));
     }
 }
 
@@ -485,21 +507,16 @@ function hgCacheSet(url, dataUri) {
     try {
         localStorage.setItem(hgCacheKey(url), dataUri);
     } catch (e) {
-        // localStorage đầy → xóa cache cũ
         try {
             var keys = [];
             for (var i = 0; i < localStorage.length; i++) {
                 var k = localStorage.key(i);
                 if (k && k.indexOf(HG_IMG_CACHE_PREFIX) === 0) keys.push(k);
             }
-            // Xóa 50 cache cũ nhất (xấp xỉ bằng cách xóa nửa đầu)
             var toDelete = Math.floor(keys.length / 2);
             for (var j = 0; j < toDelete; j++) localStorage.removeItem(keys[j]);
-            // Thử lưu lại
             localStorage.setItem(hgCacheKey(url), dataUri);
-        } catch (e2) {
-            console.warn("[HG-AES] cache set fail after cleanup: " + e2.message);
-        }
+        } catch (e2) {}
     }
 }
 
@@ -513,7 +530,7 @@ function decodeImagesBatch(urls, referer, ua) {
     var toFetch = [];
     var toFetchIdx = [];
 
-    // 1. Check cache trước
+    // 1. Check cache
     var cachedCount = 0;
     for (var i = 0; i < urls.length; i++) {
         if (!urls[i]) { results[i] = ""; continue; }
@@ -528,13 +545,13 @@ function decodeImagesBatch(urls, referer, ua) {
     }
 
     if (toFetch.length === 0) {
-        console.log("[HG-AES] All " + urls.length + " images from cache (0 fetch)");
+        dbgLog("CACHE HIT all " + urls.length);
         return results;
     }
 
-    console.log("[HG-AES] Fetching " + toFetch.length + "/" + urls.length + " images (cached " + cachedCount + ")...");
+    dbgLog("FETCH " + toFetch.length + "/" + urls.length + " (cached " + cachedCount + ")");
 
-    // 2. Batch fetch song song qua fetchAll
+    // 2. Batch fetch song song
     var responses;
     try {
         responses = fetchAll(toFetch, {
@@ -545,16 +562,20 @@ function decodeImagesBatch(urls, referer, ua) {
             }
         });
     } catch (e) {
-        console.error("[HG-AES] fetchAll fail: " + e.message);
+        dbgLog("fetchAll FAIL: " + e.message);
         responses = [];
     }
 
-    // 3. Decode tuần tự (AES không parallel được trong QuickJS)
-    var okCount = 0;
+    // 3. Decode tuần tự
+    var okCount = 0, failCount = 0, unknownMagic = "";
     for (var j = 0; j < responses.length; j++) {
         var r = responses[j];
         var idx = toFetchIdx[j];
-        if (!r || !r.isSuccessful) { results[idx] = ""; continue; }
+        if (!r || !r.isSuccessful) {
+            results[idx] = makeErrorPlaceholder("fetch " + (r ? r.status : "?"));
+            failCount++;
+            continue;
+        }
 
         try {
             var len = r.body.length;
@@ -562,38 +583,63 @@ function decodeImagesBatch(urls, referer, ua) {
             for (var k = 0; k < len; k++) cipherBytes[k] = r.body.charCodeAt(k) & 0xFF;
 
             var plainBytes = aes128CbcDecrypt(cipherBytes, HG_AES_KEY, HG_AES_IV);
-
             var end = plainBytes.length;
             while (end > 0 && plainBytes[end - 1] === 0) end--;
             var clean = plainBytes.subarray(0, end);
 
             var mimeType = detectMimeType(toFetch[j]);
             var dataUri = "";
+            var isOk = false;
 
-            // Case B: base64 string (JPEG/PNG/GIF)
-            if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||  // /9j/
-                (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||  // iVB
-                (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {  // R0l
+            // Case B: base64 string
+            if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||
+                (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||
+                (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {
                 var str = "";
                 for (var s = 0; s < clean.length; s++) str += String.fromCharCode(clean[s]);
                 dataUri = "data:" + mimeType + ";base64," + str;
-            } else {
-                // Case A: raw bytes
+                isOk = true;
+            }
+            // Case A: raw bytes
+            else if ((clean[0] === 0xFF && clean[1] === 0xD8) ||
+                     (clean[0] === 0x89 && clean[1] === 0x50) ||
+                     (clean[0] === 0x47 && clean[1] === 0x49)) {
                 dataUri = "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
+                isOk = true;
+            }
+            // Unknown
+            else {
+                var magicHex = clean[0].toString(16) + " " + clean[1].toString(16) + " " + clean[2].toString(16);
+                unknownMagic = magicHex;
+                dataUri = makeErrorPlaceholder("magic " + magicHex);
             }
 
             results[idx] = dataUri;
-            okCount++;
-
-            // Lưu cache
-            hgCacheSet(toFetch[j], dataUri);
+            if (isOk) {
+                okCount++;
+                hgCacheSet(toFetch[j], dataUri);
+            } else {
+                failCount++;
+            }
         } catch (e) {
-            console.error("[HG-AES] decode[" + j + "] fail: " + e.message);
-            results[idx] = "";
+            results[idx] = makeErrorPlaceholder("ex " + e.message.substring(0, 25));
+            failCount++;
         }
     }
 
-    console.log("[HG-AES] Decoded " + okCount + "/" + toFetch.length + " images");
+    // Lưu summary để hiển thị UI Debug
+    try {
+        localStorage.setItem("hg_dbg_summary", JSON.stringify({
+            ok: okCount,
+            fail: failCount,
+            unknownMagic: unknownMagic,
+            total: toFetch.length,
+            cached: cachedCount,
+            ts: Date.now()
+        }));
+    } catch (e) {}
+
+    dbgLog("DONE ok=" + okCount + " fail=" + failCount + (unknownMagic ? " magic=" + unknownMagic : ""));
     return results;
 }
 
@@ -622,7 +668,7 @@ function parseSearchResponse(html, apiUrl) {
 }
 
 
-// ---- 4.1. Extract drama card (metadata only, chưa decode ảnh) ----
+// ---- Extract drama card ----
 
 function normalizePosterUrl(poster) {
     if (!poster || typeof poster !== "string") return "";
@@ -664,8 +710,8 @@ function extractDramaCard(cardEl, seen) {
     return {
         id: href,
         title: title,
-        posterUrl: "",             // sẽ set sau khi decode
-        _rawPoster: poster,        // giữ URL ciphertext để batch decode
+        posterUrl: "",
+        _rawPoster: poster,
         description: desc,
         episode_current: episodeRaw,
         quality: score ? (score + "分") : "",
@@ -708,7 +754,8 @@ function parseDramaGridByRegex(html, seen) {
     return items;
 }
 
-// ---- Batch decode và gán posterUrl cho items ----
+
+// ---- ⭐ Batch decode + chèn Debug Item đầu list ----
 
 function assignDecodedPosters(rawItems) {
     var rawPosters = [];
@@ -716,17 +763,51 @@ function assignDecodedPosters(rawItems) {
         rawPosters.push(rawItems[i]._rawPoster || "");
     }
     var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
+
+    var okCount = 0, failCount = 0;
+    for (var j = 0; j < decoded.length; j++) {
+        if (decoded[j] && decoded[j].indexOf("data:image/") === 0 &&
+            decoded[j].indexOf("svg+xml") === -1) okCount++;
+        else failCount++;
+    }
+
     var items = [];
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
+    for (var k = 0; k < rawItems.length; k++) {
+        var it = rawItems[k];
         delete it._rawPoster;
-        it.posterUrl = decoded[j] || it.posterUrl || "";
+        it.posterUrl = decoded[k] || it.posterUrl || "";
         items.push(it);
     }
+
+    // ⭐ Chèn Debug Item đầu list
+    if (HG_DEBUG) {
+        var summary = null;
+        try { summary = JSON.parse(localStorage.getItem("hg_dbg_summary") || "null"); } catch (e) {}
+
+        var dbgTitle = "🔍 DBG " + okCount + "OK/" + failCount + "FAIL";
+        if (summary && summary.unknownMagic) dbgTitle += " magic=" + summary.unknownMagic;
+        if (summary && summary.cached > 0) dbgTitle += " cached=" + summary.cached;
+        if (HG_DEBUG_LOG.length > 0) {
+            var last = HG_DEBUG_LOG[HG_DEBUG_LOG.length - 1];
+            dbgTitle += " | " + last.substring(0, 40);
+        }
+
+        items.unshift({
+            id: "/video/0/",
+            title: dbgTitle,
+            posterUrl: "",
+            description: "DEBUG ITEM — không bấm vào. Thông tin decode ảnh ở title và quality.",
+            isCategory: true,
+            type: "folder",
+            quality: "LOG: " + (HG_DEBUG_LOG.length > 0 ? HG_DEBUG_LOG[HG_DEBUG_LOG.length - 1].substring(0, 60) : "empty")
+        });
+    }
+
     return items;
 }
 
-// ---- 4.2. Parse lưới phim ----
+
+// ---- Parse lưới phim ----
 
 function parseDramaGrid(html, apiUrl) {
     var rawItems = [];
@@ -778,7 +859,7 @@ function parseDramaGrid(html, apiUrl) {
 }
 
 
-// ---- 4.3. Parse danh sách chủ đề ----
+// ---- Parse danh sách chủ đề ----
 
 function parseTopicsList(html, apiUrl) {
     var rawItems = [];
@@ -843,7 +924,7 @@ function parseTopicsList(html, apiUrl) {
 }
 
 
-// ---- 4.4. Parse chi tiết chủ đề ----
+// ---- Parse chi tiết chủ đề ----
 
 function parseTopicDetail(html, apiUrl) {
     var rawItems = [];
@@ -899,7 +980,7 @@ function parseTopicDetail(html, apiUrl) {
 }
 
 
-// ---- 4.5. Parse kết quả tìm kiếm ----
+// ---- Parse kết quả tìm kiếm ----
 
 function parseSearchResults(html, apiUrl) {
     var rawItems = [];
@@ -959,7 +1040,7 @@ function parseSearchResults(html, apiUrl) {
 }
 
 
-// ---- 4.6. Parse bảng xếp hạng ----
+// ---- Parse bảng xếp hạng ----
 
 function parseRankList(html, apiUrl) {
     var rawItems = [];
@@ -1018,7 +1099,7 @@ function parseRankList(html, apiUrl) {
 }
 
 
-// ---- 4.7. Tag & Author (dùng chung DramaGrid) ----
+// ---- Tag & Author ----
 
 function parseTagPage(html, apiUrl) {
     var rawItems = [];
@@ -1053,10 +1134,6 @@ function parseTagPage(html, apiUrl) {
             if (dp) totalPages = parseInt(dp, 10) || 1;
         }
     } catch (e) {}
-    if (totalPages === 1) {
-        var mLast = html.match(/\/tag\/[^\/]+\/page\/(\d+)\/"[^>]*>\s*末页/);
-        if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
-    }
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     return JSON.stringify({
@@ -1098,10 +1175,6 @@ function parseAuthorPage(html, apiUrl) {
             if (dp) totalPages = parseInt(dp, 10) || 1;
         }
     } catch (e) {}
-    if (totalPages === 1) {
-        var mLast = html.match(/\/author\/\d+\/video\/(\d+)\/"[^>]*>\s*末页/);
-        if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
-    }
     if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
 
     return JSON.stringify({
@@ -1150,11 +1223,13 @@ function parseMovieDetail(html, apiUrl, datasend) {
     }
     poster = normalizePosterUrl(poster);
 
-    // Decode 1 ảnh poster (dùng batch helper để tận dụng cache)
+    // Decode ảnh poster
     var decodedPoster = "";
     if (poster) {
         decodedPoster = hgCacheGet(poster) || decodeHuangguoImage(poster, REFERER, UA_MOBILE) || "";
-        if (decodedPoster) hgCacheSet(poster, decodedPoster);
+        if (decodedPoster && decodedPoster.indexOf("data:image/") === 0) {
+            hgCacheSet(poster, decodedPoster);
+        }
     }
 
     // Episodes
@@ -1230,7 +1305,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
-    console.log("[HG] parseDetailResponse url=" + apiUrl.substring(0, 80) + " datasend=" + (datasend || ""));
+    console.log("[HG] parseDetailResponse url=" + apiUrl.substring(0, 80));
 
     var epId = "";
     if (datasend) {
@@ -1354,6 +1429,6 @@ function getPipeData(apiUrl) {
 // 10. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin v3.0.0 loaded");
+console.log("[HG] huangguo_plugin v3.1.0 loaded");
 console.log("[HG] AES key=" + HG_AES_KEY + " IV=" + HG_AES_IV);
-console.log("[HG] BaseUrl=" + BASE);
+console.log("[HG] DEBUG=" + HG_DEBUG + " (UI debug item sẽ hiện đầu list)");
