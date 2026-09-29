@@ -3,8 +3,15 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.4.2 VI (Fix ảnh + Vietnamese)
+// Version : 1.4.3 VI (Single Domain — bỏ fallback)
 // Author  : VAAPP Community
+//
+// Đặc điểm v1.4.3:
+//   - Chỉ dùng 1 domain duy nhất: huangguoai.com
+//   - Bỏ hết fallback URLs (tránh race song song, tăng tốc)
+//   - Fix trailing slash cho path-style (tránh 301 redirect)
+//   - Nhúng Referer vào URL ảnh (bypass anti-hotlink)
+//   - Dịch tiếng Việt đầy đủ
 // =============================================================================
 
 var BASE = "https://huangguoai.com";
@@ -20,9 +27,7 @@ var REFERER_ENCODED = encodeURIComponent(REFERER);
 function fixImageUrl(url) {
     if (!url || typeof url !== "string") return url || "";
     if (url.indexOf("http") !== 0) return url;
-    // Nếu đã có | → giữ nguyên (đã được xử lý hoặc là URL khác)
     if (url.indexOf("|") !== -1) return url;
-    // Nhúng Referer
     return url + "|Referer=" + REFERER_ENCODED;
 }
 
@@ -35,15 +40,11 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.4.2",
+        "version": "1.4.3",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
-        "fallbackUrls": [
-            "https://huangguo8.com",
-            "https://huangguoai.ai",
-            "https://huangguoai.pages.dev"
-        ],
+        // ⭐ ĐÃ BỎ fallbackUrls — chỉ dùng 1 domain duy nhất
         "iconUrl": BASE + "/static/web/images/logo-huangguo.png",
         "referrer": REFERER,
         "imageReferer": REFERER,
@@ -141,7 +142,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Các slug dùng PATH-STYLE
+    // Các slug dùng PATH-STYLE — LUÔN có trailing slash
     var pathStyleSlugs = {
         "newest":      "/newest",
         "recommend":   "/recommend",
@@ -153,7 +154,8 @@ function getUrlList(slug, filtersJson) {
 
     if (pathStyleSlugs[slug]) {
         var basePath = pathStyleSlugs[slug];
-        if (page === 1) return B + basePath;
+        // ⭐ LUÔN thêm trailing slash để tránh 301 redirect
+        if (page === 1) return B + basePath + "/";
         return B + basePath + "/" + page + "/";
     }
 
@@ -291,7 +293,6 @@ function extractDramaCard(cardEl, seen) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-    // ⭐ FIX ẢNH: Nhúng Referer
     poster = fixImageUrl(poster);
 
     var title = cardEl.find(".hg-drama-card__title").text().trim();
@@ -344,7 +345,6 @@ function parseDramaGridByRegex(html, seen) {
         }
         if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-        // ⭐ FIX ẢNH
         poster = fixImageUrl(poster);
 
         var titleRe = new RegExp(
@@ -385,7 +385,6 @@ function parseTopicsList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-            // ⭐ FIX ẢNH
             poster = fixImageUrl(poster);
 
             var title = $card.find(".hg-topic-card__title").text().trim();
@@ -604,7 +603,6 @@ function parseRankList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-            // ⭐ FIX ẢNH
             poster = fixImageUrl(poster);
 
             var title = $item.find(".hg-rank-item__title").text().trim();
@@ -701,7 +699,6 @@ function parseRankFromJsonLd(html, seen) {
                 if ($img.length > 0) {
                     var poster = $img.attr("data-src") || $img.attr("src") || "";
                     if (poster.indexOf("cover-placeholder") === -1) {
-                        // ⭐ FIX ẢNH
                         item.posterUrl = fixImageUrl(poster);
                     }
                 }
@@ -726,7 +723,6 @@ function parseRankByRegex(html, seen) {
 
         var mPoster = chunk.match(/data-src="([^"]+)"/);
         var poster = mPoster ? mPoster[1] : "";
-        // ⭐ FIX ẢNH
         poster = fixImageUrl(poster);
 
         var mTitle = chunk.match(/class="hg-rank-item__title"[^>]*>\s*<a[^>]*>([^<]+)/);
@@ -924,7 +920,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-    // ⭐ FIX ẢNH
     poster = fixImageUrl(poster);
 
     var episodes = [];
@@ -1155,4 +1150,4 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.4.2 VI loaded. BaseUrl=" + BASE);
+console.log("[HG] huangguo_plugin.js v1.4.3 VI loaded. BaseUrl=" + BASE);
