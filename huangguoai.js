@@ -3,31 +3,28 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.4.1 VI (Vietnamese)
+// Version : 1.4.2 VI (Fix ảnh + Vietnamese)
 // Author  : VAAPP Community
-//
-// Hỗ trợ đầy đủ:
-//   /newest                 → Mới Cập Nhật      (path: /newest/{N}/)
-//   /recommend              → Tuyển Chọn         (path: /recommend/{N}/)
-//   /ai-duanju              → Phim Ngắn AI       (path: /ai-duanju/{N}/)
-//   /ai-manju               → Hoạt Hình AI       (path: /ai-manju/{N}/)
-//   /ai-huanlian            → AI Hoán Đổi Mặt   (path: /ai-huanlian/{N}/)
-//   /ai-mogai               → AI Chỉnh Sửa       (path: /ai-mogai/{N}/)
-//   /ranks/hot/             → BXH Thịnh Hành     (TOP 20)
-//   /ranks/recommend/       → BXH Đề Xuất        (TOP 20)
-//   /ranks/potential/       → BXH Tiềm Năng      (TOP 20)
-//   /topics/                → Chủ Đề Đặc Biệt
-//   /topics/{slug}/         → Chi tiết chủ đề
-//   /tag/{slug}/            → Thể loại
-//   /search/video/{kw}/     → Tìm kiếm
-//   /author/{id}/video/     → Tác giả
-//   /video/{id}/            → Chi tiết phim
-//   /video/{id}/ep-{N}/     → Tập N
 // =============================================================================
 
 var BASE = "https://huangguoai.com";
 var UA_MOBILE = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 var REFERER = BASE + "/";
+var REFERER_ENCODED = encodeURIComponent(REFERER);
+
+
+// =============================================================================
+// HELPER: Fix ảnh — nhúng Referer để bypass anti-hotlink
+// =============================================================================
+
+function fixImageUrl(url) {
+    if (!url || typeof url !== "string") return url || "";
+    if (url.indexOf("http") !== 0) return url;
+    // Nếu đã có | → giữ nguyên (đã được xử lý hoặc là URL khác)
+    if (url.indexOf("|") !== -1) return url;
+    // Nhúng Referer
+    return url + "|Referer=" + REFERER_ENCODED;
+}
 
 
 // =============================================================================
@@ -38,7 +35,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.4.1",
+        "version": "1.4.2",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -156,9 +153,7 @@ function getUrlList(slug, filtersJson) {
 
     if (pathStyleSlugs[slug]) {
         var basePath = pathStyleSlugs[slug];
-        if (page === 1) {
-            return B + basePath;
-        }
+        if (page === 1) return B + basePath;
         return B + basePath + "/" + page + "/";
     }
 
@@ -168,9 +163,7 @@ function getUrlList(slug, filtersJson) {
         case "ranks/potential": return B + "/ranks/potential/";
         case "topics":          return B + "/topics/";
         default:
-            if (slug && slug.charAt(0) === "/") {
-                return B + slug;
-            }
+            if (slug && slug.charAt(0) === "/") return B + slug;
             return B + "/" + slug + "/";
     }
 }
@@ -181,41 +174,28 @@ function getUrlSearch(keyword, filtersJson) {
     var page = parseInt(filters.page || 1, 10);
     if (page < 1) page = 1;
     var kw = encodeURIComponent(keyword);
-    if (page === 1) {
-        return BASE + "/search/video/" + kw + "/";
-    }
+    if (page === 1) return BASE + "/search/video/" + kw + "/";
     return BASE + "/search/video/" + kw + "/" + page + "/";
 }
 
 function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
-
-    // Tác giả: /author/{id}/ → /author/{id}/video/
     if (/^\/author\/\d+\/?$/.test(slug)) {
         var cleanA = slug.replace(/\/+$/, "");
         return BASE + cleanA + "/video/";
     }
-
-    // Video: /video/{id}/ → giữ nguyên
     if (slug.indexOf("/video/") === 0) {
         var cleanV = slug.replace(/\/+$/, "");
         return BASE + cleanV + "/";
     }
-
-    // Chỉ số → /video/{id}/
-    if (/^\d+$/.test(slug)) {
-        return BASE + "/video/" + slug + "/";
-    }
-
+    if (/^\d+$/.test(slug)) return BASE + "/video/" + slug + "/";
     return BASE + slug;
 }
 
 
 // =============================================================================
 // 5. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC / TAG / AUTHOR
-// =============================================================================
-// (Toàn bộ logic parse giữ nguyên như v1.4.0)
 // =============================================================================
 
 function parseListResponse(html, apiUrl) {
@@ -311,11 +291,13 @@ function extractDramaCard(cardEl, seen) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
+    // ⭐ FIX ẢNH: Nhúng Referer
+    poster = fixImageUrl(poster);
+
     var title = cardEl.find(".hg-drama-card__title").text().trim();
     if (!title) {
         title = cardEl.find("h3.hg-drama-card__title a").text().trim();
     }
-    // ⚠️ GIỮ NGUYÊN: 全集在线观看 (phải match HTML gốc)
     title = title.replace(/全集在线观看\s*$/, "").trim();
 
     var desc = cardEl.find(".hg-drama-card__desc").text().trim();
@@ -362,6 +344,9 @@ function parseDramaGridByRegex(html, seen) {
         }
         if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
+        // ⭐ FIX ẢNH
+        poster = fixImageUrl(poster);
+
         var titleRe = new RegExp(
             '<h3[^>]+class="hg-drama-card__title"[^>]*>\\s*<a[^>]+href="'
             + id.replace(/\//g, "\\/") + '"[^>]*>([^<]+)',
@@ -400,6 +385,9 @@ function parseTopicsList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
+            // ⭐ FIX ẢNH
+            poster = fixImageUrl(poster);
+
             var title = $card.find(".hg-topic-card__title").text().trim();
             var meta  = $card.find(".hg-topic-card__meta").text().trim();
 
@@ -429,6 +417,7 @@ function parseTopicsList(html, apiUrl) {
             seen[href] = true;
             var poster = m[2];
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
+            poster = fixImageUrl(poster);
             items.push({
                 id: href,
                 title: m[3].trim(),
@@ -539,7 +528,6 @@ function parseSearchResults(html, apiUrl) {
         items = parseDramaGridByRegex(html, seen);
     }
 
-    // ⚠️ GIỮ NGUYÊN: 共.*个结果 — phải match HTML gốc
     var totalItems = items.length;
     try {
         var $page = _$(html).find(".hg-search-page");
@@ -616,10 +604,12 @@ function parseRankList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
+            // ⭐ FIX ẢNH
+            poster = fixImageUrl(poster);
+
             var title = $item.find(".hg-rank-item__title").text().trim();
             var desc = $item.find(".hg-rank-item__desc").text().trim();
 
-            // ⚠️ GIỮ NGUYÊN: /(\d+\.\d+)分/ — phải match text "9.5分"
             var tagsText = $item.find(".hg-rank-item__tags").text();
             var mScore = tagsText.match(/(\d+\.\d+)分/);
             var score = mScore ? mScore[1] : "";
@@ -632,7 +622,7 @@ function parseRankList(html, apiUrl) {
                 title: title,
                 posterUrl: poster,
                 description: desc,
-                episode_current: heat ? ("Nhiệt " + heat) : "",  // ← Dịch "热力" → "Nhiệt"
+                episode_current: heat ? ("Nhiệt " + heat) : "",
                 quality: score ? (score + "分") : "",
                 year: 0,
                 lang: "Vietsub",
@@ -711,7 +701,8 @@ function parseRankFromJsonLd(html, seen) {
                 if ($img.length > 0) {
                     var poster = $img.attr("data-src") || $img.attr("src") || "";
                     if (poster.indexOf("cover-placeholder") === -1) {
-                        item.posterUrl = poster;
+                        // ⭐ FIX ẢNH
+                        item.posterUrl = fixImageUrl(poster);
                     }
                 }
             }
@@ -735,6 +726,8 @@ function parseRankByRegex(html, seen) {
 
         var mPoster = chunk.match(/data-src="([^"]+)"/);
         var poster = mPoster ? mPoster[1] : "";
+        // ⭐ FIX ẢNH
+        poster = fixImageUrl(poster);
 
         var mTitle = chunk.match(/class="hg-rank-item__title"[^>]*>\s*<a[^>]*>([^<]+)/);
         var title = mTitle ? mTitle[1].trim() : "";
@@ -801,7 +794,6 @@ function parseTagPage(html, apiUrl) {
         }
     } catch (e) {}
     if (totalPages === 1) {
-        // ⚠️ GIỮ NGUYÊN: 末页 — phải match text "末页" (Last page)
         var mLast = html.match(/\/tag\/[^\/]+\/page\/(\d+)\/"[^>]*>\s*末页/);
         if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
     }
@@ -920,10 +912,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
     if (!title) {
         var mT = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
-        if (mT) {
-            // ⚠️ GIỮ NGUYÊN: 黄果短剧 trong regex
-            title = mT[1].replace(/\s*[-|]\s*黄果短剧.*$/, "").trim();
-        }
+        if (mT) title = mT[1].replace(/\s*[-|]\s*黄果短剧.*$/, "").trim();
     }
     if (!poster) {
         var mI = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
@@ -934,6 +923,9 @@ function parseMovieDetail(html, apiUrl, datasend) {
         if (mD) description = mD[1];
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
+
+    // ⭐ FIX ẢNH
+    poster = fixImageUrl(poster);
 
     var episodes = [];
     var seenSlug = {};
@@ -953,7 +945,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
             episodes.push({
                 id: href,
-                // ⚠️ Dịch hiển thị: "Tập" thay vì "集"
                 name: epName || ("Tập " + epId),
                 slug: slug,
                 datasend: "epId=" + epId
@@ -971,7 +962,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
             var epNum = keys[i];
             episodes.push({
                 id: cleanUrl + (parseInt(epNum, 10) > 1 ? "ep-" + epNum + "/" : ""),
-                // ⚠️ Dịch hiển thị: "Tập"
                 name: "Tập " + epNum,
                 slug: "ep-" + epNum,
                 datasend: "epId=" + epNum
@@ -1006,7 +996,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
         director: author,
         quality: "",
         year: 0,
-        // ⚠️ Dịch hiển thị: "Lượt xem" thay vì "浏览量"
         status: views ? ("Lượt xem: " + views) : "",
         servers: [
             {
@@ -1157,9 +1146,7 @@ function getPipeData(apiUrl) {
     var i = apiUrl.indexOf("|");
     if (i < 0) return "";
     var s = apiUrl.substring(i + 1).replace(/^\s+/, "");
-    if (s.toLowerCase().indexOf("data:") === 0) {
-        s = s.substring(5);
-    }
+    if (s.toLowerCase().indexOf("data:") === 0) s = s.substring(5);
     return s;
 }
 
@@ -1168,4 +1155,4 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.4.1 VI loaded. BaseUrl=" + BASE);
+console.log("[HG] huangguo_plugin.js v1.4.2 VI loaded. BaseUrl=" + BASE);
