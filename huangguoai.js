@@ -1,16 +1,18 @@
 // =============================================================================
-// VAAPP PLUGIN — Huangguo Short Drama (AES-IMG-DECODE v2.0)
+// VAAPP PLUGIN — Huangguo Short Drama (v3.0 - AES-IMG-DECODE FULL)
 // =============================================================================
 // Website : https://huangguoai.com
-// Type    : SHORTFILM
-// Version : 2.0.0
+// Type    : SHORTFILM (phim ngắn dọc)
+// Version : 3.0.0
 //
-// ⭐ v2.0: Tích hợp AES-128-CBC decrypt ảnh thuần JS
-//          - Ảnh poster bị mã hóa AES-CBC NoPadding
-//          - Key/IV trích từ crypto-worker.js của trang gốc
-//          - Không cần CryptoJS (QuickJS không có)
-//          - Batch fetch song song qua fetchAll()
-//          - Cache localStorage tránh decode lại
+// ĐẶC ĐIỂM v3.0:
+//   ✅ AES-128-CBC decrypt ảnh thuần JS (không cần CryptoJS)
+//   ✅ Key/IV trích từ crypto-worker.js: f5d965df75336270 / 97b60394abc2fbe1
+//   ✅ Auto-detect MIME (jpg/png/gif/webp/bmp)
+//   ✅ Auto-detect plaintext: raw bytes (Case A) hoặc base64 string (Case B)
+//   ✅ Batch fetch song song qua fetchAll() (Native OkHttp Pool)
+//   ✅ Cache localStorage tránh decode lại (lần 2 instant)
+//   ✅ Fallback placeholder khi decode fail
 // =============================================================================
 
 var BASE = "https://huangguoai.com";
@@ -23,7 +25,7 @@ var HG_AES_KEY = "f5d965df75336270";
 var HG_AES_IV  = "97b60394abc2fbe1";
 
 var HG_IMG_CACHE_PREFIX = "hgi_";
-var HG_IMG_CACHE_LIMIT = 200; // giới hạn số ảnh cache
+var HG_IMG_CACHE_MAX = 300; // giới hạn số ảnh cache để tránh tràn localStorage
 
 
 // =============================================================================
@@ -34,8 +36,8 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "2.0.0",
-        "description": "Phim ngắn AI, hoạt hình người lớn — xem miễn phí",
+        "version": "3.0.0",
+        "description": "Phim ngắn AI, hoạt hình người lớn, AI hoán đổi khuôn mặt — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
         "iconUrl": BASE + "/static/web/images/logo-huangguo.png",
@@ -94,6 +96,7 @@ function getUrlList(slug, filtersJson) {
     if (page < 1) page = 1;
     var B = BASE;
 
+    // Author page: /author/{id}/video/{N}/
     if (slug && (slug.indexOf("/author/") === 0 || slug.indexOf("author/") === 0)) {
         var cleanAuthorSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanAuthorSlug = cleanAuthorSlug.replace(/\/(video|post)\/\d+$/, "");
@@ -106,6 +109,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
+    // Tag page: /tag/{slug}/page/{N}/
     if (slug && (slug.indexOf("/tag/") === 0 || slug.indexOf("tag/") === 0)) {
         var cleanTagSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanTagSlug = cleanTagSlug.replace(/\/page\/\d+$/, "");
@@ -117,6 +121,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
+    // Topic page: /topics/{slug}/{N}/
     if (slug && (slug.indexOf("/topics/") === 0 || slug.indexOf("topics/") === 0)) {
         var cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         var topicMatch = cleanSlug.match(/^(topics\/[^\/]+)/);
@@ -167,12 +172,10 @@ function getUrlDetail(slug) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
     if (/^\/author\/\d+\/?$/.test(slug)) {
-        var cleanA = slug.replace(/\/+$/, "");
-        return BASE + cleanA + "/video/";
+        return BASE + slug.replace(/\/+$/, "") + "/video/";
     }
     if (slug.indexOf("/video/") === 0) {
-        var cleanV = slug.replace(/\/+$/, "");
-        return BASE + cleanV + "/";
+        return BASE + slug.replace(/\/+$/, "") + "/";
     }
     if (/^\d+$/.test(slug)) return BASE + "/video/" + slug + "/";
     return BASE + slug;
@@ -181,7 +184,6 @@ function getUrlDetail(slug) {
 
 // =============================================================================
 // ==================== AES-128-CBC DECRYPT PURE JS ============================
-// =============================================================================
 // Port từ crypto-worker.js của huangguoai.com
 // Key : "f5d965df75336270" (ASCII → 16 bytes)
 // IV  : "97b60394abc2fbe1" (ASCII → 16 bytes)
@@ -342,6 +344,10 @@ function aes128CbcDecrypt(cipherBytes, keyStr, ivStr) {
     return plainBytes;
 }
 
+// =============================================================================
+// Base64 encoder thuần JS
+// =============================================================================
+
 function hgBytesToBase64(bytes) {
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var out = "";
@@ -358,13 +364,30 @@ function hgBytesToBase64(bytes) {
     return out;
 }
 
+
 // =============================================================================
-// decodeHuangguoImage — Giải mã 1 ảnh Huangguo → data URI
+// detectMimeType — phát hiện MIME từ extension URL
+// =============================================================================
+
+function detectMimeType(url) {
+    if (!url) return "image/jpeg";
+    var cleanUrl = url.split("?")[0].split("|")[0].toLowerCase();
+    if (cleanUrl.lastIndexOf(".png") !== -1 && cleanUrl.lastIndexOf(".png") >= cleanUrl.length - 5) return "image/png";
+    if (cleanUrl.lastIndexOf(".gif") !== -1 && cleanUrl.lastIndexOf(".gif") >= cleanUrl.length - 5) return "image/gif";
+    if (cleanUrl.lastIndexOf(".webp") !== -1 && cleanUrl.lastIndexOf(".webp") >= cleanUrl.length - 6) return "image/webp";
+    if (cleanUrl.lastIndexOf(".bmp") !== -1 && cleanUrl.lastIndexOf(".bmp") >= cleanUrl.length - 5) return "image/bmp";
+    if (cleanUrl.lastIndexOf(".svg") !== -1 && cleanUrl.lastIndexOf(".svg") >= cleanUrl.length - 5) return "image/svg+xml";
+    return "image/jpeg";
+}
+
+
+// =============================================================================
+// decodeHuangguoImage — Giải mã 1 ảnh → data URI
 // =============================================================================
 
 function decodeHuangguoImage(imgUrl, referer, ua) {
     try {
-        // 1. Fetch ciphertext
+        // 1. Fetch ciphertext (raw binary string)
         var res = httpRequest(imgUrl, {
             method: "GET",
             headers: {
@@ -383,30 +406,56 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
         var cipherBytes = new Uint8Array(len);
         for (var i = 0; i < len; i++) cipherBytes[i] = res.body.charCodeAt(i) & 0xFF;
 
-        // 3. AES-128-CBC decrypt
+        // 3. AES-128-CBC decrypt (NoPadding)
         var plainBytes = aes128CbcDecrypt(cipherBytes, HG_AES_KEY, HG_AES_IV);
 
-        // 4. Strip trailing zero bytes (NoPadding có thể có padding 0x00)
+        // 4. Strip trailing 0x00 padding
         var end = plainBytes.length;
         while (end > 0 && plainBytes[end - 1] === 0) end--;
         var clean = plainBytes.subarray(0, end);
 
-        // 5. Auto-detect kết quả:
-        //    Case A: raw JPEG (FF D8 FF ...) → encode base64
-        //    Case B: base64 ASCII string ("/9j/...") → dùng trực tiếp
-        if (clean[0] === 0xFF && clean[1] === 0xD8) {
-            console.log("[HG-AES] Case A: raw JPEG (" + clean.length + " bytes)");
-            return "data:image/jpeg;base64," + hgBytesToBase64(clean);
-        }
+        var mimeType = detectMimeType(imgUrl);
+
+        // 5. Auto-detect: raw bytes vs base64 string
+        // Case B (worker): plaintext là base64 string, magic "/9j/" (JPEG)
         if (clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) {
-            console.log("[HG-AES] Case B: base64 string (" + clean.length + " chars)");
+            console.log("[HG-AES] Case B (base64 string) len=" + clean.length + " mime=" + mimeType);
             var str = "";
             for (var j = 0; j < clean.length; j++) str += String.fromCharCode(clean[j]);
-            return "data:image/jpeg;base64," + str;
+            return "data:" + mimeType + ";base64," + str;
         }
-        // Fallback
-        console.warn("[HG-AES] Unknown plaintext magic: " + clean[0] + " " + clean[1]);
-        return "data:image/jpeg;base64," + hgBytesToBase64(clean);
+
+        // Case B-mở rộng: base64 string của PNG (iVBORw0KGgo) / GIF (R0lGOD)
+        if ((clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) || // iVB
+            (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) { // R0l
+            console.log("[HG-AES] Case B-ext (base64 PNG/GIF) len=" + clean.length + " mime=" + mimeType);
+            var strExt = "";
+            for (var k = 0; k < clean.length; k++) strExt += String.fromCharCode(clean[k]);
+            return "data:" + mimeType + ";base64," + strExt;
+        }
+
+        // Case A: raw JPEG bytes (FF D8 FF)
+        if (clean[0] === 0xFF && clean[1] === 0xD8) {
+            console.log("[HG-AES] Case A (raw bytes) len=" + clean.length + " mime=" + mimeType);
+            return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
+        }
+
+        // Case A-mở rộng: raw PNG (89 50 4E 47) / GIF (47 49 46)
+        if ((clean[0] === 0x89 && clean[1] === 0x50) ||
+            (clean[0] === 0x47 && clean[1] === 0x49)) {
+            console.log("[HG-AES] Case A-ext (raw PNG/GIF) len=" + clean.length + " mime=" + mimeType);
+            return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
+        }
+
+        // Fallback: thử base64 trước, không được thì raw
+        console.warn("[HG-AES] Unknown magic: " + clean[0] + " " + clean[1] + " " + clean[2]);
+        var fallbackStr = "";
+        for (var m = 0; m < clean.length; m++) fallbackStr += String.fromCharCode(clean[m]);
+        // Nếu chuỗi toàn ký tự ASCII in được → coi là base64
+        if (/^[A-Za-z0-9+/=\s]+$/.test(fallbackStr.substring(0, 200))) {
+            return "data:" + mimeType + ";base64," + fallbackStr;
+        }
+        return "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
     } catch (e) {
         console.error("[HG-AES] decode error: " + e.message);
         return "";
@@ -415,7 +464,48 @@ function decodeHuangguoImage(imgUrl, referer, ua) {
 
 
 // =============================================================================
-// decodeImagesBatch — Batch decode ảnh với cache
+// Cache helpers
+// =============================================================================
+
+function hgCacheKey(url) {
+    var fname = url.substring(url.lastIndexOf("/") + 1).split("?")[0];
+    return HG_IMG_CACHE_PREFIX + fname;
+}
+
+function hgCacheGet(url) {
+    try {
+        var k = hgCacheKey(url);
+        var v = localStorage.getItem(k);
+        if (v && v.length > 100) return v;
+    } catch (e) {}
+    return null;
+}
+
+function hgCacheSet(url, dataUri) {
+    try {
+        localStorage.setItem(hgCacheKey(url), dataUri);
+    } catch (e) {
+        // localStorage đầy → xóa cache cũ
+        try {
+            var keys = [];
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf(HG_IMG_CACHE_PREFIX) === 0) keys.push(k);
+            }
+            // Xóa 50 cache cũ nhất (xấp xỉ bằng cách xóa nửa đầu)
+            var toDelete = Math.floor(keys.length / 2);
+            for (var j = 0; j < toDelete; j++) localStorage.removeItem(keys[j]);
+            // Thử lưu lại
+            localStorage.setItem(hgCacheKey(url), dataUri);
+        } catch (e2) {
+            console.warn("[HG-AES] cache set fail after cleanup: " + e2.message);
+        }
+    }
+}
+
+
+// =============================================================================
+// decodeImagesBatch — Batch decode song song + cache
 // =============================================================================
 
 function decodeImagesBatch(urls, referer, ua) {
@@ -423,28 +513,28 @@ function decodeImagesBatch(urls, referer, ua) {
     var toFetch = [];
     var toFetchIdx = [];
 
-    // 1. Check cache
+    // 1. Check cache trước
+    var cachedCount = 0;
     for (var i = 0; i < urls.length; i++) {
-        var cacheKey = HG_IMG_CACHE_PREFIX + urls[i].substring(urls[i].lastIndexOf("/") + 1).substring(0, 60);
-        try {
-            var cached = localStorage.getItem(cacheKey);
-            if (cached && cached.length > 100) {
-                results[i] = cached;
-                continue;
-            }
-        } catch (e) {}
+        if (!urls[i]) { results[i] = ""; continue; }
+        var cached = hgCacheGet(urls[i]);
+        if (cached) {
+            results[i] = cached;
+            cachedCount++;
+            continue;
+        }
         toFetch.push(urls[i]);
         toFetchIdx.push(i);
     }
 
     if (toFetch.length === 0) {
-        console.log("[HG-AES] All " + urls.length + " images from cache");
+        console.log("[HG-AES] All " + urls.length + " images from cache (0 fetch)");
         return results;
     }
 
-    console.log("[HG-AES] Fetching " + toFetch.length + "/" + urls.length + " images...");
+    console.log("[HG-AES] Fetching " + toFetch.length + "/" + urls.length + " images (cached " + cachedCount + ")...");
 
-    // 2. Fetch song song
+    // 2. Batch fetch song song qua fetchAll
     var responses;
     try {
         responses = fetchAll(toFetch, {
@@ -460,6 +550,7 @@ function decodeImagesBatch(urls, referer, ua) {
     }
 
     // 3. Decode tuần tự (AES không parallel được trong QuickJS)
+    var okCount = 0;
     for (var j = 0; j < responses.length; j++) {
         var r = responses[j];
         var idx = toFetchIdx[j];
@@ -476,28 +567,33 @@ function decodeImagesBatch(urls, referer, ua) {
             while (end > 0 && plainBytes[end - 1] === 0) end--;
             var clean = plainBytes.subarray(0, end);
 
+            var mimeType = detectMimeType(toFetch[j]);
             var dataUri = "";
-            if (clean[0] === 0xFF && clean[1] === 0xD8) {
-                dataUri = "data:image/jpeg;base64," + hgBytesToBase64(clean);
-            } else if (clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) {
+
+            // Case B: base64 string (JPEG/PNG/GIF)
+            if ((clean[0] === 0x2F && clean[1] === 0x39 && clean[2] === 0x6A) ||  // /9j/
+                (clean[0] === 0x69 && clean[1] === 0x56 && clean[2] === 0x42) ||  // iVB
+                (clean[0] === 0x52 && clean[1] === 0x30 && clean[2] === 0x6C)) {  // R0l
                 var str = "";
-                for (var m = 0; m < clean.length; m++) str += String.fromCharCode(clean[m]);
-                dataUri = "data:image/jpeg;base64," + str;
+                for (var s = 0; s < clean.length; s++) str += String.fromCharCode(clean[s]);
+                dataUri = "data:" + mimeType + ";base64," + str;
             } else {
-                dataUri = "data:image/jpeg;base64," + hgBytesToBase64(clean);
+                // Case A: raw bytes
+                dataUri = "data:" + mimeType + ";base64," + hgBytesToBase64(clean);
             }
 
             results[idx] = dataUri;
+            okCount++;
 
-            // Cache
-            var cacheKey = HG_IMG_CACHE_PREFIX + toFetch[j].substring(toFetch[j].lastIndexOf("/") + 1).substring(0, 60);
-            try { localStorage.setItem(cacheKey, dataUri); } catch (e) {}
+            // Lưu cache
+            hgCacheSet(toFetch[j], dataUri);
         } catch (e) {
             console.error("[HG-AES] decode[" + j + "] fail: " + e.message);
             results[idx] = "";
         }
     }
 
+    console.log("[HG-AES] Decoded " + okCount + "/" + toFetch.length + " images");
     return results;
 }
 
@@ -525,82 +621,29 @@ function parseSearchResponse(html, apiUrl) {
     return parseListResponse(html, apiUrl);
 }
 
-// ---- 4.1 Parse lưới phim ----
 
-function parseDramaGrid(html, apiUrl) {
-    var rawItems = [];
-    var seen = {};
+// ---- 4.1. Extract drama card (metadata only, chưa decode ảnh) ----
 
-    // Pass 1: Extract metadata (chưa decode ảnh)
-    try {
-        var $doc = _$(html);
-        $doc.find(".hg-drama-card").each(function () {
-            var item = extractDramaCard(this, seen);
-            if (item) rawItems.push(item);
-        });
-    } catch (e) {
-        console.error("[HG] MiniJQ parse fail: " + e.message);
+function normalizePosterUrl(poster) {
+    if (!poster || typeof poster !== "string") return "";
+    if (poster.indexOf("cover-placeholder") !== -1) return "";
+    if (poster.indexOf("//") === 0) return "https:" + poster;
+    if (poster.indexOf("http") !== 0) {
+        return BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
     }
-
-    if (rawItems.length === 0) {
-        rawItems = parseDramaGridByRegex(html, seen);
-    }
-
-    // Pass 2: Batch decode ảnh
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) rawPosters.push(rawItems[i]._rawPoster || "");
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
-
-    var items = [];
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
-        delete it._rawPoster;
-        it.posterUrl = decoded[j] || it.posterUrl || "";
-        items.push(it);
-    }
-
-    var currentPage = 1;
-    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
-    var m = apiUrl.match(/[?&]page=(\d+)/);
-    if (m) currentPage = parseInt(m[1], 10);
-    else {
-        var mPath = cleanUrl.match(/\/(\d+)\/?$/);
-        if (mPath) currentPage = parseInt(mPath[1], 10);
-    }
-
-    var totalPages = 1;
-    try {
-        var $p = _$(html).find("[data-hg-pager-jump]");
-        if ($p.length > 0) {
-            var dp = $p.attr("data-pages");
-            if (dp) totalPages = parseInt(dp, 10) || 1;
-        }
-    } catch (e) {}
-    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
-
-    console.log("[HG] parseDramaGrid → " + items.length + " items, decoded " + decoded.filter(function(x){return x;}).length);
-    return JSON.stringify({
-        items: items,
-        pagination: { currentPage: currentPage, totalPages: totalPages, totalItems: items.length, itemsPerPage: 20 }
-    });
+    return poster;
 }
 
 function extractDramaCard(cardEl, seen) {
     var $link = cardEl.find(".hg-drama-card__cover-link");
     var href = $link.attr("href") || "";
     if (!href) return null;
-    var id = href;
-    if (seen[id]) return null;
-    seen[id] = true;
+    if (seen[href]) return null;
+    seen[href] = true;
 
     var $img = $link.find("img");
     var poster = $img.attr("data-src") || $img.attr("src") || "";
-    if (poster.indexOf("cover-placeholder") !== -1) {
-        poster = $img.attr("data-src") || "";
-    }
-    if (poster.indexOf("cover-placeholder") !== -1) poster = "";
-    if (poster.indexOf("//") === 0) poster = "https:" + poster;
-    else if (poster && poster.indexOf("http") !== 0) poster = BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+    poster = normalizePosterUrl(poster);
 
     var title = cardEl.find(".hg-drama-card__title").text().trim();
     if (!title) title = cardEl.find("h3.hg-drama-card__title a").text().trim();
@@ -619,10 +662,10 @@ function extractDramaCard(cardEl, seen) {
     var score = cardEl.find(".hg-drama-card__score").text().trim().replace("分", "").trim();
 
     return {
-        id: id,
+        id: href,
         title: title,
-        posterUrl: "",            // sẽ set sau khi decode
-        _rawPoster: poster,       // giữ URL gốc để decode
+        posterUrl: "",             // sẽ set sau khi decode
+        _rawPoster: poster,        // giữ URL ciphertext để batch decode
         description: desc,
         episode_current: episodeRaw,
         quality: score ? (score + "分") : "",
@@ -648,9 +691,7 @@ function parseDramaGridByRegex(html, seen) {
             var dsMatch = inner.match(/data-src="([^"]+)"/);
             poster = dsMatch ? dsMatch[1] : "";
         }
-        if (poster.indexOf("cover-placeholder") !== -1) poster = "";
-        if (poster.indexOf("//") === 0) poster = "https:" + poster;
-        else if (poster && poster.indexOf("http") !== 0) poster = BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+        poster = normalizePosterUrl(poster);
 
         var titleRe = new RegExp('<h3[^>]+class="hg-drama-card__title"[^>]*>\\s*<a[^>]+href="' + id.replace(/\//g, "\\/") + '"[^>]*>([^<]+)', "i");
         var tm = html.match(titleRe);
@@ -667,13 +708,81 @@ function parseDramaGridByRegex(html, seen) {
     return items;
 }
 
+// ---- Batch decode và gán posterUrl cho items ----
 
-// ---- 4.2 Các parser khác (giữ nguyên logic v1.4.3) ----
+function assignDecodedPosters(rawItems) {
+    var rawPosters = [];
+    for (var i = 0; i < rawItems.length; i++) {
+        rawPosters.push(rawItems[i]._rawPoster || "");
+    }
+    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
+    var items = [];
+    for (var j = 0; j < rawItems.length; j++) {
+        var it = rawItems[j];
+        delete it._rawPoster;
+        it.posterUrl = decoded[j] || it.posterUrl || "";
+        items.push(it);
+    }
+    return items;
+}
+
+// ---- 4.2. Parse lưới phim ----
+
+function parseDramaGrid(html, apiUrl) {
+    var rawItems = [];
+    var seen = {};
+
+    try {
+        var $doc = _$(html);
+        $doc.find(".hg-drama-card").each(function () {
+            var item = extractDramaCard(this, seen);
+            if (item) rawItems.push(item);
+        });
+    } catch (e) {
+        console.error("[HG] MiniJQ parse fail: " + e.message);
+    }
+
+    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
+
+    var items = assignDecodedPosters(rawItems);
+
+    var currentPage = 1;
+    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
+    var m = apiUrl.match(/[?&]page=(\d+)/);
+    if (m) currentPage = parseInt(m[1], 10);
+    else {
+        var mPath = cleanUrl.match(/\/(\d+)\/?$/);
+        if (mPath) currentPage = parseInt(mPath[1], 10);
+    }
+
+    var totalPages = 1;
+    try {
+        var $p = _$(html).find("[data-hg-pager-jump]");
+        if ($p.length > 0) {
+            var dp = $p.attr("data-pages");
+            if (dp) totalPages = parseInt(dp, 10) || 1;
+        }
+    } catch (e) {}
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
+
+    console.log("[HG] parseDramaGrid → " + items.length + " items, page " + currentPage + "/" + totalPages);
+    return JSON.stringify({
+        items: items,
+        pagination: {
+            currentPage: currentPage,
+            totalPages: totalPages,
+            totalItems: items.length,
+            itemsPerPage: 20
+        }
+    });
+}
+
+
+// ---- 4.3. Parse danh sách chủ đề ----
 
 function parseTopicsList(html, apiUrl) {
-    var items = [];
-    var seen = {};
     var rawItems = [];
+    var seen = {};
 
     try {
         var $doc = _$(html);
@@ -685,9 +794,7 @@ function parseTopicsList(html, apiUrl) {
 
             var $img = $card.find("img");
             var poster = $img.attr("data-src") || $img.attr("src") || "";
-            if (poster.indexOf("cover-placeholder") !== -1) poster = "";
-            if (poster.indexOf("//") === 0) poster = "https:" + poster;
-            else if (poster && poster.indexOf("http") !== 0) poster = BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+            poster = normalizePosterUrl(poster);
 
             rawItems.push({
                 id: href,
@@ -703,20 +810,40 @@ function parseTopicsList(html, apiUrl) {
                 type: "folder"
             });
         });
-    } catch (e) {}
-
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) rawPosters.push(rawItems[i]._rawPoster || "");
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
-        delete it._rawPoster;
-        it.posterUrl = decoded[j] || "";
-        items.push(it);
+    } catch (e) {
+        console.error("[HG] parseTopicsList fail: " + e.message);
     }
 
-    return JSON.stringify({ items: items, pagination: { currentPage: 1, totalPages: 1 } });
+    if (rawItems.length === 0) {
+        var re = /<a[^>]*class="hg-topic-card"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<img[^>]+(?:data-src|src)="([^"]+)"[\s\S]*?<h3[^>]*class="hg-topic-card__title"[^>]*>([^<]+)<\/h3>/g;
+        var m;
+        while ((m = re.exec(html)) !== null) {
+            var href = m[1];
+            if (seen[href]) continue;
+            seen[href] = true;
+            var poster = normalizePosterUrl(m[2]);
+            rawItems.push({
+                id: href,
+                title: m[3].trim(),
+                posterUrl: "",
+                _rawPoster: poster,
+                isCategory: true,
+                type: "folder"
+            });
+        }
+    }
+
+    var items = assignDecodedPosters(rawItems);
+
+    console.log("[HG] parseTopicsList → " + items.length + " folders");
+    return JSON.stringify({
+        items: items,
+        pagination: { currentPage: 1, totalPages: 1 }
+    });
 }
+
+
+// ---- 4.4. Parse chi tiết chủ đề ----
 
 function parseTopicDetail(html, apiUrl) {
     var rawItems = [];
@@ -733,26 +860,46 @@ function parseTopicDetail(html, apiUrl) {
                 if (item) rawItems.push(item);
             });
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("[HG] parseTopicDetail fail: " + e.message);
+    }
     if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
 
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) rawPosters.push(rawItems[i]._rawPoster || "");
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
+    var items = assignDecodedPosters(rawItems);
 
-    var items = [];
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
-        delete it._rawPoster;
-        it.posterUrl = decoded[j] || "";
-        items.push(it);
-    }
+    var currentPage = 1;
+    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
+    var mPage = cleanUrl.match(/\/topics\/[^\/]+\/(\d+)\/?$/);
+    if (mPage) currentPage = parseInt(mPage[1], 10);
 
+    var totalPages = 1;
+    try {
+        var $pager = _$(html).find("[data-hg-pager-jump]");
+        if ($pager.length > 0) {
+            var dp = $pager.attr("data-pages");
+            if (dp) totalPages = parseInt(dp, 10) || 1;
+        }
+        if (totalPages === 1) {
+            var pageCount = _$(html).find(".hg-pager__page").length;
+            if (pageCount > 0) totalPages = pageCount;
+        }
+    } catch (e) {}
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
+
+    console.log("[HG] parseTopicDetail → " + items.length + " items, page " + currentPage + "/" + totalPages);
     return JSON.stringify({
         items: items,
-        pagination: { currentPage: 1, totalPages: 1, totalItems: items.length, itemsPerPage: 24 }
+        pagination: {
+            currentPage: currentPage,
+            totalPages: totalPages,
+            totalItems: items.length,
+            itemsPerPage: 24
+        }
     });
 }
+
+
+// ---- 4.5. Parse kết quả tìm kiếm ----
 
 function parseSearchResults(html, apiUrl) {
     var rawItems = [];
@@ -769,26 +916,50 @@ function parseSearchResults(html, apiUrl) {
                 if (item) rawItems.push(item);
             });
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("[HG] parseSearchResults fail: " + e.message);
+    }
     if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
 
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) rawPosters.push(rawItems[i]._rawPoster || "");
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
+    var items = assignDecodedPosters(rawItems);
 
-    var items = [];
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
-        delete it._rawPoster;
-        it.posterUrl = decoded[j] || "";
-        items.push(it);
-    }
+    var totalItems = items.length;
+    try {
+        var $page = _$(html).find(".hg-search-page");
+        if ($page.length > 0) {
+            var t = $page.attr("data-track-search-total");
+            if (t) totalItems = parseInt(t, 10) || items.length;
+        }
+    } catch (e) {}
 
+    var currentPage = 1;
+    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
+    var mPage = cleanUrl.match(/\/search\/video\/[^\/]+\/(\d+)\/?$/);
+    if (mPage) currentPage = parseInt(mPage[1], 10);
+
+    var totalPages = 1;
+    try {
+        var $pager = _$(html).find("[data-hg-pager-jump]");
+        if ($pager.length > 0) {
+            var dp = $pager.attr("data-pages");
+            if (dp) totalPages = parseInt(dp, 10) || 1;
+        }
+    } catch (e) {}
+
+    console.log("[HG] parseSearchResults → " + items.length + " items (total " + totalItems + ")");
     return JSON.stringify({
         items: items,
-        pagination: { currentPage: 1, totalPages: 1, totalItems: items.length, itemsPerPage: 20 }
+        pagination: {
+            currentPage: currentPage,
+            totalPages: totalPages,
+            totalItems: totalItems,
+            itemsPerPage: items.length || 20
+        }
     });
 }
+
+
+// ---- 4.6. Parse bảng xếp hạng ----
 
 function parseRankList(html, apiUrl) {
     var rawItems = [];
@@ -799,15 +970,25 @@ function parseRankList(html, apiUrl) {
             var $item = this;
             var $link = $item.find(".hg-rank-item__title a").first();
             var href = $link.attr("href") || "";
-            if (!href) { $link = $item.find(".hg-rank-item__cover"); href = $link.attr("href") || ""; }
+            if (!href) {
+                $link = $item.find(".hg-rank-item__cover");
+                href = $link.attr("href") || "";
+            }
             if (!href || seen[href]) return;
             seen[href] = true;
 
+            var rankNum = $item.find(".hg-rank-num").text().trim();
+            var rank = parseInt(rankNum, 10) || (rawItems.length + 1);
+
             var $img = $item.find(".hg-rank-item__cover img, .hg-rank-item__main img");
-            var poster = $img.attr("data-src") || $img.attr("src") || "";
-            if (poster.indexOf("cover-placeholder") !== -1) poster = "";
-            if (poster.indexOf("//") === 0) poster = "https:" + poster;
-            else if (poster && poster.indexOf("http") !== 0) poster = BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+            var poster = normalizePosterUrl($img.attr("data-src") || $img.attr("src") || "");
+
+            var tagsText = $item.find(".hg-rank-item__tags").text();
+            var mScore = tagsText.match(/(\d+\.\d+)分/);
+            var score = mScore ? mScore[1] : "";
+
+            var heat = $item.find(".hg-rank-item__heat-value").text().trim()
+                    || $item.find(".hg-rank-metric-value").text().trim();
 
             rawItems.push({
                 id: href,
@@ -815,35 +996,118 @@ function parseRankList(html, apiUrl) {
                 posterUrl: "",
                 _rawPoster: poster,
                 description: $item.find(".hg-rank-item__desc").text().trim(),
-                isCategory: false
+                episode_current: heat ? ("Nhiệt " + heat) : "",
+                quality: score ? (score + "分") : "",
+                year: 0,
+                lang: "Vietsub",
+                isCategory: false,
+                rank: rank
             });
         });
-    } catch (e) {}
-
-    var rawPosters = [];
-    for (var i = 0; i < rawItems.length; i++) rawPosters.push(rawItems[i]._rawPoster || "");
-    var decoded = decodeImagesBatch(rawPosters, REFERER, UA_MOBILE);
-
-    var items = [];
-    for (var j = 0; j < rawItems.length; j++) {
-        var it = rawItems[j];
-        delete it._rawPoster;
-        it.posterUrl = decoded[j] || "";
-        items.push(it);
+    } catch (e) {
+        console.error("[HG] parseRankList fail: " + e.message);
     }
 
+    var items = assignDecodedPosters(rawItems);
+
+    console.log("[HG] parseRankList → " + items.length + " items");
     return JSON.stringify({
         items: items,
         pagination: { currentPage: 1, totalPages: 1, totalItems: items.length, itemsPerPage: 20 }
     });
 }
 
+
+// ---- 4.7. Tag & Author (dùng chung DramaGrid) ----
+
 function parseTagPage(html, apiUrl) {
-    return parseDramaGrid(html, apiUrl);
+    var rawItems = [];
+    var seen = {};
+    try {
+        var $doc = _$(html);
+        $doc.find(".hg-channel-page .hg-card-grid .hg-drama-card").each(function () {
+            var item = extractDramaCard(this, seen);
+            if (item) rawItems.push(item);
+        });
+        if (rawItems.length === 0) {
+            $doc.find(".hg-drama-card").each(function () {
+                var item = extractDramaCard(this, seen);
+                if (item) rawItems.push(item);
+            });
+        }
+    } catch (e) {}
+    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
+
+    var items = assignDecodedPosters(rawItems);
+
+    var currentPage = 1;
+    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
+    var mPage = cleanUrl.match(/\/tag\/[^\/]+\/page\/(\d+)\/?$/);
+    if (mPage) currentPage = parseInt(mPage[1], 10);
+
+    var totalPages = 1;
+    try {
+        var $pager = _$(html).find("[data-hg-pager-jump]");
+        if ($pager.length > 0) {
+            var dp = $pager.attr("data-pages");
+            if (dp) totalPages = parseInt(dp, 10) || 1;
+        }
+    } catch (e) {}
+    if (totalPages === 1) {
+        var mLast = html.match(/\/tag\/[^\/]+\/page\/(\d+)\/"[^>]*>\s*末页/);
+        if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
+    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
+
+    return JSON.stringify({
+        items: items,
+        pagination: { currentPage: currentPage, totalPages: totalPages, totalItems: items.length, itemsPerPage: 16 }
+    });
 }
 
 function parseAuthorPage(html, apiUrl) {
-    return parseDramaGrid(html, apiUrl);
+    var rawItems = [];
+    var seen = {};
+    try {
+        var $doc = _$(html);
+        $doc.find(".hg-creator-page .hg-card-grid .hg-drama-card").each(function () {
+            var item = extractDramaCard(this, seen);
+            if (item) rawItems.push(item);
+        });
+        if (rawItems.length === 0) {
+            $doc.find(".hg-drama-card").each(function () {
+                var item = extractDramaCard(this, seen);
+                if (item) rawItems.push(item);
+            });
+        }
+    } catch (e) {}
+    if (rawItems.length === 0) rawItems = parseDramaGridByRegex(html, seen);
+
+    var items = assignDecodedPosters(rawItems);
+
+    var currentPage = 1;
+    var cleanUrl = apiUrl.split("|")[0].split("?")[0];
+    var mPage = cleanUrl.match(/\/author\/\d+\/video\/(\d+)\/?$/);
+    if (mPage) currentPage = parseInt(mPage[1], 10);
+
+    var totalPages = 1;
+    try {
+        var $pager = _$(html).find("[data-hg-pager-jump]");
+        if ($pager.length > 0) {
+            var dp = $pager.attr("data-pages");
+            if (dp) totalPages = parseInt(dp, 10) || 1;
+        }
+    } catch (e) {}
+    if (totalPages === 1) {
+        var mLast = html.match(/\/author\/\d+\/video\/(\d+)\/"[^>]*>\s*末页/);
+        if (mLast) totalPages = parseInt(mLast[1], 10) || 1;
+    }
+    if (totalPages === 1 && items.length >= 20) totalPages = currentPage + 1;
+
+    return JSON.stringify({
+        items: items,
+        pagination: { currentPage: currentPage, totalPages: totalPages, totalItems: items.length, itemsPerPage: 20 }
+    });
 }
 
 
@@ -858,7 +1122,9 @@ function parseMovieDetail(html, apiUrl, datasend) {
     var vdata = null;
     var mData = html.match(/<script[^>]+id="videoInitialData"[^>]*>([\s\S]*?)<\/script>/);
     if (mData) {
-        try { vdata = JSON.parse(mData[1]); } catch (e) {}
+        try { vdata = JSON.parse(mData[1]); } catch (e) {
+            console.error("[HG] videoInitialData parse fail: " + e.message);
+        }
     }
 
     var title = "", poster = "", description = "", tags = [], author = "", views = "";
@@ -882,14 +1148,13 @@ function parseMovieDetail(html, apiUrl, datasend) {
         var mD = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
         if (mD) description = mD[1];
     }
-    if (poster.indexOf("cover-placeholder") !== -1) poster = "";
-    if (poster.indexOf("//") === 0) poster = "https:" + poster;
-    else if (poster && poster.indexOf("http") !== 0) poster = BASE + (poster.charAt(0) === "/" ? poster : "/" + poster);
+    poster = normalizePosterUrl(poster);
 
-    // Decode ảnh poster
+    // Decode 1 ảnh poster (dùng batch helper để tận dụng cache)
     var decodedPoster = "";
     if (poster) {
-        decodedPoster = decodeHuangguoImage(poster, REFERER, UA_MOBILE);
+        decodedPoster = hgCacheGet(poster) || decodeHuangguoImage(poster, REFERER, UA_MOBILE) || "";
+        if (decodedPoster) hgCacheSet(poster, decodedPoster);
     }
 
     // Episodes
@@ -906,9 +1171,16 @@ function parseMovieDetail(html, apiUrl, datasend) {
             var slug = epId ? ("ep-" + epId) : ("ep-" + (episodes.length + 1));
             if (seenSlug[slug]) return;
             seenSlug[slug] = true;
-            episodes.push({ id: href, name: epName || ("Tập " + epId), slug: slug, datasend: "epId=" + epId });
+            episodes.push({
+                id: href,
+                name: epName || ("Tập " + epId),
+                slug: slug,
+                datasend: "epId=" + epId
+            });
         });
-    } catch (e) {}
+    } catch (e) {
+        console.error("[HG] parse episodes fail: " + e.message);
+    }
 
     if (episodes.length === 0 && vdata && vdata.epPlaySrcs) {
         var keys = Object.keys(vdata.epPlaySrcs).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
@@ -932,6 +1204,8 @@ function parseMovieDetail(html, apiUrl, datasend) {
         return na - nb;
     });
 
+    console.log("[HG] parseMovieDetail → " + episodes.length + " episodes");
+
     return JSON.stringify({
         id: cleanUrl,
         title: title,
@@ -943,7 +1217,10 @@ function parseMovieDetail(html, apiUrl, datasend) {
         quality: "",
         year: 0,
         status: views ? ("Lượt xem: " + views) : "",
-        servers: [{ name: "Vietsub", episodes: episodes }]
+        servers: [{
+            name: "Vietsub",
+            episodes: episodes
+        }]
     });
 }
 
@@ -953,7 +1230,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
-    console.log("[HG] parseDetailResponse url=" + apiUrl.substring(0, 80));
+    console.log("[HG] parseDetailResponse url=" + apiUrl.substring(0, 80) + " datasend=" + (datasend || ""));
 
     var epId = "";
     if (datasend) {
@@ -991,27 +1268,35 @@ function parseDetailResponse(html, apiUrl, datasend) {
         url: streamUrl,
         isEmbed: false,
         mimeType: "application/x-mpegURL",
-        headers: { "Referer": REFERER, "User-Agent": UA_MOBILE, "Origin": BASE }
+        headers: {
+            "Referer": REFERER,
+            "User-Agent": UA_MOBILE,
+            "Origin": BASE
+        }
     });
 }
 
 
 // =============================================================================
-// 7. EMBED FALLBACK
+// 7. PARSER — EMBED FALLBACK
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
     var m3u8 = html.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
     if (m3u8) {
         return JSON.stringify({
-            url: m3u8[0], isEmbed: false, mimeType: "application/x-mpegURL",
+            url: m3u8[0],
+            isEmbed: false,
+            mimeType: "application/x-mpegURL",
             headers: { "Referer": REFERER, "User-Agent": UA_MOBILE }
         });
     }
     var mp4 = html.match(/https?:\/\/[^\s"'<>\\]+\.mp4[^\s"'<>\\]*/i);
     if (mp4) {
         return JSON.stringify({
-            url: mp4[0], isEmbed: false, mimeType: "video/mp4",
+            url: mp4[0],
+            isEmbed: false,
+            mimeType: "video/mp4",
             headers: { "Referer": REFERER, "User-Agent": UA_MOBILE }
         });
     }
@@ -1023,7 +1308,29 @@ function parseEmbedResponse(html, sourceUrl) {
 // 8. PARSER PHỤ
 // =============================================================================
 
-function parseCategoriesResponse(html, apiUrl) { return JSON.stringify([]); }
+function parseCategoriesResponse(html, apiUrl) {
+    var items = [];
+    var seen = {};
+    try {
+        var $doc = _$(html);
+        $doc.find("a[href^='/tag/']").each(function () {
+            var href = this.attr("href") || "";
+            var name = this.text().trim();
+            if (!href || !name) return;
+            if (/\/page\/\d+\/?$/.test(href)) return;
+            if (seen[href]) return;
+            seen[href] = true;
+            items.push({
+                slug: href.replace(/^\/+/, "").replace(/\/+$/, ""),
+                name: name,
+                value: href,
+                isCategory: true
+            });
+        });
+    } catch (e) {}
+    return JSON.stringify(items);
+}
+
 function parseCountriesResponse(html) { return JSON.stringify([]); }
 function parseYearsResponse(html) { return JSON.stringify([]); }
 function getFilterConfig() { return JSON.stringify({ filters: [] }); }
@@ -1042,4 +1349,11 @@ function getPipeData(apiUrl) {
     return s;
 }
 
-console.log("[HG] huangguo_plugin v2.0 loaded, AES key=" + HG_AES_KEY);
+
+// =============================================================================
+// 10. LOG KHỞI TẠO
+// =============================================================================
+
+console.log("[HG] huangguo_plugin v3.0.0 loaded");
+console.log("[HG] AES key=" + HG_AES_KEY + " IV=" + HG_AES_IV);
+console.log("[HG] BaseUrl=" + BASE);
