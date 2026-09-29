@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.4.2 VI (Fix ảnh + Vietnamese)
+// Version : 1.5.0 VI (Image Proxy + Vietnamese)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -12,18 +12,47 @@ var UA_MOBILE = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KH
 var REFERER = BASE + "/";
 var REFERER_ENCODED = encodeURIComponent(REFERER);
 
+// ⭐ Server trung gian cho ảnh (Cloudflare Worker)
+var IMG_PROXY = "https://huangguoai.alokillgtv02.workers.dev/?url=";
+var USE_IMG_PROXY = true; // đổi thành false để tắt proxy ảnh
+
 
 // =============================================================================
-// HELPER: Fix ảnh — nhúng Referer để bypass anti-hotlink
+// HELPER: Bọc ảnh qua server trung gian
+// =============================================================================
+
+function proxyImageUrl(url) {
+    if (!url || typeof url !== "string") return url || "";
+    if (!USE_IMG_PROXY) return url;
+    if (url.indexOf("http") !== 0) return url;
+    // Tránh double-wrap
+    if (url.indexOf("workers.dev/?url=") !== -1) return url;
+    // Bỏ placeholder
+    if (url.indexOf("cover-placeholder") !== -1) return "";
+    return IMG_PROXY + encodeURIComponent(url);
+}
+
+
+// =============================================================================
+// HELPER: Fix ảnh — ưu tiên proxy, fallback nhúng Referer
 // =============================================================================
 
 function fixImageUrl(url) {
     if (!url || typeof url !== "string") return url || "";
-    if (url.indexOf("http") !== 0) return url;
-    // Nếu đã có | → giữ nguyên (đã được xử lý hoặc là URL khác)
-    if (url.indexOf("|") !== -1) return url;
-    // Nhúng Referer
-    return url + "|Referer=" + REFERER_ENCODED;
+
+    // 1) Bọc qua server trung gian
+    var proxied = proxyImageUrl(url);
+    if (!proxied) return "";
+
+    // Ảnh đã qua proxy → không nhúng Referer nữa (worker tự set)
+    if (proxied.indexOf("workers.dev/?url=") !== -1) {
+        return proxied;
+    }
+
+    // 2) Fallback: nhúng Referer như cũ
+    if (proxied.indexOf("http") !== 0) return proxied;
+    if (proxied.indexOf("|") !== -1) return proxied;
+    return proxied + "|Referer=" + REFERER_ENCODED;
 }
 
 
@@ -35,11 +64,16 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.4.2",
+        "version": "1.5.0",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
-        "iconUrl": BASE + "/static/web/images/logo-huangguo.png",
+        "fallbackUrls": [
+            "https://huangguo8.com",
+            "https://huangguoai.ai",
+            "https://huangguoai.pages.dev"
+        ],
+        "iconUrl": IMG_PROXY + encodeURIComponent(BASE + "/static/web/images/logo-huangguo.png"),
         "referrer": REFERER,
         "imageReferer": REFERER,
         "info": "Plugin cho web Huangguo Short Drama. Nội dung người lớn 18+.",
@@ -286,7 +320,7 @@ function extractDramaCard(cardEl, seen) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-    // ⭐ FIX ẢNH: Nhúng Referer
+    // ⭐ FIX ẢNH: Proxy qua worker
     poster = fixImageUrl(poster);
 
     var title = cardEl.find(".hg-drama-card__title").text().trim();
@@ -1150,4 +1184,5 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.4.2 VI loaded. BaseUrl=" + BASE);
+console.log("[HG] huangguo_plugin.js v1.5.0 VI loaded. BaseUrl=" + BASE
+    + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
