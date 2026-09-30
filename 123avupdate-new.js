@@ -1,12 +1,12 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 4.0.1
-// Cập nhật: 
-//   - Thêm previewUrl với 3 strategy
-//   - Sửa lỗi title bị "0"
-//   - Parse chính xác từ card__body
-//   - Hỗ trợ filter nâng cao (type, year, actress, sort)
-//   - Tối ưu parseListResponse
+// Version: 5.0.0
+// Cập nhật:
+//   - Sửa domain API stream từ javplayer.cc -> jav-master-52.site
+//   - Tự động trích xuất domain API từ iframeUrl (tăng độ bền bỉ)
+//   - Đảm bảo tham số poster được gửi kèm
+//   - Cập nhật Referer header cho API stream
+//   - Giữ nguyên logic parse x-data, list, detail từ v4.0.1
 // =============================================================================
 
 // =============================================================================
@@ -17,7 +17,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "123av",
         "name": "123AV",
-        "version": "4.0.1",
+        "version": "5.0.0",
         "baseUrl": "https://123av.com",
         "fallbackUrls": [
             "https://123av.net",
@@ -149,12 +149,10 @@ var PluginUtils = {
             }
         }
 
-        // Strategy 3: Thử chuyển PNG sang MP4
-        if (url && url.indexOf('.png') !== -1) {
-            var mp4Url = url.replace('.png', '.mp4');
-            // Có thể dùng MP4 nếu muốn
-            // url = mp4Url;
-        }
+        // Strategy 3: Thử chuyển PNG sang MP4 (không dùng, giữ để tham khảo)
+        // if (url && url.indexOf('.png') !== -1) {
+        //     var mp4Url = url.replace('.png', '.mp4');
+        // }
 
         // Chuẩn hóa URL
         return PluginUtils.normalizeUrl(url);
@@ -192,7 +190,7 @@ var PluginUtils = {
 };
 
 // =============================================================================
-// HELPER FUNCTIONS (Giữ nguyên từ plugin cũ)
+// HELPER FUNCTIONS
 // =============================================================================
 
 function getPipeData(raw) {
@@ -266,6 +264,18 @@ function getMeta(html, property) {
     return PluginUtils.getMeta(html, property);
 }
 
+/**
+ * Lấy origin (scheme + host) từ một URL
+ */
+function getOrigin(url) {
+    try {
+        var urlObj = new URL(url);
+        return urlObj.origin;
+    } catch (e) {
+        return null;
+    }
+}
+
 // =============================================================================
 // X-DATA PARSER (PHƯƠNG PHÁP MỚI)
 // =============================================================================
@@ -305,7 +315,7 @@ function extractPlayerDataFromXData(html) {
         }
 
         var firstEpisode = episodeData[0];
-        var iframeUrl = firstEpisode?.url || null;
+        var iframeUrl = firstEpisode && firstEpisode.url ? firstEpisode.url : null;
 
         if (!iframeUrl) {
             return null;
@@ -313,6 +323,7 @@ function extractPlayerDataFromXData(html) {
 
         var hashId = extractHashId(iframeUrl);
         var poster = extractPosterFromUrl(iframeUrl);
+        var iframeOrigin = getOrigin(iframeUrl);
 
         return {
             episodes: episodeData,
@@ -321,6 +332,7 @@ function extractPlayerDataFromXData(html) {
             apiBase: playerMatch[4],
             recKey: playerMatch[5],
             iframeUrl: iframeUrl,
+            iframeOrigin: iframeOrigin,
             hashId: hashId,
             poster: poster
         };
@@ -330,26 +342,74 @@ function extractPlayerDataFromXData(html) {
 }
 
 // =============================================================================
-// STREAM DATA FETCHER
+// STREAM DATA FETCHER (ĐÃ CẬP NHẬT)
 // =============================================================================
 
-function fetchStreamDataAdvanced(hashId, poster) {
+/**
+ * Lấy dữ liệu stream từ API.
+ * 
+ * Cập nhật v5.0.0:
+ *   - Ưu tiên sử dụng origin của iframeUrl để gọi API stream
+ *     (theo dữ liệu HAR: https://jav-master-52.site/stream)
+ *   - Fallback về các domain đã biết
+ *   - Đảm bảo gửi kèm tham số poster (bắt buộc theo dữ liệu HAR)
+ *   - Cập nhật Referer header tương ứng với domain API
+ * 
+ * @param {string} hashId - ID hash trích xuất từ iframeUrl
+ * @param {string} poster - URL poster (bắt buộc theo dữ liệu HAR)
+ * @param {string} [iframeUrl] - URL đầy đủ của iframe (tùy chọn, để trích xuất origin)
+ * @returns {Object} { stream, vtt, poster }
+ */
+function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
     var result = { stream: null, vtt: null, poster: null };
     
-    var endpoints = [
-        'https://javplayer.cc/stream',
-        'https://stream.javplayer.cc/stream'
-    ];
+    if (!hashId) {
+        return result;
+    }
     
-    for (var i = 0; i < endpoints.length; i++) {
+    // Xây dựng danh sách các endpoint API cần thử
+    var apiEndpoints = [];
+    
+    // 1. Ưu tiên origin của iframeUrl (tự động thích ứng khi domain thay đổi)
+    if (iframeUrl) {
+        var iframeOrigin = getOrigin(iframeUrl);
+        if (iframeOrigin) {
+            apiEndpoints.push(iframeOrigin + '/stream');
+        }
+    }
+    
+    // 2. Fallback: các domain đã biết (từ dữ liệu HAR mới nhất)
+    apiEndpoints.push('https://jav-master-52.site/stream');
+    apiEndpoints.push('https://javplayer.cc/stream');
+    apiEndpoints.push('https://stream.javplayer.cc/stream');
+    
+    // Loại bỏ các endpoint trùng lặp
+    var uniqueEndpoints = [];
+    for (var i = 0; i < apiEndpoints.length; i++) {
+        if (uniqueEndpoints.indexOf(apiEndpoints[i]) === -1) {
+            uniqueEndpoints.push(apiEndpoints[i]);
+        }
+    }
+    
+    // Thử từng endpoint
+    for (var j = 0; j < uniqueEndpoints.length; j++) {
         try {
-            var url = endpoints[i] + '?id=' + encodeURIComponent(hashId);
-            if (poster) url += '&poster=' + encodeURIComponent(poster);
+            var endpoint = uniqueEndpoints[j];
+            var url = endpoint + '?id=' + encodeURIComponent(hashId);
+            
+            // Tham số poster là bắt buộc theo dữ liệu HAR
+            if (poster) {
+                url += '&poster=' + encodeURIComponent(poster);
+            }
+            
+            // Xác định Referer tương ứng với domain API
+            var apiOrigin = getOrigin(endpoint) || endpoint;
             
             var response = httpRequest(url, {
                 method: "GET",
                 headers: {
                     "Accept": "application/json",
+                    "Referer": apiOrigin + "/",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
             });
@@ -364,6 +424,7 @@ function fetchStreamDataAdvanced(hashId, poster) {
                 }
             }
         } catch (e) {
+            // Thử endpoint tiếp theo
             continue;
         }
     }
@@ -372,7 +433,7 @@ function fetchStreamDataAdvanced(hashId, poster) {
 }
 
 // =============================================================================
-// URL GENERATION (CẢI TIẾN - HỖ TRỢ FILTER NÂNG CAO)
+// URL GENERATION (HỖ TRỢ FILTER NÂNG CAO)
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
@@ -502,7 +563,7 @@ function getUrlYears() {
 }
 
 // =============================================================================
-// LIST PARSER (CẢI TIẾN HOÀN TOÀN)
+// LIST PARSER
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
@@ -609,7 +670,7 @@ function parseListResponse(html, apiUrl, datasend) {
     }
     
     // ============================================================
-    // PARSE DANH SÁCH PHIM (CẢI TIẾN)
+    // PARSE DANH SÁCH PHIM
     // ============================================================
     $doc.find(".card, .featured").each(function() {
         // --- BƯỚC 1: LẤY SLUG VÀ URL ---
@@ -769,7 +830,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER (CẢI TIẾN - CÓ PREVIEW URL)
+// MOVIE DETAIL PARSER (ĐÃ CẬP NHẬT)
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -820,8 +881,12 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             }
             previewUrl = PluginUtils.normalizeUrl(previewUrl);
             
-            // Lấy stream từ API
-            var streamData = fetchStreamDataAdvanced(xDataResult.hashId, xDataResult.poster);
+            // Lấy stream từ API (đã cập nhật: truyền thêm iframeUrl)
+            var streamData = fetchStreamDataAdvanced(
+                xDataResult.hashId, 
+                xDataResult.poster,
+                xDataResult.iframeUrl
+            );
             
             if (streamData.stream) {
                 var episodes = [];
@@ -972,7 +1037,8 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 var vttUrl = "";
                 
                 if (hashId) {
-                    var streamData = fetchStreamDataAdvanced(hashId, poster);
+                    // Đã cập nhật: truyền thêm rawUrl (là iframeUrl)
+                    var streamData = fetchStreamDataAdvanced(hashId, poster, rawUrl);
                     if (streamData.stream) {
                         m3u8Url = streamData.stream;
                         vttUrl = streamData.vtt || "";
@@ -1029,7 +1095,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// DETAIL RESPONSE PARSER
+// DETAIL RESPONSE PARSER (ĐÃ CẬP NHẬT)
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
@@ -1080,7 +1146,12 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         if (hasXData) {
             var xDataResult = extractPlayerDataFromXData(htmlContent);
             if (xDataResult && xDataResult.iframeUrl) {
-                var streamData = fetchStreamDataAdvanced(xDataResult.hashId, xDataResult.poster);
+                // Đã cập nhật: truyền thêm iframeUrl
+                var streamData = fetchStreamDataAdvanced(
+                    xDataResult.hashId, 
+                    xDataResult.poster,
+                    xDataResult.iframeUrl
+                );
                 if (streamData.stream) {
                     return JSON.stringify({
                         url: streamData.stream,
