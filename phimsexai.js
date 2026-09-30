@@ -454,7 +454,7 @@ function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     
     // ⭐ Chuẩn hóa page về number, tránh "1" vs 1
-    var page = parseInt(filters.page, 10);
+    var page = parseInt(filters.page, 10) || 1;
     if (isNaN(page) || page < 1) page = 1;
 
     var base = getBase();
