@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.5.0 VI (Image Proxy + Vietnamese)
+// Version : 1.5.1 VI (Fix parseDramaGridByRegex — split block)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -57,6 +57,26 @@ function fixImageUrl(url) {
 
 
 // =============================================================================
+// HELPER: HTML utilities
+// =============================================================================
+
+function stripTags(s) {
+    return String(s || "").replace(/<[^>]*>/g, "").trim();
+}
+
+function decodeHtml(s) {
+    return String(s || "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&#x27;/g, "'")
+        .replace(/\\u0026/g, "&");
+}
+
+
+// =============================================================================
 // 1. MANIFEST
 // =============================================================================
 
@@ -64,7 +84,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.5.0",
+        "version": "1.5.1",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -355,34 +375,69 @@ function extractDramaCard(cardEl, seen) {
     };
 }
 
+// ⭐ VIẾT LẠI: split block, match cả <h3> và <div>, strip sr-only
 function parseDramaGridByRegex(html, seen) {
     var items = [];
-    var reLink = /<a[^>]*class="hg-drama-card__cover-link"[^>]*href="(\/video\/\d+\/)"[^>]*>([\s\S]*?)<\/a>/g;
-    var m;
-    while ((m = reLink.exec(html)) !== null) {
-        var id = m[1];
+
+    // Split HTML theo từng card
+    var parts = html.split(/<div\s+class="hg-drama-card"/);
+    for (var i = 1; i < parts.length; i++) {
+        var block = parts[i];
+
+        // Cắt đến card tiếp theo (nếu có)
+        var nextCard = block.indexOf('<div class="hg-drama-card"');
+        if (nextCard > 0) block = block.substring(0, nextCard);
+
+        // Lấy href từ cover-link
+        var mHref = block.match(
+            /<a[^>]*class="hg-drama-card__cover-link"[^>]*href="(\/video\/\d+\/)"/
+        );
+        if (!mHref) continue;
+        var id = mHref[1];
         if (seen[id]) continue;
         seen[id] = true;
 
-        var inner = m[2];
-        var imgMatch = inner.match(/<img[^>]+(?:data-src|src)="([^"]+)"/);
-        var poster = imgMatch ? imgMatch[1] : "";
+        // Lấy poster
+        var mImg = block.match(/<img[^>]+data-src="([^"]+)"/) ||
+                   block.match(/<img[^>]+src="([^"]+)"/);
+        var poster = mImg ? mImg[1] : "";
         if (poster.indexOf("cover-placeholder") !== -1) {
-            var dsMatch = inner.match(/data-src="([^"]+)"/);
-            poster = dsMatch ? dsMatch[1] : "";
+            var mDs = block.match(/data-src="([^"]+)"/);
+            poster = mDs ? mDs[1] : "";
         }
         if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
         // ⭐ FIX ẢNH
         poster = fixImageUrl(poster);
 
-        var titleRe = new RegExp(
-            '<h3[^>]+class="hg-drama-card__title"[^>]*>\\s*<a[^>]+href="'
-            + id.replace(/\//g, "\\/") + '"[^>]*>([^<]+)',
-            "i"
+        // ⭐ Lấy title từ CẢ <h3> VÀ <div>, strip <span class="sr-only">
+        var title = "";
+        var mTitle = block.match(
+            /<h3[^>]*class="[^"]*hg-drama-card__title[^"]*"[^>]*>([\s\S]*?)<\/h3>/
         );
-        var tm = html.match(titleRe);
-        var title = tm ? tm[1].trim() : "";
+        if (!mTitle) {
+            mTitle = block.match(
+                /<div[^>]*class="[^"]*hg-drama-card__title[^"]*"[^>]*>([\s\S]*?)<\/div>/
+            );
+        }
+        if (mTitle) {
+            title = mTitle[1]
+                .replace(/<span[^>]*class="sr-only"[^>]*>[\s\S]*?<\/span>/g, "")
+                .replace(/<[^>]*>/g, "")
+                .trim();
+        }
+
+        // Fallback: alt của img
+        if (!title) {
+            var mAlt = block.match(/<img[^>]+alt="([^"]+)"/);
+            if (mAlt) title = decodeHtml(mAlt[1]).trim();
+        }
+
+        // Bỏ prefix sr-only tiếng Trung / Việt nếu còn sót
+        title = title.replace(/全集在线观看\s*$/, "").trim();
+        title = title.replace(/Xem toàn bộ trực tuyến\.?\s*$/i, "").trim();
+
+        if (!title) continue;
 
         items.push({
             id: id,
@@ -1184,5 +1239,5 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.5.0 VI loaded. BaseUrl=" + BASE
+console.log("[HG] huangguo_plugin.js v1.5.1 VI loaded. BaseUrl=" + BASE
     + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
