@@ -1,25 +1,38 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 5.2.0
-// Cập nhật so với 5.0.0:
-//   - FIX 403 khi tải segment video (.ts/.m4s/.webp):
-//     * Thêm header "Origin" và "Referer" động dựa trên iframeUrl
-//     * CDN con (video-encoder-farm-*.site) yêu cầu Origin/Referer
-//       phải là player cha (jav-master-52.site), không phải CDN con
-//   - Thêm hàm getStreamHeaders() để tạo headers đúng cách
-//   - Áp dụng headers động cho mọi episode, detail response, embed response
-//   - Trả về headers ở cấp episode (ưu tiên) và cấp detail (fallback)
+// Version: 5.3.0
+// Cập nhật so với 5.2.0:
+//   - CHUYỂN SANG CÁCH 2: Gắn pipe-headers vào URL m3u8
+//     * URL trả về có dạng: https://cdn.com/master.m3u8|Referer=...|Origin=...|User-Agent=...
+//     * Player tự parse pipe-suffix và propagate headers cho mọi request con
+//     * VẪN giữ object "headers" làm fallback cho VAApp core cũ
+//   - Thêm hàm buildPipeHeaders() và attachPipeHeaders()
+//   - Áp dụng pipe cho mọi episode, detail response, embed response, subtitle
+//   - Có flag USE_PIPE_HEADERS để bật/tắt nhanh nếu CDN reject dấu "|"
 // =============================================================================
 
 // =============================================================================
 // CONFIGURATION & METADATA
 // =============================================================================
 
+/**
+ * Bật/tắt chế độ gắn pipe-headers vào URL.
+ * - true : URL trả về có |Referer=...|Origin=...|User-Agent=...
+ * - false: Chỉ trả object headers (giống phiên bản 5.2.0)
+ * 
+ * Đổi thành false nếu CDN reject URL có dấu "|" (trả 400/403).
+ */
+var USE_PIPE_HEADERS = true;
+
+var DEFAULT_PLAYER_ORIGIN = "https://jav-master-52.site";
+
+var DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0";
+
 function getManifest() {
     return JSON.stringify({
         "id": "123av",
         "name": "123AV",
-        "version": "5.2.0",
+        "version": "5.3.0",
         "baseUrl": "https://123av.com",
         "referrer": "https://123av.com/",
         "imageReferer": "https://123av.com/",
@@ -125,13 +138,11 @@ var PluginUtils = {
     extractPreviewUrl: function(itemHtml, $element) {
         var url = "";
 
-        // Strategy 1: Lấy từ data-preview attribute (PNG)
         var previewMatch = itemHtml.match(/data-preview="([^"]+)"/);
         if (previewMatch) {
             url = previewMatch[1];
         }
 
-        // Nếu dùng jQuery
         if (!url && $element) {
             var posterDiv = $element.find(".card__poster, .featured__poster").first();
             if (posterDiv && posterDiv.length > 0) {
@@ -139,7 +150,6 @@ var PluginUtils = {
             }
         }
 
-        // Strategy 2: Lấy từ video data-src (MP4)
         if (!url) {
             var videoMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
             if (videoMatch) {
@@ -147,7 +157,6 @@ var PluginUtils = {
             }
         }
 
-        // Chuẩn hóa URL
         return PluginUtils.normalizeUrl(url);
     },
 
@@ -155,29 +164,21 @@ var PluginUtils = {
      * Xác định loại phim (Censored/Uncensored) từ nhiều nguồn
      */
     detectLanguage: function($element, href, title, cardHtml) {
-        // 1. Kiểm tra trong URL
         if (href && href.indexOf('uncensored') !== -1) {
             return 'Uncensored';
         }
-
-        // 2. Kiểm tra trong title
         if (title && title.toLowerCase().indexOf('uncensored') !== -1) {
             return 'Uncensored';
         }
-
-        // 3. Kiểm tra class của card
         if ($element && $element.length > 0) {
             var cardClass = $element.attr("class") || "";
             if (cardClass.toLowerCase().indexOf('uncensored') !== -1) {
                 return 'Uncensored';
             }
         }
-
-        // 4. Kiểm tra HTML của card
         if (cardHtml && cardHtml.toLowerCase().indexOf('uncensored') !== -1) {
             return 'Uncensored';
         }
-
         return 'Censored';
     }
 };
@@ -269,41 +270,99 @@ function getOrigin(url) {
     }
 }
 
+// =============================================================================
+// PIPE HEADERS (CÁCH 2)
+// =============================================================================
+
 /**
- * Tạo headers phù hợp cho CDN stream dựa trên domain của iframeUrl.
+ * Tạo pipe-suffix cho URL.
  * 
- * QUAN TRỌNG - FIX 403:
- *   CDN con (vd: 8xxz.video-encoder-farm-12.site) yêu cầu:
- *     - Origin: https://jav-master-52.site (player cha)
- *     - Referer: https://jav-master-52.site/ (player cha)
- *   
- *   Nếu set Origin = origin của CDN con → 403 Forbidden.
- *   Nếu thiếu Origin hoặc Referer → 403 Forbidden.
- *   Nếu Referer = 123av.com → 403 Forbidden.
+ * Cú pháp: |Header=Value|Header=Value|...
  * 
- * → Bắt buộc dùng origin của iframeUrl (player cha), KHÔNG dùng
- *   origin của stream URL (CDN con).
+ * LƯU Ý:
+ *   - Chỉ gắn vào URL MASTER m3u8, KHÔNG gắn vào segment.
+ *   - Player hỗ trợ (VLC/Kodi/FFmpeg/VAApp custom) sẽ parse phần sau "|"
+ *     và propagate headers cho MỌI request con (playlist + segment + subtitle).
+ *   - Nếu VAApp core dùng ExoPlayer thuần → KHÔNG hoạt động, phải dùng
+ *     object "headers" (fallback đã giữ sẵn).
  * 
- * @param {string} streamUrl - URL của stream (m3u8/ts/m4s)
- * @param {string} iframeUrl - URL của iframe player (jav-master-52.site)
- * @returns {Object} headers object
+ * @param {string} streamUrl - URL stream (không dùng, để tương thích chữ ký hàm)
+ * @param {string} iframeUrl - URL iframe player cha
+ * @returns {string} pipe-suffix, ví dụ:
+ *   "|Referer=https://jav-master-52.site/|Origin=https://jav-master-52.site|User-Agent=Mozilla/5.0 ..."
  */
-function getStreamHeaders(streamUrl, iframeUrl) {
-    var headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0",
-        "Accept": "*/*",
-        "Accept-Language": "vi"
-    };
-    
-    // Ưu tiên origin của iframe (player cha - jav-master-52.site)
+function buildPipeHeaders(streamUrl, iframeUrl) {
     var playOrigin = null;
     if (iframeUrl) {
         playOrigin = getOrigin(iframeUrl);
     }
-    
-    // Fallback: nếu không có iframeUrl, dùng hardcoded domain đã biết
     if (!playOrigin) {
-        playOrigin = "https://jav-master-52.site";
+        playOrigin = DEFAULT_PLAYER_ORIGIN;
+    }
+    
+    // Cú pháp VLC/Kodi: |Header=Value|Header=Value
+    // Referer và Origin để nguyên (không encode) vì player tự hiểu
+    // User-Agent có dấu cách → encode để tránh player cắt nhầm
+    return "|Referer=" + playOrigin + "/" +
+           "|Origin=" + playOrigin +
+           "|User-Agent=" + encodeURIComponent(DEFAULT_USER_AGENT);
+}
+
+/**
+ * Gắn pipe-suffix vào URL (nếu chưa có).
+ * 
+ * - Bỏ qua nếu URL rỗng hoặc là data:
+ * - Bỏ qua nếu URL đã có "|Referer=" (tránh gắn trùng)
+ * - Tự động append vào CUỐI URL (sau query string) → an toàn
+ * 
+ * @param {string} url - URL gốc
+ * @param {string} iframeUrl - iframe player cha
+ * @returns {string} URL đã gắn pipe (hoặc nguyên gốc nếu không cần)
+ */
+function attachPipeHeaders(url, iframeUrl) {
+    if (!url) return url;
+    if (!USE_PIPE_HEADERS) return url;
+    
+    // Đã có pipe → không gắn nữa
+    if (url.indexOf("|Referer=") !== -1 || url.indexOf("|referer=") !== -1) {
+        return url;
+    }
+    
+    // Không gắn pipe cho data: URI
+    if (url.indexOf("data:") === 0) return url;
+    
+    // Không gắn pipe cho URL không phải http/https
+    if (url.indexOf("http://") !== 0 && url.indexOf("https://") !== 0) {
+        return url;
+    }
+    
+    return url + buildPipeHeaders(url, iframeUrl);
+}
+
+/**
+ * Tạo headers OBJECT (fallback cho VAApp core cũ không hỗ trợ pipe).
+ * 
+ * QUAN TRỌNG - FIX 403:
+ *   CDN con yêu cầu Origin/Referer = player cha (jav-master-52.site),
+ *   KHÔNG dùng origin của CDN con, KHÔNG dùng 123av.com.
+ * 
+ * @param {string} streamUrl - URL stream (m3u8/ts/m4s)
+ * @param {string} iframeUrl - URL iframe player cha
+ * @returns {Object} headers object
+ */
+function getStreamHeaders(streamUrl, iframeUrl) {
+    var headers = {
+        "User-Agent": DEFAULT_USER_AGENT,
+        "Accept": "*/*",
+        "Accept-Language": "vi"
+    };
+    
+    var playOrigin = null;
+    if (iframeUrl) {
+        playOrigin = getOrigin(iframeUrl);
+    }
+    if (!playOrigin) {
+        playOrigin = DEFAULT_PLAYER_ORIGIN;
     }
     
     headers["Origin"] = playOrigin;
@@ -396,10 +455,8 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
         return result;
     }
     
-    // Xây dựng danh sách các endpoint API cần thử
     var apiEndpoints = [];
     
-    // 1. Ưu tiên origin của iframeUrl (tự động thích ứng khi domain thay đổi)
     if (iframeUrl) {
         var iframeOrigin = getOrigin(iframeUrl);
         if (iframeOrigin) {
@@ -407,12 +464,10 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
         }
     }
     
-    // 2. Fallback: các domain đã biết (từ dữ liệu HAR mới nhất)
     apiEndpoints.push('https://jav-master-52.site/stream');
     apiEndpoints.push('https://javplayer.cc/stream');
     apiEndpoints.push('https://stream.javplayer.cc/stream');
     
-    // Loại bỏ các endpoint trùng lặp
     var uniqueEndpoints = [];
     for (var i = 0; i < apiEndpoints.length; i++) {
         if (uniqueEndpoints.indexOf(apiEndpoints[i]) === -1) {
@@ -420,18 +475,15 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
         }
     }
     
-    // Thử từng endpoint
     for (var j = 0; j < uniqueEndpoints.length; j++) {
         try {
             var endpoint = uniqueEndpoints[j];
             var url = endpoint + '?id=' + encodeURIComponent(hashId);
             
-            // Tham số poster là bắt buộc theo dữ liệu HAR
             if (poster) {
                 url += '&poster=' + encodeURIComponent(poster);
             }
             
-            // Xác định Referer tương ứng với domain API
             var apiOrigin = getOrigin(endpoint) || endpoint;
             
             var response = httpRequest(url, {
@@ -439,7 +491,7 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
                 headers: {
                     "Accept": "application/json",
                     "Referer": apiOrigin + "/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0"
+                    "User-Agent": DEFAULT_USER_AGENT
                 }
             });
             
@@ -449,7 +501,6 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
                     result.stream = data.media.stream;
                     result.vtt = data.media.vtt || null;
                     result.poster = data.media.poster || poster || null;
-                    // Lưu lại endpoint đã thành công để dùng làm iframeUrl fallback
                     result.iframeUrl = iframeUrl || (apiOrigin + '/e/' + hashId);
                     return result;
                 }
@@ -485,17 +536,9 @@ function getUrlList(slug, filtersJson) {
     
     params.push("page=" + page);
     
-    if (filters.type) {
-        params.push("type=" + encodeURIComponent(filters.type));
-    }
-    
-    if (filters.year) {
-        params.push("year=" + encodeURIComponent(filters.year));
-    }
-    
-    if (filters.actress) {
-        params.push("actress=" + encodeURIComponent(filters.actress));
-    }
+    if (filters.type) params.push("type=" + encodeURIComponent(filters.type));
+    if (filters.year) params.push("year=" + encodeURIComponent(filters.year));
+    if (filters.actress) params.push("actress=" + encodeURIComponent(filters.actress));
     
     if (filters.sort) {
         var sortMap = {
@@ -510,21 +553,10 @@ function getUrlList(slug, filtersJson) {
         params.push("sort=" + encodeURIComponent(sortValue));
     }
     
-    if (filters.keyword) {
-        params.push("keyword=" + encodeURIComponent(filters.keyword));
-    }
-    
-    if (filters.genre) {
-        params.push("genre=" + encodeURIComponent(filters.genre));
-    }
-    
-    if (filters.maker) {
-        params.push("maker=" + encodeURIComponent(filters.maker));
-    }
-    
-    if (filters.series) {
-        params.push("series=" + encodeURIComponent(filters.series));
-    }
+    if (filters.keyword) params.push("keyword=" + encodeURIComponent(filters.keyword));
+    if (filters.genre) params.push("genre=" + encodeURIComponent(filters.genre));
+    if (filters.maker) params.push("maker=" + encodeURIComponent(filters.maker));
+    if (filters.series) params.push("series=" + encodeURIComponent(filters.series));
     
     return url + "?" + params.join("&");
 }
@@ -831,7 +863,7 @@ function parseSearchResponse(html, apiUrl, datasend) {
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER (ĐÃ CẬP NHẬT HEADERS ĐỘNG)
+// MOVIE DETAIL PARSER (CÁCH 2 - PIPE HEADERS)
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
@@ -865,6 +897,11 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             thumb = getMeta(htmlContent, "og:image") || xDataResult.poster || '';
             desc = getMeta(htmlContent, "og:description") || '';
             
+            // FIX: Ưu tiên poster từ iframe URL (chính xác hơn og:image)
+            if (xDataResult.poster) {
+                thumb = xDataResult.poster;
+            }
+            
             var previewMatch = htmlContent.match(/<video[^>]+data-src="([^"]+)"/);
             if (previewMatch) {
                 previewUrl = previewMatch[1];
@@ -880,7 +917,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             }
             previewUrl = PluginUtils.normalizeUrl(previewUrl);
             
-            // Lấy stream từ API (có kèm iframeUrl để tạo headers đúng)
+            // Lấy stream từ API
             var streamData = fetchStreamDataAdvanced(
                 xDataResult.hashId, 
                 xDataResult.poster,
@@ -888,16 +925,22 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             );
             
             if (streamData.stream) {
-                // FIX 403: Tạo headers động dựa trên iframeUrl (player cha)
+                // Headers object (fallback cho VAApp core cũ)
                 var streamHeaders = getStreamHeaders(streamData.stream, xDataResult.iframeUrl);
+                
+                // CÁCH 2: Gắn pipe vào URL m3u8
+                var pipedStreamUrl = attachPipeHeaders(streamData.stream, xDataResult.iframeUrl);
+                var pipedVttUrl = streamData.vtt 
+                    ? attachPipeHeaders(streamData.vtt, xDataResult.iframeUrl) 
+                    : '';
                 
                 var episodes = [];
                 episodes.push({
-                    id: streamData.stream,
+                    id: pipedStreamUrl,           // ← URL đã gắn |Referer=...
                     name: "Server HD #1",
                     slug: "server-1",
-                    vtt: streamData.vtt || '',
-                    headers: streamHeaders
+                    vtt: pipedVttUrl,             // ← VTT cũng gắn pipe
+                    headers: streamHeaders        // ← fallback object
                 });
                 
                 servers.push({
@@ -957,8 +1000,8 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         var thumb = getMeta(htmlContent, "og:image") || "";
         var desc = getMeta(htmlContent, "og:description") || "";
         
-        var coverMatch = htmlContent.match(/style="background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)"/i) ||
-                         htmlContent.match(/background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)/i) ||
+        var coverMatch = htmlContent.match(/style="background-image:url\(['"]?([^'")]+cover\.jpg[^'")]*)['"]?\)"/i) ||
+                         htmlContent.match(/background-image:url\(['"]?([^'")]+cover\.jpg[^'")]*)['"]?\)/i) ||
                          htmlContent.match(/src="([^"]+cover\.jpg[^"]*)"/i);
         if (coverMatch) {
             thumb = coverMatch[1];
@@ -1041,14 +1084,17 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                     }
                 }
                 
-                // FIX 403: Headers động cho mỗi episode
                 var epHeaders = getStreamHeaders(m3u8Url, rawUrl);
                 
+                // CÁCH 2: Gắn pipe
+                var pipedM3u8 = attachPipeHeaders(m3u8Url, rawUrl);
+                var pipedVtt = vttUrl ? attachPipeHeaders(vttUrl, rawUrl) : "";
+                
                 episodes.push({
-                    id: m3u8Url,
+                    id: pipedM3u8,
                     name: "Server HD #" + (item.name || (i + 1)),
                     slug: "server-" + (i + 1),
-                    vtt: vttUrl,
+                    vtt: pipedVtt,
                     headers: epHeaders
                 });
             }
@@ -1096,7 +1142,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// DETAIL RESPONSE PARSER (FIX 403 HEADERS)
+// DETAIL RESPONSE PARSER (CÁCH 2 - PIPE HEADERS)
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
@@ -1105,17 +1151,33 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
             try {
                 var data = JSON.parse(datasend);
                 if (data && data.url) {
-                    // FIX 403: Nếu có iframeUrl, tạo headers động
-                    var dynamicHeaders = data.iframeUrl 
-                        ? getStreamHeaders(data.url, data.iframeUrl)
+                    var iframeUrl = data.iframeUrl || null;
+                    
+                    // CÁCH 2: Gắn pipe vào URL
+                    var pipedUrl = attachPipeHeaders(data.url, iframeUrl);
+                    
+                    // Headers object (fallback)
+                    var dynamicHeaders = iframeUrl 
+                        ? getStreamHeaders(data.url, iframeUrl)
                         : (data.headers || getStreamHeaders(data.url, null));
                     
+                    // Subtitle cũng gắn pipe
+                    var subtitles = [];
+                    if (data.subtitles && data.subtitles.length) {
+                        for (var si = 0; si < data.subtitles.length; si++) {
+                            subtitles.push({
+                                lang: data.subtitles[si].lang,
+                                url: attachPipeHeaders(data.subtitles[si].url, iframeUrl)
+                            });
+                        }
+                    }
+                    
                     return JSON.stringify({
-                        url: data.url,
+                        url: pipedUrl,
                         isEmbed: data.isEmbed || false,
                         headers: dynamicHeaders,
                         mimeType: data.mimeType || "application/x-mpegURL",
-                        subtitles: data.subtitles || []
+                        subtitles: subtitles
                     });
                 }
             } catch (e) {}
@@ -1152,16 +1214,21 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                     xDataResult.iframeUrl
                 );
                 if (streamData.stream) {
-                    // FIX 403: Headers động dựa trên iframeUrl
                     var streamHeaders = getStreamHeaders(streamData.stream, xDataResult.iframeUrl);
                     
+                    // CÁCH 2: Gắn pipe
+                    var pipedStream = attachPipeHeaders(streamData.stream, xDataResult.iframeUrl);
+                    var pipedVtt = streamData.vtt 
+                        ? attachPipeHeaders(streamData.vtt, xDataResult.iframeUrl) 
+                        : null;
+                    
                     return JSON.stringify({
-                        url: streamData.stream,
+                        url: pipedStream,
                         isEmbed: false,
                         headers: streamHeaders,
                         mimeType: "application/x-mpegURL",
-                        subtitles: streamData.vtt ? [
-                            { lang: "Preview", url: streamData.vtt }
+                        subtitles: pipedVtt ? [
+                            { lang: "Preview", url: pipedVtt }
                         ] : []
                     });
                 }
@@ -1170,10 +1237,11 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         
         var m3u8Match = htmlContent.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
+            var rawM3u8 = m3u8Match[0];
             return JSON.stringify({
-                url: m3u8Match[0],
+                url: attachPipeHeaders(rawM3u8, null),
                 isEmbed: false,
-                headers: getStreamHeaders(m3u8Match[0], null),
+                headers: getStreamHeaders(rawM3u8, null),
                 mimeType: "application/x-mpegURL"
             });
         }
@@ -1196,7 +1264,7 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// EMBED RESPONSE PARSER (FIX 403 HEADERS)
+// EMBED RESPONSE PARSER (CÁCH 2 - PIPE HEADERS)
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
@@ -1212,20 +1280,22 @@ function parseEmbedResponse(html, sourceUrl) {
         
         var m3u8Match = html.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
+            var rawM3u8 = m3u8Match[0];
             return JSON.stringify({
-                url: m3u8Match[0],
+                url: attachPipeHeaders(rawM3u8, sourceUrl),
                 isEmbed: false,
                 mimeType: "application/x-mpegURL",
-                headers: getStreamHeaders(m3u8Match[0], sourceUrl)
+                headers: getStreamHeaders(rawM3u8, sourceUrl)
             });
         }
         
         var videoMatch = html.match(/["'](?:file|src|url)["']\s*:\s*["']([^"']+\.(?:mp4|mkv|m3u8)[^"']*)["']/i);
         if (videoMatch) {
+            var rawVideo = videoMatch[1];
             return JSON.stringify({
-                url: videoMatch[1],
+                url: attachPipeHeaders(rawVideo, sourceUrl),
                 isEmbed: false,
-                headers: getStreamHeaders(videoMatch[1], sourceUrl)
+                headers: getStreamHeaders(rawVideo, sourceUrl)
             });
         }
         
