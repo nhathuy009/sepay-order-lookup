@@ -1,18 +1,14 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.6.0 - VAAPP COMPLIANT RELEASE
+// Version: 6.7.0 - FULL CATEGORY + TAG SUPPORT
 // Base: https://phimsexai.xyz
 //
-// CHANGELOG v6.6.0:
-//   [FIX] Tuân thủ tài liệu VAAPP chính thức:
-//         - episode.slug DUY NHẤT (không dùng "full" cho mọi tập)
-//         - parseDetailResponse() đọc datasend đúng cách
-//         - Dùng getCookie() để lấy cookie gửi kèm request /player/
-//   [ADD] fetchAll() — resolve tất cả server song song (nhanh 10-20x)
-//   [ADD] _$() MiniJQ cho parse HTML gọn hơn
-//   [ADD] getResponseHeaders() debug 302
-//   [ADD] Hỗ trợ playerType "embedtoexoplay" cho server iframe
-//   [KEEP] Tất cả fix từ v6.5.1 (domain, headers, fallback /?p=)
+// CHANGELOG v6.7.0:
+//   [ADD] Hỗ trợ đầy đủ Category + Tag từ tag-cloud thực tế
+//   [ADD] getUrlList() nhận diện slug dạng "tag/xxx"
+//   [UPDATE] getPrimaryCategories() khớp tag-cloud thực tế
+//   [UPDATE] getFilterConfig() thêm ~15 tag phổ biến
+//   [KEEP] Tất cả fix từ v6.6.0 (fetchAll, getCookie, uniqueSlug, fallback /?p=)
 // =============================================================================
 
 var DEFAULT_BASE = "https://phimsexai.xyz";
@@ -23,7 +19,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.6.0",
+        "version": "6.7.0",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -42,22 +38,23 @@ function getManifest() {
 
 function getHomeSections() {
     return JSON.stringify([
-        { slug: 'home', title: 'Trang Chủ', type: 'Horizontal', path: '' },
-        { slug: 'phim-sex-ai-vietsub', title: 'Sex AI Vietsub', type: 'Horizontal', path: '' },
-        { slug: 'phim-sex-ai-thuyet-minh', title: 'Sex AI Thuyết Minh', type: 'Horizontal', path: '' },
-        { slug: 'phim-bo-sex-ai-nhieu-tap', title: 'Phim Bộ', type: 'Horizontal', path: '' },
-        { slug: 'phim-le-sex-ai-hay', title: 'Phim Lẻ', type: 'Horizontal', path: '' }
+        { slug: 'home',                     title: 'Trang Chủ',         type: 'Horizontal', path: '' },
+        { slug: 'phim-sex',                 title: 'Phim Sex',          type: 'Horizontal', path: '' },
+        { slug: 'phim-sex-ai-vietsub',      title: 'Sex Vietsub',       type: 'Horizontal', path: '' },
+        { slug: 'phim-sex-ai-thuyet-minh',  title: 'Sex Thuyết Minh',   type: 'Horizontal', path: '' },
+        { slug: 'phim-bo-sex-ai-nhieu-tap', title: 'Phim Bộ',           type: 'Horizontal', path: '' },
+        { slug: 'phim-le-sex-ai-hay',       title: 'Phim Lẻ',           type: 'Horizontal', path: '' }
     ]);
 }
 
 function getPrimaryCategories() {
     return JSON.stringify([
-        { name: 'Trang chủ', slug: 'home' },
-        { name: 'Phim Sex', slug: 'phim-sex' },
-        { name: 'Sex AI Vietsub', slug: 'phim-sex-ai-vietsub' },
-        { name: 'Sex AI Thuyết Minh', slug: 'phim-sex-ai-thuyet-minh' },
-        { name: 'Phim Bộ', slug: 'phim-bo-sex-ai-nhieu-tap' },
-        { name: 'Phim Lẻ', slug: 'phim-le-sex-ai-hay' }
+        { name: 'Trang chủ',        slug: 'home' },
+        { name: 'Phim Sex',          slug: 'phim-sex' },
+        { name: 'Sex Vietsub',       slug: 'phim-sex-ai-vietsub' },
+        { name: 'Sex Thuyết Minh',   slug: 'phim-sex-ai-thuyet-minh' },
+        { name: 'Phim Bộ',           slug: 'phim-bo-sex-ai-nhieu-tap' },
+        { name: 'Phim Lẻ',           slug: 'phim-le-sex-ai-hay' }
     ]);
 }
 
@@ -65,12 +62,53 @@ function getFilterConfig() {
     return JSON.stringify({
         sort: [{ name: 'Mới nhất', value: 'new' }],
         category: [
-            { name: "Trang chủ", value: "home" },
-            { name: "Phim Sex", value: "phim-sex" },
-            { name: "Sex AI Vietsub", value: "phim-sex-ai-vietsub" },
-            { name: "Sex AI Thuyết Minh", value: "phim-sex-ai-thuyet-minh" },
-            { name: "Phim Bộ", value: "phim-bo-sex-ai-nhieu-tap" },
-            { name: "Phim Lẻ", value: "phim-le-sex-ai-hay" }
+            // ===== THỂ LOẠI CHÍNH =====
+            { name: "Trang chủ",       value: "home" },
+            { name: "Phim Sex",         value: "phim-sex" },
+            { name: "Sex Vietsub",      value: "phim-sex-ai-vietsub" },
+            { name: "Sex Thuyết Minh",  value: "phim-sex-ai-thuyet-minh" },
+            { name: "Phim Bộ",          value: "phim-bo-sex-ai-nhieu-tap" },
+            { name: "Phim Lẻ",          value: "phim-le-sex-ai-hay" },
+
+            // ===== TAG PHỔ BIẾN =====
+            { name: "─── Thể loại phụ ───", value: "" },
+            { name: "Sex cô giáo",      value: "tag/sex-co-giao" },
+            { name: "Sex nữ sinh",      value: "tag/sex-nu-sinh" },
+            { name: "Sex nam sinh",     value: "tag/sex-nam-sinh" },
+            { name: "Sex sinh viên",    value: "tag/sex-sinh-vien" },
+            { name: "Sex y tá",         value: "tag/sex-y-ta" },
+            { name: "Sex bác sĩ",       value: "tag/sex-bac-si" },
+            { name: "Sex thầy giáo",    value: "tag/sex-thay-giao" },
+            { name: "Sex loạn luân",    value: "tag/sex-loan-luan" },
+            { name: "Sex mẹ kế",        value: "tag/sex-me-ke" },
+            { name: "Sex mẹ con",       value: "tag/sex-me-con" },
+            { name: "Sex chị dâu",      value: "tag/sex-chi-dau" },
+            { name: "Sex chị em",       value: "tag/sex-chi-em" },
+            { name: "Sex em chồng",     value: "tag/sex-em-chong" },
+            { name: "Sex bố chồng",     value: "tag/sex-bo-chong" },
+            { name: "Sex con dâu",      value: "tag/sex-con-dau" },
+            { name: "Sex vợ hàng xóm",  value: "tag/sex-vo-hang-xom" },
+            { name: "Sex hàng xóm",     value: "tag/hiep-dam-hang-xom" },
+            { name: "Sex ngoại tình",   value: "tag/sex-ngoai-tinh" },
+            { name: "Sex vụng trộm",    value: "tag/sex-vung-trom" },
+            { name: "Sex lén lút",      value: "tag/sex-len-lut" },
+            { name: "Sex hiếp dâm",     value: "tag/sex-hiep-dam" },
+            { name: "Sex tập thể",      value: "tag/sex-tap-the" },
+            { name: "Sex bạo dâm",      value: "tag/sex-bao-dam" },
+            { name: "Sex thú",          value: "tag/sex-thu" },
+            { name: "Sex thủ dâm",      value: "tag/sex-thu-dam" },
+            { name: "Sex phá trinh",    value: "tag/sex-pha-trinh" },
+            { name: "Sex công cộng",    value: "tag/sex-cong-cong" },
+            { name: "Sex có thai",      value: "tag/sex-co-thai" },
+            { name: "Sex cổ trang",     value: "tag/sex-co-trang" },
+            { name: "Sex xuyên không",  value: "tag/sex-xuyen-khong" },
+            { name: "Sex trọng sinh",   value: "tag/sex-trong-sinh" },
+            { name: "Sex tu tiên",      value: "tag/sex-tu-tien" },
+            { name: "Sex gái đẹp",      value: "tag/sex-gai-dep" },
+            { name: "Sex vú khủng",     value: "tag/sex-vu-khung" },
+            { name: "Sex ông già",      value: "tag/sex-ong-gia" },
+            { name: "Anime Style",      value: "tag/anime-style" },
+            { name: "Realistic Style",  value: "tag/realistic-style" }
         ]
     });
 }
@@ -117,7 +155,7 @@ function debugLog() {
 }
 
 // =============================================================================
-// ⭐ [v6.6.0] HELPER: Đọc datasend từ pipe (theo tài liệu VAAPP)
+// HELPER: Đọc datasend từ pipe (theo tài liệu VAAPP)
 // =============================================================================
 
 function getPipeData(apiUrl) {
@@ -266,7 +304,6 @@ var U = {
         return getBase() + "/";
     },
 
-    // ⭐ [v6.6.0] Tạo slug DUY NHẤT cho episode (tuân thủ tài liệu VAAPP)
     uniqueSlug: function(prefix, url) {
         var hash = 0;
         var s = String(url || "");
@@ -325,7 +362,6 @@ function buildHeaders(url, sourceUrl) {
         headers["Accept"] = "*/*";
     }
 
-    // ⭐ [v6.6.0] Gửi cookie nếu App có CookieManager
     try {
         if (typeof getCookie === 'function') {
             var cookie = getCookie(url);
@@ -411,6 +447,7 @@ function fetchUrl(url, sourceUrl) {
 
 // =============================================================================
 // URL GENERATION
+// ⭐ [v6.7.0] Hỗ trợ slug dạng "tag/xxx"
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
@@ -419,10 +456,28 @@ function getUrlList(slug, filtersJson) {
     var path = slug || "";
     var base = getBase();
 
-    if ((path === "home" || path === "") && page === 1) return base + "/";
-    if (path === "home" || path === "") return base + "/page/" + page + "/";
+    // Home
+    if (path === "home" || path === "") {
+        return page === 1 ? base + "/" : base + "/page/" + page + "/";
+    }
+
+    // Bỏ dấu / đầu
     if (path.indexOf("/") === 0) path = path.substring(1);
-    return page === 1 ? base + "/" + path + "/" : base + "/" + path + "/page/" + page + "/";
+
+    // Bỏ dấu / cuối
+    if (path.charAt(path.length - 1) === "/") path = path.substring(0, path.length - 1);
+
+    // ⭐ Tag: "tag/slug" → /tag/slug/ hoặc /tag/slug/page/N/
+    if (path.indexOf("tag/") === 0) {
+        return page === 1
+            ? base + "/" + path + "/"
+            : base + "/" + path + "/page/" + page + "/";
+    }
+
+    // Category thường
+    return page === 1
+        ? base + "/" + path + "/"
+        : base + "/" + path + "/page/" + page + "/";
 }
 
 function getUrlSearch(keyword, filtersJson) {
@@ -500,7 +555,7 @@ function findEmbedUrl(html) {
 }
 
 // =============================================================================
-// EXTRACT STREAMS (với fetchAll song song)
+// EXTRACT STREAMS
 // =============================================================================
 
 function extractAllStreamsFromPlayer(playerHtml) {
@@ -547,7 +602,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         return a.num - b.num;
     });
 
-    // ⭐ [v6.6.0] Dùng fetchAll() để resolve song song (nhanh 10-20x)
     var apiUrls = [];
     for (var j = 0; j < streamLinks.length; j++) {
         var encodedUrl = U.btoa(streamLinks[j].url);
@@ -594,7 +648,6 @@ function extractAllStreamsFromPlayer(playerHtml) {
         }
     }
 
-    // Fallback nếu fetchAll không có hoặc lỗi
     if (resolvedUrls.length === 0) {
         for (var m = 0; m < streamLinks.length; m++) {
             resolvedUrls.push(streamLinks[m].url);
@@ -739,14 +792,13 @@ function parseSeriesArchive(html) {
             if (titleMatch) epName = U.clean(titleMatch[1]);
         }
 
-        // ⭐ [v6.6.0] Slug DUY NHẤT theo tài liệu VAAPP
         var uniqueSlug = epSlug || U.uniqueSlug("ep-" + epNum, epUrl);
 
         if (epNum > 0 && uniqueSlug) {
             episodes.push({
                 id: epUrl,
                 name: epName || ("Tập " + epNum),
-                slug: uniqueSlug  // ⭐ Duy nhất
+                slug: uniqueSlug
             });
         }
     }
@@ -775,7 +827,6 @@ function parseSeriesArchive(html) {
 
 // =============================================================================
 // PARSE EPISODE DETAIL
-// ⭐ [v6.6.0] Slug DUY NHẤT + truyền datasend qua pipe
 // =============================================================================
 
 function parseEpisodeDetail(html, apiUrl) {
@@ -821,7 +872,6 @@ function parseEpisodeDetail(html, apiUrl) {
     var embedUrl = findEmbedUrl(html);
 
     if (embedUrl) {
-        // ⭐ [v6.6.0] Slug DUY NHẤT (không dùng "full" trùng lặp)
         var uniqueSlug = slug ? ("full-" + U.slug(embedUrl).replace(/\//g, "-")) : U.uniqueSlug("full", embedUrl);
 
         result.servers.push({
@@ -829,7 +879,7 @@ function parseEpisodeDetail(html, apiUrl) {
             episodes: [{
                 id: embedUrl,
                 name: duration ? "Full (" + duration + ")" : "Full",
-                slug: uniqueSlug  // ⭐ Duy nhất
+                slug: uniqueSlug
             }]
         });
         result.episode_current = duration ? "Full (" + duration + ")" : "Full";
@@ -1077,7 +1127,6 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
     try {
         setActiveBase(apiUrl);
 
-        // ⭐ [v6.6.0] Đọc pipe data từ apiUrl (chuẩn VAAPP)
         var pipeData = datasend || getPipeData(apiUrl);
         if (pipeData) {
             debugLog("parseDetailResponse pipeData:", pipeData);
