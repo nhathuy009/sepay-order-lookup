@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.6.0 VI (Fix episode parse — regex fallback + httpRequest fetch)
+// Version : 1.7.0 VI (Filter thể loại + sửa lỗi list trang chủ)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -62,6 +62,68 @@ function decodeHtml(s) {
 
 
 // =============================================================================
+// ⭐ DANH SÁCH TAG (rút từ HTML thực tế)
+// =============================================================================
+
+var TAG_MAP = [
+    { slug: "xiandai",      name: "Hiện đại" },
+    { slug: "dushi",        name: "Đô thị" },
+    { slug: "xiaoyuan",     name: "Học đường" },
+    { slug: "zhichang",     name: "Công sở" },
+    { slug: "dananzhu",     name: "Đại nam chủ" },
+    { slug: "danvzhu",      name: "Đại nữ chủ" },
+    { slug: "ntr",          name: "NTR" },
+    { slug: "lvmao",        name: "Cuckold" },
+    { slug: "luanlun",      name: "Loạn luân" },
+    { slug: "muzi",         name: "Mẫu tử" },
+    { slug: "funv",         name: "Phụ nữ" },
+    { slug: "hougong",      name: "Hậu cung" },
+    { slug: "shunv",        name: "Thục nữ" },
+    { slug: "nixi",         name: "Nghịch tập" },
+    { slug: "xitong",       name: "Hệ thống" },
+    { slug: "chuanyue",     name: "Xuyên không" },
+    { slug: "gufeng",       name: "Cổ phong" },
+    { slug: "wuxia",        name: "Võ hiệp" },
+    { slug: "xianxia",      name: "Tiên hiệp" },
+    { slug: "xuanhuan",     name: "Huyền huyễn" },
+    { slug: "xiuxian",      name: "Tu tiên" },
+    { slug: "quanmou",      name: "Quyền mưu" },
+    { slug: "tianchong",    name: "Ngọt sủng" },
+    { slug: "bazong",       name: "Bá tổng" },
+    { slug: "yulequan",     name: "Giới giải trí" },
+    { slug: "mingxing",     name: "Ngôi sao" },
+    { slug: "youxi",        name: "Trò chơi" },
+    { slug: "qingchun",     name: "Thanh xuân" },
+    { slug: "nianxia",      name: "Niên hạ" },
+    { slug: "yujie",        name: "Ngự tỷ" },
+    { slug: "juru",         name: "Ngực lớn" },
+    { slug: "meiru",        name: "Ngực đẹp" },
+    { slug: "koubao",       name: "Khẩu bạo" },
+    { slug: "neishe",       name: "Nội xạ" },
+    { slug: "qicheng",      name: "Cưỡi ngựa" },
+    { slug: "houru",        name: "Hậu nhập" },
+    { slug: "baihu",        name: "Bạch hổ" },
+    { slug: "youmao",       name: "Hữu mao" },
+    { slug: "yewai",        name: "Dã ngoại" },
+    { slug: "jiudian",      name: "Khách sạn" },
+    { slug: "bangonshi",    name: "Văn phòng" },
+    { slug: "sheyingpeng",  name: "Phòng chụp" },
+    { slug: "zhifu",        name: "Chế phục" },
+    { slug: "tianmei",      name: "Ngọt mỹ" },
+    { slug: "lengyan",      name: "Lãnh diễm" },
+    { slug: "gaotiao",      name: "Cao gầy" },
+    { slug: "gaoyanzhi",    name: "Nhan sắc cao" },
+    { slug: "taitui",       name: "Nâng chân" },
+    { slug: "duanfa",       name: "Tóc ngắn" },
+    { slug: "tongshi",      name: "Đồng nghiệp" },
+    { slug: "tongxue",      name: "Bạn học" },
+    { slug: "chaonengli",   name: "Siêu năng lực" },
+    { slug: "qihuan",       name: "Kỳ ảo" },
+    { slug: "juesebanyan",  name: "Nhập vai" }
+];
+
+
+// =============================================================================
 // 1. MANIFEST
 // =============================================================================
 
@@ -69,7 +131,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -124,7 +186,32 @@ function getPrimaryCategories() {
 
 
 // =============================================================================
-// 4. URL BUILDERS
+// 4. ⭐ FILTER CONFIG — Thể loại (tag)
+// =============================================================================
+
+function getFilterConfig() {
+    var options = [{ name: "Tất cả", value: "" }];
+    for (var i = 0; i < TAG_MAP.length; i++) {
+        options.push({
+            name: TAG_MAP[i].name,
+            value: TAG_MAP[i].slug
+        });
+    }
+    return JSON.stringify({
+        filters: [
+            {
+                slug: "tag",
+                name: "Thể Loại",
+                type: "select",
+                options: options
+            }
+        ]
+    });
+}
+
+
+// =============================================================================
+// 5. URL BUILDERS
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
@@ -134,6 +221,14 @@ function getUrlList(slug, filtersJson) {
     if (page < 1) page = 1;
     var B = BASE;
 
+    // ⭐ NHÁNH MỚI: Nếu user chọn filter tag → ưu tiên URL tag
+    var tagSlug = filters.tag || "";
+    if (tagSlug) {
+        if (page === 1) return B + "/tag/" + tagSlug + "/";
+        return B + "/tag/" + tagSlug + "/page/" + page + "/";
+    }
+
+    // Nhánh AUTHOR
     if (slug && (slug.indexOf("/author/") === 0 || slug.indexOf("author/") === 0)) {
         var cleanAuthorSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanAuthorSlug = cleanAuthorSlug.replace(/\/(video|post)\/\d+$/, "");
@@ -146,6 +241,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
+    // Nhánh TAG (giữ lại để backward compat nếu slug là tag/...)
     if (slug && (slug.indexOf("/tag/") === 0 || slug.indexOf("tag/") === 0)) {
         var cleanTagSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanTagSlug = cleanTagSlug.replace(/\/page\/\d+$/, "");
@@ -157,6 +253,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
+    // Nhánh TOPIC
     if (slug && (slug.indexOf("/topics/") === 0 || slug.indexOf("topics/") === 0)) {
         var cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         var topicMatch = cleanSlug.match(/^(topics\/[^\/]+)/);
@@ -167,6 +264,7 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
+    // Path-style slugs
     var pathStyleSlugs = {
         "newest":      "/newest",
         "recommend":   "/recommend",
@@ -220,11 +318,25 @@ function getUrlDetail(slug, datasend) {
 
 
 // =============================================================================
-// 5. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC / TAG / AUTHOR
+// 6. PARSER — LIST / CATEGORY / SEARCH / RANK / TOPIC / TAG / AUTHOR
 // =============================================================================
 
 function parseListResponse(html, apiUrl) {
     console.log("[HG] parseListResponse url=" + apiUrl);
+
+    // ⭐ Guard: HTML phải là trang Huangguo thật
+    if (!html || html.length < 1000) {
+        console.error("[HG] HTML too short (" + (html ? html.length : 0) + " bytes)");
+        return JSON.stringify({ items: [], pagination: { currentPage: 1, totalPages: 1 } });
+    }
+    if (html.indexOf("hg-drama-card") === -1 &&
+        html.indexOf("hg-card-grid") === -1 &&
+        html.indexOf("hg-list-page") === -1) {
+        console.error("[HG] HTML doesn't look like Huangguo page. First 200: "
+            + html.substring(0, 200));
+        return JSON.stringify({ items: [], pagination: { currentPage: 1, totalPages: 1 } });
+    }
+
     var cleanUrl = apiUrl.split("|")[0].split("?")[0];
 
     if (/\/ranks\//.test(cleanUrl)) return parseRankList(html, apiUrl);
@@ -245,7 +357,7 @@ function parseSearchResponse(html, apiUrl) {
 }
 
 
-// ---- 5.1. Parse lưới phim ----
+// ---- 6.1. Parse lưới phim ----
 
 function parseDramaGrid(html, apiUrl) {
     var items = [];
@@ -416,7 +528,7 @@ function parseDramaGridByRegex(html, seen) {
 }
 
 
-// ---- 5.2. Parse danh sách chủ đề ----
+// ---- 6.2. Parse danh sách chủ đề ----
 
 function parseTopicsList(html, apiUrl) {
     var items = [];
@@ -486,7 +598,7 @@ function parseTopicsList(html, apiUrl) {
 }
 
 
-// ---- 5.3. Parse chi tiết chủ đề ----
+// ---- 6.3. Parse chi tiết chủ đề ----
 
 function parseTopicDetail(html, apiUrl) {
     console.log("[HG] parseTopicDetail url=" + apiUrl);
@@ -549,7 +661,7 @@ function parseTopicDetail(html, apiUrl) {
 }
 
 
-// ---- 5.4. Parse kết quả tìm kiếm ----
+// ---- 6.4. Parse kết quả tìm kiếm ----
 
 function parseSearchResults(html, apiUrl) {
     console.log("[HG] parseSearchResults url=" + apiUrl);
@@ -623,7 +735,7 @@ function parseSearchResults(html, apiUrl) {
 }
 
 
-// ---- 5.5. Parse bảng xếp hạng ----
+// ---- 6.5. Parse bảng xếp hạng ----
 
 function parseRankList(html, apiUrl) {
     console.log("[HG] parseRankList url=" + apiUrl);
@@ -798,7 +910,7 @@ function parseRankByRegex(html, seen) {
 }
 
 
-// ---- 5.6. Parse trang thể loại (tag) ----
+// ---- 6.6. Parse trang thể loại (tag) ----
 
 function parseTagPage(html, apiUrl) {
     console.log("[HG] parseTagPage url=" + apiUrl);
@@ -812,6 +924,12 @@ function parseTagPage(html, apiUrl) {
             var item = extractDramaCard(this, seen);
             if (item) items.push(item);
         });
+        if (items.length === 0) {
+            $doc.find(".hg-list-page .hg-card-grid .hg-drama-card").each(function () {
+                var item = extractDramaCard(this, seen);
+                if (item) items.push(item);
+            });
+        }
         if (items.length === 0) {
             $doc.find(".hg-drama-card").each(function () {
                 var item = extractDramaCard(this, seen);
@@ -854,13 +972,13 @@ function parseTagPage(html, apiUrl) {
             currentPage: currentPage,
             totalPages: totalPages,
             totalItems: items.length,
-            itemsPerPage: 16
+            itemsPerPage: 20
         }
     });
 }
 
 
-// ---- 5.7. Parse trang tác giả ----
+// ---- 6.7. Parse trang tác giả ----
 
 function parseAuthorPage(html, apiUrl) {
     console.log("[HG] parseAuthorPage url=" + apiUrl);
@@ -923,7 +1041,7 @@ function parseAuthorPage(html, apiUrl) {
 
 
 // =============================================================================
-// 5.8. HELPER — PARSE videoInitialData JSON
+// 7. HELPER — PARSE videoInitialData JSON
 // =============================================================================
 
 function parseVideoInitialData(html) {
@@ -940,14 +1058,14 @@ function parseVideoInitialData(html) {
 
 
 // =============================================================================
-// 5.9. PARSER — DANH SÁCH TẬP TỪ DOM BẰNG REGEX (fallback khi MiniJQ fail)
+// 8. PARSER — DANH SÁCH TẬP TỪ DOM BẰNG REGEX (fallback khi MiniJQ fail)
 // =============================================================================
 
 function parseEpisodesByRegex(html, seenSlug) {
     var episodes = [];
     var seen = seenSlug || {};
 
-    // ── Lớp 1: match thẻ <a> có class chứa "hg-web-play__ep" ──
+    // Lớp 1: match thẻ <a> có class chứa "hg-web-play__ep"
     var re = /<a\b[^>]*class="[^"]*\bhg-web-play__ep\b[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
     var m;
 
@@ -976,7 +1094,7 @@ function parseEpisodesByRegex(html, seenSlug) {
         });
     }
 
-    // ── Lớp 2: fallback nếu thứ tự attribute đảo (data-ep-id trước href) ──
+    // Lớp 2: fallback nếu thứ tự attribute đảo
     if (episodes.length === 0) {
         var re2 = /data-ep-id="(\d+)"[^>]*\bhref="([^"]+)"/g;
         var m2;
@@ -995,7 +1113,7 @@ function parseEpisodesByRegex(html, seenSlug) {
         }
     }
 
-    // ── Lớp 3: fallback cuối — chỉ cần data-ep-id + href gần đó ──
+    // Lớp 3: fallback cuối
     if (episodes.length === 0) {
         var re3 = /href="(\/video\/\d+(?:\/ep-\d+)?\/)"[^>]*data-ep-id="(\d+)"/g;
         var m3;
@@ -1023,7 +1141,7 @@ function parseEpisodesByRegex(html, seenSlug) {
 
 
 // =============================================================================
-// 6. PARSER — CHI TIẾT PHIM
+// 9. PARSER — CHI TIẾT PHIM
 // =============================================================================
 
 function parseMovieDetail(html, apiUrl, datasend) {
@@ -1067,7 +1185,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
     var episodes = [];
     var seenSlug = {};
 
-    // ── Tầng 1: MiniJQ DOM parse ──
+    // Tầng 1: MiniJQ DOM parse
     try {
         var $doc = _$(html);
         $doc.find("a.hg-web-play__ep").each(function () {
@@ -1092,13 +1210,13 @@ function parseMovieDetail(html, apiUrl, datasend) {
         console.error("[HG] parse episodes fail: " + e.message);
     }
 
-    // ⭐ Tầng 2 MỚI: Regex fallback trên thẻ <a class="hg-web-play__ep">
+    // Tầng 2: Regex fallback trên thẻ <a class="hg-web-play__ep">
     if (episodes.length === 0) {
         console.log("[HG] DOM parse empty → trying regex fallback");
         episodes = parseEpisodesByRegex(html, seenSlug);
     }
 
-    // ── Tầng 3: Fallback từ epPlaySrcs JSON ──
+    // Tầng 3: Fallback từ epPlaySrcs JSON
     if (episodes.length === 0 && vdata && vdata.epPlaySrcs) {
         var keys = Object.keys(vdata.epPlaySrcs).sort(function (a, b) {
             return parseInt(a, 10) - parseInt(b, 10);
@@ -1153,13 +1271,12 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
 
 // =============================================================================
-// 7. PARSER — LINK STREAM
+// 10. PARSER — LINK STREAM
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
     console.log("[HG] parseDetailResponse url=" + apiUrl + " datasend=" + (datasend || ""));
 
-    // ── 1. Trích epId ──
     var epId = "";
     if (datasend) {
         var mEp = datasend.match(/epId=(\d+)/);
@@ -1171,18 +1288,17 @@ function parseDetailResponse(html, apiUrl, datasend) {
         else epId = "1";
     }
 
-    // ── 2. Parse vdata từ HTML hiện tại (VAAPP đã fetch URL tập) ──
     var vdata = parseVideoInitialData(html);
     var vid = vdata ? String(vdata.id || "") : "";
 
-    // ── 3. Ưu tiên 1: epPlaySrcs[epId] (có sẵn cho tập hiện tại) ──
+    // Ưu tiên 1: epPlaySrcs[epId]
     var streamUrl = "";
     if (vdata && vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
         streamUrl = vdata.epPlaySrcs[epId];
         console.log("[HG] stream from epPlaySrcs[" + epId + "]");
     }
 
-    // ── 4. ⭐ Fallback: httpRequest() fetch HTML tập cụ thể ──
+    // Fallback: httpRequest() fetch HTML tập cụ thể
     if (!streamUrl && epId !== "1" && vid) {
         var epUrl = BASE + "/video/" + vid + "/ep-" + epId + "/";
         console.log("[HG] fallback httpRequest: " + epUrl);
@@ -1204,7 +1320,6 @@ function parseDetailResponse(html, apiUrl, datasend) {
                         console.log("[HG] stream from fetched videoSrc");
                     }
                 }
-                // Regex m3u8 fallback cuối
                 if (!streamUrl) {
                     var m3 = res.body.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
                     if (m3) {
@@ -1218,7 +1333,7 @@ function parseDetailResponse(html, apiUrl, datasend) {
         }
     }
 
-    // ── 5. Fallback cuối: videoSrc / previewSrc (chỉ epId=1) ──
+    // Fallback cuối: videoSrc (chỉ epId=1)
     if (!streamUrl && vdata && epId === "1") {
         if (vdata.videoSrc) streamUrl = vdata.videoSrc;
         else if (vdata.previewSrc) streamUrl = vdata.previewSrc;
@@ -1249,7 +1364,7 @@ function parseDetailResponse(html, apiUrl, datasend) {
 
 
 // =============================================================================
-// 8. PARSER — EMBED (fallback)
+// 11. PARSER — EMBED (fallback)
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
@@ -1276,12 +1391,14 @@ function parseEmbedResponse(html, sourceUrl) {
 
 
 // =============================================================================
-// 9. PARSER PHỤ
+// 12. PARSER PHỤ — Categories / Countries / Years
 // =============================================================================
 
 function parseCategoriesResponse(html, apiUrl) {
     var items = [];
     var seen = {};
+
+    // Cách 1: Thử parse từ HTML trang tags
     try {
         var $doc = _$(html);
         $doc.find("a[href^='/tag/']").each(function () {
@@ -1291,14 +1408,49 @@ function parseCategoriesResponse(html, apiUrl) {
             if (/\/page\/\d+\/?$/.test(href)) return;
             if (seen[href]) return;
             seen[href] = true;
+            var slug = href.replace(/^\/tag\//, "").replace(/\/+$/, "");
             items.push({
-                slug: href.replace(/^\/+/, "").replace(/\/+$/, ""),
+                slug: slug,
                 name: name,
-                value: href,
+                value: slug,
                 isCategory: true
             });
         });
-    } catch (e) {}
+    } catch (e) {
+        console.error("[HG] parseCategoriesResponse MiniJQ fail: " + e.message);
+    }
+
+    // Cách 2: Regex fallback
+    if (items.length === 0) {
+        var re = /<a[^>]*class="[^"]*hg-tag[^"]*"[^>]*href="\/tag\/([^\/"]+)\/"[^>]*>([^<]+)/g;
+        var m;
+        while ((m = re.exec(html)) !== null) {
+            var slug = m[1];
+            if (seen[slug]) continue;
+            seen[slug] = true;
+            items.push({
+                slug: slug,
+                name: m[2].trim(),
+                value: slug,
+                isCategory: true
+            });
+        }
+    }
+
+    // Cách 3: Fallback về TAG_MAP tĩnh
+    if (items.length === 0) {
+        for (var i = 0; i < TAG_MAP.length; i++) {
+            items.push({
+                slug: TAG_MAP[i].slug,
+                name: TAG_MAP[i].name,
+                value: TAG_MAP[i].slug,
+                isCategory: true
+            });
+        }
+    }
+
+    console.log("[HG] parseCategoriesResponse → " + items.length + " tags");
+
     return JSON.stringify(items);
 }
 
@@ -1307,16 +1459,7 @@ function parseYearsResponse(html) { return JSON.stringify([]); }
 
 
 // =============================================================================
-// 10. FILTER CONFIG
-// =============================================================================
-
-function getFilterConfig() {
-    return JSON.stringify({ filters: [] });
-}
-
-
-// =============================================================================
-// 11. HELPER
+// 13. HELPER
 // =============================================================================
 
 function getPipeData(apiUrl) {
@@ -1330,8 +1473,9 @@ function getPipeData(apiUrl) {
 
 
 // =============================================================================
-// 12. LOG KHỞI TẠO
+// 14. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.6.0 VI loaded. BaseUrl=" + BASE
-    + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
+console.log("[HG] huangguo_plugin.js v1.7.0 VI loaded. BaseUrl=" + BASE
+    + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF")
+    + " | Tags=" + TAG_MAP.length);
