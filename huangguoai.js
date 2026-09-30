@@ -73,11 +73,6 @@ function getManifest() {
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
-        "fallbackUrls": [
-            "https://huangguo8.com",
-            "https://huangguoai.ai",
-            "https://huangguoai.pages.dev"
-        ],
         "iconUrl": IMG_PROXY + encodeURIComponent(BASE + "/static/web/images/logo-huangguo.png"),
         "referrer": REFERER,
         "imageReferer": REFERER,
