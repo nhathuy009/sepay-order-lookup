@@ -453,28 +453,21 @@ function fetchUrl(url, sourceUrl) {
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
-    var path = slug || "";
     var base = getBase();
 
-    // Home
+    // ⭐ ĐỌC CATEGORY TỪ FILTERS TRƯỚC, FALLBACK VỀ SLUG
+    var path = filters.category || slug || "";
+
+    // "home" hoặc "" → về trang chủ
     if (path === "home" || path === "") {
         return page === 1 ? base + "/" : base + "/page/" + page + "/";
     }
 
-    // Bỏ dấu / đầu
+    // Bỏ dấu / đầu/cuối
     if (path.indexOf("/") === 0) path = path.substring(1);
-
-    // Bỏ dấu / cuối
     if (path.charAt(path.length - 1) === "/") path = path.substring(0, path.length - 1);
 
-    // ⭐ Tag: "tag/slug" → /tag/slug/ hoặc /tag/slug/page/N/
-    if (path.indexOf("tag/") === 0) {
-        return page === 1
-            ? base + "/" + path + "/"
-            : base + "/" + path + "/page/" + page + "/";
-    }
-
-    // Category thường
+    // Tag hoặc category đều cùng dạng URL
     return page === 1
         ? base + "/" + path + "/"
         : base + "/" + path + "/page/" + page + "/";
