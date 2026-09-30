@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.5.1 VI (Fix parseDramaGridByRegex — split block)
+// Version : 1.6.0 VI (Fix episode parse — regex fallback + httpRequest fetch)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -25,31 +25,16 @@ function proxyImageUrl(url) {
     if (!url || typeof url !== "string") return url || "";
     if (!USE_IMG_PROXY) return url;
     if (url.indexOf("http") !== 0) return url;
-    // Tránh double-wrap
     if (url.indexOf("workers.dev/?url=") !== -1) return url;
-    // Bỏ placeholder
     if (url.indexOf("cover-placeholder") !== -1) return "";
     return IMG_PROXY + encodeURIComponent(url);
 }
 
-
-// =============================================================================
-// HELPER: Fix ảnh — ưu tiên proxy, fallback nhúng Referer
-// =============================================================================
-
 function fixImageUrl(url) {
     if (!url || typeof url !== "string") return url || "";
-
-    // 1) Bọc qua server trung gian
     var proxied = proxyImageUrl(url);
     if (!proxied) return "";
-
-    // Ảnh đã qua proxy → không nhúng Referer nữa (worker tự set)
-    if (proxied.indexOf("workers.dev/?url=") !== -1) {
-        return proxied;
-    }
-
-    // 2) Fallback: nhúng Referer như cũ
+    if (proxied.indexOf("workers.dev/?url=") !== -1) return proxied;
     if (proxied.indexOf("http") !== 0) return proxied;
     if (proxied.indexOf("|") !== -1) return proxied;
     return proxied + "|Referer=" + REFERER_ENCODED;
@@ -84,7 +69,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.5.1",
+        "version": "1.6.0",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -154,7 +139,6 @@ function getUrlList(slug, filtersJson) {
     if (page < 1) page = 1;
     var B = BASE;
 
-    // Nhánh AUTHOR — path-style /author/{id}/video/{N}/
     if (slug && (slug.indexOf("/author/") === 0 || slug.indexOf("author/") === 0)) {
         var cleanAuthorSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanAuthorSlug = cleanAuthorSlug.replace(/\/(video|post)\/\d+$/, "");
@@ -167,7 +151,6 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Nhánh TAG — path-style /tag/{slug}/page/{N}/
     if (slug && (slug.indexOf("/tag/") === 0 || slug.indexOf("tag/") === 0)) {
         var cleanTagSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         cleanTagSlug = cleanTagSlug.replace(/\/page\/\d+$/, "");
@@ -179,7 +162,6 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Nhánh TOPIC — path-style /topics/{slug}/{N}/
     if (slug && (slug.indexOf("/topics/") === 0 || slug.indexOf("topics/") === 0)) {
         var cleanSlug = slug.replace(/^\/+/, "").replace(/\/+$/, "");
         var topicMatch = cleanSlug.match(/^(topics\/[^\/]+)/);
@@ -190,7 +172,6 @@ function getUrlList(slug, filtersJson) {
         }
     }
 
-    // Các slug dùng PATH-STYLE
     var pathStyleSlugs = {
         "newest":      "/newest",
         "recommend":   "/recommend",
@@ -227,7 +208,7 @@ function getUrlSearch(keyword, filtersJson) {
     return BASE + "/search/video/" + kw + "/" + page + "/";
 }
 
-function getUrlDetail(slug) {
+function getUrlDetail(slug, datasend) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
     if (/^\/author\/\d+\/?$/.test(slug)) {
@@ -340,7 +321,6 @@ function extractDramaCard(cardEl, seen) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-    // ⭐ FIX ẢNH: Proxy qua worker
     poster = fixImageUrl(poster);
 
     var title = cardEl.find(".hg-drama-card__title").text().trim();
@@ -375,20 +355,16 @@ function extractDramaCard(cardEl, seen) {
     };
 }
 
-// ⭐ VIẾT LẠI: split block, match cả <h3> và <div>, strip sr-only
 function parseDramaGridByRegex(html, seen) {
     var items = [];
 
-    // Split HTML theo từng card
     var parts = html.split(/<div\s+class="hg-drama-card"/);
     for (var i = 1; i < parts.length; i++) {
         var block = parts[i];
 
-        // Cắt đến card tiếp theo (nếu có)
         var nextCard = block.indexOf('<div class="hg-drama-card"');
         if (nextCard > 0) block = block.substring(0, nextCard);
 
-        // Lấy href từ cover-link
         var mHref = block.match(
             /<a[^>]*class="hg-drama-card__cover-link"[^>]*href="(\/video\/\d+\/)"/
         );
@@ -397,7 +373,6 @@ function parseDramaGridByRegex(html, seen) {
         if (seen[id]) continue;
         seen[id] = true;
 
-        // Lấy poster
         var mImg = block.match(/<img[^>]+data-src="([^"]+)"/) ||
                    block.match(/<img[^>]+src="([^"]+)"/);
         var poster = mImg ? mImg[1] : "";
@@ -407,10 +382,8 @@ function parseDramaGridByRegex(html, seen) {
         }
         if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-        // ⭐ FIX ẢNH
         poster = fixImageUrl(poster);
 
-        // ⭐ Lấy title từ CẢ <h3> VÀ <div>, strip <span class="sr-only">
         var title = "";
         var mTitle = block.match(
             /<h3[^>]*class="[^"]*hg-drama-card__title[^"]*"[^>]*>([\s\S]*?)<\/h3>/
@@ -427,13 +400,11 @@ function parseDramaGridByRegex(html, seen) {
                 .trim();
         }
 
-        // Fallback: alt của img
         if (!title) {
             var mAlt = block.match(/<img[^>]+alt="([^"]+)"/);
             if (mAlt) title = decodeHtml(mAlt[1]).trim();
         }
 
-        // Bỏ prefix sr-only tiếng Trung / Việt nếu còn sót
         title = title.replace(/全集在线观看\s*$/, "").trim();
         title = title.replace(/Xem toàn bộ trực tuyến\.?\s*$/i, "").trim();
 
@@ -469,7 +440,6 @@ function parseTopicsList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-            // ⭐ FIX ẢNH
             poster = fixImageUrl(poster);
 
             var title = $card.find(".hg-topic-card__title").text().trim();
@@ -688,7 +658,6 @@ function parseRankList(html, apiUrl) {
             var poster = $img.attr("data-src") || $img.attr("src") || "";
             if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-            // ⭐ FIX ẢNH
             poster = fixImageUrl(poster);
 
             var title = $item.find(".hg-rank-item__title").text().trim();
@@ -785,7 +754,6 @@ function parseRankFromJsonLd(html, seen) {
                 if ($img.length > 0) {
                     var poster = $img.attr("data-src") || $img.attr("src") || "";
                     if (poster.indexOf("cover-placeholder") === -1) {
-                        // ⭐ FIX ẢNH
                         item.posterUrl = fixImageUrl(poster);
                     }
                 }
@@ -810,7 +778,6 @@ function parseRankByRegex(html, seen) {
 
         var mPoster = chunk.match(/data-src="([^"]+)"/);
         var poster = mPoster ? mPoster[1] : "";
-        // ⭐ FIX ẢNH
         poster = fixImageUrl(poster);
 
         var mTitle = chunk.match(/class="hg-rank-item__title"[^>]*>\s*<a[^>]*>([^<]+)/);
@@ -961,6 +928,106 @@ function parseAuthorPage(html, apiUrl) {
 
 
 // =============================================================================
+// 5.8. HELPER — PARSE videoInitialData JSON
+// =============================================================================
+
+function parseVideoInitialData(html) {
+    if (!html) return null;
+    var m = html.match(/<script[^>]+id="videoInitialData"[^>]*>([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    try {
+        return JSON.parse(m[1]);
+    } catch (e) {
+        console.error("[HG] videoInitialData parse fail: " + e.message);
+        return null;
+    }
+}
+
+
+// =============================================================================
+// 5.9. PARSER — DANH SÁCH TẬP TỪ DOM BẰNG REGEX (fallback khi MiniJQ fail)
+// =============================================================================
+
+function parseEpisodesByRegex(html, seenSlug) {
+    var episodes = [];
+    var seen = seenSlug || {};
+
+    // ── Lớp 1: match thẻ <a> có class chứa "hg-web-play__ep" ──
+    var re = /<a\b[^>]*class="[^"]*\bhg-web-play__ep\b[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
+    var m;
+
+    while ((m = re.exec(html)) !== null) {
+        var tag = m[0];
+        var inner = m[1];
+
+        var mHref = tag.match(/\bhref="([^"]+)"/);
+        var href = mHref ? mHref[1] : "";
+        if (!href) continue;
+
+        var mEpId = tag.match(/\bdata-ep-id="(\d+)"/);
+        var epId = mEpId ? mEpId[1] : "";
+
+        var epName = inner.replace(/<[^>]*>/g, "").trim();
+
+        var slug = epId ? ("ep-" + epId) : ("ep-" + (episodes.length + 1));
+        if (seen[slug]) continue;
+        seen[slug] = true;
+
+        episodes.push({
+            id: href,
+            name: epName || (epId ? ("Tập " + epId) : ("Tập " + (episodes.length + 1))),
+            slug: slug,
+            datasend: epId ? ("epId=" + epId) : ("epId=" + (episodes.length + 1))
+        });
+    }
+
+    // ── Lớp 2: fallback nếu thứ tự attribute đảo (data-ep-id trước href) ──
+    if (episodes.length === 0) {
+        var re2 = /data-ep-id="(\d+)"[^>]*\bhref="([^"]+)"/g;
+        var m2;
+        while ((m2 = re2.exec(html)) !== null) {
+            var epId2 = m2[1];
+            var href2 = m2[2];
+            var slug2 = "ep-" + epId2;
+            if (seen[slug2]) continue;
+            seen[slug2] = true;
+            episodes.push({
+                id: href2,
+                name: "Tập " + epId2,
+                slug: slug2,
+                datasend: "epId=" + epId2
+            });
+        }
+    }
+
+    // ── Lớp 3: fallback cuối — chỉ cần data-ep-id + href gần đó ──
+    if (episodes.length === 0) {
+        var re3 = /href="(\/video\/\d+(?:\/ep-\d+)?\/)"[^>]*data-ep-id="(\d+)"/g;
+        var m3;
+        while ((m3 = re3.exec(html)) !== null) {
+            var href3 = m3[1];
+            var epId3 = m3[2];
+            var slug3 = "ep-" + epId3;
+            if (seen[slug3]) continue;
+            seen[slug3] = true;
+            episodes.push({
+                id: href3,
+                name: "Tập " + epId3,
+                slug: slug3,
+                datasend: "epId=" + epId3
+            });
+        }
+    }
+
+    if (episodes.length > 0) {
+        console.log("[HG] parseEpisodesByRegex → " + episodes.length + " episodes");
+    }
+
+    return episodes;
+}
+
+
+// =============================================================================
 // 6. PARSER — CHI TIẾT PHIM
 // =============================================================================
 
@@ -968,15 +1035,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
     console.log("[HG] parseMovieDetail url=" + apiUrl);
     var cleanUrl = apiUrl.split("|")[0];
 
-    var vdata = null;
-    var mData = html.match(/<script[^>]+id="videoInitialData"[^>]*>([\s\S]*?)<\/script>/);
-    if (mData) {
-        try {
-            vdata = JSON.parse(mData[1]);
-        } catch (e) {
-            console.error("[HG] videoInitialData parse fail: " + e.message);
-        }
-    }
+    var vdata = parseVideoInitialData(html);
 
     var title = "";
     var poster = "";
@@ -1008,12 +1067,12 @@ function parseMovieDetail(html, apiUrl, datasend) {
     }
     if (poster.indexOf("cover-placeholder") !== -1) poster = "";
 
-    // ⭐ FIX ẢNH
     poster = fixImageUrl(poster);
 
     var episodes = [];
     var seenSlug = {};
 
+    // ── Tầng 1: MiniJQ DOM parse ──
     try {
         var $doc = _$(html);
         $doc.find("a.hg-web-play__ep").each(function () {
@@ -1038,6 +1097,13 @@ function parseMovieDetail(html, apiUrl, datasend) {
         console.error("[HG] parse episodes fail: " + e.message);
     }
 
+    // ⭐ Tầng 2 MỚI: Regex fallback trên thẻ <a class="hg-web-play__ep">
+    if (episodes.length === 0) {
+        console.log("[HG] DOM parse empty → trying regex fallback");
+        episodes = parseEpisodesByRegex(html, seenSlug);
+    }
+
+    // ── Tầng 3: Fallback từ epPlaySrcs JSON ──
     if (episodes.length === 0 && vdata && vdata.epPlaySrcs) {
         var keys = Object.keys(vdata.epPlaySrcs).sort(function (a, b) {
             return parseInt(a, 10) - parseInt(b, 10);
@@ -1098,6 +1164,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
 function parseDetailResponse(html, apiUrl, datasend) {
     console.log("[HG] parseDetailResponse url=" + apiUrl + " datasend=" + (datasend || ""));
 
+    // ── 1. Trích epId ──
     var epId = "";
     if (datasend) {
         var mEp = datasend.match(/epId=(\d+)/);
@@ -1109,29 +1176,61 @@ function parseDetailResponse(html, apiUrl, datasend) {
         else epId = "1";
     }
 
-    var vdata = null;
-    var mData = html.match(/<script[^>]+id="videoInitialData"[^>]*>([\s\S]*?)<\/script>/);
-    if (mData) {
-        try {
-            vdata = JSON.parse(mData[1]);
-        } catch (e) {
-            console.error("[HG] videoInitialData parse fail: " + e.message);
-        }
-    }
+    // ── 2. Parse vdata từ HTML hiện tại (VAAPP đã fetch URL tập) ──
+    var vdata = parseVideoInitialData(html);
+    var vid = vdata ? String(vdata.id || "") : "";
 
+    // ── 3. Ưu tiên 1: epPlaySrcs[epId] (có sẵn cho tập hiện tại) ──
     var streamUrl = "";
-
-    if (vdata) {
-        if (vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
-            streamUrl = vdata.epPlaySrcs[epId];
-        }
-        if (!streamUrl && vdata.videoSrc) streamUrl = vdata.videoSrc;
-        if (!streamUrl && vdata.previewSrc) streamUrl = vdata.previewSrc;
+    if (vdata && vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
+        streamUrl = vdata.epPlaySrcs[epId];
+        console.log("[HG] stream from epPlaySrcs[" + epId + "]");
     }
 
-    if (!streamUrl) {
-        var mM3u8 = html.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
-        if (mM3u8) streamUrl = mM3u8[0];
+    // ── 4. ⭐ Fallback: httpRequest() fetch HTML tập cụ thể ──
+    if (!streamUrl && epId !== "1" && vid) {
+        var epUrl = BASE + "/video/" + vid + "/ep-" + epId + "/";
+        console.log("[HG] fallback httpRequest: " + epUrl);
+        try {
+            var res = httpRequest(epUrl, {
+                headers: {
+                    "Referer": REFERER,
+                    "User-Agent": UA_MOBILE
+                }
+            });
+            if (res && res.isSuccessful && res.body) {
+                var epVdata = parseVideoInitialData(res.body);
+                if (epVdata) {
+                    if (epVdata.epPlaySrcs && epVdata.epPlaySrcs[epId]) {
+                        streamUrl = epVdata.epPlaySrcs[epId];
+                        console.log("[HG] stream from fetched epPlaySrcs[" + epId + "]");
+                    } else if (epVdata.videoSrc) {
+                        streamUrl = epVdata.videoSrc;
+                        console.log("[HG] stream from fetched videoSrc");
+                    }
+                }
+                // Regex m3u8 fallback cuối
+                if (!streamUrl) {
+                    var m3 = res.body.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
+                    if (m3) {
+                        streamUrl = m3[0].replace(/\\\//g, "/");
+                        console.log("[HG] stream from fetched html regex");
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("[HG] httpRequest fail: " + e.message);
+        }
+    }
+
+    // ── 5. Fallback cuối: videoSrc / previewSrc (chỉ epId=1) ──
+    if (!streamUrl && vdata && epId === "1") {
+        if (vdata.videoSrc) streamUrl = vdata.videoSrc;
+        else if (vdata.previewSrc) streamUrl = vdata.previewSrc;
+        else {
+            var mM3u8 = html.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
+            if (mM3u8) streamUrl = mM3u8[0].replace(/\\\//g, "/");
+        }
     }
 
     if (!streamUrl) {
@@ -1239,5 +1338,5 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.5.1 VI loaded. BaseUrl=" + BASE
+console.log("[HG] huangguo_plugin.js v1.6.0 VI loaded. BaseUrl=" + BASE
     + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
