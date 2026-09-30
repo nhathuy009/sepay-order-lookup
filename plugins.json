@@ -18,7 +18,7 @@
         {
             "id": "huangguo_ai",
             "name": "黄果短剧",
-            "version": "1.5.1",
+            "version": "1.5.2",
             "scriptUrl": "https://raw.githubusercontent.com/nhathuy009/sepay-order-lookup/refs/heads/main/huangguoai.js",
             "iconUrl": "https://huangguoai.com/static/web/images/logo-huangguo.png"
         }
