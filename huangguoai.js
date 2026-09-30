@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.5.1 VI (Fix parseDramaGridByRegex — split block)
+// Version : 1.5.2 VI (Fix episodes parser — MiniJQ selector + regex fallback)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -84,7 +84,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.5.1",
+        "version": "1.5.2",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -1011,34 +1011,66 @@ function parseMovieDetail(html, apiUrl, datasend) {
     // ⭐ FIX ẢNH
     poster = fixImageUrl(poster);
 
+    // =========================================================================
+    // ⭐ PARSE EPISODES — 3 LỚP
+    // =========================================================================
     var episodes = [];
     var seenSlug = {};
 
+    // ---- Lớp 1: MiniJQ (selector .class, KHÔNG dùng tag.class) ----
     try {
         var $doc = _$(html);
-        $doc.find("a.hg-web-play__ep").each(function () {
+        $doc.find(".hg-web-play__ep").each(function () {
             var $a = this;
             var href = $a.attr("href") || "";
             var epId = $a.attr("data-ep-id") || "";
             var epName = $a.text().trim();
-            if (!href) return;
+            if (!href || !epId) return;
 
-            var slug = epId ? ("ep-" + epId) : ("ep-" + (episodes.length + 1));
+            var slug = "ep-" + epId;
             if (seenSlug[slug]) return;
             seenSlug[slug] = true;
 
             episodes.push({
                 id: href,
-                name: epName || ("Tập " + epId),
+                name: "Tập " + epId,
                 slug: slug,
                 datasend: "epId=" + epId
             });
         });
+        console.log("[HG] MiniJQ episodes: " + episodes.length);
     } catch (e) {
-        console.error("[HG] parse episodes fail: " + e.message);
+        console.error("[HG] MiniJQ episodes parse fail: " + e.message);
     }
 
+    // ---- Lớp 2: Regex fallback (bắt buộc có data-ep-id) ----
+    if (episodes.length === 0) {
+        console.log("[HG] MiniJQ found 0 episodes, trying regex fallback");
+        var epRe = /<a[^>]*class="[^"]*hg-web-play__ep[^"]*"[^>]*href="([^"]+)"[^>]*data-ep-id="(\d+)"[^>]*>([^<]*)<\/a>/g;
+        var m;
+        while ((m = epRe.exec(html)) !== null) {
+            var href = m[1];
+            var epId = m[2];
+            var epName = m[3].trim();
+            if (!href) continue;
+
+            var slug = "ep-" + epId;
+            if (seenSlug[slug]) continue;
+            seenSlug[slug] = true;
+
+            episodes.push({
+                id: href,
+                name: "Tập " + epId,
+                slug: slug,
+                datasend: "epId=" + epId
+            });
+        }
+        console.log("[HG] regex episodes: " + episodes.length);
+    }
+
+    // ---- Lớp 3: Fallback cuối — vdata.epPlaySrcs (chỉ khi 2 lớp trên rỗng) ----
     if (episodes.length === 0 && vdata && vdata.epPlaySrcs) {
+        console.log("[HG] HTML episodes empty, falling back to vdata.epPlaySrcs");
         var keys = Object.keys(vdata.epPlaySrcs).sort(function (a, b) {
             return parseInt(a, 10) - parseInt(b, 10);
         });
@@ -1051,8 +1083,10 @@ function parseMovieDetail(html, apiUrl, datasend) {
                 datasend: "epId=" + epNum
             });
         }
+        console.log("[HG] vdata episodes: " + episodes.length);
     }
 
+    // ---- Fallback cuối cùng: 1 tập Full ----
     if (episodes.length === 0) {
         episodes.push({
             id: cleanUrl,
@@ -1239,5 +1273,5 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.5.1 VI loaded. BaseUrl=" + BASE
+console.log("[HG] huangguo_plugin.js v1.5.2 VI loaded. BaseUrl=" + BASE
     + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
