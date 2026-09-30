@@ -1,13 +1,12 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.7.0 - FULL CATEGORY + TAG SUPPORT
+// Version: 6.7.1 - TAG ARCHIVE FIX
 // Base: https://phimsexai.xyz
 //
-// CHANGELOG v6.7.0:
-//   [ADD] Hỗ trợ đầy đủ Category + Tag từ tag-cloud thực tế
-//   [ADD] getUrlList() nhận diện slug dạng "tag/xxx"
-//   [UPDATE] getPrimaryCategories() khớp tag-cloud thực tế
-//   [UPDATE] getFilterConfig() thêm ~15 tag phổ biến
+// CHANGELOG v6.7.1:
+//   [FIX] parseListResponse() nhận diện "organic-post-card" (trang tag/archive)
+//   [FIX] parseInt(filters.page, 10) — tránh 301 do "1" !== 1
+//   [KEEP] Tất cả fix từ v6.7.0 (category + tag, 36 tag phổ biến)
 //   [KEEP] Tất cả fix từ v6.6.0 (fetchAll, getCookie, uniqueSlug, fallback /?p=)
 // =============================================================================
 
@@ -19,7 +18,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.7.0",
+        "version": "6.7.1",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -71,7 +70,6 @@ function getFilterConfig() {
             { name: "Phim Lẻ",          value: "phim-le-sex-ai-hay" },
 
             // ===== TAG PHỔ BIẾN =====
-            { name: "─── Thể loại phụ ───", value: "" },
             { name: "Sex cô giáo",      value: "tag/sex-co-giao" },
             { name: "Sex nữ sinh",      value: "tag/sex-nu-sinh" },
             { name: "Sex nam sinh",     value: "tag/sex-nam-sinh" },
@@ -88,7 +86,7 @@ function getFilterConfig() {
             { name: "Sex bố chồng",     value: "tag/sex-bo-chong" },
             { name: "Sex con dâu",      value: "tag/sex-con-dau" },
             { name: "Sex vợ hàng xóm",  value: "tag/sex-vo-hang-xom" },
-            { name: "Sex hàng xóm",     value: "tag/hiep-dam-hang-xom" },
+            { name: "Hiếp dâm hàng xóm", value: "tag/hiep-dam-hang-xom" },
             { name: "Sex ngoại tình",   value: "tag/sex-ngoai-tinh" },
             { name: "Sex vụng trộm",    value: "tag/sex-vung-trom" },
             { name: "Sex lén lút",      value: "tag/sex-len-lut" },
@@ -107,6 +105,7 @@ function getFilterConfig() {
             { name: "Sex gái đẹp",      value: "tag/sex-gai-dep" },
             { name: "Sex vú khủng",     value: "tag/sex-vu-khung" },
             { name: "Sex ông già",      value: "tag/sex-ong-gia" },
+            { name: "Đụ vợ bạn",        value: "tag/du-vo-ban" },
             { name: "Anime Style",      value: "tag/anime-style" },
             { name: "Realistic Style",  value: "tag/realistic-style" }
         ]
@@ -447,14 +446,14 @@ function fetchUrl(url, sourceUrl) {
 
 // =============================================================================
 // URL GENERATION
-// ⭐ [v6.7.0] Hỗ trợ slug dạng "tag/xxx"
+// ⭐ [v6.7.1] parseInt(filters.page) — tránh 301
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
-    
-    // ⭐ Chuẩn hóa page về number, tránh "1" vs 1
-    var page = parseInt(filters.page, 10) || 1;
+
+    // ⭐ Chuẩn hóa page về number
+    var page = parseInt(filters.page, 10);
     if (isNaN(page) || page < 1) page = 1;
 
     var base = getBase();
@@ -469,7 +468,7 @@ function getUrlList(slug, filtersJson) {
     if (path.indexOf("/") === 0) path = path.substring(1);
     if (path.charAt(path.length - 1) === "/") path = path.substring(0, path.length - 1);
 
-    // ⭐ Page 1 → KHÔNG thêm /page/1/ (tránh 301)
+    // Page 1 → KHÔNG thêm /page/1/
     return page === 1
         ? base + "/" + path + "/"
         : base + "/" + path + "/page/" + page + "/";
@@ -477,7 +476,7 @@ function getUrlList(slug, filtersJson) {
 
 function getUrlSearch(keyword, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
-    var page = filters.page || 1;
+    var page = parseInt(filters.page, 10) || 1;
     var base = getBase();
     return page === 1
         ? base + "/?s=" + encodeURIComponent(keyword)
@@ -899,6 +898,7 @@ function parseEpisodeDetail(html, apiUrl) {
 
 // =============================================================================
 // LIST PARSER
+// ⭐ [v6.7.1] Thêm regex cho "organic-post-card" (trang tag/archive)
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
@@ -907,16 +907,31 @@ function parseListResponse(html, apiUrl, datasend) {
     var movies = [];
     var match;
 
+    // 1. Standard cards (trang chủ / category)
     var standardRegex = /<article[^>]+class="[^"]*standard-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = standardRegex.exec(html)) !== null) {
-        var m = parseStandardPost(match[1]);
-        if (m) movies.push(m);
+        var m1 = parseStandardPost(match[1]);
+        if (m1) movies.push(m1);
     }
 
+    // 2. Series cards (trang chủ)
     var seriesRegex = /<article[^>]+class="[^"]*series-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = seriesRegex.exec(html)) !== null) {
         var m2 = parseSeriesPost(match[1]);
         if (m2) movies.push(m2);
+    }
+
+    // ⭐ 3. Organic cards (trang tag / archive)
+    // CHÚ Ý: phải đặt SAU standard/series để tránh trùng lặp
+    var organicRegex = /<article[^>]+class="[^"]*organic-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
+    while ((match = organicRegex.exec(html)) !== null) {
+        // Bỏ qua nếu đã có standard/series (tránh trùng)
+        var cardClass = match[1].substring(0, 200);
+        // parseOrganicPost dùng lại logic của parseStandardPost
+        var m3 = parseOrganicPost(match[1]);
+        if (m3 && !isDuplicate(movies, m3.id)) {
+            movies.push(m3);
+        }
     }
 
     var currentPage = 1, totalPages = 1;
@@ -940,6 +955,60 @@ function parseListResponse(html, apiUrl, datasend) {
             itemsPerPage: 20
         }
     });
+}
+
+function isDuplicate(arr, id) {
+    for (var i = 0; i < arr.length; i++) {
+        if (arr[i].id === id) return true;
+    }
+    return false;
+}
+
+// ⭐ [v6.7.1] Parser cho "organic-post-card" (trang tag/archive)
+function parseOrganicPost(itemHtml) {
+    try {
+        var linkMatch = itemHtml.match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*organic-thumb-link[^"]*"/i) ||
+                        itemHtml.match(/<a[^>]+class="[^"]*organic-thumb-link[^"]*"[^>]+href="([^"]+)"/i);
+        if (!linkMatch) return null;
+
+        var url = linkMatch[1];
+        var slug = U.slug(url);
+        if (!slug) return null;
+
+        var title = "";
+        var titleMatch = itemHtml.match(/<h[24][^>]+class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+        if (titleMatch) title = U.clean(titleMatch[1]);
+        if (!title) {
+            var altMatch = itemHtml.match(/<img[^>]+alt="([^"]+)"/i);
+            if (altMatch) title = U.clean(altMatch[1]);
+        }
+        if (!title) title = slug.replace(/-/g, " ");
+
+        var poster = "";
+        var imgMatch = itemHtml.match(/<img[^>]+class="[^"]*organic-img[^"]*"[^>]+src="([^"]+)"/i) ||
+                       itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*organic-img[^"]*"/i);
+        if (imgMatch) poster = U.url(imgMatch[1]);
+
+        // Badges từ class
+        var badges = [];
+        if (itemHtml.indexOf("category-phim-sex-ai-vietsub") !== -1) badges.push("Vietsub");
+        if (itemHtml.indexOf("category-phim-sex-ai-thuyet-minh") !== -1) badges.push("Thuyết Minh");
+        if (itemHtml.indexOf("phim-bo-") !== -1) badges.push("Phim Bộ");
+        if (itemHtml.indexOf("phim-le-") !== -1) badges.push("Phim Lẻ");
+
+        return {
+            id: slug,
+            title: title,
+            posterUrl: poster,
+            backdropUrl: poster,
+            description: badges.join(" • "),
+            year: 0,
+            quality: "HD",
+            episode_current: "",
+            lang: "Vietsub",
+            previewUrl: ""
+        };
+    } catch (e) { return null; }
 }
 
 function parseStandardPost(itemHtml) {
