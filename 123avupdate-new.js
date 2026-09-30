@@ -21,10 +21,6 @@ function getManifest() {
         "name": "123AV",
         "version": "5.1.0",
         "baseUrl": "https://123av.com",
-        "fallbackUrls": [
-            "https://123av.net",
-            "https://123av.org"
-        ],
         "referrer": "https://123av.com/",
         "imageReferer": "https://123av.com/",
         "iconUrl": "https://123av.com/assets/123av/favicon.png",
