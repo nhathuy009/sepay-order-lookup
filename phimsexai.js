@@ -452,13 +452,15 @@ function fetchUrl(url, sourceUrl) {
 
 function getUrlList(slug, filtersJson) {
     var filters = JSON.parse(filtersJson || "{}");
-    var page = filters.page || 1;
-    var base = getBase();
+    
+    // ⭐ Chuẩn hóa page về number, tránh "1" vs 1
+    var page = parseInt(filters.page, 10);
+    if (isNaN(page) || page < 1) page = 1;
 
-    // ⭐ ĐỌC CATEGORY TỪ FILTERS TRƯỚC, FALLBACK VỀ SLUG
+    var base = getBase();
     var path = filters.category || slug || "";
 
-    // "home" hoặc "" → về trang chủ
+    // Home
     if (path === "home" || path === "") {
         return page === 1 ? base + "/" : base + "/page/" + page + "/";
     }
@@ -467,7 +469,7 @@ function getUrlList(slug, filtersJson) {
     if (path.indexOf("/") === 0) path = path.substring(1);
     if (path.charAt(path.length - 1) === "/") path = path.substring(0, path.length - 1);
 
-    // Tag hoặc category đều cùng dạng URL
+    // ⭐ Page 1 → KHÔNG thêm /page/1/ (tránh 301)
     return page === 1
         ? base + "/" + path + "/"
         : base + "/" + path + "/page/" + page + "/";
