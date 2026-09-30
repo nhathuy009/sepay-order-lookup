@@ -1,6 +1,6 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 5.1.0
+// Version: 5.2.0
 // Cập nhật so với 5.0.0:
 //   - FIX 403 khi tải segment video (.ts/.m4s/.webp):
 //     * Thêm header "Origin" và "Referer" động dựa trên iframeUrl
@@ -19,7 +19,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "123av",
         "name": "123AV",
-        "version": "5.1.0",
+        "version": "5.2.0",
         "baseUrl": "https://123av.com",
         "referrer": "https://123av.com/",
         "imageReferer": "https://123av.com/",
