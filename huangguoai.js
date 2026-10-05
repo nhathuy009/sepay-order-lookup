@@ -396,6 +396,17 @@ function extractDramaCard(cardEl, seen) {
         episodeRaw = $clone.text().trim();
     }
 
+    // ⭐ v1.8.1 — Trích nhãn thời gian cập nhật từ <i class="hg-ep-time__at">
+    // Ví dụ: "14小时前", "1天前", "3小时前"
+    var langValue = "Vietsub";
+    var $timeAt = cardEl.find("i.hg-ep-time__at");
+    if ($timeAt.length > 0) {
+        var timeText = $timeAt.text().trim();
+        if (timeText) {
+            langValue = timeText;
+        }
+    }
+
     var score = cardEl.find(".hg-drama-card__score").text().trim()
                        .replace("分", "").trim();
 
@@ -407,7 +418,7 @@ function extractDramaCard(cardEl, seen) {
         episode_current: episodeRaw,
         quality: score ? (score + "分") : "",
         year: 0,
-        lang: "Vietsub",
+        lang: langValue,          // ⭐ "14小时前" hoặc "Vietsub"
         isCategory: false
     };
 }
@@ -416,7 +427,6 @@ function extractDramaCard(cardEl, seen) {
 function parseDramaGridByRegex(html, seen) {
     var items = [];
 
-    // Cắt bỏ vùng search-suggest / SSP trước khi parse
     var cleaned = stripNonContentBlocks(html);
 
     var parts = cleaned.split(/<div\s+class="hg-drama-card"/);
@@ -471,10 +481,19 @@ function parseDramaGridByRegex(html, seen) {
 
         if (!title) continue;
 
+        // ⭐ v1.8.1 — Trích nhãn thời gian cập nhật từ <i class="hg-ep-time__at">
+        var langValue = "Vietsub";
+        var mTimeAt = block.match(/<i[^>]*class="[^"]*hg-ep-time__at[^"]*"[^>]*>([^<]*)<\/i>/);
+        if (mTimeAt) {
+            var timeText = decodeHtml(mTimeAt[1]).trim();
+            if (timeText) langValue = timeText;
+        }
+
         items.push({
             id: id,
             title: title,
             posterUrl: poster,
+            lang: langValue,       // ⭐ "14小时前" hoặc "Vietsub"
             isCategory: false
         });
     }
