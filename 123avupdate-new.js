@@ -24,7 +24,7 @@
  */
 var USE_PIPE_HEADERS = true;
 
-var DEFAULT_PLAYER_ORIGIN = "https://jav-master-52.site";
+var DEFAULT_PLAYER_ORIGIN = "https://sadie-shop.site";
 
 var DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0";
 
@@ -289,7 +289,7 @@ function getOrigin(url) {
  * @param {string} streamUrl - URL stream (không dùng, để tương thích chữ ký hàm)
  * @param {string} iframeUrl - URL iframe player cha
  * @returns {string} pipe-suffix, ví dụ:
- *   "|Referer=https://jav-master-52.site/|Origin=https://jav-master-52.site|User-Agent=Mozilla/5.0 ..."
+ *   "|Referer=https://sadie-shop.site/|Origin=https://sadie-shop.site|User-Agent=Mozilla/5.0 ..."
  */
 function buildPipeHeaders(streamUrl, iframeUrl) {
     var playOrigin = null;
@@ -343,7 +343,7 @@ function attachPipeHeaders(url, iframeUrl) {
  * Tạo headers OBJECT (fallback cho VAApp core cũ không hỗ trợ pipe).
  * 
  * QUAN TRỌNG - FIX 403:
- *   CDN con yêu cầu Origin/Referer = player cha (jav-master-52.site),
+ *   CDN con yêu cầu Origin/Referer = player cha (sadie-shop.site),
  *   KHÔNG dùng origin của CDN con, KHÔNG dùng 123av.com.
  * 
  * @param {string} streamUrl - URL stream (m3u8/ts/m4s)
@@ -464,7 +464,7 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
         }
     }
     
-    apiEndpoints.push('https://jav-master-52.site/stream');
+    apiEndpoints.push('https://sadie-shop.site/stream');
     apiEndpoints.push('https://javplayer.cc/stream');
     apiEndpoints.push('https://stream.javplayer.cc/stream');
     
