@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.8.0 VI (Fix search-suggest leak — loại trừ card ngoài section)
+// Version : 1.8.2 VI (Fix card leak + ep URL chuẩn hóa + ep time dịch VI)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -76,6 +76,47 @@ function buildEpisodeUrl(videoId, epNum) {
 
 
 // =============================================================================
+// ⭐ v1.8.2 — HELPER: Dịch nhãn thời gian cập nhật từ tiếng Trung sang tiếng Việt
+// Ví dụ: "14小时前" → "14 giờ trước", "1天前" → "1 ngày trước"
+// =============================================================================
+
+function translateEpTime(s) {
+    if (!s || typeof s !== "string") return s || "";
+    var t = s.trim();
+    if (!t) return t;
+
+    if (t === "刚刚" || t === "刚才") return "Vừa xong";
+    if (t === "昨天") return "Hôm qua";
+    if (t === "前天") return "Hôm trước";
+
+    var m;
+
+    m = t.match(/^(\d+)\s*秒前$/);
+    if (m) return m[1] + " giây trước";
+
+    m = t.match(/^(\d+)\s*分钟前$/);
+    if (m) return m[1] + " phút trước";
+
+    m = t.match(/^(\d+)\s*小时前$/);
+    if (m) return m[1] + " giờ trước";
+
+    m = t.match(/^(\d+)\s*天前$/);
+    if (m) return m[1] + " ngày trước";
+
+    m = t.match(/^(\d+)\s*周前$/);
+    if (m) return m[1] + " tuần trước";
+
+    m = t.match(/^(\d+)\s*个月前$/);
+    if (m) return m[1] + " tháng trước";
+
+    m = t.match(/^(\d+)\s*年前$/);
+    if (m) return m[1] + " năm trước";
+
+    return t;
+}
+
+
+// =============================================================================
 // ⭐ v1.8.0 — HELPER: Lọc card không thuộc section chính
 // Loại trừ card nằm trong search-suggest (dropdown tìm kiếm ở header) và
 // trong SSP slot (quảng cáo). Tránh parse nhầm phim từ "猜你喜欢" của header.
@@ -84,30 +125,23 @@ function buildEpisodeUrl(videoId, epNum) {
 function isValidCard($el) {
     if (!$el) return false;
     try {
-        // Loại trừ search-suggest (khối "猜你喜欢" trong dropdown tìm kiếm)
         if ($el.closest(".hg-search-suggest").length > 0) return false;
         if ($el.closest(".hg-search-suggest__guess").length > 0) return false;
         if ($el.closest("#hg-search-suggest").length > 0) return false;
-        // Loại trừ SSP slot (quảng cáo)
         if ($el.closest("[data-ssp-slot-key]").length > 0) return false;
         if ($el.closest(".hg-ssp-slot").length > 0) return false;
-        // Loại trừ hero carousel (banner trang chủ)
         if ($el.closest("[data-hero-carousel]").length > 0) return false;
         return true;
     } catch (e) {
-        // Nếu MiniJQ không hỗ trợ closest → mặc định cho qua
         return true;
     }
 }
 
 // ⭐ v1.8.0 — Cắt vùng HTML không cần thiết trước khi parse regex
-// (dùng cho các hàm fallback regex để tránh lấy nhầm card từ search-suggest)
 function stripNonContentBlocks(html) {
     if (!html) return "";
     var s = html;
-    // Cắt search-suggest dropdown (thường nằm trong <form ... data-search-form>)
     s = s.replace(/<div[^>]*class="[^"]*hg-search-suggest[^"]*"[\s\S]*?<\/form>/gi, "");
-    // Cắt SSP slot quảng cáo
     s = s.replace(/<aside[^>]*class="[^"]*hg-ssp-slot[^"]*"[\s\S]*?<\/aside>/gi, "");
     return s;
 }
@@ -121,7 +155,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.8.0",
+        "version": "1.8.2",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -305,7 +339,6 @@ function parseSearchResponse(html, apiUrl) {
 
 
 // ---- 5.1. Parse lưới phim ----
-// ⭐ v1.8.0: áp dụng isValidCard() để loại trừ search-suggest / SSP / hero
 
 function parseDramaGrid(html, apiUrl) {
     var items = [];
@@ -314,7 +347,6 @@ function parseDramaGrid(html, apiUrl) {
     try {
         var $doc = _$(html);
         $doc.find(".hg-drama-card").each(function () {
-            // ⭐ v1.8.0 — loại trừ card ngoài section chính
             if (!isValidCard(this)) return;
             var item = extractDramaCard(this, seen);
             if (item) items.push(item);
@@ -396,14 +428,13 @@ function extractDramaCard(cardEl, seen) {
         episodeRaw = $clone.text().trim();
     }
 
-    // ⭐ v1.8.1 — Trích nhãn thời gian cập nhật từ <i class="hg-ep-time__at">
-    // Ví dụ: "14小时前", "1天前", "3小时前"
+    // ⭐ v1.8.2 — Lấy nhãn thời gian cập nhật từ <i class="hg-ep-time__at"> → dịch VI
     var langValue = "Vietsub";
     var $timeAt = cardEl.find("i.hg-ep-time__at");
     if ($timeAt.length > 0) {
         var timeText = $timeAt.text().trim();
         if (timeText) {
-            langValue = timeText;
+            langValue = translateEpTime(timeText);
         }
     }
 
@@ -418,12 +449,11 @@ function extractDramaCard(cardEl, seen) {
         episode_current: episodeRaw,
         quality: score ? (score + "分") : "",
         year: 0,
-        lang: langValue,          // ⭐ "14小时前" hoặc "Vietsub"
+        lang: langValue,
         isCategory: false
     };
 }
 
-// ⭐ v1.8.0 — Regex fallback: strip search-suggest trước khi split
 function parseDramaGridByRegex(html, seen) {
     var items = [];
 
@@ -481,19 +511,19 @@ function parseDramaGridByRegex(html, seen) {
 
         if (!title) continue;
 
-        // ⭐ v1.8.1 — Trích nhãn thời gian cập nhật từ <i class="hg-ep-time__at">
+        // ⭐ v1.8.2 — Lấy nhãn thời gian cập nhật và dịch VI
         var langValue = "Vietsub";
         var mTimeAt = block.match(/<i[^>]*class="[^"]*hg-ep-time__at[^"]*"[^>]*>([^<]*)<\/i>/);
         if (mTimeAt) {
             var timeText = decodeHtml(mTimeAt[1]).trim();
-            if (timeText) langValue = timeText;
+            if (timeText) langValue = translateEpTime(timeText);
         }
 
         items.push({
             id: id,
             title: title,
             posterUrl: poster,
-            lang: langValue,       // ⭐ "14小时前" hoặc "Vietsub"
+            lang: langValue,
             isCategory: false
         });
     }
@@ -502,7 +532,6 @@ function parseDramaGridByRegex(html, seen) {
 
 
 // ---- 5.2. Parse danh sách chủ đề ----
-// ⭐ v1.8.0: loại trừ topic card trong search-suggest (nếu có)
 
 function parseTopicsList(html, apiUrl) {
     var items = [];
@@ -511,7 +540,6 @@ function parseTopicsList(html, apiUrl) {
     try {
         var $doc = _$(html);
         $doc.find(".hg-topic-card").each(function () {
-            // ⭐ loại trừ topic card nằm trong search-suggest / SSP
             if (!isValidCard(this)) return;
 
             var $card = this;
@@ -577,7 +605,6 @@ function parseTopicsList(html, apiUrl) {
 
 
 // ---- 5.3. Parse chi tiết chủ đề ----
-// ⭐ v1.8.0: áp dụng isValidCard
 
 function parseTopicDetail(html, apiUrl) {
     console.log("[HG] parseTopicDetail url=" + apiUrl);
@@ -643,7 +670,6 @@ function parseTopicDetail(html, apiUrl) {
 
 
 // ---- 5.4. Parse kết quả tìm kiếm ----
-// ⭐ v1.8.0: áp dụng isValidCard
 
 function parseSearchResults(html, apiUrl) {
     console.log("[HG] parseSearchResults url=" + apiUrl);
@@ -720,7 +746,6 @@ function parseSearchResults(html, apiUrl) {
 
 
 // ---- 5.5. Parse bảng xếp hạng ----
-// ⭐ v1.8.0: áp dụng isValidCard
 
 function parseRankList(html, apiUrl) {
     console.log("[HG] parseRankList url=" + apiUrl);
@@ -899,7 +924,6 @@ function parseRankByRegex(html, seen) {
 
 
 // ---- 5.6. Parse trang thể loại (tag) ----
-// ⭐ v1.8.0: áp dụng isValidCard
 
 function parseTagPage(html, apiUrl) {
     console.log("[HG] parseTagPage url=" + apiUrl);
@@ -964,7 +988,6 @@ function parseTagPage(html, apiUrl) {
 
 
 // ---- 5.7. Parse trang tác giả ----
-// ⭐ v1.8.0: áp dụng isValidCard
 
 function parseAuthorPage(html, apiUrl) {
     console.log("[HG] parseAuthorPage url=" + apiUrl);
@@ -1047,7 +1070,6 @@ function parseVideoInitialData(html) {
 
 // =============================================================================
 // 5.9. PARSER — DANH SÁCH TẬP TỪ DOM BẰNG REGEX (fallback khi MiniJQ fail)
-//     ⭐ v1.7.0: chuẩn hóa href → luôn /video/{vid}/ep-{n}/
 // =============================================================================
 
 function parseEpisodesByRegex(html, seenSlug, videoId) {
@@ -1144,7 +1166,6 @@ function parseEpisodesByRegex(html, seenSlug, videoId) {
 
 // =============================================================================
 // 6. PARSER — CHI TIẾT PHIM
-//    ⭐ v1.7.0: MỌI episode luôn có URL /video/{vid}/ep-{n}/ — kể cả tập 1
 // =============================================================================
 
 function parseMovieDetail(html, apiUrl, datasend) {
@@ -1301,8 +1322,6 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
 // =============================================================================
 // 7. PARSER — LINK STREAM
-//    ⭐ v1.7.0: LUÔN fetch tươi URL /video/{vid}/ep-{epId}/ khi apiUrl
-//    không có /ep-N/ — tránh dùng epPlaySrcs từ trang gốc bị cache.
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
@@ -1479,7 +1498,6 @@ function parseCategoriesResponse(html, apiUrl) {
     try {
         var $doc = _$(html);
         $doc.find("a[href^='/tag/']").each(function () {
-            // ⭐ v1.8.0 — loại trừ tag trong search-suggest / SSP
             if (!isValidCard(this)) return;
 
             var $a = _$(this);
@@ -1531,6 +1549,7 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.8.0 VI loaded. BaseUrl=" + BASE
+console.log("[HG] huangguo_plugin.js v1.8.2 VI loaded. BaseUrl=" + BASE
     + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF")
-    + " | CardFilter=ON (exclude search-suggest/SSP/hero)");
+    + " | CardFilter=ON (exclude search-suggest/SSP/hero)"
+    + " | EpTimeInLang=ON (translated VI)");
