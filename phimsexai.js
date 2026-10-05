@@ -1,11 +1,14 @@
 // =============================================================================
 // PHIMSEXAI PLUGIN FOR VAAPP
-// Version: 6.7.1 - TAG ARCHIVE FIX
+// Version: 6.7.2 - BREADCRUMB LANG
 // Base: https://phimsexai.xyz
 //
-// CHANGELOG v6.7.1:
-//   [FIX] parseListResponse() nhận diện "organic-post-card" (trang tag/archive)
-//   [FIX] parseInt(filters.page, 10) — tránh 301 do "1" !== 1
+// CHANGELOG v6.7.2:
+//   [NEW] parseBreadcrumb() — lấy tên bộ/tên tập từ <p id="breadcrumbs">
+//   [NEW] Trường "lang" không còn hardcode "Vietsub":
+//         - Trang chủ     → badge từ class CSS (Vietsub/Thuyết Minh/...)
+//         - Trang khác    → tên bộ phim lấy từ breadcrumb (phần thứ 2)
+//   [KEEP] Tất cả fix từ v6.7.1 (organic-post-card, parseInt page)
 //   [KEEP] Tất cả fix từ v6.7.0 (category + tag, 36 tag phổ biến)
 //   [KEEP] Tất cả fix từ v6.6.0 (fetchAll, getCookie, uniqueSlug, fallback /?p=)
 // =============================================================================
@@ -18,7 +21,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "phimsexai",
         "name": "Phim Sex AI",
-        "version": "6.7.1",
+        "version": "6.7.2",
         "baseUrl": DEFAULT_BASE,
         "fallbackUrls": [],
         "referrer": DEFAULT_BASE + "/",
@@ -315,6 +318,54 @@ var U = {
 };
 
 // =============================================================================
+// BREADCRUMB PARSER ⭐ [v6.7.2]
+// Input : HTML có <p id="breadcrumbs">...</p>
+// Output: { siteName, seriesName, episodeName, raw }
+//
+// Ví dụ breadcrumb:
+//   Phim Sex AI » Quế Liên – Máu Lệ Cung Đình » Thái hậu được lão thái giám kích dâm
+//   → siteName    = "Phim Sex AI"
+//   → seriesName  = "Quế Liên – Máu Lệ Cung Đình"
+//   → episodeName = "Thái hậu được lão thái giám kích dâm"
+// =============================================================================
+
+function parseBreadcrumb(html) {
+    var result = { siteName: "", seriesName: "", episodeName: "", raw: "" };
+    if (!html) return result;
+
+    var m = html.match(/<p[^>]+id=["']breadcrumbs["'][^>]*>([\s\S]*?)<\/p>/i);
+    if (!m) return result;
+
+    var crumbHtml = m[1];
+
+    // Tách theo dấu » (dạng HTML entity &raquo; hoặc ký tự »)
+    var parts = crumbHtml.split(/&raquo;|»/);
+
+    var crumbs = [];
+    for (var i = 0; i < parts.length; i++) {
+        var text = U.clean(parts[i]);
+        if (text) crumbs.push(text);
+    }
+
+    result.raw = crumbs.join(" » ");
+
+    if (crumbs.length >= 3) {
+        // [site] » [bộ phim] » [tập]
+        result.siteName    = crumbs[0];
+        result.seriesName  = crumbs[1];
+        result.episodeName = crumbs[crumbs.length - 1];
+    } else if (crumbs.length === 2) {
+        // [site] » [tên phim]
+        result.siteName   = crumbs[0];
+        result.seriesName = crumbs[1];
+    } else if (crumbs.length === 1) {
+        result.siteName = crumbs[0];
+    }
+
+    return result;
+}
+
+// =============================================================================
 // HTTP FETCH
 // =============================================================================
 
@@ -446,7 +497,6 @@ function fetchUrl(url, sourceUrl) {
 
 // =============================================================================
 // URL GENERATION
-// ⭐ [v6.7.1] parseInt(filters.page) — tránh 301
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
@@ -712,7 +762,7 @@ function buildStreamResponse(servers) {
 }
 
 // =============================================================================
-// PARSE SERIES ARCHIVE
+// PARSE SERIES ARCHIVE ⭐ [v6.7.2] lang từ breadcrumb
 // =============================================================================
 
 function parseSeriesArchive(html) {
@@ -727,7 +777,7 @@ function parseSeriesArchive(html) {
         quality: "SERIES",
         servers: [],
         episode_current: "",
-        lang: "Vietsub",
+        lang: "",                       // ⭐ bỏ hardcode, gán từ breadcrumb
         category: "",
         country: "",
         director: "",
@@ -745,8 +795,15 @@ function parseSeriesArchive(html) {
     var canonicalMatch = html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
     if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
 
+    // ⭐ Ưu tiên tên bộ từ breadcrumb
+    var crumb = parseBreadcrumb(html);
+    if (crumb.seriesName) {
+        result.lang  = crumb.seriesName;
+        result.title = crumb.seriesName;
+    }
+
     result.id = slug;
-    result.title = title;
+    if (!result.title) result.title = title;
     result.posterUrl = U.url(poster);
     result.backdropUrl = U.url(poster);
     result.description = U.clean(desc);
@@ -820,7 +877,7 @@ function parseSeriesArchive(html) {
 }
 
 // =============================================================================
-// PARSE EPISODE DETAIL
+// PARSE EPISODE DETAIL ⭐ [v6.7.2] lang từ breadcrumb
 // =============================================================================
 
 function parseEpisodeDetail(html, apiUrl) {
@@ -835,7 +892,7 @@ function parseEpisodeDetail(html, apiUrl) {
         quality: "HD",
         servers: [],
         episode_current: "Full",
-        lang: "Vietsub",
+        lang: "",                       // ⭐ bỏ hardcode
         category: "",
         country: "",
         director: "",
@@ -852,6 +909,15 @@ function parseEpisodeDetail(html, apiUrl) {
     var slug = "";
     var canonicalMatch = html.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
     if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
+
+    // ⭐ Breadcrumb: lấy tên bộ cho "lang", tên tập cho "episode_current"
+    var crumb = parseBreadcrumb(html);
+    if (crumb.seriesName) {
+        result.lang = crumb.seriesName;
+    }
+    if (crumb.episodeName) {
+        result.episode_current = crumb.episodeName;
+    }
 
     result.id = slug;
     result.title = title;
@@ -876,7 +942,10 @@ function parseEpisodeDetail(html, apiUrl) {
                 slug: uniqueSlug
             }]
         });
-        result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+        // Nếu breadcrumb không có tên tập → fallback "Full"
+        if (!crumb.episodeName) {
+            result.episode_current = duration ? "Full (" + duration + ")" : "Full";
+        }
     } else {
         result.episode_current = "No Source";
     }
@@ -897,8 +966,7 @@ function parseEpisodeDetail(html, apiUrl) {
 }
 
 // =============================================================================
-// LIST PARSER
-// ⭐ [v6.7.1] Thêm regex cho "organic-post-card" (trang tag/archive)
+// LIST PARSER ⭐ [v6.7.2] lang từ breadcrumb (trang khác)
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
@@ -921,19 +989,29 @@ function parseListResponse(html, apiUrl, datasend) {
         if (m2) movies.push(m2);
     }
 
-    // ⭐ 3. Organic cards (trang tag / archive)
-    // CHÚ Ý: phải đặt SAU standard/series để tránh trùng lặp
+    // 3. Organic cards (trang tag / archive)
     var organicRegex = /<article[^>]+class="[^"]*organic-post-card[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
     while ((match = organicRegex.exec(html)) !== null) {
-        // Bỏ qua nếu đã có standard/series (tránh trùng)
-        var cardClass = match[1].substring(0, 200);
-        // parseOrganicPost dùng lại logic của parseStandardPost
         var m3 = parseOrganicPost(match[1]);
         if (m3 && !isDuplicate(movies, m3.id)) {
             movies.push(m3);
         }
     }
 
+    // ⭐ [v6.7.2] Gán lang từ breadcrumb cho tất cả item (khi KHÔNG phải trang chủ)
+    var crumb = parseBreadcrumb(html);
+    if (crumb.seriesName) {
+        // Có breadcrumb ≥ 2 phần → đây là trang category/tag/archive/detail
+        // → dùng tên bộ phim/category làm "lang" cho tất cả item
+        for (var i = 0; i < movies.length; i++) {
+            movies[i].lang = crumb.seriesName;
+        }
+        debugLog("parseListResponse: lang from breadcrumb =", crumb.seriesName);
+    } else {
+        debugLog("parseListResponse: homepage → keep badge lang");
+    }
+
+    // Pagination
     var currentPage = 1, totalPages = 1;
     var currentMatch = html.match(/<span[^>]+class=['"]current['"][^>]*>(\d+)<\/span>/i);
     if (currentMatch) currentPage = parseInt(currentMatch[1]);
@@ -964,7 +1042,11 @@ function isDuplicate(arr, id) {
     return false;
 }
 
-// ⭐ [v6.7.1] Parser cho "organic-post-card" (trang tag/archive)
+// =============================================================================
+// CARD PARSERS ⭐ [v6.7.2] lang lấy từ badge (fallback), sẽ bị ghi đè
+// bởi parseListResponse khi không phải trang chủ
+// =============================================================================
+
 function parseOrganicPost(itemHtml) {
     try {
         var linkMatch = itemHtml.match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*organic-thumb-link[^"]*"/i) ||
@@ -989,7 +1071,7 @@ function parseOrganicPost(itemHtml) {
                        itemHtml.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*organic-img[^"]*"/i);
         if (imgMatch) poster = U.url(imgMatch[1]);
 
-        // Badges từ class
+        // Badges từ class CSS
         var badges = [];
         if (itemHtml.indexOf("category-phim-sex-ai-vietsub") !== -1) badges.push("Vietsub");
         if (itemHtml.indexOf("category-phim-sex-ai-thuyet-minh") !== -1) badges.push("Thuyết Minh");
@@ -1005,7 +1087,7 @@ function parseOrganicPost(itemHtml) {
             year: 0,
             quality: "HD",
             episode_current: "",
-            lang: "Vietsub",
+            lang: badges.length > 0 ? badges[0] : "",   // ⭐ bỏ hardcode "Vietsub"
             previewUrl: ""
         };
     } catch (e) { return null; }
@@ -1049,7 +1131,7 @@ function parseStandardPost(itemHtml) {
             year: 0,
             quality: "HD",
             episode_current: "",
-            lang: "Vietsub",
+            lang: badges.length > 0 ? badges[0] : "",   // ⭐ bỏ hardcode "Vietsub"
             previewUrl: ""
         };
     } catch (e) { return null; }
@@ -1099,7 +1181,7 @@ function parseSeriesPost(itemHtml) {
             year: 0,
             quality: "SERIES",
             episode_current: episodeCount > 0 ? episodeCount + " tập" : "",
-            lang: "Vietsub",
+            lang: badges.length > 0 ? badges[0] : "",   // ⭐ bỏ hardcode "Vietsub"
             previewUrl: ""
         };
     } catch (e) { return null; }
@@ -1132,6 +1214,9 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="([^"]+)"/i);
                 if (canonicalMatch) slug = U.slug(canonicalMatch[1]);
 
+                // ⭐ Lang từ breadcrumb
+                var crumb = parseBreadcrumb(htmlContent);
+
                 var result = {
                     id: slug,
                     title: title,
@@ -1143,7 +1228,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                     quality: "HD",
                     servers: [],
                     episode_current: servers.length > 0 ? "Full" : "No Source",
-                    lang: "Vietsub",
+                    lang: crumb.seriesName || "",       // ⭐ bỏ hardcode "Vietsub"
                     category: "",
                     country: "",
                     director: "",
