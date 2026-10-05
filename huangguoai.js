@@ -3,7 +3,7 @@
 // =============================================================================
 // Website : https://huangguoai.com
 // Type    : SHORTFILM (phim ngắn dọc — vuốt TikTok chuyển tập)
-// Version : 1.6.0 VI (Fix episode parse — regex fallback + httpRequest fetch)
+// Version : 1.7.0 VI (Fix ep 1-2 cache — luôn dùng URL /ep-N/ chuẩn hóa)
 // Author  : VAAPP Community
 // =============================================================================
 
@@ -60,6 +60,20 @@ function decodeHtml(s) {
         .replace(/\\u0026/g, "&");
 }
 
+// ⭐ NEW: Trích videoId (số) từ một URL bất kỳ dạng /video/{id}/...
+function extractVideoId(url) {
+    if (!url) return "";
+    var m = String(url).match(/\/video\/(\d+)/);
+    return m ? m[1] : "";
+}
+
+// ⭐ NEW: Build URL chuẩn cho 1 tập — LUÔN dạng /video/{vid}/ep-{n}/
+// Tập 1 cũng dùng /ep-1/ thay vì /video/{vid}/ để tránh CDN cache trang gốc.
+function buildEpisodeUrl(videoId, epNum) {
+    var n = parseInt(epNum, 10) || 1;
+    return BASE + "/video/" + videoId + "/ep-" + n + "/";
+}
+
 
 // =============================================================================
 // 1. MANIFEST
@@ -69,7 +83,7 @@ function getManifest() {
     return JSON.stringify({
         "id": "huangguo_ai",
         "name": "Huangguo Short Drama",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "description": "Phim ngắn AI, phim hoạt hình người lớn, AI hoán đổi khuôn mặt, AI chỉnh sửa — xem miễn phí",
         "author": "VAAPP Community",
         "baseUrl": BASE,
@@ -206,6 +220,18 @@ function getUrlSearch(keyword, filtersJson) {
 function getUrlDetail(slug, datasend) {
     if (!slug) return "";
     if (slug.indexOf("http") === 0) return slug;
+
+    // ⭐ Nhánh mới: URL tập dạng /video/{id}/ep-{n}/ → giữ nguyên
+    if (/^\/video\/\d+\/ep-\d+\/?$/.test(slug)) {
+        return BASE + slug.replace(/\/+$/, "") + "/";
+    }
+
+    // URL phim dạng /video/{id}/ → giữ nguyên (nhưng lưu ý: parseMovieDetail sẽ
+    // tự chuẩn hóa episode 1 sang /ep-1/ khi trả về danh sách tập)
+    if (/^\/video\/\d+\/?$/.test(slug)) {
+        return BASE + slug.replace(/\/+$/, "") + "/";
+    }
+
     if (/^\/author\/\d+\/?$/.test(slug)) {
         var cleanA = slug.replace(/\/+$/, "");
         return BASE + cleanA + "/video/";
@@ -941,11 +967,13 @@ function parseVideoInitialData(html) {
 
 // =============================================================================
 // 5.9. PARSER — DANH SÁCH TẬP TỪ DOM BẰNG REGEX (fallback khi MiniJQ fail)
+//     ⭐ v1.7.0: chuẩn hóa href → luôn /video/{vid}/ep-{n}/
 // =============================================================================
 
-function parseEpisodesByRegex(html, seenSlug) {
+function parseEpisodesByRegex(html, seenSlug, videoId) {
     var episodes = [];
     var seen = seenSlug || {};
+    var vid = videoId || "";
 
     // ── Lớp 1: match thẻ <a> có class chứa "hg-web-play__ep" ──
     var re = /<a\b[^>]*class="[^"]*\bhg-web-play__ep\b[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
@@ -968,11 +996,21 @@ function parseEpisodesByRegex(html, seenSlug) {
         if (seen[slug]) continue;
         seen[slug] = true;
 
+        // ⭐ Chuẩn hóa href: luôn /video/{vid}/ep-{n}/
+        var finalHref = href;
+        if (vid && epId) {
+            finalHref = buildEpisodeUrl(vid, epId);
+        } else if (vid && !epId) {
+            finalHref = buildEpisodeUrl(vid, episodes.length + 1);
+        }
+
+        var finalEpNum = epId || String(episodes.length + 1);
+
         episodes.push({
-            id: href,
-            name: epName || (epId ? ("Tập " + epId) : ("Tập " + (episodes.length + 1))),
+            id: finalHref,
+            name: epName || ("Tập " + finalEpNum),
             slug: slug,
-            datasend: epId ? ("epId=" + epId) : ("epId=" + (episodes.length + 1))
+            datasend: "epId=" + finalEpNum
         });
     }
 
@@ -986,8 +1024,11 @@ function parseEpisodesByRegex(html, seenSlug) {
             var slug2 = "ep-" + epId2;
             if (seen[slug2]) continue;
             seen[slug2] = true;
+
+            var finalHref2 = vid ? buildEpisodeUrl(vid, epId2) : href2;
+
             episodes.push({
-                id: href2,
+                id: finalHref2,
                 name: "Tập " + epId2,
                 slug: slug2,
                 datasend: "epId=" + epId2
@@ -1005,8 +1046,11 @@ function parseEpisodesByRegex(html, seenSlug) {
             var slug3 = "ep-" + epId3;
             if (seen[slug3]) continue;
             seen[slug3] = true;
+
+            var finalHref3 = vid ? buildEpisodeUrl(vid, epId3) : href3;
+
             episodes.push({
-                id: href3,
+                id: finalHref3,
                 name: "Tập " + epId3,
                 slug: slug3,
                 datasend: "epId=" + epId3
@@ -1024,11 +1068,16 @@ function parseEpisodesByRegex(html, seenSlug) {
 
 // =============================================================================
 // 6. PARSER — CHI TIẾT PHIM
+//    ⭐ v1.7.0: MỌI episode luôn có URL /video/{vid}/ep-{n}/ — kể cả tập 1
 // =============================================================================
 
 function parseMovieDetail(html, apiUrl, datasend) {
     console.log("[HG] parseMovieDetail url=" + apiUrl);
     var cleanUrl = apiUrl.split("|")[0];
+
+    // ⭐ Trích videoId từ URL để build URL episode chuẩn
+    var videoId = extractVideoId(cleanUrl);
+    console.log("[HG] videoId=" + videoId);
 
     var vdata = parseVideoInitialData(html);
 
@@ -1046,6 +1095,7 @@ function parseMovieDetail(html, apiUrl, datasend) {
         tags = vdata.tags || [];
         author = vdata.author || "";
         views = vdata.views || "";
+        if (!videoId && vdata.id) videoId = String(vdata.id);
     }
 
     if (!title) {
@@ -1075,27 +1125,31 @@ function parseMovieDetail(html, apiUrl, datasend) {
             var href = $a.attr("href") || "";
             var epId = $a.attr("data-ep-id") || "";
             var epName = $a.text().trim();
-            if (!href) return;
+            if (!href && !epId) return;
 
             var slug = epId ? ("ep-" + epId) : ("ep-" + (episodes.length + 1));
             if (seenSlug[slug]) return;
             seenSlug[slug] = true;
 
+            // ⭐ Chuẩn hóa href: LUÔN /video/{vid}/ep-{n}/
+            var finalEpNum = epId || String(episodes.length + 1);
+            var finalHref = videoId ? buildEpisodeUrl(videoId, finalEpNum) : href;
+
             episodes.push({
-                id: href,
-                name: epName || ("Tập " + epId),
+                id: finalHref,
+                name: epName || ("Tập " + finalEpNum),
                 slug: slug,
-                datasend: "epId=" + epId
+                datasend: "epId=" + finalEpNum
             });
         });
     } catch (e) {
         console.error("[HG] parse episodes fail: " + e.message);
     }
 
-    // ⭐ Tầng 2 MỚI: Regex fallback trên thẻ <a class="hg-web-play__ep">
+    // ⭐ Tầng 2: Regex fallback trên thẻ <a class="hg-web-play__ep">
     if (episodes.length === 0) {
         console.log("[HG] DOM parse empty → trying regex fallback");
-        episodes = parseEpisodesByRegex(html, seenSlug);
+        episodes = parseEpisodesByRegex(html, seenSlug, videoId);
     }
 
     // ── Tầng 3: Fallback từ epPlaySrcs JSON ──
@@ -1105,8 +1159,9 @@ function parseMovieDetail(html, apiUrl, datasend) {
         });
         for (var i = 0; i < keys.length; i++) {
             var epNum = keys[i];
+            var finalHref3 = videoId ? buildEpisodeUrl(videoId, epNum) : cleanUrl;
             episodes.push({
-                id: cleanUrl + (parseInt(epNum, 10) > 1 ? "ep-" + epNum + "/" : ""),
+                id: finalHref3,
                 name: "Tập " + epNum,
                 slug: "ep-" + epNum,
                 datasend: "epId=" + epNum
@@ -1114,22 +1169,45 @@ function parseMovieDetail(html, apiUrl, datasend) {
         }
     }
 
+    // ── Tầng 4: Fallback cuối — tổng số tập từ vdata.total hoặc mặc định ──
     if (episodes.length === 0) {
-        episodes.push({
-            id: cleanUrl,
-            name: "Full",
-            slug: "full",
-            datasend: "epId=1"
-        });
+        var total = 0;
+        if (vdata) {
+            if (vdata.total) total = parseInt(vdata.total, 10) || 0;
+            else if (vdata.episode) {
+                var mTotal = String(vdata.episode).match(/(\d+)/);
+                if (mTotal) total = parseInt(mTotal[1], 10) || 0;
+            }
+        }
+        if (total > 0 && videoId) {
+            for (var t = 1; t <= total; t++) {
+                episodes.push({
+                    id: buildEpisodeUrl(videoId, t),
+                    name: "Tập " + t,
+                    slug: "ep-" + t,
+                    datasend: "epId=" + t
+                });
+            }
+        } else {
+            // Không có thông tin → trả về tập 1 để tránh crash
+            episodes.push({
+                id: videoId ? buildEpisodeUrl(videoId, 1) : cleanUrl,
+                name: "Tập 1",
+                slug: "ep-1",
+                datasend: "epId=1"
+            });
+        }
     }
 
+    // Sắp xếp theo số tập
     episodes.sort(function (a, b) {
         var na = parseInt((a.slug.match(/\d+/) || ["0"])[0], 10);
         var nb = parseInt((b.slug.match(/\d+/) || ["0"])[0], 10);
         return na - nb;
     });
 
-    console.log("[HG] parseMovieDetail → " + episodes.length + " episodes");
+    console.log("[HG] parseMovieDetail → " + episodes.length + " episodes"
+        + " (ep1 url=" + (episodes[0] ? episodes[0].id : "?") + ")");
 
     return JSON.stringify({
         id: cleanUrl,
@@ -1154,10 +1232,14 @@ function parseMovieDetail(html, apiUrl, datasend) {
 
 // =============================================================================
 // 7. PARSER — LINK STREAM
+//    ⭐ v1.7.0: LUÔN fetch tươi URL /video/{vid}/ep-{epId}/ khi apiUrl
+//    không có /ep-N/ — tránh dùng epPlaySrcs từ trang gốc bị cache.
 // =============================================================================
 
 function parseDetailResponse(html, apiUrl, datasend) {
     console.log("[HG] parseDetailResponse url=" + apiUrl + " datasend=" + (datasend || ""));
+
+    var cleanApiUrl = (apiUrl || "").split("|")[0].split("?")[0];
 
     // ── 1. Trích epId ──
     var epId = "";
@@ -1166,26 +1248,42 @@ function parseDetailResponse(html, apiUrl, datasend) {
         if (mEp) epId = mEp[1];
     }
     if (!epId) {
-        var mUrl = apiUrl.match(/\/ep-(\d+)\//);
+        var mUrl = cleanApiUrl.match(/\/ep-(\d+)\//);
         if (mUrl) epId = mUrl[1];
         else epId = "1";
     }
 
-    // ── 2. Parse vdata từ HTML hiện tại (VAAPP đã fetch URL tập) ──
-    var vdata = parseVideoInitialData(html);
-    var vid = vdata ? String(vdata.id || "") : "";
+    // ── 2. Trích videoId ──
+    var videoId = extractVideoId(cleanApiUrl);
+    if (!videoId && html) {
+        // fallback: parse tạm videoInitialData để lấy id
+        var vdataTemp = parseVideoInitialData(html);
+        if (vdataTemp && vdataTemp.id) videoId = String(vdataTemp.id);
+    }
+    console.log("[HG] resolved videoId=" + videoId + " epId=" + epId);
 
-    // ── 3. Ưu tiên 1: epPlaySrcs[epId] (có sẵn cho tập hiện tại) ──
-    var streamUrl = "";
-    if (vdata && vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
-        streamUrl = vdata.epPlaySrcs[epId];
-        console.log("[HG] stream from epPlaySrcs[" + epId + "]");
+    // ── 3. ⭐ QUYẾT ĐỊNH: có cần fetch tươi không? ──
+    // Nếu apiUrl không có /ep-N/ → đây là trang gốc → bắt buộc fetch tươi
+    //   trang /video/{vid}/ep-{epId}/ để có URL stream mới, tránh cache.
+    // Nếu apiUrl đã có /ep-N/ đúng với epId → có thể dùng HTML hiện tại.
+    var needFresh = false;
+    var hasEpInUrl = /\/ep-\d+\//.test(cleanApiUrl);
+    if (!hasEpInUrl) {
+        needFresh = true;
+    } else {
+        // URL có /ep-N/ nhưng N có thể khác epId → kiểm tra
+        var mEpUrl = cleanApiUrl.match(/\/ep-(\d+)\//);
+        if (mEpUrl && mEpUrl[1] !== epId) {
+            needFresh = true;
+        }
     }
 
-    // ── 4. ⭐ Fallback: httpRequest() fetch HTML tập cụ thể ──
-    if (!streamUrl && epId !== "1" && vid) {
-        var epUrl = BASE + "/video/" + vid + "/ep-" + epId + "/";
-        console.log("[HG] fallback httpRequest: " + epUrl);
+    var workingHtml = html;
+    var workingVdata = null;
+
+    if (needFresh && videoId) {
+        var epUrl = buildEpisodeUrl(videoId, epId);
+        console.log("[HG] needFresh=true → fetch " + epUrl);
         try {
             var res = httpRequest(epUrl, {
                 headers: {
@@ -1194,37 +1292,76 @@ function parseDetailResponse(html, apiUrl, datasend) {
                 }
             });
             if (res && res.isSuccessful && res.body) {
-                var epVdata = parseVideoInitialData(res.body);
-                if (epVdata) {
-                    if (epVdata.epPlaySrcs && epVdata.epPlaySrcs[epId]) {
-                        streamUrl = epVdata.epPlaySrcs[epId];
-                        console.log("[HG] stream from fetched epPlaySrcs[" + epId + "]");
-                    } else if (epVdata.videoSrc) {
-                        streamUrl = epVdata.videoSrc;
-                        console.log("[HG] stream from fetched videoSrc");
-                    }
+                workingHtml = res.body;
+                workingVdata = parseVideoInitialData(res.body);
+                console.log("[HG] fresh fetch OK, vdata=" + (workingVdata ? "yes" : "no"));
+            } else {
+                console.warn("[HG] fresh fetch failed, fallback to original html");
+            }
+        } catch (e) {
+            console.error("[HG] fresh fetch error: " + e.message);
+        }
+    }
+
+    var vdata = workingVdata || parseVideoInitialData(workingHtml);
+    var vid = vdata ? String(vdata.id || "") : "";
+    if (!vid && videoId) vid = videoId;
+
+    // ── 4. Ưu tiên 1: epPlaySrcs[epId] từ HTML (đã tươi nếu needFresh) ──
+    var streamUrl = "";
+    if (vdata && vdata.epPlaySrcs && vdata.epPlaySrcs[epId]) {
+        streamUrl = vdata.epPlaySrcs[epId];
+        console.log("[HG] stream from epPlaySrcs[" + epId + "]"
+            + (needFresh ? " (fresh)" : " (cached)"));
+    }
+
+    // ── 5. Fallback: videoSrc / previewSrc nếu epId=1 ──
+    if (!streamUrl && vdata && epId === "1") {
+        if (vdata.videoSrc) {
+            streamUrl = vdata.videoSrc;
+            console.log("[HG] stream from videoSrc");
+        } else if (vdata.previewSrc) {
+            streamUrl = vdata.previewSrc;
+            console.log("[HG] stream from previewSrc");
+        }
+    }
+
+    // ── 6. Fallback: regex m3u8 trực tiếp trên HTML ──
+    if (!streamUrl && workingHtml) {
+        var mM3u8 = workingHtml.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
+        if (mM3u8) {
+            streamUrl = mM3u8[0].replace(/\\\//g, "/");
+            console.log("[HG] stream from html regex m3u8");
+        }
+    }
+
+    // ── 7. Fallback cuối: nếu chưa fetch và vẫn không có stream, thử fetch 1 lần nữa ──
+    if (!streamUrl && !needFresh && videoId) {
+        var epUrl2 = buildEpisodeUrl(videoId, epId);
+        console.log("[HG] no stream yet → last-resort fetch " + epUrl2);
+        try {
+            var res2 = httpRequest(epUrl2, {
+                headers: {
+                    "Referer": REFERER,
+                    "User-Agent": UA_MOBILE
                 }
-                // Regex m3u8 fallback cuối
+            });
+            if (res2 && res2.isSuccessful && res2.body) {
+                var vdata2 = parseVideoInitialData(res2.body);
+                if (vdata2 && vdata2.epPlaySrcs && vdata2.epPlaySrcs[epId]) {
+                    streamUrl = vdata2.epPlaySrcs[epId];
+                    console.log("[HG] stream from last-resort fetch");
+                }
                 if (!streamUrl) {
-                    var m3 = res.body.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
-                    if (m3) {
-                        streamUrl = m3[0].replace(/\\\//g, "/");
-                        console.log("[HG] stream from fetched html regex");
+                    var mM3u8b = res2.body.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
+                    if (mM3u8b) {
+                        streamUrl = mM3u8b[0].replace(/\\\//g, "/");
+                        console.log("[HG] stream from last-resort regex");
                     }
                 }
             }
         } catch (e) {
-            console.error("[HG] httpRequest fail: " + e.message);
-        }
-    }
-
-    // ── 5. Fallback cuối: videoSrc / previewSrc (chỉ epId=1) ──
-    if (!streamUrl && vdata && epId === "1") {
-        if (vdata.videoSrc) streamUrl = vdata.videoSrc;
-        else if (vdata.previewSrc) streamUrl = vdata.previewSrc;
-        else {
-            var mM3u8 = html.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/i);
-            if (mM3u8) streamUrl = mM3u8[0].replace(/\\\//g, "/");
+            console.error("[HG] last-resort fetch fail: " + e.message);
         }
     }
 
@@ -1233,7 +1370,7 @@ function parseDetailResponse(html, apiUrl, datasend) {
         return JSON.stringify({ url: "", isEmbed: false });
     }
 
-    console.log("[HG] ep=" + epId + " stream=" + streamUrl.substring(0, 80) + "...");
+    console.log("[HG] ep=" + epId + " stream=" + streamUrl.substring(0, 90) + "...");
 
     return JSON.stringify({
         url: streamUrl,
@@ -1285,8 +1422,9 @@ function parseCategoriesResponse(html, apiUrl) {
     try {
         var $doc = _$(html);
         $doc.find("a[href^='/tag/']").each(function () {
-            var href = this.attr("href") || "";
-            var name = this.text().trim();
+            var $a = _$(this);
+            var href = $a.attr("href") || "";
+            var name = $a.text().trim();
             if (!href || !name) return;
             if (/\/page\/\d+\/?$/.test(href)) return;
             if (seen[href]) return;
@@ -1333,5 +1471,5 @@ function getPipeData(apiUrl) {
 // 12. LOG KHỞI TẠO
 // =============================================================================
 
-console.log("[HG] huangguo_plugin.js v1.6.0 VI loaded. BaseUrl=" + BASE
+console.log("[HG] huangguo_plugin.js v1.7.0 VI loaded. BaseUrl=" + BASE
     + " | ImgProxy=" + (USE_IMG_PROXY ? "ON" : "OFF"));
