@@ -33,19 +33,6 @@ from _invoice import lookup_invoice, fetch_invoices_by_date
 from _gdt_invoice import lookup_gdt_invoices, lookup_gdt_invoices_by_type, gdt_fetch_invoice_detail, gdt_export_invoice_xml
 from _invoiceBKAV import ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_list, ehoadon_warehouse_create
 from _customsdeclaration import parse_customs_declaration_from_bytes
-# TẠM THỜI TẮT chức năng refund (_refund.py trên server đang lệch version,
-# thiếu hàm get_case_with_checklist -> import lỗi làm sập toàn bộ app).
-# Bật lại bằng cách bỏ comment khối import này sau khi đồng bộ lại _refund.py.
-# from _refund import (  # noqa: E402
-#     create_case as refund_create_case,
-#     list_cases as refund_list_cases,
-#     get_case_with_checklist as refund_get_case_with_checklist,
-#     update_case_status as refund_update_case_status,
-#     parse_email_text as refund_parse_email_text,
-#     attach_document as refund_attach_document,
-#     patch_case_fields as refund_patch_case_fields,
-# )
-
 def handle_fetch_employees_excel(body):
     file_b64 = body.get("file_base64", "")
     if not file_b64:
@@ -806,12 +793,6 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_ehoadon_invoice_list(body)
         elif action == "parse_customs_declaration":
             status, payload = handle_parse_customs_declaration(body)
-        elif action in (
-            "refund_create", "refund_list", "refund_get", "refund_update_status",
-            "refund_parse_email", "refund_upload", "refund_patch",
-        ):
-            # Chức năng refund đang tạm tắt (xem comment ở đầu file, phần import _refund).
-            status, payload = 503, {"error": "Chức năng hoàn tiền (refund) đang tạm thời bảo trì."}
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
