@@ -1,6 +1,6 @@
 Công cụ tra cứu đơn hàng (10X + SOLOBIZ) — Web app trên Vercel
 
-Web app nội bộ: tra cứu đơn hàng (DH… / BIZ… / SA…), chuyển khoản SePay, hóa đơn điện tử, HĐĐT Tổng cục Thuế, bảng lương, Air Packing List, eHoadon, hoàn tiền…
+Web app nội bộ: tra cứu đơn hàng (DH… / BIZ… / SA…), chuyển khoản SePay, hóa đơn điện tử, HĐĐT Tổng cục Thuế, bảng lương, Air Packing List, eHoadon…
 
 Backend là serverless function Python trên Vercel.
 
@@ -16,7 +16,6 @@ api/
   _gdt_invoice.py          HĐĐT Tổng cục Thuế (danh sách / chi tiết / export XML)
   _invoiceBKAV.py          eHoadon (BKAV) — login, tạo HĐ, danh sách
   _customsdeclaration.py   Parse tờ khai hải quan từ file
-  _refund.py               Hoàn tiền (Upstash Redis) — hiện đang tạm tắt trong index.py
 
 index.html + app.js + app.css   Giao diện chính (các tab chức năng)
 vercel.json                     Build + route (Python @vercel/python@4.8.0 + static)
@@ -151,20 +150,6 @@ ehoadon_login, ehoadon_buyer_search, ehoadon_invoice_create, ehoadon_invoice_lis
 
 (user nhập trên UI; tùy chọn ehoadon_username / ehoadon_password prefill)
 
-
-
-
-
-Hoàn tiền
-
-
-
-refund_*
-
-
-
-Đang tạm tắt — cần Upstash KV khi bật lại
-
 Deploy lên Vercel
 
 
@@ -227,10 +212,6 @@ ehoadon_username, ehoadon_password — prefill form eHoadon (tùy chọn)
 
 TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, TELEGRAM_ALLOWED_IDS — bot Telegram
 
-
-
-REFUND_KV_REST_API_URL + REFUND_KV_REST_API_TOKEN (hoặc KV_REST_API_*) — khi bật lại refund
-
 Xem chi tiết + ví dụ trong file .env.example.
 
 Bot Telegram
@@ -260,16 +241,6 @@ Nút XML trên từng dòng / trong popup chi tiết → tải invoice.xml gốc
 Tick nhiều dòng → Tải XML đã chọn: 1 HĐ = file .xml; nhiều HĐ = 1 file .zip.
 
 Action: gdt_invoice_export_xml (body: username, password, invoice, token tùy chọn).
-
-Trạng thái chức năng Hoàn tiền
-
-Import _refund trong api/index.py đang bị comment vì lệch version (thiếu một số hàm so với expect của index.py). Mọi action refund_* trả về HTTP 503:
-
-
-
-Chức năng hoàn tiền (refund) đang tạm thời bảo trì.
-
-Khi đồng bộ xong _refund.py, bỏ comment khối import và các nhánh refund_* trong index.py rồi cấu hình Upstash Redis (REFUND_KV_REST_API_*).
 
 Bảo mật
 
