@@ -3303,17 +3303,20 @@ function downloadBankStatement() {
 }
 
 // Hàm Copy bảng Sao kê - đọc trực tiếp từ bảng đang hiển thị (bao gồm cả nội dung người dùng vừa gõ vào cột "Nội dung diễn giải")
+// Không copy dòng tiêu đề (NỘI DUNG DIỄN GIẢI, GỬI VÀO, RÚT RA, SỐ DƯ LŨY KẾ, GHI CHÚ...)
 function buildBankStatementTsvFromDOM() {
   const table = document.getElementById('bankStatementTable');
   if (!table) return "";
   const rows = table.querySelectorAll('tr');
   const lines = [];
   rows.forEach((tr, rowIndex) => {
+    // Bỏ qua dòng tiêu đề (thead) — chỉ copy dữ liệu
+    if (rowIndex === 0) return;
     const cells = tr.querySelectorAll('th, td');
     const vals = Array.from(cells).map((cell, colIndex) => {
       let text = (cell.innerText || cell.textContent || "").trim();
-      // Xóa dấu chấm/phẩy ở các cột số (Index 1, 2, 3), bỏ qua dòng tiêu đề
-      if (rowIndex > 0 && colIndex >= 1 && colIndex <= 3) {
+      // Xóa dấu chấm/phẩy ở các cột số (Index 1, 2, 3)
+      if (colIndex >= 1 && colIndex <= 3) {
         text = text.replace(/[,.]/g, '');
       }
       // Lọc bỏ ký tự tab/xuống dòng thừa
@@ -3459,7 +3462,7 @@ async function doTxList() {
       const lookupCellContent = paymentCode ? `<span class="spinner" style="color:var(--accent)"></span>` : "—";
 
       rows += `
-        <tr>
+        <tr data-tx-index="${i}">
           <td data-sort-value="${tx.transaction_date}">
             <div>${formattedDate}</div>
             <div class="text-muted-small">${relativeTime}</div>
@@ -3865,9 +3868,25 @@ function copyTxListForMisa() {
       alert("Chưa có dữ liệu để copy. Vui lòng tra cứu danh sách giao dịch trước.");
       return;
     }
+    // Lấy thứ tự theo đúng thứ tự đang hiển thị trên bảng (sau khi user sort),
+    // để khi copy sang mẫu DS bán MISA cũng giữ đúng thứ tự đã sắp xếp.
+    // data-tx-index gắn trên mỗi <tr> lúc render, trỏ về index trong currentTxListData.
+    let orderedData = currentTxListData;
+    const tableEl = document.getElementById("txListTable");
+    if (tableEl) {
+      const domRows = Array.from(tableEl.querySelectorAll("tbody tr[data-tx-index]"));
+      if (domRows.length > 0) {
+        const indices = domRows
+          .map(row => parseInt(row.dataset.txIndex, 10))
+          .filter(i => !isNaN(i) && i >= 0 && i < currentTxListData.length);
+        if (indices.length > 0) {
+          orderedData = indices.map(i => currentTxListData[i]);
+        }
+      }
+    }
     // Bỏ qua các dòng "Tiền ra (-)" (giao dịch tiền ra, VD hoàn tiền) - mẫu DS bán
     // MISA chỉ cần các giao dịch "Tiền vào (+)" (giao dịch bán hàng thực tế).
-    const rowsToExport = currentTxListData.filter(tx => Number(tx.amount_in || 0) > 0);
+    const rowsToExport = orderedData.filter(tx => Number(tx.amount_in || 0) > 0);
     if (rowsToExport.length === 0) {
       alert("Không có giao dịch \"Tiền vào (+)\" nào để copy.");
       return;
