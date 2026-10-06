@@ -567,14 +567,17 @@ async function doFetchEmployeesExcel(fileOverride) {
       if (pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
         
-        // Đọc ô T5 để làm số ngày công chuẩn (nếu trống hoặc lỗi thì mặc định là 26)
-        let soNgayCongChuan = 26;
-        if (worksheet['T5'] && worksheet['T5'].v) {
-            const t5Val = parseFloat(worksheet['T5'].v);
-            if (!isNaN(t5Val) && t5Val > 0) soNgayCongChuan = t5Val;
-        }
+        // Số ngày công chuẩn mặc định (fallback). Ưu tiên lấy theo từng NV ở cột K.
+        // (Không đọc T5 nữa — ô T5 trong format mới là tỷ lệ BHXH, không phải ngày công)
+        const soNgayCongChuan = 26;
 
         // Đọc dữ liệu từ dòng 8 (index 7)
+        // Mapping theo cấu trúc bảng lương T07/T08/2026 trở đi:
+        //   B=MSNV C=Họ tên H=Lương CB J=Ngày công TT K=Ngày công chuẩn
+        //   L=Ngày công hưởng lương M=Trang phục N=Cơm O=Trách nhiệm P=HT-BHXH
+        //   Q=Hoa hồng R=Thưởng S=Lương phép T=Khác U=Tổng TN
+        //   V–Y=BHXH/BHYT/BHTN/CĐ trừ  AC=Thuế TNCN AD=Tạm ứng AE=Thực nhận
+        //   AF–AG=STK/NH  AK–AM=HT-TT/ÔĐ-TS/TNLĐ  AN–AP=BHYT/BHTN/CĐ CTY
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
         // Skip first 7 rows (0-6) → start at index 7
         const dataRows = jsonData.slice(7);
@@ -584,32 +587,33 @@ async function doFetchEmployeesExcel(fileOverride) {
           if (!row || !Array.isArray(row)) return;
           const ma_nv = row[1]; 
           const ten_nv = row[2];
-          const luong_cb_raw = row[7];
-          const ngay_cong_tt_raw = row[9];
-          const ngay_cong_hl_raw = row[10];
-          const trang_phuc_raw = row[11];
-          const com_trua_raw = row[12];
-          const trach_nhiem_raw = row[13];
-          const bhxh_raw = row[14];
-          const hoa_hong_raw = row[15];         // P: Hoa hồng bán hàng
-          const thuong_dong_gop_raw = row[16];  // Q: Thưởng ghi nhận đóng góp
-          const luong_phep_raw = row[17];       // R: Lương phép năm
-          const khac_raw = row[18];             // S: Khác
-          const tong_thu_nhap_raw = row[19];    // T: Tổng thu nhập trong tháng
-          const bhxh_tru_raw = row[20];         // U: BHXH
-          const bhyt_tru_raw = row[21];         // V: BHYT
-          const bhtn_tru_raw = row[22];         // W: BHTN
-          const cd_tru_raw = row[23];           // X: CĐ
-          const thue_tncn_raw = row[27];        // AB: Tiền thuế TNCN
-          const thuc_nhan_raw = row[29];        // AD: Thực nhận
-          const stk_raw = row[30];              // AE: STK
-          const ngan_hang_raw = row[31];        // AF: Ngân hàng
-          const ht_tt_raw = row[35];             // AJ: HT-TT
-          const od_ts_raw = row[36];             // AK: ÔĐ-TS
-          const tnld_bnn_raw = row[37];           // AL: TNLĐ-BNN
-          const bhyt_cty_raw = row[38];           // AM: BHYT
-          const bhtn_cty_raw = row[39];           // AN: BHTN
-          const cd_cty_raw = row[40];             // AO: CĐ
+          const luong_cb_raw = row[7];            // H: Lương cơ bản
+          const ngay_cong_tt_raw = row[9];        // J: Ngày công thực tế
+          const ngay_cong_chuan_raw = row[10];    // K: Ngày công chuẩn (mẫu số)
+          const ngay_cong_hl_raw = row[11];       // L: Ngày công hưởng lương
+          const trang_phuc_raw = row[12];         // M: Trang phục
+          const com_trua_raw = row[13];           // N: Cơm trưa
+          const trach_nhiem_raw = row[14];        // O: Trách nhiệm
+          const bhxh_raw = row[15];               // P: Chi phí HT-BHXH
+          const hoa_hong_raw = row[16];           // Q: Hoa hồng bán hàng
+          const thuong_dong_gop_raw = row[17];    // R: Thưởng
+          const luong_phep_raw = row[18];         // S: Lương phép năm
+          const khac_raw = row[19];               // T: Khác
+          const tong_thu_nhap_raw = row[20];      // U: Tổng thu nhập trong tháng
+          const bhxh_tru_raw = row[21];           // V: BHXH (NLĐ trừ)
+          const bhyt_tru_raw = row[22];           // W: BHYT (NLĐ trừ)
+          const bhtn_tru_raw = row[23];           // X: BHTN (NLĐ trừ)
+          const cd_tru_raw = row[24];             // Y: CĐ (NLĐ trừ)
+          const thue_tncn_raw = row[28];          // AC: Tiền thuế TNCN
+          const thuc_nhan_raw = row[30];          // AE: Thực nhận
+          const stk_raw = row[31];                // AF: STK
+          const ngan_hang_raw = row[32];          // AG: Ngân hàng
+          const ht_tt_raw = row[36];              // AK: HT-TT
+          const od_ts_raw = row[37];              // AL: ÔĐ-TS
+          const tnld_bnn_raw = row[38];           // AM: TNLĐ-BNN
+          const bhyt_cty_raw = row[39];           // AN: BHYT (CTY)
+          const bhtn_cty_raw = row[40];           // AO: BHTN (CTY)
+          const cd_cty_raw = row[41];             // AP: CĐ (CTY)
           
           const ma_nv_str = ma_nv !== undefined && ma_nv !== null ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined && ten_nv !== null ? String(ten_nv).trim() : "";
@@ -617,6 +621,7 @@ async function doFetchEmployeesExcel(fileOverride) {
           if (ma_nv_str !== "" && ten_nv_str !== "") {
             const luong_cb = parseFloat(luong_cb_raw) || 0;
             const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
+            const ngay_cong_chuan = parseFloat(ngay_cong_chuan_raw) || 0;
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
             const trang_phuc = parseFloat(trang_phuc_raw) || 0;
             const com_trua = parseFloat(com_trua_raw) || 0;
@@ -641,18 +646,18 @@ async function doFetchEmployeesExcel(fileOverride) {
             const bhyt_cty = parseFloat(bhyt_cty_raw) || 0;
             const bhtn_cty = parseFloat(bhtn_cty_raw) || 0;
             const cd_cty = parseFloat(cd_cty_raw) || 0;
-            const tong_bhxh_nld = bhxh_tru + bhyt_tru + bhtn_tru; // U + V + W (BHXH người lao động đóng)
-            const tong_ajakal = ht_tt + od_ts + tnld_bnn; // Cột mới: AJ + AK + AL
+            const tong_bhxh_nld = bhxh_tru + bhyt_tru + bhtn_tru; // V + W + X (BHXH người lao động đóng)
+            const tong_ajakal = ht_tt + od_ts + tnld_bnn; // AK + AL + AM
             const tong_bhxh_moi = ht_tt + od_ts + tnld_bnn + bhyt_cty + bhtn_cty; // Tổng BHXH CTY Đóng (không gồm CĐ)
             
-            // XỬ LÝ ĐIỀU KIỆN MẪU SỐ CHIA (Theo ô T5 hoặc theo Cột K)
+            // Mẫu số chia: ưu tiên Ngày công chuẩn (cột K) của từng NV, fallback 26
             let mauSoChia = soNgayCongChuan;
-            // Nếu cột K có số ngày lớn hơn 0 VÀ khác với T5 -> Dùng giá trị cột K làm mẫu số
-            if (ngay_cong_hl > 0 && ngay_cong_hl !== soNgayCongChuan) {
-                mauSoChia = ngay_cong_hl;
+            if (ngay_cong_chuan > 0) {
+                mauSoChia = ngay_cong_chuan;
             }
 
-            // CÔNG THỨC MỚI: (H / mẫu số * K) + (L + M + N + O)
+            // Công thức: (Lương CB / Ngày công chuẩn) * Ngày công hưởng lương + phụ cấp
+            //   H / K * L + (M + N + O + P)
             const luong_tinh_toan = Math.round((luong_cb / mauSoChia) * ngay_cong_hl) + trang_phuc + com_trua + trach_nhiem + bhxh;
 
             sheetData.push({
