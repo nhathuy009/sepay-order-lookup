@@ -572,9 +572,10 @@ async function doFetchEmployeesExcel(fileOverride) {
         const soNgayCongChuan = 26;
 
         // Đọc dữ liệu từ dòng 8 (index 7)
-        // Mapping theo cấu trúc bảng lương T07/T08/2026 trở đi:
+        // Mapping (sau khi chuyển Trách nhiệm từ O → M, các cột phúc lợi dời sang phải):
         //   B=MSNV C=Họ tên H=Lương CB J=Ngày công TT K=Ngày công chuẩn
-        //   L=Ngày công hưởng lương M=Trang phục N=Cơm O=Trách nhiệm P=HT-BHXH
+        //   L=Ngày công hưởng lương
+        //   M=Trách nhiệm  N=Trang phục  O=Cơm trưa  P=HT-BHXH
         //   Q=Hoa hồng R=Thưởng S=Lương phép T=Khác U=Tổng TN
         //   V–Y=BHXH/BHYT/BHTN/CĐ trừ  AC=Thuế TNCN AD=Tạm ứng AE=Thực nhận
         //   AF–AG=STK/NH  AK–AM=HT-TT/ÔĐ-TS/TNLĐ  AN–AP=BHYT/BHTN/CĐ CTY
@@ -591,9 +592,9 @@ async function doFetchEmployeesExcel(fileOverride) {
           const ngay_cong_tt_raw = row[9];        // J: Ngày công thực tế
           const ngay_cong_chuan_raw = row[10];    // K: Ngày công chuẩn (mẫu số)
           const ngay_cong_hl_raw = row[11];       // L: Ngày công hưởng lương
-          const trang_phuc_raw = row[12];         // M: Trang phục
-          const com_trua_raw = row[13];           // N: Cơm trưa
-          const trach_nhiem_raw = row[14];        // O: Trách nhiệm
+          const trach_nhiem_raw = row[12];        // M: Trách nhiệm (đã chuyển từ O)
+          const trang_phuc_raw = row[13];         // N: Trang phục
+          const com_trua_raw = row[14];           // O: Cơm trưa
           const bhxh_raw = row[15];               // P: Chi phí HT-BHXH
           const hoa_hong_raw = row[16];           // Q: Hoa hồng bán hàng
           const thuong_dong_gop_raw = row[17];    // R: Thưởng
@@ -623,9 +624,9 @@ async function doFetchEmployeesExcel(fileOverride) {
             const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
             const ngay_cong_chuan = parseFloat(ngay_cong_chuan_raw) || 0;
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
+            const trach_nhiem = Math.round(parseFloat(trach_nhiem_raw) || 0);
             const trang_phuc = parseFloat(trang_phuc_raw) || 0;
             const com_trua = parseFloat(com_trua_raw) || 0;
-            const trach_nhiem = Math.round(parseFloat(trach_nhiem_raw) || 0);
             const bhxh = parseFloat(bhxh_raw) || 0;
             const hoa_hong = parseFloat(hoa_hong_raw) || 0;
             const thuong_dong_gop = parseFloat(thuong_dong_gop_raw) || 0;
@@ -657,8 +658,8 @@ async function doFetchEmployeesExcel(fileOverride) {
             }
 
             // Công thức: (Lương CB / Ngày công chuẩn) * Ngày công hưởng lương + phụ cấp
-            //   H / K * L + (M + N + O + P)
-            const luong_tinh_toan = Math.round((luong_cb / mauSoChia) * ngay_cong_hl) + trang_phuc + com_trua + trach_nhiem + bhxh;
+            //   H / K * L + (M Trách nhiệm + N Trang phục + O Cơm + P HT-BHXH)
+            const luong_tinh_toan = Math.round((luong_cb / mauSoChia) * ngay_cong_hl) + trach_nhiem + trang_phuc + com_trua + bhxh;
 
             sheetData.push({
               ma_nv: ma_nv_str,
@@ -1150,9 +1151,9 @@ function displaySheetData() {
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
         <td style="text-align: center;">${r.ngay_cong_chuan != null ? r.ngay_cong_chuan : ""}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
+        <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: right;">${formatMoney(r.trang_phuc)}</td>
         <td style="text-align: right;">${formatMoney(r.com_trua)}</td>
-        <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: right;">${formatMoney(r.bhxh)}</td>
         <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(r.luong_tinh_toan)}</td>
         <td style="text-align: right;">${formatMoney(r.hoa_hong)}</td>
@@ -1430,9 +1431,9 @@ function displaySheetData() {
       <td colspan="2" class="freeze-col-total" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng cộng:</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongCb)}</td>
       <td colspan="3"></td>
+      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrangPhuc)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumComTrua)}</td>
-      <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumBhxh)}</td>
       <td style="text-align: right; font-weight: 800; color: var(--amount-in); font-size: 14px;">${formatMoney(sumLuongTinhToan)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumHoaHong)}</td>
