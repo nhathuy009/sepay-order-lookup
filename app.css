@@ -1345,16 +1345,152 @@
     box-shadow: 0 6px 16px -4px rgba(240,161,36,.5);
   }
 
-  /* --- Mã chấm công màu sắc --- */
-  #attendanceTable .att-code-l { color: var(--amount-in, #16a34a); }
-  #attendanceTable .att-code-n { color: var(--text-muted, #94a3b8); }
-  #attendanceTable .att-code-p { color: #e67e22; }
-  #attendanceTable .att-code-v { color: var(--badge-err-text, #dc2626); }
-  #attendanceTable .att-code-k { color: #9b59b6; }
-  #attendanceTable .att-code-le { color: #8b5cf6; }
-  #attendanceTable td.att-day { padding: 4px 2px !important; min-width: 28px; }
-  #attendanceTable th { white-space: nowrap; }
-  #attendanceTableScroll { max-height: 70vh; overflow: auto; }
+  /* --- Layout bảng chấm công + panel quy tắc bên phải --- */
+  .att-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .att-table-pane {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .att-rules-pane {
+    flex: 0 0 240px;
+    max-width: 260px;
+    position: sticky;
+    top: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+    background: var(--card-bg, var(--bg-secondary, #f8fafc));
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .att-rules-title {
+    font-weight: 800;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--heading-color, inherit);
+  }
+  .att-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .att-rules-list > div {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .att-swatch {
+    display: inline-block;
+    min-width: 16px;
+    font-weight: 800;
+    font-size: 13px;
+    text-align: center;
+  }
+  .att-rules-formula b {
+    color: var(--accent, #2563eb);
+    margin-right: 2px;
+  }
+  .att-rules-note {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color, rgba(0,0,0,0.12));
+    font-size: 11px;
+    color: var(--text-muted, #64748b);
+    line-height: 1.5;
+  }
+  @media (max-width: 900px) {
+    .att-layout { flex-direction: column; }
+    .att-rules-pane {
+      flex: 1 1 auto;
+      max-width: none;
+      width: 100%;
+      position: static;
+    }
+  }
+
+  /* --- Mã chấm công màu sắc (theo bảng Excel mẫu) --- */
+  .att-code-l, #attendanceTable .att-code-l { color: #1e293b; font-weight: 700; }
+  .att-code-n, #attendanceTable .att-code-n { color: #2563eb; font-weight: 700; }
+  .att-code-p, #attendanceTable .att-code-p { color: #ea580c; font-weight: 700; }
+  .att-code-v, #attendanceTable .att-code-v { color: #dc2626; font-weight: 700; }
+  .att-code-k, #attendanceTable .att-code-k { color: #7c3aed; font-weight: 700; }
+  .att-code-s, #attendanceTable .att-code-s { color: #0d9488; font-weight: 700; }
+  .att-code-le, #attendanceTable .att-code-le { color: #db2777; font-weight: 700; }
+
+  #attendanceTable {
+    font-size: 12px;
+    border-collapse: collapse;
+  }
+  #attendanceTable th,
+  #attendanceTable td {
+    white-space: nowrap;
+    padding: 2px 1px !important;
+    line-height: 1.2;
+  }
+  #attendanceTable th.att-th-ma,
+  #attendanceTable td.att-ma {
+    min-width: 64px;
+    max-width: 80px;
+    padding: 2px 6px !important;
+    font-weight: 700;
+    color: var(--accent, #2563eb);
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--card-bg, #fff);
+  }
+  #attendanceTable thead th.att-th-ma {
+    z-index: 3;
+  }
+  #attendanceTable th.att-th-day {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 18px;
+    width: 18px;
+    padding: 2px 0 !important;
+  }
+  #attendanceTable th.att-th-day.is-weekend {
+    color: var(--badge-err-text, #dc2626);
+  }
+  #attendanceTable th.att-th-sum {
+    text-align: center;
+    vertical-align: middle;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 28px;
+    padding: 2px 3px !important;
+    line-height: 1.25;
+  }
+  #attendanceTable td.att-day {
+    text-align: center;
+    font-weight: 700;
+    font-size: 11px;
+    min-width: 18px;
+    width: 18px;
+    padding: 1px 0 !important;
+  }
+  #attendanceTable td.att-day.is-weekend-bg {
+    background: rgba(0, 0, 0, 0.03);
+  }
+  #attendanceTable td.att-sum {
+    text-align: center;
+    font-weight: 600;
+    font-size: 11px;
+    min-width: 28px;
+    padding: 2px 3px !important;
+  }
+  #attendanceTable td.att-sum-strong {
+    font-weight: 800;
+  }
+  #attendanceTableScroll {
+    max-height: 70vh;
+    overflow: auto;
+  }
 
   /* --- Badge lỗi trên tab Kiểm tra lỗi + banner cảnh báo --- */
   .emp-audit-badge {
