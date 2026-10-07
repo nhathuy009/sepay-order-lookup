@@ -384,22 +384,42 @@
 
           <!-- Panel 4: Chấm công -->
           <div id="attendanceWrapper" style="display:none;">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 12px; flex-wrap: wrap;">
-              <div class="text-muted-small" style="margin:0;" id="attendanceLegend">
-                <span style="margin-right:10px;"><b style="color:var(--amount-in);">L</b> Làm việc</span>
-                <span style="margin-right:10px;"><b style="color:var(--text-muted);">N</b> Nghỉ tuần</span>
-                <span style="margin-right:10px;"><b style="color:#e67e22;">P</b> Phép có lương</span>
-                <span style="margin-right:10px;"><b style="color:var(--badge-err-text);">V</b> Vắng không lý do</span>
-                <span><b style="color:#9b59b6;">K</b> Không lương</span>
+            <div class="att-layout">
+              <div class="att-table-pane">
+                <div class="table-responsive" id="attendanceTableScroll">
+                  <table class="sepay-table" id="attendanceTable">
+                    <thead id="attendanceThead"></thead>
+                    <tbody id="attendanceTbody"></tbody>
+                  </table>
+                </div>
+                <div id="attendanceEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
               </div>
+              <aside class="att-rules-pane" id="attendanceLegend">
+                <div class="att-rules-title">Ký hiệu</div>
+                <div class="att-rules-list">
+                  <div><span class="att-code-l att-swatch">L</span> Làm việc</div>
+                  <div><span class="att-code-n att-swatch">N</span> Nghỉ tuần</div>
+                  <div><span class="att-code-le att-swatch">H</span> Nghỉ lễ</div>
+                  <div><span class="att-code-p att-swatch">P</span> Phép có lương (+ phép năm còn đủ)</div>
+                  <div><span class="att-code-v att-swatch">V</span> Vắng (không lý do / được phép năm bù)</div>
+                  <div><span class="att-code-k att-swatch">U</span> Không hưởng lương</div>
+                  <div><span class="att-code-s att-swatch">S</span> Nghỉ chế độ BHXH</div>
+                </div>
+                <div class="att-rules-title" style="margin-top:14px;">Công thức ngày công</div>
+                <div class="att-rules-list att-rules-formula">
+                  <div><b>(1)</b> Ngày công thực tế = tổng <span class="att-code-l">L</span></div>
+                  <div><b>(2)</b> Ngày công chuẩn = 30(31) − <span class="att-code-n">N</span></div>
+                  <div><b>(3)</b> Ngày công hưởng lương = <span class="att-code-l">L</span> + <span class="att-code-le">H</span> + <span class="att-code-p">P</span> + <span class="att-code-v">V</span></div>
+                </div>
+                <div class="att-rules-note">
+                  <span class="att-code-l">L</span> + <span class="att-code-n">N</span> + <span class="att-code-le">H</span> + <span class="att-code-p">P</span> + <span class="att-code-v">V</span> + <span class="att-code-k">U</span> + <span class="att-code-s">S</span> = tổng số ngày trong tháng
+                </div>
+                <div class="att-rules-note" style="margin-top:8px;">
+                  Ngày công thực tế dùng tính cơm trưa, phụ cấp.<br>
+                  Ngày công chuẩn = tổng ngày phải làm để hưởng trọn lương.
+                </div>
+              </aside>
             </div>
-            <div class="table-responsive" id="attendanceTableScroll">
-              <table class="sepay-table" id="attendanceTable">
-                <thead id="attendanceThead"></thead>
-                <tbody id="attendanceTbody"></tbody>
-              </table>
-            </div>
-            <div id="attendanceEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
           </div>
 
           <!-- Panel 5: Kiểm tra lỗi (đối soát chấm công ↔ bảng lương) -->
