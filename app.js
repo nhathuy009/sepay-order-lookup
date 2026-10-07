@@ -1148,10 +1148,10 @@ function displaySheetData() {
         <td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>
         <td class="freeze-col-2" title="${escapeHtml(r.ten_nv)}">${escapeHtml(toTitleCaseVN(r.ten_nv))}</td>
         <td style="text-align: right;">${formatMoney(r.luong_cb)}</td>
+        <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
         <td style="text-align: center;">${r.ngay_cong_chuan != null ? r.ngay_cong_chuan : ""}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
-        <td style="text-align: right;">${formatMoney(r.trach_nhiem)}</td>
         <td style="text-align: right;">${formatMoney(r.trang_phuc)}</td>
         <td style="text-align: right;">${formatMoney(r.com_trua)}</td>
         <td style="text-align: right;">${formatMoney(r.bhxh)}</td>
@@ -1430,8 +1430,8 @@ function displaySheetData() {
     totalTr.innerHTML = `
       <td colspan="2" class="freeze-col-total" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng cộng:</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongCb)}</td>
-      <td colspan="3"></td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
+      <td colspan="3"></td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrangPhuc)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumComTrua)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumBhxh)}</td>
