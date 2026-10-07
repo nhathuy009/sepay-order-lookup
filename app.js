@@ -2132,8 +2132,8 @@ function getAttendanceCodeClass(code) {
   if (c === "N") return "att-code-n";
   if (c === "P") return "att-code-p";
   if (c === "V") return "att-code-v";
-  if (c === "K" || c === "U") return "att-code-k"; // U = không hưởng lương (thay K)
-  if (c === "S") return "att-code-k";               // S = nghỉ chế độ BHXH
+  if (c === "K" || c === "U") return "att-code-k"; // U = không hưởng lương
+  if (c === "S") return "att-code-s";               // S = nghỉ chế độ BHXH
   if (c === "H" || c === "LE" || c === "LỄ") return "att-code-le";
   return "";
 }
@@ -2206,27 +2206,26 @@ function renderAttendanceTable() {
   const days = att.days || [];
   const weekdays = att.weekdays || [];
 
-  // Header 2 dòng: thứ + số ngày
-  let h1 = `<tr><th class="freeze-col-1" rowspan="2" style="vertical-align:middle; min-width:90px;">Mã NV</th>`;
-  weekdays.forEach((w, i) => {
+  // Header 2 dòng: thứ + số ngày — cột tổng gọn theo công thức (1)(2)(3)
+  let h1 = `<tr><th class="freeze-col-1 att-th-ma" rowspan="2">Mã NV</th>`;
+  weekdays.forEach((w) => {
     const isWeekend = /CN|T7/i.test(w);
-    h1 += `<th style="text-align:center; font-size:11px; padding:4px 2px;${isWeekend ? " color:var(--badge-err-text);" : ""}">${escapeHtml(w || "")}</th>`;
+    h1 += `<th class="att-th-day${isWeekend ? " is-weekend" : ""}">${escapeHtml(w || "")}</th>`;
   });
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; background:var(--badge-ok-bg);">Tổng<br>Làm</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Tổng<br>Nghỉ</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Tổng<br>Lễ</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; color:#e67e22;">Phép<br>có lương</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">K<br>lương</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center; color:var(--badge-err-text);">Vắng</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Ngày công<br>chuẩn</th>`;
-  h1 += `<th rowspan="2" style="vertical-align:middle; text-align:center;">Ngày công<br>HL</th>`;
+  h1 += `<th class="att-th-sum att-code-l" rowspan="2" title="Tổng Làm = count(L)">Σ L</th>`;
+  h1 += `<th class="att-th-sum att-code-n" rowspan="2" title="Tổng Nghỉ tuần = count(N)">Σ N</th>`;
+  h1 += `<th class="att-th-sum att-code-le" rowspan="2" title="Tổng Lễ = count(H)">Σ H</th>`;
+  h1 += `<th class="att-th-sum att-code-v" rowspan="2" title="Tổng Vắng = count(V)">Σ V</th>`;
+  h1 += `<th class="att-th-sum" rowspan="2" title="(1) Ngày công thực tế = tổng L">(1)<br>TT</th>`;
+  h1 += `<th class="att-th-sum" rowspan="2" title="(2) Ngày công chuẩn = 30(31) − N">(2)<br>Chuẩn</th>`;
+  h1 += `<th class="att-th-sum" rowspan="2" title="(3) Ngày công hưởng lương = L+H+P+V">(3)<br>HL</th>`;
   h1 += `</tr>`;
 
   let h2 = `<tr>`;
   days.forEach((d, i) => {
     const w = weekdays[i] || "";
     const isWeekend = /CN|T7/i.test(w);
-    h2 += `<th style="text-align:center; font-size:11px; padding:4px 2px; min-width:28px;${isWeekend ? " color:var(--badge-err-text);" : ""}">${d}</th>`;
+    h2 += `<th class="att-th-day${isWeekend ? " is-weekend" : ""}">${d}</th>`;
   });
   h2 += `</tr>`;
   thead.innerHTML = h1 + h2;
@@ -2235,25 +2234,51 @@ function renderAttendanceTable() {
     const tr = document.createElement("tr");
     const maNorm = (r.ma_nv || "").trim().toUpperCase();
     if (maNorm) tr.setAttribute("data-ma-nv", maNorm);
-    let tds = `<td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(r.ma_nv)}</td>`;
+
+    // Đếm lại theo quy tắc mới (đảm bảo khớp cột tổng)
+    let cntL = 0, cntN = 0, cntH = 0, cntP = 0, cntV = 0, cntU = 0, cntS = 0;
+    (r.days || []).forEach(code => {
+      const c = (code || "").toUpperCase();
+      if (c === "L") cntL++;
+      else if (c === "N") cntN++;
+      else if (c === "P") cntP++;
+      else if (c === "V") cntV++;
+      else if (c === "U" || c === "K") cntU++;
+      else if (c === "S") cntS++;
+      else if (c === "H" || c === "LE" || c === "LỄ") cntH++;
+    });
+    // Ưu tiên số đã parse từ sheet nếu có, không thì dùng đếm
+    const tongL = r.tong_lam !== "" && r.tong_lam != null ? r.tong_lam : cntL;
+    const tongN = r.tong_nghi !== "" && r.tong_nghi != null ? r.tong_nghi : cntN;
+    const tongH = r.tong_le !== "" && r.tong_le != null ? r.tong_le : cntH;
+    const tongV = r.tong_vang !== "" && r.tong_vang != null ? r.tong_vang : cntV;
+    const nctt = r.ngay_cong_thuc_te !== "" && r.ngay_cong_thuc_te != null
+      ? r.ngay_cong_thuc_te
+      : (typeof tongL === "number" ? tongL : cntL);
+    const ncchuan = r.ngay_cong_chuan !== "" && r.ngay_cong_chuan != null
+      ? r.ngay_cong_chuan
+      : "";
+    const nchl = r.ngay_cong_huong_luong !== "" && r.ngay_cong_huong_luong != null
+      ? r.ngay_cong_huong_luong
+      : (cntL + cntH + cntP + cntV);
+
+    let tds = `<td class="freeze-col-1 att-ma">${escapeHtml(r.ma_nv)}</td>`;
     (r.days || []).forEach((code, i) => {
       const cls = getAttendanceCodeClass(code);
       const w = weekdays[i] || "";
       const isWeekend = /CN|T7/i.test(w);
-      tds += `<td class="att-day ${cls}" style="text-align:center; font-weight:600; font-size:12px;${isWeekend && !code ? " background:rgba(0,0,0,0.03);" : ""}">${escapeHtml(code || "")}</td>`;
+      tds += `<td class="att-day ${cls}${isWeekend && !code ? " is-weekend-bg" : ""}">${escapeHtml(code || "")}</td>`;
     });
-    // pad if days length mismatch
     for (let i = (r.days || []).length; i < days.length; i++) {
-      tds += `<td class="att-day" style="text-align:center;"></td>`;
+      tds += `<td class="att-day"></td>`;
     }
-    tds += `<td style="text-align:center; font-weight:700; color:var(--amount-in);">${r.tong_lam !== "" ? r.tong_lam : ""}</td>`;
-    tds += `<td style="text-align:center;">${r.tong_nghi !== "" ? r.tong_nghi : ""}</td>`;
-    tds += `<td style="text-align:center;">${r.tong_le !== "" ? r.tong_le : ""}</td>`;
-    tds += `<td style="text-align:center; color:#e67e22; font-weight:600;">${r.tong_phep !== "" ? r.tong_phep : ""}</td>`;
-    tds += `<td style="text-align:center;">${r.tong_k !== "" ? r.tong_k : ""}</td>`;
-    tds += `<td style="text-align:center; color:var(--badge-err-text); font-weight:600;">${r.tong_vang !== "" ? r.tong_vang : ""}</td>`;
-    tds += `<td style="text-align:center;">${r.ngay_cong_chuan !== "" ? r.ngay_cong_chuan : ""}</td>`;
-    tds += `<td style="text-align:center; font-weight:700;">${r.ngay_cong_huong_luong !== "" ? r.ngay_cong_huong_luong : ""}</td>`;
+    tds += `<td class="att-sum att-code-l">${tongL}</td>`;
+    tds += `<td class="att-sum att-code-n">${tongN}</td>`;
+    tds += `<td class="att-sum att-code-le">${tongH}</td>`;
+    tds += `<td class="att-sum att-code-v">${tongV !== "" ? tongV : ""}</td>`;
+    tds += `<td class="att-sum att-sum-strong">${nctt !== "" ? nctt : ""}</td>`;
+    tds += `<td class="att-sum">${ncchuan !== "" ? ncchuan : ""}</td>`;
+    tds += `<td class="att-sum att-sum-strong">${nchl !== "" ? nchl : ""}</td>`;
     tr.innerHTML = tds;
     tbody.appendChild(tr);
   });
