@@ -2532,11 +2532,20 @@ function renderAuditTable() {
   }
   if (emptyMsg) emptyMsg.style.display = "none";
 
-  stats.rows.forEach((row, idx) => {
+  // Dồn lỗi lên đầu: Lệch → Cảnh báo → OK
+  const statusOrder = { err: 0, warn: 1, ok: 2 };
+  const sortedRows = [...stats.rows].sort((x, y) => {
+    const sx = statusOrder[x.status] ?? 9;
+    const sy = statusOrder[y.status] ?? 9;
+    if (sx !== sy) return sx - sy;
+    return (x.ma || "").localeCompare(y.ma || "", "vi");
+  });
+
+  sortedRows.forEach((row, idx) => {
     const { ma, a, p, status, issues } = row;
     const tr = document.createElement("tr");
-    if (status === "err") tr.style.background = "rgba(220, 53, 69, 0.06)";
-    else if (status === "warn") tr.style.background = "rgba(230, 126, 34, 0.06)";
+    if (status === "err") tr.classList.add("audit-row-err");
+    else if (status === "warn") tr.classList.add("audit-row-warn");
 
     const badge = status === "ok"
       ? `<span class="badge ok">OK</span>`
@@ -2544,8 +2553,10 @@ function renderAuditTable() {
         ? `<span class="badge err">Lệch</span>`
         : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
 
-    const cell = (v) =>
-      `<td style="text-align:center;">${v !== undefined && v !== null && v !== "" ? escapeHtml(String(v)) : "—"}</td>`;
+    const cell = (v, cls) => {
+      const empty = v === undefined || v === null || v === "";
+      return `<td class="audit-td${cls ? " " + cls : ""}">${empty ? "—" : escapeHtml(String(v))}</td>`;
+    };
 
     // Lệch / Cảnh báo / có CC: click MÃ NV (hoặc cả dòng) → tab Chấm công + nháy dòng
     const canJump = (status === "err" || status === "warn" || !!a);
@@ -2559,22 +2570,30 @@ function renderAuditTable() {
       ? `<td class="freeze-col-1"><a href="javascript:void(0)" class="audit-ma-link" data-jump-ma="${escapeHtml(ma)}" role="button">${escapeHtml(ma)}</a></td>`
       : `<td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(ma)}</td>`;
 
+    // Highlight số lệch giữa CC và Lương
+    const ncttCc = a ? a.cong_tt_cc : null;
+    const ncttLuong = p && p.nctt != null ? p.nctt : null;
+    const nchlCc = a ? a.cong_hl_uoc : null;
+    const nchlLuong = p && p.nchl != null ? p.nchl : null;
+    const ttMismatch = ncttCc != null && ncttLuong != null && Number(ncttCc) !== Number(ncttLuong);
+    const hlMismatch = nchlCc != null && nchlLuong != null && Number(nchlCc) !== Number(nchlLuong);
+
     tr.innerHTML = `
-      <td style="text-align:center;">${idx + 1}</td>
+      <td class="audit-td audit-td-stt">${idx + 1}</td>
       ${maCell}
-      ${cell(a ? a.L_count : "")}
-      ${cell(a ? a.H : "")}
-      ${cell(a ? a.P : "")}
-      ${cell(a ? a.V : "")}
-      ${cell(a ? a.U : "")}
-      ${cell(a ? a.S : "")}
-      ${cell(a ? a.N : "")}
-      ${cell(a ? a.cong_tt_cc : "")}
-      ${cell(p && p.nctt !== undefined && p.nctt !== null ? p.nctt : "")}
-      ${cell(a ? a.cong_hl_uoc : "")}
-      ${cell(p && p.nchl !== undefined && p.nchl !== null ? p.nchl : "")}
-      <td style="text-align:center;">${badge}</td>
-      <td style="font-size:12px;">${escapeHtml(issues.join("; "))}</td>
+      ${cell(a ? a.L_count : "", "att-code-l")}
+      ${cell(a ? a.H : "", "att-code-le")}
+      ${cell(a ? a.P : "", "att-code-p")}
+      ${cell(a ? a.V : "", "att-code-v")}
+      ${cell(a ? a.U : "", "att-code-k")}
+      ${cell(a ? a.S : "", "att-code-s")}
+      ${cell(a ? a.N : "", "att-code-n")}
+      ${cell(ncttCc, ttMismatch ? "audit-mismatch" : "att-sum-strong")}
+      ${cell(ncttLuong, ttMismatch ? "audit-mismatch" : "")}
+      ${cell(nchlCc, hlMismatch ? "audit-mismatch" : "att-sum-strong")}
+      ${cell(nchlLuong, hlMismatch ? "audit-mismatch" : "")}
+      <td class="audit-td">${badge}</td>
+      <td class="audit-td-detail">${escapeHtml(issues.join("; "))}</td>
     `;
     tbody.appendChild(tr);
   });
