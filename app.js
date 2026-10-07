@@ -946,8 +946,8 @@ async function doFetchEmployeesExcel(fileOverride) {
               const maUp = ma.toUpperCase();
               // Bỏ header lặp / chú thích / STT thuần số / legend
               if (isEmpHeader(ma) || maUp === "STT" || maUp === "MSNV") continue;
-              if (/^(l|n|v|p|k|h)\s*[=:]/i.test(ma)) continue;
-              if (/làm việc|nghỉ tuần|nghỉ phép|vắng|không lương/i.test(ma)) continue;
+              if (/^(l|n|v|p|k|h|u|s)\s*[=:]/i.test(ma)) continue;
+              if (/làm việc|nghỉ tuần|nghỉ phép|vắng|không lương|chế độ/i.test(ma)) continue;
               if (ma.length > 25) continue;
               // Bỏ dòng chỉ là số STT (khi empCol nhầm sang cột STT)
               if (/^\d{1,3}$/.test(ma)) {
@@ -966,7 +966,8 @@ async function doFetchEmployeesExcel(fileOverride) {
                 return String(raw).trim().toUpperCase();
               });
               // Bỏ dòng không có mã chấm công nào (có thể là dòng nhóm/team)
-              if (!dayCodes.some(c => c && /^(L|N|P|V|K|H|LE|LỄ)$/.test(c))) continue;
+              // Mã hợp lệ: L N P V H K U S (và LE/LỄ)
+              if (!dayCodes.some(c => c && /^(L|N|P|V|K|U|S|H|LE|LỄ)$/.test(c))) continue;
 
               let tongLam = 0, tongNghi = 0, tongLe = 0, tongPhep = 0, tongK = 0, tongVang = 0;
               dayCodes.forEach(code => {
@@ -974,7 +975,8 @@ async function doFetchEmployeesExcel(fileOverride) {
                 else if (code === "N") tongNghi++;
                 else if (code === "P") tongPhep++;
                 else if (code === "V") tongVang++;
-                else if (code === "K") tongK++;
+                else if (code === "K" || code === "U") tongK++; // U = không hưởng lương
+                else if (code === "S") tongK++;                 // S = nghỉ chế độ — gom cột K/không lương
                 else if (code === "LE" || code === "LỄ" || code === "H") tongLe++;
               });
 
@@ -2127,7 +2129,8 @@ function getAttendanceCodeClass(code) {
   if (c === "N") return "att-code-n";
   if (c === "P") return "att-code-p";
   if (c === "V") return "att-code-v";
-  if (c === "K") return "att-code-k";
+  if (c === "K" || c === "U") return "att-code-k"; // U = không hưởng lương (thay K)
+  if (c === "S") return "att-code-k";               // S = nghỉ chế độ BHXH
   if (c === "H" || c === "LE" || c === "LỄ") return "att-code-le";
   return "";
 }
@@ -2285,7 +2288,23 @@ function resolveAttendanceForSheet(selectedSheet) {
 
 /**
  * Tính kết quả đối soát CC ↔ Lương cho 1 tháng.
- * Quy tắc: nctt ≈ count(L); nchl ≈ L+H+P
+ *
+ * Quy tắc chấm công (theo legend file mới):
+ *   L = Làm việc
+ *   N = Nghỉ tuần
+ *   V = Vắng (không lý do / được phép năm bù)  — vẫn tính vào HL
+ *   P = Nghỉ phép có lương
+ *   H = Nghỉ lễ
+ *   U = Không hưởng lương
+ *   S = Nghỉ chế độ BHXH
+ *   K = (cũ) Phép không lương — vẫn đếm nếu gặp
+ *
+ * Công thức:
+ *   (1) Ngày công thực tế     = tổng L
+ *   (2) Ngày công chuẩn       = số ngày trong tháng − N
+ *   (3) Ngày công hưởng lương = L + H + P + V
+ *   L + N + H + P + V + U + S = tổng số ngày trong tháng
+ *
  * @returns {{ sheet, ok, err, warn, rows, attCount, payCount, hasData }}
  */
 function computeAuditStats(selectedSheet) {
@@ -2295,11 +2314,22 @@ function computeAuditStats(selectedSheet) {
   const payRows = globalSheetsData[selectedSheet] || [];
   const att = resolveAttendanceForSheet(selectedSheet);
 
+  // Số ngày trong tháng từ key sheet TMMYYYY (vd T082026 → 8/2026)
+  let daysInMonth = 0;
+  const mm = selectedSheet.match(/^T(\d{2})(\d{4})$/i);
+  if (mm) {
+    const month = parseInt(mm[1], 10);
+    const year = parseInt(mm[2], 10);
+    if (month >= 1 && month <= 12 && year > 2000) {
+      daysInMonth = new Date(year, month, 0).getDate();
+    }
+  }
+
   const attMap = {};
   (att && att.rows ? att.rows : []).forEach(r => {
     const ma = (r.ma_nv || "").trim().toUpperCase();
     if (!ma) return;
-    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0;
+    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0, U = 0, S = 0;
     (r.days || []).forEach(code => {
       const c = (code || "").toUpperCase();
       if (c === "L") L++;
@@ -2307,12 +2337,18 @@ function computeAuditStats(selectedSheet) {
       else if (c === "P") P++;
       else if (c === "V") V++;
       else if (c === "K") K++;
+      else if (c === "U") U++;
+      else if (c === "S") S++;
       else if (c === "H" || c === "LE" || c === "LỄ") H++;
     });
+    // (1) Công TT = tổng L
+    // (2) Công chuẩn = daysInMonth − N (nếu biết số ngày tháng)
+    // (3) Công HL = L + H + P + V
     attMap[ma] = {
-      L_count: L, N, P, V, K, H,
+      L_count: L, N, P, V, K, H, U, S,
       cong_tt_cc: L,
-      cong_hl_uoc: L + H + P
+      cong_chuan_cc: daysInMonth > 0 ? daysInMonth - N : "",
+      cong_hl_uoc: L + H + P + V
     };
   });
 
@@ -2352,7 +2388,7 @@ function computeAuditStats(selectedSheet) {
       }
       if (!isNaN(nchl) && nchl !== a.cong_hl_uoc) {
         status = "err";
-        issues.push(`Công HL: ước L+H+P=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
+        issues.push(`Công HL: ước L+H+P+V=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
       }
       if (issues.length === 0) {
         status = "ok";
@@ -2502,7 +2538,8 @@ function renderAuditTable() {
       ${cell(a ? a.H : "")}
       ${cell(a ? a.P : "")}
       ${cell(a ? a.V : "")}
-      ${cell(a ? a.K : "")}
+      ${cell(a ? a.U : "")}
+      ${cell(a ? a.S : "")}
       ${cell(a ? a.N : "")}
       ${cell(a ? a.cong_tt_cc : "")}
       ${cell(p && p.nctt !== undefined && p.nctt !== null ? p.nctt : "")}
