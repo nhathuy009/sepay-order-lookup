@@ -664,8 +664,9 @@ async function doFetchEmployeesExcel(fileOverride) {
               ma_nv: ma_nv_str,
               ten_nv: ten_nv_str,
               luong_cb: luong_cb,
-              ngay_cong_tt: ngay_cong_tt,
-              ngay_cong_hl: ngay_cong_hl,
+              ngay_cong_tt: ngay_cong_tt,         // J: Ngày công thực tế
+              ngay_cong_chuan: ngay_cong_chuan,   // K: Ngày công chuẩn
+              ngay_cong_hl: ngay_cong_hl,         // L: Ngày công hưởng lương
               trang_phuc: trang_phuc,
               com_trua: com_trua,
               trach_nhiem: trach_nhiem,
@@ -1147,6 +1148,7 @@ function displaySheetData() {
         <td class="freeze-col-2" title="${escapeHtml(r.ten_nv)}">${escapeHtml(toTitleCaseVN(r.ten_nv))}</td>
         <td style="text-align: right;">${formatMoney(r.luong_cb)}</td>
         <td style="text-align: center;">${r.ngay_cong_tt}</td>
+        <td style="text-align: center;">${r.ngay_cong_chuan != null ? r.ngay_cong_chuan : ""}</td>
         <td style="text-align: center;">${r.ngay_cong_hl}</td>
         <td style="text-align: right;">${formatMoney(r.trang_phuc)}</td>
         <td style="text-align: right;">${formatMoney(r.com_trua)}</td>
@@ -1427,7 +1429,7 @@ function displaySheetData() {
     totalTr.innerHTML = `
       <td colspan="2" class="freeze-col-total" style="text-align: right; font-weight: 800; text-transform: uppercase;">Tổng cộng:</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumLuongCb)}</td>
-      <td colspan="2"></td>
+      <td colspan="3"></td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrangPhuc)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumComTrua)}</td>
       <td style="text-align: right; font-weight: 700; color: var(--amount-in);">${formatMoney(sumTrachNhiem)}</td>
