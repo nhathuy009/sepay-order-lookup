@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon"];
+  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon", "vax1"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -483,7 +483,7 @@ let currentBankTransferRows = [];
 let currentTxListData = []; // Lưu dữ liệu gốc (đã gộp thông tin KH/hóa đơn) của bảng Kiểm tra giao dịch SePay v2 để phục vụ nút Copy
 let currentBankTransferContent = "";
 let accActiveTab = 'luongthuong'; // 'luongthuong' | 'bhxh' | 'bhxhnld'
-let empMainTab = 'luong'; // 'luong' | 'dinhkhoan' | 'chuyenkhoan' | 'chamcong' | 'kiemtra'
+let empMainTab = 'luong'; // 'luong' | 'dinhkhoan' | 'chuyenkhoan' | 'chamcong' | 'kiemtra' | 'congthuc'
 let bankGroupsData = {};
 let bankActiveTab = '';
 let gdtLastInvoices = []; // Danh sách hóa đơn thô (từ API gdt_invoice) để mở chi tiết khi bấm dòng
@@ -605,7 +605,9 @@ async function doFetchEmployeesExcel(fileOverride) {
           const bhyt_tru_raw = row[22];           // W: BHYT (NLĐ trừ)
           const bhtn_tru_raw = row[23];           // X: BHTN (NLĐ trừ)
           const cd_tru_raw = row[24];             // Y: CĐ (NLĐ trừ)
+          const tong_khau_tru_raw = row[25];      // Z: Tổng khấu trừ
           const thue_tncn_raw = row[28];          // AC: Tiền thuế TNCN
+          const tam_ung_raw = row[29];            // AD: Tạm ứng
           const thuc_nhan_raw = row[30];          // AE: Thực nhận
           const stk_raw = row[31];                // AF: STK
           const ngan_hang_raw = row[32];          // AG: Ngân hàng
@@ -637,7 +639,9 @@ async function doFetchEmployeesExcel(fileOverride) {
             const bhyt_tru = parseFloat(bhyt_tru_raw) || 0;
             const bhtn_tru = parseFloat(bhtn_tru_raw) || 0;
             const cd_tru = parseFloat(cd_tru_raw) || 0;
+            const tong_khau_tru = parseFloat(tong_khau_tru_raw) || 0;
             const thue_tncn = parseFloat(thue_tncn_raw) || 0;
+            const tam_ung = parseFloat(tam_ung_raw) || 0;
             const thuc_nhan = parseFloat(thuc_nhan_raw) || 0;
             const stk = stk_raw !== undefined && stk_raw !== null ? String(stk_raw).trim() : "";
             const ngan_hang = ngan_hang_raw !== undefined && ngan_hang_raw !== null ? String(ngan_hang_raw).trim() : "";
@@ -682,7 +686,9 @@ async function doFetchEmployeesExcel(fileOverride) {
               bhyt_tru: bhyt_tru,
               bhtn_tru: bhtn_tru,
               cd_tru: cd_tru,
+              tong_khau_tru: tong_khau_tru,
               thue_tncn: thue_tncn,
+              tam_ung: tam_ung,
               thuc_nhan: thuc_nhan,
               stk: stk,
               ngan_hang: ngan_hang,
@@ -1668,7 +1674,7 @@ function displaySheetData() {
 
   // Hiện card kết quả + mặc định tab Bảng lương (giữ tab đang chọn nếu đã có dữ liệu)
   if (resultCard) resultCard.style.display = "block";
-  if (!empMainTab || !["luong", "dinhkhoan", "chuyenkhoan", "chamcong", "kiemtra"].includes(empMainTab)) {
+  if (!empMainTab || !["luong", "dinhkhoan", "chuyenkhoan", "chamcong", "kiemtra", "congthuc"].includes(empMainTab)) {
     empMainTab = "luong";
   }
   applyEmpMainTabView();
@@ -2622,20 +2628,209 @@ function renderAuditTable() {
   updateAuditAlerts();
 }
 
+/**
+ * Kiểm tra công thức cộng tiền trên bảng lương.
+ * Sai lệch cho phép ≤ 1 đồng (làm tròn).
+ *
+ * F0: Lương TT = round((H/K)*L) + M+N+O+P   (tính từ thành phần — dùng làm gốc)
+ * F1: Tổng TN (U) ≟ Lương TT + Q + R + S + T
+ * F2: Tổng trừ (Z) ≟ V + W + X + Y
+ * F3: Thực nhận (AE) ≟ U − (V+W+X+Y) − AC − AD
+ */
+function computeFormulaAuditStats(selectedSheet) {
+  const empty = { sheet: selectedSheet || "", ok: 0, err: 0, warn: 0, rows: [], payCount: 0, hasData: false };
+  if (!selectedSheet) return empty;
+
+  const payRows = globalSheetsData[selectedSheet] || [];
+  if (!payRows.length) return empty;
+
+  const TOL = 1; // cho phép lệch 1 đồng do làm tròn
+  let ok = 0, err = 0, warn = 0;
+  const rows = [];
+
+  payRows.forEach(r => {
+    const ma = (r.ma_nv || "").trim().toUpperCase();
+    if (!ma) return;
+
+    const luongTt = Math.round(r.luong_tinh_toan || 0);
+    const tongTnExcel = Math.round(r.tong_thu_nhap || 0);
+    const tongTnTinh = Math.round(luongTt + (r.hoa_hong || 0) + (r.thuong_dong_gop || 0) + (r.luong_phep || 0) + (r.khac || 0));
+    const truTinh = Math.round((r.bhxh_tru || 0) + (r.bhyt_tru || 0) + (r.bhtn_tru || 0) + (r.cd_tru || 0));
+    const truExcel = Math.round(r.tong_khau_tru || 0);
+    const thue = Math.round(r.thue_tncn || 0);
+    const tamUng = Math.round(r.tam_ung || 0);
+    const thucNhanExcel = Math.round(r.thuc_nhan || 0);
+    const thucNhanTinh = Math.round(tongTnExcel - truTinh - thue - tamUng);
+
+    const issues = [];
+    let status = "ok";
+
+    // Cảnh báo thiếu dữ liệu cơ bản
+    if (!r.luong_cb && !tongTnExcel && !thucNhanExcel) {
+      status = "warn";
+      issues.push("Thiếu dữ liệu lương");
+    } else {
+      // F1: Tổng thu nhập
+      if (Math.abs(tongTnExcel - tongTnTinh) > TOL) {
+        status = "err";
+        issues.push(`F1 Tổng TN: U=${tongTnExcel.toLocaleString("vi-VN")} ≠ tính=${tongTnTinh.toLocaleString("vi-VN")} (Δ=${(tongTnExcel - tongTnTinh).toLocaleString("vi-VN")})`);
+      }
+      // F2: Tổng khấu trừ (chỉ so khi Excel có Z > 0 hoặc có thành phần trừ)
+      if (truExcel > 0 || truTinh > 0) {
+        if (Math.abs(truExcel - truTinh) > TOL) {
+          status = "err";
+          issues.push(`F2 Σ trừ: Z=${truExcel.toLocaleString("vi-VN")} ≠ V+W+X+Y=${truTinh.toLocaleString("vi-VN")} (Δ=${(truExcel - truTinh).toLocaleString("vi-VN")})`);
+        }
+      }
+      // F3: Thực nhận
+      if (thucNhanExcel > 0 || tongTnExcel > 0) {
+        if (Math.abs(thucNhanExcel - thucNhanTinh) > TOL) {
+          status = "err";
+          issues.push(`F3 Thực nhận: AE=${thucNhanExcel.toLocaleString("vi-VN")} ≠ tính=${thucNhanTinh.toLocaleString("vi-VN")} (Δ=${(thucNhanExcel - thucNhanTinh).toLocaleString("vi-VN")})`);
+        }
+      }
+      if (issues.length === 0) {
+        status = "ok";
+        issues.push("Khớp F1–F3");
+      }
+    }
+
+    if (status === "ok") ok++;
+    else if (status === "err") err++;
+    else warn++;
+
+    rows.push({
+      ma,
+      ten: r.ten_nv || "",
+      status,
+      issues,
+      luongTt,
+      tongTnExcel,
+      tongTnTinh,
+      truTinh,
+      truExcel,
+      thucNhanExcel,
+      thucNhanTinh,
+      f1ok: Math.abs(tongTnExcel - tongTnTinh) <= TOL,
+      f2ok: !(truExcel > 0 || truTinh > 0) || Math.abs(truExcel - truTinh) <= TOL,
+      f3ok: !(thucNhanExcel > 0 || tongTnExcel > 0) || Math.abs(thucNhanExcel - thucNhanTinh) <= TOL
+    });
+  });
+
+  return {
+    sheet: selectedSheet,
+    ok, err, warn,
+    rows,
+    payCount: rows.length,
+    hasData: rows.length > 0
+  };
+}
+
+function renderFormulaAuditTable() {
+  const tbody = document.getElementById("formulaAuditTbody");
+  const emptyMsg = document.getElementById("formulaAuditEmptyMsg");
+  const summaryEl = document.getElementById("formulaAuditSummary");
+  const badge = document.getElementById("empFormulaBadge");
+  if (!tbody) return;
+
+  const selectedSheet = document.getElementById("sheetSelect")?.value || "";
+  tbody.innerHTML = "";
+
+  if (!selectedSheet) {
+    if (emptyMsg) {
+      emptyMsg.style.display = "block";
+      emptyMsg.innerHTML = `<span class="err">Chưa chọn tháng. Hãy chọn tháng trên dropdown rồi mở tab Công thức.</span>`;
+    }
+    if (summaryEl) summaryEl.textContent = "Chưa chọn tháng.";
+    if (badge) { badge.style.display = "none"; badge.textContent = ""; }
+    return;
+  }
+
+  const stats = computeFormulaAuditStats(selectedSheet);
+
+  if (badge) {
+    if (stats.err + stats.warn > 0) {
+      badge.style.display = "inline-flex";
+      badge.textContent = String(stats.err + stats.warn);
+      badge.classList.remove("is-err", "is-warn");
+      badge.classList.add(stats.err > 0 ? "is-err" : "is-warn");
+    } else {
+      badge.style.display = "none";
+      badge.textContent = "";
+    }
+  }
+
+  if (!stats.hasData) {
+    if (emptyMsg) {
+      emptyMsg.style.display = "block";
+      emptyMsg.innerHTML = `<span class="err">Tháng <b>${escapeHtml(selectedSheet)}</b> không có dữ liệu bảng lương để kiểm tra công thức.</span>`;
+    }
+    if (summaryEl) summaryEl.textContent = "Không có dữ liệu.";
+    return;
+  }
+  if (emptyMsg) emptyMsg.style.display = "none";
+
+  const statusOrder = { err: 0, warn: 1, ok: 2 };
+  const sortedRows = [...stats.rows].sort((x, y) => {
+    const sx = statusOrder[x.status] ?? 9;
+    const sy = statusOrder[y.status] ?? 9;
+    if (sx !== sy) return sx - sy;
+    return (x.ma || "").localeCompare(y.ma || "", "vi");
+  });
+
+  const fmt = (n) => (n === undefined || n === null || n === "") ? "—" : Number(n).toLocaleString("vi-VN");
+
+  sortedRows.forEach((row, idx) => {
+    const tr = document.createElement("tr");
+    if (row.status === "err") tr.classList.add("audit-row-err");
+    else if (row.status === "warn") tr.classList.add("audit-row-warn");
+
+    const badgeHtml = row.status === "ok"
+      ? `<span class="badge ok">OK</span>`
+      : row.status === "err"
+        ? `<span class="badge err">Lệch</span>`
+        : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
+
+    tr.innerHTML = `
+      <td class="audit-td audit-td-stt">${idx + 1}</td>
+      <td class="freeze-col-1" style="font-weight:600; color:var(--accent);">${escapeHtml(row.ma)}</td>
+      <td class="audit-td">${fmt(row.luongTt)}</td>
+      <td class="audit-td${!row.f1ok ? " audit-mismatch" : ""}">${fmt(row.tongTnExcel)}</td>
+      <td class="audit-td${!row.f1ok ? " audit-mismatch" : " att-sum-strong"}">${fmt(row.tongTnTinh)}</td>
+      <td class="audit-td${!row.f2ok ? " audit-mismatch" : " att-sum-strong"}">${fmt(row.truTinh)}</td>
+      <td class="audit-td${!row.f2ok ? " audit-mismatch" : ""}">${fmt(row.truExcel)}</td>
+      <td class="audit-td${!row.f3ok ? " audit-mismatch" : ""}">${fmt(row.thucNhanExcel)}</td>
+      <td class="audit-td${!row.f3ok ? " audit-mismatch" : " att-sum-strong"}">${fmt(row.thucNhanTinh)}</td>
+      <td class="audit-td">${badgeHtml}</td>
+      <td class="audit-td-detail">${escapeHtml(row.issues.join("; "))}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (summaryEl) {
+    summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · Lương: ${stats.payCount} NV · ` +
+      `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
+      `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
+      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
+  }
+}
+
 function applyEmpMainTabView() {
   const panels = {
     luong: document.getElementById("employeeTableWrapper"),
     dinhkhoan: document.getElementById("accountingWrapper"),
     chuyenkhoan: document.getElementById("bankTransferWrapper"),
     chamcong: document.getElementById("attendanceWrapper"),
-    kiemtra: document.getElementById("auditWrapper")
+    kiemtra: document.getElementById("auditWrapper"),
+    congthuc: document.getElementById("formulaAuditWrapper")
   };
   const btns = {
     luong: document.getElementById("empMainBtn-luong"),
     dinhkhoan: document.getElementById("empMainBtn-dinhkhoan"),
     chuyenkhoan: document.getElementById("empMainBtn-chuyenkhoan"),
     chamcong: document.getElementById("empMainBtn-chamcong"),
-    kiemtra: document.getElementById("empMainBtn-kiemtra")
+    kiemtra: document.getElementById("empMainBtn-kiemtra"),
+    congthuc: document.getElementById("empMainBtn-congthuc")
   };
   const titleEl = document.getElementById("employeeResultTitle");
   const titles = {
@@ -2643,7 +2838,8 @@ function applyEmpMainTabView() {
     dinhkhoan: "Định khoản Hạch toán",
     chuyenkhoan: "Danh sách chuyển khoản lương",
     chamcong: "Bảng chấm công",
-    kiemtra: "Kiểm tra lỗi (CC ↔ Lương)"
+    kiemtra: "Kiểm tra lỗi (CC ↔ Lương)",
+    congthuc: "Kiểm tra công thức lương"
   };
   Object.keys(panels).forEach(key => {
     if (panels[key]) panels[key].style.display = empMainTab === key ? "block" : "none";
@@ -2659,6 +2855,8 @@ function applyEmpMainTabView() {
   }
   if (empMainTab === "kiemtra") {
     renderAuditTable();
+  } else if (empMainTab === "congthuc") {
+    renderFormulaAuditTable();
   } else {
     // Cập nhật badge + banner khi đang ở tab khác (banner ẩn khi đang ở kiemtra)
     updateAuditAlerts();
@@ -5969,5 +6167,170 @@ async function doEhoadonFetchInvoiceList() {
     resultsEl.innerHTML = `<span class="err">Lỗi kết nối: ${escapeHtml(e.message)}</span>`;
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ============================================================
+// Tab Giải mã VAX1 (AES-256-CBC, key = SHA-256(A ⊕ 0x5C))
+// ============================================================
+const VAX1_A = [
+  10, 29, 4, 113, 15, 25, 31, 9, 14, 25, 113, 12, 16, 9, 27, 21,
+  18, 113, 8, 19, 23, 25, 18, 113, 110, 108, 110, 106, 28, 5, 30, 3,
+  20, 8, 3, 10, 29, 29, 12, 12
+];
+
+let _vax1PlaintextCache = "";
+
+async function vax1DeriveKey() {
+  const bArr = new Uint8Array(VAX1_A.map((a) => (a ^ 92) & 0xff));
+  const hash = await crypto.subtle.digest("SHA-256", bArr);
+  return crypto.subtle.importKey("raw", hash, { name: "AES-CBC" }, false, ["decrypt"]);
+}
+
+function vax1Pkcs7Unpad(buf) {
+  if (!buf || buf.length === 0) throw new Error("Ciphertext rỗng");
+  const pad = buf[buf.length - 1];
+  if (pad < 1 || pad > 16) throw new Error("PKCS7 padding không hợp lệ");
+  for (let i = 0; i < pad; i++) {
+    if (buf[buf.length - 1 - i] !== pad) throw new Error("PKCS7 padding không hợp lệ");
+  }
+  return buf.slice(0, buf.length - pad);
+}
+
+function vax1Base64ToBytes(b64) {
+  const cleaned = String(b64 || "").replace(/\s+/g, "");
+  const padLen = (4 - (cleaned.length % 4)) % 4;
+  const padded = cleaned + "=".repeat(padLen);
+  const bin = atob(padded);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function decryptVax1Payload(payload) {
+  let s = String(payload || "").trim();
+  if (s.startsWith("VAX1:")) s = s.slice(5).trim();
+  // Cho phép nội dung có nhiều dòng — lấy đoạn base64 dài nhất chứa VAX1 hoặc toàn bộ
+  if (!s.includes("VAX1:") && !/^[A-Za-z0-9+/=\s]+$/.test(s.slice(0, 200))) {
+    const m = String(payload || "").match(/VAX1:\s*([A-Za-z0-9+/=\s]+)/);
+    if (m) s = m[1].replace(/\s+/g, "");
+  } else {
+    s = s.replace(/\s+/g, "");
+  }
+  if (!s) throw new Error("Không tìm thấy payload VAX1");
+
+  const raw = vax1Base64ToBytes(s);
+  if (raw.length <= 16) throw new Error("Payload quá ngắn (thiếu IV)");
+
+  const iv = raw.slice(0, 16);
+  const ct = raw.slice(16);
+  const key = await vax1DeriveKey();
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-CBC", iv }, key, ct);
+  // Web Crypto đã unpad PKCS7; vẫn giữ raw ArrayBuffer
+  return new Uint8Array(decrypted);
+}
+
+function vax1BytesToUtf8(bytes) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function doDecryptVax1() {
+  const urlInput = document.getElementById("vax1UrlInput");
+  const statusEl = document.getElementById("vax1Status");
+  const resultCard = document.getElementById("vax1ResultCard");
+  const resultPre = document.getElementById("vax1ResultPre");
+  const metaEl = document.getElementById("vax1Meta");
+  const btn = document.getElementById("vax1DecryptBtn");
+  const url = (urlInput && urlInput.value || "").trim();
+
+  if (!url) {
+    statusEl.style.display = "block";
+    statusEl.innerHTML = '<span class="err">Vui lòng nhập URL nguồn.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.style.display = "block";
+  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải và giải mã…';
+  resultCard.style.display = "none";
+  _vax1PlaintextCache = "";
+
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fetch_vax1", url, access_token: getToken() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tải URL thất bại")}</span>`;
+      return;
+    }
+
+    let sourceText = data.text || "";
+    if (!sourceText && data.text_b64) {
+      try {
+        sourceText = atob(data.text_b64);
+      } catch (_) {
+        statusEl.innerHTML = '<span class="err">Không đọc được nội dung nhị phân từ URL.</span>';
+        return;
+      }
+    }
+    if (!sourceText) {
+      statusEl.innerHTML = '<span class="err">URL không trả về nội dung.</span>';
+      return;
+    }
+
+    const plainBytes = await decryptVax1Payload(sourceText);
+    let text = vax1BytesToUtf8(plainBytes);
+    let note = "";
+    if (text === null) {
+      // Thử zlib (magic 0x78) — browser không có zlib sẵn; hiển thị hex + gợi ý
+      const hex = Array.from(plainBytes.slice(0, 64)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+      text = `[Binary ${plainBytes.length} bytes]\nHex (64 byte đầu): ${hex}…`;
+      note = "Không phải UTF-8; có thể cần giải nén thêm (zlib/gzip) ngoài trình duyệt.";
+    }
+
+    _vax1PlaintextCache = text;
+    metaEl.textContent = `Kích thước: ${plainBytes.length.toLocaleString()} byte` + (note ? ` — ${note}` : "");
+    resultPre.textContent = text;
+    resultCard.style.display = "block";
+    statusEl.innerHTML = '<span style="color:var(--badge-ok-text);font-weight:500;">✅ Giải mã thành công</span>';
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">Lỗi: ${escapeHtml(e.message || String(e))}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function clearVax1Result() {
+  const urlInput = document.getElementById("vax1UrlInput");
+  const statusEl = document.getElementById("vax1Status");
+  const resultCard = document.getElementById("vax1ResultCard");
+  const resultPre = document.getElementById("vax1ResultPre");
+  if (urlInput) urlInput.value = "";
+  if (statusEl) { statusEl.style.display = "none"; statusEl.innerHTML = ""; }
+  if (resultCard) resultCard.style.display = "none";
+  if (resultPre) resultPre.textContent = "";
+  _vax1PlaintextCache = "";
+}
+
+async function copyVax1Result() {
+  const text = _vax1PlaintextCache || (document.getElementById("vax1ResultPre") || {}).textContent || "";
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById("vax1CopyBtn");
+    if (btn) {
+      const old = btn.textContent;
+      btn.textContent = "✅ Đã copy";
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }
+  } catch (e) {
+    alert("Không copy được: " + (e.message || e));
   }
 }
