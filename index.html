@@ -894,7 +894,10 @@
       <div id="tabVax1" class="hidden tab-panel">
         <h2 style="margin:0 0 16px 0;">Giải mã VAX1</h2>
         <div class="card">
-          <label for="vax1UrlInput">Đường link nguồn mã hóa (VAX1:…)</label>
+          <label for="vax1PasteInput">Dán nội dung mã hóa (ưu tiên)</label>
+          <textarea id="vax1PasteInput" rows="5" placeholder="VAX1:.... hoặc dán toàn bộ chuỗi base64" style="width:100%; resize:vertical; min-height:100px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
+
+          <label for="vax1UrlInput" style="margin-top:14px; display:block;">Hoặc đường link nguồn</label>
           <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
             <div style="flex:1; min-width:240px;">
               <input type="url" id="vax1UrlInput" placeholder="https://… (raw text chứa VAX1:...)" style="width:100%;" />
@@ -905,7 +908,7 @@
             </div>
           </div>
           <div class="hint" style="margin-top:10px;">
-            Dán link file/raw text chứa payload dạng <code>VAX1:&lt;base64&gt;</code>. Hệ thống tải nội dung qua proxy, giải mã AES-256-CBC (key từ mảng A ⊕ 0x5C → SHA-256) và hiển thị kết quả. Không lưu file.
+            Có thể <strong>dán trực tiếp</strong> payload <code>VAX1:&lt;base64&gt;</code>, hoặc dán link để hệ thống tải qua proxy. Ưu tiên nội dung đã dán nếu có. Giải mã AES-256-CBC (key = SHA-256(A ⊕ 0x5C)). Không lưu file.
           </div>
           <div id="vax1Status" class="msg" style="margin-top:12px; display:none;"></div>
         </div>
