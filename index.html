@@ -907,8 +907,10 @@
               <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa</button>
             </div>
           </div>
+          <label for="vax1HeadersInput" style="margin-top:12px; display:block;">Headers khi tải URL (tùy chọn, mỗi dòng: <code>Tên: giá trị</code>)</label>
+          <textarea id="vax1HeadersInput" rows="2" placeholder="Referer: https://vkey.vn/&#10;User-Agent: Mozilla/5.0 …" style="width:100%; resize:vertical; min-height:56px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
           <div class="hint" style="margin-top:10px;">
-            Có thể <strong>dán trực tiếp</strong> payload <code>VAX1:&lt;base64&gt;</code>, hoặc dán link để hệ thống tải qua proxy. Ưu tiên nội dung đã dán nếu có. Giải mã AES-256-CBC (key = SHA-256(A ⊕ 0x5C)). Không lưu file.
+            Có thể <strong>dán trực tiếp</strong> payload <code>VAX1:&lt;base64&gt;</code>, hoặc dán link để hệ thống tải qua proxy. Ưu tiên nội dung đã dán nếu có. Khi tải URL có thể thêm headers (vd. <code>Referer: https://vkey.vn/</code>). Giải mã AES-256-CBC (key = SHA-256(A ⊕ 0x5C)). Không lưu file.
           </div>
           <div id="vax1Status" class="msg" style="margin-top:12px; display:none;"></div>
         </div>
