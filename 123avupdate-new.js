@@ -1,65 +1,119 @@
 // =============================================================================
 // 123AV PLUGIN FOR VAAPP - TUÂN THỦ ĐÚNG QUY ĐỊNH
-// Version: 5.3.0
-// Cập nhật so với 5.2.0:
-//   - CHUYỂN SANG CÁCH 2: Gắn pipe-headers vào URL m3u8
-//     * URL trả về có dạng: https://cdn.com/master.m3u8|Referer=...|Origin=...|User-Agent=...
-//     * Player tự parse pipe-suffix và propagate headers cho mọi request con
-//     * VẪN giữ object "headers" làm fallback cho VAApp core cũ
-//   - Thêm hàm buildPipeHeaders() và attachPipeHeaders()
-//   - Áp dụng pipe cho mọi episode, detail response, embed response, subtitle
-//   - Có flag USE_PIPE_HEADERS để bật/tắt nhanh nếu CDN reject dấu "|"
+// Version: 4.0.2
+// Cập nhật: 
+//   - Thêm DEBUG_MODE toàn cục để bật/tắt console.log
+//   - Thêm log chi tiết từng bước xử lý
+//   - Thêm previewUrl với 3 strategy
+//   - Sửa lỗi title bị "0"
+//   - Parse chính xác từ card__body
+//   - Hỗ trợ filter nâng cao (type, year, actress, sort)
+//   - Tối ưu parseListResponse
 // =============================================================================
+
+// =============================================================================
+// GLOBAL DEBUG FLAG - BẬT/TẮT LOG
+// Đặt thành true để bật log, false để tắt
+// =============================================================================
+var DEBUG_MODE = true;
+
+// Prefix cho tất cả log để dễ nhận biết
+var LOG_PREFIX = "[123AV]";
+
+/**
+ * Hàm log chính - chỉ log khi DEBUG_MODE = true
+ * @param {string} level - 'LOG' | 'INFO' | 'WARN' | 'ERROR'
+ * @param {string} message - Thông điệp
+ * @param {any} data - Dữ liệu kèm theo (tùy chọn)
+ */
+function _log(level, message, data) {
+    if (!DEBUG_MODE) return;
+    var timestamp = new Date().toISOString().substring(11, 23);
+    var prefix = LOG_PREFIX + "[" + timestamp + "][" + level + "]";
+    
+    if (typeof data !== 'undefined') {
+        // Cắt bớt dữ liệu quá dài để tránh spam
+        var displayData = data;
+        if (typeof data === 'string' && data.length > 500) {
+            displayData = data.substring(0, 500) + "... [TRUNCATED " + data.length + " chars]";
+        }
+        console.log(prefix, message, displayData);
+    } else {
+        console.log(prefix, message);
+    }
+}
+
+// Các hàm log tiện dụng
+function logInfo(msg, data)  { _log("INFO",  msg, data); }
+function logWarn(msg, data)  { _log("WARN",  msg, data); }
+function logError(msg, data) { _log("ERROR", msg, data); }
+function logStep(msg, data)  { _log("STEP",  msg, data); }
+function logData(msg, data)  { _log("DATA",  msg, data); }
+
+/**
+ * Log nhóm - bắt đầu một section
+ */
+function logSection(title) {
+    if (!DEBUG_MODE) return;
+    console.log(LOG_PREFIX + " ========== " + title + " ==========");
+}
+
+/**
+ * Hàm bật/tắt debug runtime
+ */
+function setDebugMode(enabled) {
+    DEBUG_MODE = !!enabled;
+    console.log(LOG_PREFIX + " DEBUG_MODE đã được đặt thành: " + DEBUG_MODE);
+}
 
 // =============================================================================
 // CONFIGURATION & METADATA
 // =============================================================================
 
-/**
- * Bật/tắt chế độ gắn pipe-headers vào URL.
- * - true : URL trả về có |Referer=...|Origin=...|User-Agent=...
- * - false: Chỉ trả object headers (giống phiên bản 5.2.0)
- * 
- * Đổi thành false nếu CDN reject URL có dấu "|" (trả 400/403).
- */
-var USE_PIPE_HEADERS = true;
-
-var DEFAULT_PLAYER_ORIGIN = "https://sadie-shop.site";
-
-var DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:156.0) Gecko/20100101 Firefox/156.0";
-
 function getManifest() {
-    return JSON.stringify({
+    logSection("getManifest()");
+    var manifest = {
         "id": "123av",
-        "name": "123AV",
-        "version": "5.3.0",
+        "name": "123AV [XXX]",
+        "version": "4.0.5",
         "baseUrl": "https://123av.com",
+        "fallbackUrls": [
+            "https://123av.net",
+            "https://123av.org"
+        ],
+        "author":"Huỳnh Nhật Huy",
         "referrer": "https://123av.com/",
         "imageReferer": "https://123av.com/",
-        "iconUrl": "https://123av.com/assets/123av/favicon.png",
+        "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/123av.png",
         "isEnabled": true,
         "isAdult": true,
         "type": "VIDEO",
         "layoutType": "HORIZONTAL",
         "playerType": "exoplayer",
-        "subtitleCat": true,
-        "debug": false,
+        "subtitleCat": false,
+        "debug": DEBUG_MODE,
         "adblock": true
-    });
+    };
+    logData("Manifest:", manifest);
+    return JSON.stringify(manifest);
 }
 
 function getHomeSections() {
-    return JSON.stringify([
-        { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Horizontal', path: '' },
+    logSection("getHomeSections()");
+    var sections = [
         { slug: 'vi/hot', title: 'Hot & Thịnh Hành', type: 'Horizontal', path: '' },
         { slug: 'vi/recent', title: 'Mới thêm gần đây', type: 'Horizontal', path: '' },
         { slug: 'vi/all?sort=today&type=uncensored-leaked', title: 'Xu hướng (Hôm Nay)', type: 'Horizontal', path: '' },
-        { slug: 'vi/all?sort=week&type=uncensored-leaked', title: 'Xu hướng (Tuần Này)', type: 'Horizontal', path: '' }
-    ]);
+        { slug: 'vi/all?sort=week&type=uncensored-leaked', title: 'Xu hướng (Tuần Này)', type: 'Horizontal', path: '' },
+        { slug: 'vi/new', title: 'Mới Cập Nhật', type: 'Grid', path: '' },
+    ];
+    logData("Số lượng home sections: " + sections.length, sections);
+    return JSON.stringify(sections);
 }
 
 function getPrimaryCategories() {
-    return JSON.stringify([
+    logSection("getPrimaryCategories()");
+    var categories = [
         { name: 'Mới cập nhật', slug: 'vi/new' },
         { name: 'Thịnh hành', slug: 'vi/hot' },
         { name: 'Mới thêm gần đây', slug: 'vi/recent' },
@@ -69,11 +123,14 @@ function getPrimaryCategories() {
         { name: 'Diễn viên', slug: 'vi/actresses' },
         { name: 'Nhà sản xuất', slug: 'vi/makers' },
         { name: 'Loạt phim (Series)', slug: 'vi/series' }
-    ]);
+    ];
+    logData("Số lượng categories: " + categories.length, categories);
+    return JSON.stringify(categories);
 }
 
 function getFilterConfig() {
-    return JSON.stringify({
+    logSection("getFilterConfig()");
+    var config = {
         sort: [
             { name: 'Mới nhất', value: 'new' },
             { name: 'Hôm nay', value: 'today' },
@@ -89,7 +146,9 @@ function getFilterConfig() {
             { name: "Nhà sản xuất", value: "vi/makers" },
             { name: "Loạt phim (Series)", value: "vi/series" }
         ]
-    });
+    };
+    logData("Filter config:", config);
+    return JSON.stringify(config);
 }
 
 // =============================================================================
@@ -97,12 +156,9 @@ function getFilterConfig() {
 // =============================================================================
 
 var PluginUtils = {
-    /**
-     * Làm sạch text: loại bỏ HTML tags, entities, khoảng trắng thừa
-     */
     cleanText: function(text) {
         if (!text) return "";
-        return text.replace(/<[^>]*>/g, "")
+        var cleaned = text.replace(/<[^>]*>/g, "")
             .replace(/&amp;/g, "&")
             .replace(/&quot;/g, '"')
             .replace(/&#039;/g, "'")
@@ -110,21 +166,17 @@ var PluginUtils = {
             .replace(/&gt;/g, ">")
             .replace(/\s+/g, " ")
             .trim();
+        return cleaned;
     },
 
-    /**
-     * Lấy meta tag từ HTML
-     */
     getMeta: function(html, property) {
         var regex1 = new RegExp('(?:property|name)=["\']' + property + '["\'][^>]*content=(["\'])(.*?)\\1', 'i');
         var regex2 = new RegExp('content=(["\'])(.*?)\\1[^>]*(?:property|name)=["\']' + property + '["\']', 'i');
         var match = html.match(regex1) || html.match(regex2);
-        return match ? match[2] : "";
+        var result = match ? match[2] : "";
+        return result;
     },
 
-    /**
-     * Chuẩn hóa URL: thêm https: nếu thiếu
-     */
     normalizeUrl: function(url) {
         if (!url) return "";
         if (url.indexOf('//') === 0) return "https:" + url;
@@ -132,53 +184,51 @@ var PluginUtils = {
         return url;
     },
 
-    /**
-     * Trích xuất preview URL từ card với 3 strategy
-     */
     extractPreviewUrl: function(itemHtml, $element) {
         var url = "";
+        var strategy = "none";
 
+        // Strategy 1: data-preview attribute (PNG)
         var previewMatch = itemHtml.match(/data-preview="([^"]+)"/);
         if (previewMatch) {
             url = previewMatch[1];
+            strategy = "data-preview";
         }
 
         if (!url && $element) {
             var posterDiv = $element.find(".card__poster, .featured__poster").first();
             if (posterDiv && posterDiv.length > 0) {
                 url = posterDiv.attr("data-preview") || "";
+                if (url) strategy = "jQuery data-preview";
             }
         }
 
+        // Strategy 2: video data-src (MP4)
         if (!url) {
             var videoMatch = itemHtml.match(/<video[^>]+data-src="([^"]+)"/);
             if (videoMatch) {
                 url = videoMatch[1];
+                strategy = "video data-src";
             }
         }
 
-        return PluginUtils.normalizeUrl(url);
+        // Strategy 3: PNG -> MP4 (giữ nguyên png)
+        if (url && url.indexOf('.png') !== -1) {
+            strategy += " (png)";
+        }
+
+        var normalized = PluginUtils.normalizeUrl(url);
+        return normalized;
     },
 
-    /**
-     * Xác định loại phim (Censored/Uncensored) từ nhiều nguồn
-     */
     detectLanguage: function($element, href, title, cardHtml) {
-        if (href && href.indexOf('uncensored') !== -1) {
-            return 'Uncensored';
-        }
-        if (title && title.toLowerCase().indexOf('uncensored') !== -1) {
-            return 'Uncensored';
-        }
+        if (href && href.indexOf('uncensored') !== -1) return 'Uncensored';
+        if (title && title.toLowerCase().indexOf('uncensored') !== -1) return 'Uncensored';
         if ($element && $element.length > 0) {
             var cardClass = $element.attr("class") || "";
-            if (cardClass.toLowerCase().indexOf('uncensored') !== -1) {
-                return 'Uncensored';
-            }
+            if (cardClass.toLowerCase().indexOf('uncensored') !== -1) return 'Uncensored';
         }
-        if (cardHtml && cardHtml.toLowerCase().indexOf('uncensored') !== -1) {
-            return 'Uncensored';
-        }
+        if (cardHtml && cardHtml.toLowerCase().indexOf('uncensored') !== -1) return 'Uncensored';
         return 'Censored';
     }
 };
@@ -209,7 +259,9 @@ function extractHashId(url) {
     if (!url) return null;
     
     var hashMatch = url.match(/\/e\/([a-z0-9_]+)/i);
-    if (hashMatch) return hashMatch[1];
+    if (hashMatch) {
+        return hashMatch[1];
+    }
     
     try {
         var urlObj = new URL(url);
@@ -246,6 +298,7 @@ function decodePlayerJson(escapedStr) {
         }).replace(/\\/g, '');
         return JSON.parse(cleanStr);
     } catch (e) {
+        logError("decodePlayerJson thất bại", e.message);
         return [];
     }
 }
@@ -258,131 +311,22 @@ function getMeta(html, property) {
     return PluginUtils.getMeta(html, property);
 }
 
-/**
- * Lấy origin (scheme + host) từ một URL
- */
-function getOrigin(url) {
-    try {
-        var urlObj = new URL(url);
-        return urlObj.origin;
-    } catch (e) {
-        return null;
-    }
-}
-
-// =============================================================================
-// PIPE HEADERS (CÁCH 2)
-// =============================================================================
-
-/**
- * Tạo pipe-suffix cho URL.
- * 
- * Cú pháp: |Header=Value|Header=Value|...
- * 
- * LƯU Ý:
- *   - Chỉ gắn vào URL MASTER m3u8, KHÔNG gắn vào segment.
- *   - Player hỗ trợ (VLC/Kodi/FFmpeg/VAApp custom) sẽ parse phần sau "|"
- *     và propagate headers cho MỌI request con (playlist + segment + subtitle).
- *   - Nếu VAApp core dùng ExoPlayer thuần → KHÔNG hoạt động, phải dùng
- *     object "headers" (fallback đã giữ sẵn).
- * 
- * @param {string} streamUrl - URL stream (không dùng, để tương thích chữ ký hàm)
- * @param {string} iframeUrl - URL iframe player cha
- * @returns {string} pipe-suffix, ví dụ:
- *   "|Referer=https://sadie-shop.site/|Origin=https://sadie-shop.site|User-Agent=Mozilla/5.0 ..."
- */
-function buildPipeHeaders(streamUrl, iframeUrl) {
-    var playOrigin = null;
-    if (iframeUrl) {
-        playOrigin = getOrigin(iframeUrl);
-    }
-    if (!playOrigin) {
-        playOrigin = DEFAULT_PLAYER_ORIGIN;
-    }
-    
-    // Cú pháp VLC/Kodi: |Header=Value|Header=Value
-    // Referer và Origin để nguyên (không encode) vì player tự hiểu
-    // User-Agent có dấu cách → encode để tránh player cắt nhầm
-    return "|Referer=" + playOrigin + "/" +
-           "|Origin=" + playOrigin +
-           "|User-Agent=" + encodeURIComponent(DEFAULT_USER_AGENT);
-}
-
-/**
- * Gắn pipe-suffix vào URL (nếu chưa có).
- * 
- * - Bỏ qua nếu URL rỗng hoặc là data:
- * - Bỏ qua nếu URL đã có "|Referer=" (tránh gắn trùng)
- * - Tự động append vào CUỐI URL (sau query string) → an toàn
- * 
- * @param {string} url - URL gốc
- * @param {string} iframeUrl - iframe player cha
- * @returns {string} URL đã gắn pipe (hoặc nguyên gốc nếu không cần)
- */
-function attachPipeHeaders(url, iframeUrl) {
-    if (!url) return url;
-    if (!USE_PIPE_HEADERS) return url;
-    
-    // Đã có pipe → không gắn nữa
-    if (url.indexOf("|Referer=") !== -1 || url.indexOf("|referer=") !== -1) {
-        return url;
-    }
-    
-    // Không gắn pipe cho data: URI
-    if (url.indexOf("data:") === 0) return url;
-    
-    // Không gắn pipe cho URL không phải http/https
-    if (url.indexOf("http://") !== 0 && url.indexOf("https://") !== 0) {
-        return url;
-    }
-    
-    return url + buildPipeHeaders(url, iframeUrl);
-}
-
-/**
- * Tạo headers OBJECT (fallback cho VAApp core cũ không hỗ trợ pipe).
- * 
- * QUAN TRỌNG - FIX 403:
- *   CDN con yêu cầu Origin/Referer = player cha (sadie-shop.site),
- *   KHÔNG dùng origin của CDN con, KHÔNG dùng 123av.com.
- * 
- * @param {string} streamUrl - URL stream (m3u8/ts/m4s)
- * @param {string} iframeUrl - URL iframe player cha
- * @returns {Object} headers object
- */
-function getStreamHeaders(streamUrl, iframeUrl) {
-    var headers = {
-        "User-Agent": DEFAULT_USER_AGENT,
-        "Accept": "*/*",
-        "Accept-Language": "vi"
-    };
-    
-    var playOrigin = null;
-    if (iframeUrl) {
-        playOrigin = getOrigin(iframeUrl);
-    }
-    if (!playOrigin) {
-        playOrigin = DEFAULT_PLAYER_ORIGIN;
-    }
-    
-    headers["Origin"] = playOrigin;
-    headers["Referer"] = playOrigin + "/";
-    
-    return headers;
-}
-
 // =============================================================================
 // X-DATA PARSER
 // =============================================================================
 
 function extractPlayerDataFromXData(html) {
+    logStep("extractPlayerDataFromXData() - Bắt đầu parse x-data");
+    
     try {
         var divPattern = /<div\s+class="watch__main"\s+x-data="([^"]+)"/;
         var divMatch = html.match(divPattern);
         
         if (!divMatch) {
+            logWarn("Không tìm thấy watch__main x-data");
             return null;
         }
+        logInfo("✓ Tìm thấy watch__main x-data, độ dài: " + divMatch[1].length);
 
         var xDataContent = divMatch[1];
         
@@ -390,8 +334,10 @@ function extractPlayerDataFromXData(html) {
         var playerMatch = xDataContent.match(playerPattern);
         
         if (!playerMatch) {
+            logWarn("Không tìm thấy player(JSON.parse...)");
             return null;
         }
+        logInfo("✓ Tìm thấy player() call");
 
         var jsonStr = playerMatch[1]
             .replace(/\\"/g, '"')
@@ -406,32 +352,46 @@ function extractPlayerDataFromXData(html) {
         var episodeData = JSON.parse(jsonStr);
         
         if (!Array.isArray(episodeData) || episodeData.length === 0) {
+            logWarn("episodeData rỗng hoặc không phải mảng");
             return null;
         }
+        logInfo("✓ Parse JSON thành công, số episodes: " + episodeData.length);
 
         var firstEpisode = episodeData[0];
-        var iframeUrl = firstEpisode && firstEpisode.url ? firstEpisode.url : null;
+        var iframeUrl = firstEpisode?.url || null;
 
         if (!iframeUrl) {
+            logWarn("Không có iframeUrl trong episode đầu tiên");
             return null;
         }
 
         var hashId = extractHashId(iframeUrl);
         var poster = extractPosterFromUrl(iframeUrl);
-        var iframeOrigin = getOrigin(iframeUrl);
 
-        return {
+        logInfo("✓ hashId: " + hashId);
+        logInfo("✓ poster: " + poster);
+
+        var result = {
             episodes: episodeData,
             videoId: parseInt(playerMatch[2]),
             code: playerMatch[3],
             apiBase: playerMatch[4],
             recKey: playerMatch[5],
             iframeUrl: iframeUrl,
-            iframeOrigin: iframeOrigin,
             hashId: hashId,
             poster: poster
         };
+        
+        logData("Kết quả x-data parse:", {
+            videoId: result.videoId,
+            code: result.code,
+            apiBase: result.apiBase,
+            hashId: result.hashId
+        });
+        
+        return result;
     } catch (e) {
+        logError("Lỗi parse x-data: " + e.message, e.stack);
         return null;
     }
 }
@@ -440,76 +400,58 @@ function extractPlayerDataFromXData(html) {
 // STREAM DATA FETCHER
 // =============================================================================
 
-/**
- * Lấy dữ liệu stream từ API.
- * 
- * @param {string} hashId - ID hash trích xuất từ iframeUrl
- * @param {string} poster - URL poster (bắt buộc theo dữ liệu HAR)
- * @param {string} [iframeUrl] - URL đầy đủ của iframe (để trích xuất origin)
- * @returns {Object} { stream, vtt, poster, iframeUrl }
- */
-function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
-    var result = { stream: null, vtt: null, poster: null, iframeUrl: iframeUrl || null };
+function fetchStreamDataAdvanced(hashId, poster) {
+    logStep("fetchStreamDataAdvanced() - hashId: " + hashId);
+    var result = { stream: null, vtt: null, poster: null };
     
-    if (!hashId) {
-        return result;
-    }
+    var endpoints = [
+        'https://javplayer.cc/stream',
+        'https://stream.javplayer.cc/stream'
+    ];
     
-    var apiEndpoints = [];
-    
-    if (iframeUrl) {
-        var iframeOrigin = getOrigin(iframeUrl);
-        if (iframeOrigin) {
-            apiEndpoints.push(iframeOrigin + '/stream');
-        }
-    }
-    
-    apiEndpoints.push('https://sadie-shop.site/stream');
-    apiEndpoints.push('https://javplayer.cc/stream');
-    apiEndpoints.push('https://stream.javplayer.cc/stream');
-    
-    var uniqueEndpoints = [];
-    for (var i = 0; i < apiEndpoints.length; i++) {
-        if (uniqueEndpoints.indexOf(apiEndpoints[i]) === -1) {
-            uniqueEndpoints.push(apiEndpoints[i]);
-        }
-    }
-    
-    for (var j = 0; j < uniqueEndpoints.length; j++) {
+    for (var i = 0; i < endpoints.length; i++) {
         try {
-            var endpoint = uniqueEndpoints[j];
-            var url = endpoint + '?id=' + encodeURIComponent(hashId);
+            var url = endpoints[i] + '?id=' + encodeURIComponent(hashId);
+            if (poster) url += '&poster=' + encodeURIComponent(poster);
             
-            if (poster) {
-                url += '&poster=' + encodeURIComponent(poster);
-            }
-            
-            var apiOrigin = getOrigin(endpoint) || endpoint;
+            logInfo("Thử endpoint [" + (i+1) + "/" + endpoints.length + "]: " + endpoints[i]);
             
             var response = httpRequest(url, {
                 method: "GET",
                 headers: {
                     "Accept": "application/json",
-                    "Referer": apiOrigin + "/",
-                    "User-Agent": DEFAULT_USER_AGENT
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
             });
             
             if (response && response.isSuccessful && response.status === 200) {
+                logInfo("✓ Nhận response 200 từ " + endpoints[i]);
                 var data = JSON.parse(response.body);
+                
                 if (data.status === 'ok' && data.media && data.media.stream) {
                     result.stream = data.media.stream;
                     result.vtt = data.media.vtt || null;
                     result.poster = data.media.poster || poster || null;
-                    result.iframeUrl = iframeUrl || (apiOrigin + '/e/' + hashId);
+                    
+                    logData("✓ Stream URL lấy được:", {
+                        stream: result.stream.substring(0, 80) + "...",
+                        hasVtt: !!result.vtt,
+                        hasPoster: !!result.poster
+                    });
                     return result;
+                } else {
+                    logWarn("Response không hợp lệ (status != ok hoặc thiếu media.stream)");
                 }
+            } else {
+                logWarn("Response không thành công: " + (response ? response.status : "null"));
             }
         } catch (e) {
+            logWarn("Lỗi endpoint " + endpoints[i] + ": " + e.message);
             continue;
         }
     }
     
+    logError("✗ Không lấy được stream từ bất kỳ endpoint nào");
     return result;
 }
 
@@ -518,6 +460,10 @@ function fetchStreamDataAdvanced(hashId, poster, iframeUrl) {
 // =============================================================================
 
 function getUrlList(slug, filtersJson) {
+    logSection("getUrlList()");
+    logInfo("Input slug: " + slug);
+    logInfo("Input filtersJson: " + filtersJson);
+    
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var baseUrl = "https://123av.com";
@@ -558,10 +504,16 @@ function getUrlList(slug, filtersJson) {
     if (filters.maker) params.push("maker=" + encodeURIComponent(filters.maker));
     if (filters.series) params.push("series=" + encodeURIComponent(filters.series));
     
-    return url + "?" + params.join("&");
+    var finalUrl = url + "?" + params.join("&");
+    logInfo("✓ URL cuối cùng: " + finalUrl);
+    return finalUrl;
 }
 
 function getUrlSearch(keyword, filtersJson) {
+    logSection("getUrlSearch()");
+    logInfo("Keyword: " + keyword);
+    logInfo("Filters: " + filtersJson);
+    
     var filters = JSON.parse(filtersJson || "{}");
     var page = filters.page || 1;
     var url = "https://123av.com/vi/search?keyword=" + encodeURIComponent(keyword) + "&page=" + page;
@@ -577,41 +529,55 @@ function getUrlSearch(keyword, filtersJson) {
         url += "&sort=" + (sortMap[filters.sort] || filters.sort);
     }
     
-    if (filters.type) {
-        url += "&type=" + encodeURIComponent(filters.type);
-    }
+    if (filters.type) url += "&type=" + encodeURIComponent(filters.type);
     
+    logInfo("✓ URL search: " + url);
     return url;
 }
 
 function getUrlDetail(slug, datasend) {
+    logSection("getUrlDetail()");
+    logInfo("Slug: " + slug);
+    logInfo("DataSend: " + (datasend ? datasend.substring(0, 100) : "null"));
+    
     if (datasend) {
         try {
             var data = JSON.parse(datasend);
             if (data && data.id) {
+                logInfo("✓ DataSend có id, trả về nguyên datasend");
                 return datasend;
             }
         } catch (e) {}
     }
     
-    if (slug.indexOf("http") === 0) return slug;
-    if (slug.indexOf("vi/v/") === 0) return "https://123av.com/" + slug;
-    if (slug.indexOf("/vi/v/") === 0) return "https://123av.com" + slug;
-    if (slug.indexOf("v/") === 0) return "https://123av.com/vi/" + slug;
-    if (slug.indexOf("/v/") === 0) return "https://123av.com/en" + slug;
+    if (slug.indexOf("http") === 0) {
+        logInfo("✓ URL đầy đủ: " + slug);
+        return slug;
+    }
     
-    return "https://123av.com/vi/v/" + slug;
+    var url;
+    if (slug.indexOf("vi/v/") === 0) url = "https://123av.com/" + slug;
+    else if (slug.indexOf("/vi/v/") === 0) url = "https://123av.com" + slug;
+    else if (slug.indexOf("v/") === 0) url = "https://123av.com/vi/" + slug;
+    else if (slug.indexOf("/v/") === 0) url = "https://123av.com/en" + slug;
+    else url = "https://123av.com/vi/v/" + slug;
+    
+    logInfo("✓ URL detail: " + url);
+    return url;
 }
 
 function getUrlCategories() { 
+    logInfo("getUrlCategories()");
     return "https://123av.com/vi/genres"; 
 }
 
 function getUrlCountries() { 
+    logInfo("getUrlCountries()");
     return ""; 
 }
 
 function getUrlYears() { 
+    logInfo("getUrlYears()");
     return ""; 
 }
 
@@ -620,6 +586,10 @@ function getUrlYears() {
 // =============================================================================
 
 function parseListResponse(html, apiUrl, datasend) {
+    logSection("parseListResponse()");
+    logInfo("API URL: " + apiUrl);
+    logInfo("HTML length: " + (html ? html.length : 0));
+    
     var movies = [];
     var $doc = _$(html);
     
@@ -630,10 +600,16 @@ function parseListResponse(html, apiUrl, datasend) {
                           html.indexOf('Genres') !== -1 && 
                           html.indexOf('title="Genres"') === -1;
     
+    logInfo("isActressesPage: " + isActressesPage);
+    logInfo("isAllGenresPage: " + isAllGenresPage);
+    
     // ============================================================
     // PARSE TRANG DIỄN VIÊN
     // ============================================================
     if (isActressesPage) {
+        logStep("Parse trang DIỄN VIÊN");
+        var actressCount = 0;
+        
         $doc.find("a[href*='/actresses/']").each(function() {
             var href = this.attr("href");
             if (!href) return;
@@ -648,10 +624,7 @@ function parseListResponse(html, apiUrl, datasend) {
             
             var exists = false;
             for (var i = 0; i < movies.length; i++) {
-                if (movies[i].id === slug) {
-                    exists = true;
-                    break;
-                }
+                if (movies[i].id === slug) { exists = true; break; }
             }
             
             if (!exists) {
@@ -667,8 +640,11 @@ function parseListResponse(html, apiUrl, datasend) {
                     lang: "",
                     previewUrl: ""
                 });
+                actressCount++;
             }
         });
+        
+        logInfo("✓ Đã parse " + actressCount + " diễn viên");
         return JSON.stringify({
             items: movies,
             pagination: { currentPage: 1, totalPages: 1, totalItems: movies.length, itemsPerPage: 20 }
@@ -679,6 +655,9 @@ function parseListResponse(html, apiUrl, datasend) {
     // PARSE TRANG THỂ LOẠI
     // ============================================================
     if (isAllGenresPage) {
+        logStep("Parse trang THỂ LOẠI");
+        var genreCount = 0;
+        
         $doc.find("a[href*='/genres/']").each(function() {
             var href = this.attr("href");
             if (!href) return;
@@ -693,10 +672,7 @@ function parseListResponse(html, apiUrl, datasend) {
             
             var exists = false;
             for (var i = 0; i < movies.length; i++) {
-                if (movies[i].id === slug) {
-                    exists = true;
-                    break;
-                }
+                if (movies[i].id === slug) { exists = true; break; }
             }
             
             if (!exists) {
@@ -712,8 +688,11 @@ function parseListResponse(html, apiUrl, datasend) {
                     lang: "",
                     previewUrl: ""
                 });
+                genreCount++;
             }
         });
+        
+        logInfo("✓ Đã parse " + genreCount + " thể loại");
         return JSON.stringify({
             items: movies,
             pagination: { currentPage: 1, totalPages: 1, totalItems: movies.length, itemsPerPage: 20 }
@@ -723,12 +702,19 @@ function parseListResponse(html, apiUrl, datasend) {
     // ============================================================
     // PARSE DANH SÁCH PHIM
     // ============================================================
+    logStep("Parse danh sách PHIM");
+    var cardCount = 0;
+    var skippedCount = 0;
+    
     $doc.find(".card, .featured").each(function() {
+        cardCount++;
+        
+        // --- BƯỚC 1: LẤY SLUG VÀ URL ---
         var href = "";
         var slug = "";
         var link = null;
-        
         var bodyLink = this.find(".card__body .card__link, .featured__body .card__link").first();
+        
         if (bodyLink && bodyLink.length > 0) {
             link = bodyLink;
             href = bodyLink.attr("href") || "";
@@ -745,8 +731,12 @@ function parseListResponse(html, apiUrl, datasend) {
             }
         }
         
-        if (!slug) return;
+        if (!slug) {
+            skippedCount++;
+            return;
+        }
         
+        // --- BƯỚC 2: LẤY TITLE ---
         var title = "";
         var cardHtml = this.html() || "";
         
@@ -787,6 +777,7 @@ function parseListResponse(html, apiUrl, datasend) {
         
         title = cleanText(title);
         
+        // --- BƯỚC 3: LẤY POSTER ---
         var poster = "";
         var posterImg = this.find(".card__poster img, .featured__poster img").first();
         if (posterImg && posterImg.length > 0) {
@@ -794,27 +785,35 @@ function parseListResponse(html, apiUrl, datasend) {
             poster = PluginUtils.normalizeUrl(poster);
         }
         
+        // --- BƯỚC 4: LẤY PREVIEW URL ---
         var previewUrl = PluginUtils.extractPreviewUrl(cardHtml, this);
         
+        // --- BƯỚC 5: LẤY DURATION ---
         var duration = "";
         var durEl = this.find(".card__dur, .featured__dur").first();
         if (durEl && durEl.length > 0) {
             duration = durEl.text().trim();
         }
         
+        // --- BƯỚC 6: LẤY VIEWS ---
         var views = "";
         var viewsEl = this.find(".card__views, .featured__views").first();
         if (viewsEl && viewsEl.length > 0) {
             views = viewsEl.text().trim();
         }
         
+        // --- BƯỚC 7: XÁC ĐỊNH LANG ---
         var lang = PluginUtils.detectLanguage(this, href, title, cardHtml);
+        
+        // --- BƯỚC 8: XÁC ĐỊNH QUALITY ---
         var quality = lang === 'Uncensored' ? "K.K.Duyệt" : "HD";
         
+        // --- BƯỚC 9: TẠO MÔ TẢ ---
         var description = "";
         if (duration) description += "⏱ " + duration;
         if (views) description += (description ? " | " : "") + "👁 " + views;
         
+        // --- BƯỚC 10: THÊM VÀO DANH SÁCH ---
         movies.push({
             id: slug,
             title: title,
@@ -828,6 +827,15 @@ function parseListResponse(html, apiUrl, datasend) {
             previewUrl: previewUrl
         });
     });
+    
+    logInfo("✓ Tổng số card tìm thấy: " + cardCount);
+    logInfo("✓ Đã parse thành công: " + movies.length);
+    logInfo("✓ Bỏ qua (không có slug): " + skippedCount);
+    
+    // Log 3 item đầu tiên để kiểm tra
+    if (movies.length > 0) {
+        logData("3 items đầu tiên:", movies.slice(0, 3));
+    }
     
     // ============================================================
     // PAGINATION
@@ -847,6 +855,8 @@ function parseListResponse(html, apiUrl, datasend) {
         }
     }
     
+    logInfo("Pagination: currentPage=" + currentPage + ", totalPages=" + totalPages);
+    
     return JSON.stringify({
         items: movies,
         pagination: {
@@ -859,27 +869,33 @@ function parseListResponse(html, apiUrl, datasend) {
 }
 
 function parseSearchResponse(html, apiUrl, datasend) {
+    logSection("parseSearchResponse() - delegate to parseListResponse");
     return parseListResponse(html, apiUrl, datasend);
 }
 
 // =============================================================================
-// MOVIE DETAIL PARSER (CÁCH 2 - PIPE HEADERS)
+// MOVIE DETAIL PARSER
 // =============================================================================
 
 function parseMovieDetail(htmlContent, apiUrl, datasend) {
+    logSection("parseMovieDetail()");
+    logInfo("HTML length: " + (htmlContent ? htmlContent.length : 0));
+    logInfo("DataSend: " + (datasend ? datasend.substring(0, 100) : "null"));
+    
     try {
         // === 1. ƯU TIÊN ĐỌC TỪ DATASEND ===
-        var detailData = null;
         if (datasend) {
             try {
-                detailData = JSON.parse(datasend);
+                var detailData = JSON.parse(datasend);
                 if (detailData && detailData.servers) {
+                    logInfo("✓ DataSend có servers, trả về nguyên datasend");
                     return JSON.stringify(detailData);
                 }
             } catch (e) {}
         }
         
         // === 2. THỬ PARSE X-DATA ===
+        logStep("Thử parse x-data method");
         var xDataResult = extractPlayerDataFromXData(htmlContent);
         var servers = [];
         var title = '';
@@ -893,61 +909,55 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         var previewUrl = '';
         
         if (xDataResult && xDataResult.iframeUrl) {
+            logInfo("✓ x-data parse thành công, tiếp tục lấy metadata");
+            
             title = getMeta(htmlContent, "og:title") || xDataResult.code || '';
             thumb = getMeta(htmlContent, "og:image") || xDataResult.poster || '';
             desc = getMeta(htmlContent, "og:description") || '';
             
-            // FIX: Ưu tiên poster từ iframe URL (chính xác hơn og:image)
-            if (xDataResult.poster) {
-                thumb = xDataResult.poster;
-            }
+            logInfo("Title: " + title);
+            logInfo("Thumb: " + thumb);
             
+            // Lấy preview URL
             var previewMatch = htmlContent.match(/<video[^>]+data-src="([^"]+)"/);
             if (previewMatch) {
                 previewUrl = previewMatch[1];
+                logInfo("✓ Preview URL từ <video> tag");
             }
             if (!previewUrl) {
                 var previewDivMatch = htmlContent.match(/<div[^>]+data-preview="([^"]+)"/);
                 if (previewDivMatch) {
                     previewUrl = previewDivMatch[1];
+                    logInfo("✓ Preview URL từ data-preview");
                 }
             }
             if (!previewUrl && thumb) {
                 previewUrl = thumb.replace('/cover.jpg', '/preview.png');
+                logInfo("✓ Preview URL từ thumb fallback");
             }
             previewUrl = PluginUtils.normalizeUrl(previewUrl);
             
             // Lấy stream từ API
-            var streamData = fetchStreamDataAdvanced(
-                xDataResult.hashId, 
-                xDataResult.poster,
-                xDataResult.iframeUrl
-            );
+            logStep("Fetch stream từ API");
+            var streamData = fetchStreamDataAdvanced(xDataResult.hashId, xDataResult.poster);
             
             if (streamData.stream) {
-                // Headers object (fallback cho VAApp core cũ)
-                var streamHeaders = getStreamHeaders(streamData.stream, xDataResult.iframeUrl);
-                
-                // CÁCH 2: Gắn pipe vào URL m3u8
-                var pipedStreamUrl = attachPipeHeaders(streamData.stream, xDataResult.iframeUrl);
-                var pipedVttUrl = streamData.vtt 
-                    ? attachPipeHeaders(streamData.vtt, xDataResult.iframeUrl) 
-                    : '';
-                
+                logInfo("✓ Đã lấy stream, tạo episodes");
                 var episodes = [];
                 episodes.push({
-                    id: pipedStreamUrl,           // ← URL đã gắn |Referer=...
+                    id: streamData.stream,
                     name: "Server HD #1",
                     slug: "server-1",
-                    vtt: pipedVttUrl,             // ← VTT cũng gắn pipe
-                    headers: streamHeaders        // ← fallback object
+                    vtt: streamData.vtt || ''
                 });
                 
                 servers.push({
                     name: "123AV Play",
-                    episodes: episodes,
-                    headers: streamHeaders
+                    episodes: episodes
                 });
+                logInfo("✓ Đã tạo " + servers.length + " server");
+            } else {
+                logWarn("✗ Không có stream từ API");
             }
             
             // Parse metadata từ HTML
@@ -975,6 +985,12 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
             var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="https:\/\/123av\.com\/[^"\/]+\/v\/([^"]+)"/i);
             if (canonicalMatch) slug = canonicalMatch[1];
             
+            logInfo("Actors: " + actors.join(", "));
+            logInfo("Genres: " + genres.join(", "));
+            logInfo("Year: " + year);
+            logInfo("Director: " + director);
+            logInfo("Slug: " + slug);
+            
             return JSON.stringify({
                 id: slug,
                 title: cleanText(title),
@@ -996,36 +1012,29 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         }
         
         // === 3. FALLBACK: PHƯƠNG PHÁP CŨ ===
+        logStep("Fallback: dùng phương pháp cũ");
         var title = getMeta(htmlContent, "og:title") || "";
         var thumb = getMeta(htmlContent, "og:image") || "";
         var desc = getMeta(htmlContent, "og:description") || "";
         
-        var coverMatch = htmlContent.match(/style="background-image:url\(['"]?([^'")]+cover\.jpg[^'")]*)['"]?\)"/i) ||
-                         htmlContent.match(/background-image:url\(['"]?([^'")]+cover\.jpg[^'")]*)['"]?\)/i) ||
+        var coverMatch = htmlContent.match(/style="background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)"/i) ||
+                         htmlContent.match(/background-image:url\(['"]?([^'")]+cover\.jpg[^'")]+)['"]?\)/i) ||
                          htmlContent.match(/src="([^"]+cover\.jpg[^"]*)"/i);
         if (coverMatch) {
             thumb = coverMatch[1];
         } else if (thumb.indexOf("logo-square.png") !== -1 || thumb.indexOf("logo") !== -1) {
             var coverGenericMatch = htmlContent.match(/https?:\/\/[^\s"'><]+?\/cover\.jpg[^\s"'><]*/i);
-            if (coverGenericMatch) {
-                thumb = coverGenericMatch[0];
-            }
+            if (coverGenericMatch) thumb = coverGenericMatch[0];
         }
         
         var previewUrl = "";
         var previewMatch = htmlContent.match(/<video[^>]+data-src="([^"]+)"/);
-        if (previewMatch) {
-            previewUrl = previewMatch[1];
-        }
+        if (previewMatch) previewUrl = previewMatch[1];
         if (!previewUrl) {
             var previewDivMatch = htmlContent.match(/<div[^>]+data-preview="([^"]+)"/);
-            if (previewDivMatch) {
-                previewUrl = previewDivMatch[1];
-            }
+            if (previewDivMatch) previewUrl = previewDivMatch[1];
         }
-        if (!previewUrl && thumb) {
-            previewUrl = thumb.replace('/cover.jpg', '/preview.png');
-        }
+        if (!previewUrl && thumb) previewUrl = thumb.replace('/cover.jpg', '/preview.png');
         previewUrl = PluginUtils.normalizeUrl(previewUrl);
         
         var releaseMatch = htmlContent.match(/<dt>Release date<\/dt>\s*<dd>([^<]+)<\/dd>/i);
@@ -1054,11 +1063,11 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         var dirMatch = htmlContent.match(/<dt>Maker<\/dt>\s*<dd>[\s\S]*?href="[^"]*">([^<]+)<\/a>/i);
         if (dirMatch) director = cleanText(dirMatch[1]);
         
-        // Xử lý video stream cũ
         var servers = [];
         var playerJsonMatch = /player\(\s*JSON\.parse\(\s*['"]([^'"]+)['"]\s*\)/i.exec(htmlContent);
         
         if (playerJsonMatch) {
+            logInfo("✓ Tìm thấy player(JSON.parse) fallback");
             var playerItems = decodePlayerJson(playerJsonMatch[1]);
             var episodes = [];
             
@@ -1077,41 +1086,43 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
                 var vttUrl = "";
                 
                 if (hashId) {
-                    var streamData = fetchStreamDataAdvanced(hashId, poster, rawUrl);
+                    var streamData = fetchStreamDataAdvanced(hashId, poster);
                     if (streamData.stream) {
                         m3u8Url = streamData.stream;
                         vttUrl = streamData.vtt || "";
                     }
                 }
                 
-                var epHeaders = getStreamHeaders(m3u8Url, rawUrl);
-                
-                // CÁCH 2: Gắn pipe
-                var pipedM3u8 = attachPipeHeaders(m3u8Url, rawUrl);
-                var pipedVtt = vttUrl ? attachPipeHeaders(vttUrl, rawUrl) : "";
-                
                 episodes.push({
-                    id: pipedM3u8,
+                    id: m3u8Url,
                     name: "Server HD #" + (item.name || (i + 1)),
                     slug: "server-" + (i + 1),
-                    vtt: pipedVtt,
-                    headers: epHeaders
+                    vtt: vttUrl
                 });
             }
             
             if (episodes.length > 0) {
-                var firstHeaders = episodes[0].headers || getStreamHeaders(episodes[0].id, null);
                 servers.push({
                     name: "123AV Play",
-                    episodes: episodes,
-                    headers: firstHeaders
+                    episodes: (function (arr) {
+                        var ids = [];
+                        for (var i = 0; i < arr.length; i++) { ids.push({ name: arr[i].name, url: arr[i].id }); }
+                        if (!ids.length) return [];
+                        var ep = { id: ids[0].url, name: "Xem ngay", slug: "full", ids: ids };
+                        if (arr[0].vtt) { ep.vtt = arr[0].vtt; }
+                        return [ep];
+                    })(episodes)
                 });
             }
+        } else {
+            logWarn("✗ Không tìm thấy player(JSON.parse) trong fallback");
         }
         
         var slug = "";
         var canonicalMatch = htmlContent.match(/<link\s+rel="canonical"\s+href="https:\/\/123av\.com\/[^"\/]+\/v\/([^"]+)"/i);
         if (canonicalMatch) slug = canonicalMatch[1];
+        
+        logInfo("Fallback kết quả - Title: " + title + " | Servers: " + servers.length);
         
         return JSON.stringify({
             id: slug,
@@ -1133,6 +1144,7 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
         });
         
     } catch (e) {
+        logError("Lỗi parseMovieDetail: " + e.message, e.stack);
         toast("Lỗi parseMovieDetail: " + e.message);
         return JSON.stringify({
             error: true,
@@ -1142,42 +1154,28 @@ function parseMovieDetail(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// DETAIL RESPONSE PARSER (CÁCH 2 - PIPE HEADERS)
+// DETAIL RESPONSE PARSER
 // =============================================================================
 
 function parseDetailResponse(htmlContent, apiUrl, datasend) {
+    logSection("parseDetailResponse()");
+    logInfo("HTML length: " + (htmlContent ? htmlContent.length : 0));
+    
     try {
         if (datasend) {
             try {
                 var data = JSON.parse(datasend);
                 if (data && data.url) {
-                    var iframeUrl = data.iframeUrl || null;
-                    
-                    // CÁCH 2: Gắn pipe vào URL
-                    var pipedUrl = attachPipeHeaders(data.url, iframeUrl);
-                    
-                    // Headers object (fallback)
-                    var dynamicHeaders = iframeUrl 
-                        ? getStreamHeaders(data.url, iframeUrl)
-                        : (data.headers || getStreamHeaders(data.url, null));
-                    
-                    // Subtitle cũng gắn pipe
-                    var subtitles = [];
-                    if (data.subtitles && data.subtitles.length) {
-                        for (var si = 0; si < data.subtitles.length; si++) {
-                            subtitles.push({
-                                lang: data.subtitles[si].lang,
-                                url: attachPipeHeaders(data.subtitles[si].url, iframeUrl)
-                            });
-                        }
-                    }
-                    
+                    logInfo("✓ DataSend có url, trả về nguyên datasend");
                     return JSON.stringify({
-                        url: pipedUrl,
+                        url: data.url,
                         isEmbed: data.isEmbed || false,
-                        headers: dynamicHeaders,
+                        headers: data.headers || {
+                            "Referer": "https://123av.com/",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        },
                         mimeType: data.mimeType || "application/x-mpegURL",
-                        subtitles: subtitles
+                        subtitles: data.subtitles || []
                     });
                 }
             } catch (e) {}
@@ -1194,41 +1192,40 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
                       !hasVideo &&
                       !hasXData;
         
+        logInfo("hasXData: " + hasXData + " | hasVideo: " + hasVideo + " | isEmbed: " + isEmbed);
+        
         if (isEmbed) {
             var iframeMatch = htmlContent.match(/<iframe[^>]+src=["']([^"']+)["']/i);
             if (iframeMatch) {
+                logInfo("✓ Tìm thấy iframe: " + iframeMatch[1]);
                 return JSON.stringify({
                     url: iframeMatch[1],
                     isEmbed: true,
-                    headers: getStreamHeaders(iframeMatch[1], iframeMatch[1])
+                    headers: {
+                        "Referer": "https://123av.com/",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
                 });
             }
         }
         
         if (hasXData) {
+            logStep("Parse detail qua x-data");
             var xDataResult = extractPlayerDataFromXData(htmlContent);
             if (xDataResult && xDataResult.iframeUrl) {
-                var streamData = fetchStreamDataAdvanced(
-                    xDataResult.hashId, 
-                    xDataResult.poster,
-                    xDataResult.iframeUrl
-                );
+                var streamData = fetchStreamDataAdvanced(xDataResult.hashId, xDataResult.poster);
                 if (streamData.stream) {
-                    var streamHeaders = getStreamHeaders(streamData.stream, xDataResult.iframeUrl);
-                    
-                    // CÁCH 2: Gắn pipe
-                    var pipedStream = attachPipeHeaders(streamData.stream, xDataResult.iframeUrl);
-                    var pipedVtt = streamData.vtt 
-                        ? attachPipeHeaders(streamData.vtt, xDataResult.iframeUrl) 
-                        : null;
-                    
+                    logInfo("✓ Lấy được stream từ x-data");
                     return JSON.stringify({
-                        url: pipedStream,
+                        url: streamData.stream,
                         isEmbed: false,
-                        headers: streamHeaders,
+                        headers: {
+                            "Referer": "https://123av.com/",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        },
                         mimeType: "application/x-mpegURL",
-                        subtitles: pipedVtt ? [
-                            { lang: "Preview", url: pipedVtt }
+                        subtitles: streamData.vtt ? [
+                            { lang: "Preview", url: streamData.vtt }
                         ] : []
                     });
                 }
@@ -1237,22 +1234,30 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
         
         var m3u8Match = htmlContent.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
-            var rawM3u8 = m3u8Match[0];
+            logInfo("✓ Tìm thấy m3u8 trực tiếp: " + m3u8Match[0]);
             return JSON.stringify({
-                url: attachPipeHeaders(rawM3u8, null),
+                url: m3u8Match[0],
                 isEmbed: false,
-                headers: getStreamHeaders(rawM3u8, null),
+                headers: {
+                    "Referer": "https://123av.com/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                },
                 mimeType: "application/x-mpegURL"
             });
         }
         
+        logWarn("✗ Không tìm được URL stream nào");
         return JSON.stringify({
             url: "",
             isEmbed: false,
-            headers: getStreamHeaders(null, null)
+            headers: {
+                "Referer": "https://123av.com/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
         });
         
     } catch (e) {
+        logError("Lỗi parseDetailResponse: " + e.message, e.stack);
         toast("Lỗi parseDetailResponse: " + e.message);
         return JSON.stringify({
             url: "",
@@ -1264,47 +1269,62 @@ function parseDetailResponse(htmlContent, apiUrl, datasend) {
 }
 
 // =============================================================================
-// EMBED RESPONSE PARSER (CÁCH 2 - PIPE HEADERS)
+// EMBED RESPONSE PARSER
 // =============================================================================
 
 function parseEmbedResponse(html, sourceUrl) {
+    logSection("parseEmbedResponse()");
+    logInfo("Source URL: " + sourceUrl);
+    
     try {
         var iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
         if (iframeMatch) {
+            logInfo("✓ Tìm thấy iframe: " + iframeMatch[1]);
             return JSON.stringify({
                 url: iframeMatch[1],
                 isEmbed: true,
-                headers: getStreamHeaders(iframeMatch[1], sourceUrl)
+                headers: {
+                    "Referer": sourceUrl || "https://123av.com/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
             });
         }
         
         var m3u8Match = html.match(/https?:\/\/[^\s"']+\.m3u8[^\s"']*/i);
         if (m3u8Match) {
-            var rawM3u8 = m3u8Match[0];
+            logInfo("✓ Tìm thấy m3u8: " + m3u8Match[0]);
             return JSON.stringify({
-                url: attachPipeHeaders(rawM3u8, sourceUrl),
+                url: m3u8Match[0],
                 isEmbed: false,
                 mimeType: "application/x-mpegURL",
-                headers: getStreamHeaders(rawM3u8, sourceUrl)
+                headers: {
+                    "Referer": sourceUrl || "https://123av.com/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
             });
         }
         
         var videoMatch = html.match(/["'](?:file|src|url)["']\s*:\s*["']([^"']+\.(?:mp4|mkv|m3u8)[^"']*)["']/i);
         if (videoMatch) {
-            var rawVideo = videoMatch[1];
+            logInfo("✓ Tìm thấy video URL: " + videoMatch[1]);
             return JSON.stringify({
-                url: attachPipeHeaders(rawVideo, sourceUrl),
+                url: videoMatch[1],
                 isEmbed: false,
-                headers: getStreamHeaders(rawVideo, sourceUrl)
+                headers: {
+                    "Referer": sourceUrl || "https://123av.com/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
             });
         }
         
+        logWarn("✗ Không tìm thấy URL nào trong embed response");
         return JSON.stringify({
             url: "",
             isEmbed: false
         });
         
     } catch (e) {
+        logError("Lỗi parseEmbedResponse: " + e.message);
         return JSON.stringify({
             url: "",
             isEmbed: false,
@@ -1319,6 +1339,7 @@ function parseEmbedResponse(html, sourceUrl) {
 // =============================================================================
 
 function parseCategoriesResponse(html, apiUrl) {
+    logSection("parseCategoriesResponse()");
     var categories = [];
     var $doc = _$(html);
     
@@ -1336,28 +1357,25 @@ function parseCategoriesResponse(html, apiUrl) {
         
         var exists = false;
         for (var i = 0; i < categories.length; i++) {
-            if (categories[i].slug === slug) {
-                exists = true;
-                break;
-            }
+            if (categories[i].slug === slug) { exists = true; break; }
         }
         
         if (!exists) {
-            categories.push({ 
-                name: name, 
-                slug: slug 
-            });
+            categories.push({ name: name, slug: slug });
         }
     });
     
+    logInfo("✓ Đã parse " + categories.length + " categories");
     return JSON.stringify(categories);
 }
 
 function parseCountriesResponse(html) { 
+    logInfo("parseCountriesResponse() - trả về []");
     return "[]"; 
 }
 
 function parseYearsResponse(html) { 
+    logInfo("parseYearsResponse() - trả về []");
     return "[]"; 
 }
 
@@ -1383,15 +1401,23 @@ var pluginExports = {
     parseEmbedResponse: parseEmbedResponse,
     parseCategoriesResponse: parseCategoriesResponse,
     parseCountriesResponse: parseCountriesResponse,
-    parseYearsResponse: parseYearsResponse
+    parseYearsResponse: parseYearsResponse,
+    // Debug helpers
+    setDebugMode: setDebugMode,
+    isDebugMode: function() { return DEBUG_MODE; }
 };
 
 // =============================================================================
 // AUTO-REGISTER
 // =============================================================================
 
+logSection("PLUGIN INITIALIZATION");
+logInfo("DEBUG_MODE = " + DEBUG_MODE + " | Bạn có thể đổi bằng setDebugMode(true/false)");
+logInfo("Đang đăng ký plugin...");
+
 if (typeof _vaapp_register !== 'undefined') {
     _vaapp_register(pluginExports);
+    logInfo("✓ Đã đăng ký với _vaapp_register");
 }
 
 if (typeof window !== 'undefined') {
@@ -1400,8 +1426,11 @@ if (typeof window !== 'undefined') {
             window[key] = pluginExports[key];
         }
     }
+    logInfo("✓ Đã expose các hàm ra window");
 }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = pluginExports;
 }
+
+logInfo("✓ Plugin 123AV khởi tạo xong!");
