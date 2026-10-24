@@ -715,17 +715,31 @@ def handle_fetch_vax1(body):
         return 400, {"error": "Thiếu URL"}
     if not (url.startswith("http://") or url.startswith("https://")):
         return 400, {"error": "URL phải bắt đầu bằng http:// hoặc https://"}
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/plain, text/*, application/octet-stream, */*",
+    }
+    extra = body.get("headers")
+    if isinstance(extra, dict):
+        for k, v in extra.items():
+            k = str(k or "").strip()
+            if not k:
+                continue
+            headers[k] = str(v if v is not None else "").strip()
+    elif isinstance(extra, str) and extra.strip():
+        for line in extra.splitlines():
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            name, val = line.split(":", 1)
+            name, val = name.strip(), val.strip()
+            if name:
+                headers[name] = val
+
     try:
-        resp = requests.get(
-            url,
-            timeout=30,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; VAX1-Decrypt/1.0)",
-                "Accept": "text/plain, text/*, application/octet-stream, */*",
-            },
-        )
+        resp = requests.get(url, timeout=30, headers=headers)
         resp.raise_for_status()
-        # Ưu tiên text; nếu binary thì trả base64 để client xử lý
         content_type = (resp.headers.get("Content-Type") or "").lower()
         raw_bytes = resp.content
         if len(raw_bytes) > 5 * 1024 * 1024:
