@@ -6246,8 +6246,10 @@ async function doDecryptVax1() {
   const resultPre = document.getElementById("vax1ResultPre");
   const metaEl = document.getElementById("vax1Meta");
   const btn = document.getElementById("vax1DecryptBtn");
+  const headersInput = document.getElementById("vax1HeadersInput");
   const pasted = (pasteInput && pasteInput.value || "").trim();
   const url = (urlInput && urlInput.value || "").trim();
+  const headersText = (headersInput && headersInput.value || "").trim();
 
   if (!pasted && !url) {
     statusEl.style.display = "block";
@@ -6270,7 +6272,12 @@ async function doDecryptVax1() {
       const resp = await fetch("/api/index", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "fetch_vax1", url, access_token: getToken() }),
+        body: JSON.stringify({
+          action: "fetch_vax1",
+          url,
+          headers: headersText || undefined,
+          access_token: getToken(),
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) {
@@ -6317,11 +6324,13 @@ async function doDecryptVax1() {
 function clearVax1Result() {
   const pasteInput = document.getElementById("vax1PasteInput");
   const urlInput = document.getElementById("vax1UrlInput");
+  const headersInput = document.getElementById("vax1HeadersInput");
   const statusEl = document.getElementById("vax1Status");
   const resultCard = document.getElementById("vax1ResultCard");
   const resultPre = document.getElementById("vax1ResultPre");
   if (pasteInput) pasteInput.value = "";
   if (urlInput) urlInput.value = "";
+  if (headersInput) headersInput.value = "";
   if (statusEl) { statusEl.style.display = "none"; statusEl.innerHTML = ""; }
   if (resultCard) resultCard.style.display = "none";
   if (resultPre) resultPre.textContent = "";
