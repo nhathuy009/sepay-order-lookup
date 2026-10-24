@@ -6239,64 +6239,71 @@ function vax1BytesToUtf8(bytes) {
 }
 
 async function doDecryptVax1() {
+  const pasteInput = document.getElementById("vax1PasteInput");
   const urlInput = document.getElementById("vax1UrlInput");
   const statusEl = document.getElementById("vax1Status");
   const resultCard = document.getElementById("vax1ResultCard");
   const resultPre = document.getElementById("vax1ResultPre");
   const metaEl = document.getElementById("vax1Meta");
   const btn = document.getElementById("vax1DecryptBtn");
+  const pasted = (pasteInput && pasteInput.value || "").trim();
   const url = (urlInput && urlInput.value || "").trim();
 
-  if (!url) {
+  if (!pasted && !url) {
     statusEl.style.display = "block";
-    statusEl.innerHTML = '<span class="err">Vui lòng nhập URL nguồn.</span>';
+    statusEl.innerHTML = '<span class="err">Vui lòng dán nội dung mã hóa hoặc nhập URL nguồn.</span>';
     return;
   }
 
   btn.disabled = true;
   statusEl.style.display = "block";
-  statusEl.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang tải và giải mã…';
+  statusEl.innerHTML = pasted
+    ? '<span class="spinner" style="color:var(--accent)"></span> Đang giải mã…'
+    : '<span class="spinner" style="color:var(--accent)"></span> Đang tải và giải mã…';
   resultCard.style.display = "none";
   _vax1PlaintextCache = "";
 
   try {
-    const resp = await fetch("/api/index", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "fetch_vax1", url, access_token: getToken() }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tải URL thất bại")}</span>`;
-      return;
-    }
+    let sourceText = pasted;
 
-    let sourceText = data.text || "";
-    if (!sourceText && data.text_b64) {
-      try {
-        sourceText = atob(data.text_b64);
-      } catch (_) {
-        statusEl.innerHTML = '<span class="err">Không đọc được nội dung nhị phân từ URL.</span>';
+    if (!sourceText) {
+      const resp = await fetch("/api/index", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "fetch_vax1", url, access_token: getToken() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        statusEl.innerHTML = `<span class="err">${escapeHtml(data.error || "Tải URL thất bại")}</span>`;
         return;
       }
-    }
-    if (!sourceText) {
-      statusEl.innerHTML = '<span class="err">URL không trả về nội dung.</span>';
-      return;
+      sourceText = data.text || "";
+      if (!sourceText && data.text_b64) {
+        try {
+          sourceText = atob(data.text_b64);
+        } catch (_) {
+          statusEl.innerHTML = '<span class="err">Không đọc được nội dung nhị phân từ URL.</span>';
+          return;
+        }
+      }
+      if (!sourceText) {
+        statusEl.innerHTML = '<span class="err">URL không trả về nội dung.</span>';
+        return;
+      }
     }
 
     const plainBytes = await decryptVax1Payload(sourceText);
     let text = vax1BytesToUtf8(plainBytes);
     let note = "";
     if (text === null) {
-      // Thử zlib (magic 0x78) — browser không có zlib sẵn; hiển thị hex + gợi ý
       const hex = Array.from(plainBytes.slice(0, 64)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
       text = `[Binary ${plainBytes.length} bytes]\nHex (64 byte đầu): ${hex}…`;
       note = "Không phải UTF-8; có thể cần giải nén thêm (zlib/gzip) ngoài trình duyệt.";
     }
 
     _vax1PlaintextCache = text;
-    metaEl.textContent = `Kích thước: ${plainBytes.length.toLocaleString()} byte` + (note ? ` — ${note}` : "");
+    const sourceLabel = pasted ? "từ nội dung dán" : "từ URL";
+    metaEl.textContent = `Nguồn: ${sourceLabel} · Kích thước: ${plainBytes.length.toLocaleString()} byte` + (note ? ` — ${note}` : "");
     resultPre.textContent = text;
     resultCard.style.display = "block";
     statusEl.innerHTML = '<span style="color:var(--badge-ok-text);font-weight:500;">✅ Giải mã thành công</span>';
@@ -6308,10 +6315,12 @@ async function doDecryptVax1() {
 }
 
 function clearVax1Result() {
+  const pasteInput = document.getElementById("vax1PasteInput");
   const urlInput = document.getElementById("vax1UrlInput");
   const statusEl = document.getElementById("vax1Status");
   const resultCard = document.getElementById("vax1ResultCard");
   const resultPre = document.getElementById("vax1ResultPre");
+  if (pasteInput) pasteInput.value = "";
   if (urlInput) urlInput.value = "";
   if (statusEl) { statusEl.style.display = "none"; statusEl.innerHTML = ""; }
   if (resultCard) resultCard.style.display = "none";
