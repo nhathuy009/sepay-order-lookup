@@ -708,6 +708,43 @@ def handle_parse_customs_declaration(body):
     return (400 if "error" in res else 200), res
 
 
+def handle_fetch_vax1(body):
+    """Proxy tải nội dung text từ URL (raw VAX1 payload) để client giải mã."""
+    url = (body.get("url") or "").strip()
+    if not url:
+        return 400, {"error": "Thiếu URL"}
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return 400, {"error": "URL phải bắt đầu bằng http:// hoặc https://"}
+    try:
+        resp = requests.get(
+            url,
+            timeout=30,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; VAX1-Decrypt/1.0)",
+                "Accept": "text/plain, text/*, application/octet-stream, */*",
+            },
+        )
+        resp.raise_for_status()
+        # Ưu tiên text; nếu binary thì trả base64 để client xử lý
+        content_type = (resp.headers.get("Content-Type") or "").lower()
+        raw_bytes = resp.content
+        if len(raw_bytes) > 5 * 1024 * 1024:
+            return 400, {"error": "Nội dung quá lớn (>5MB)"}
+        try:
+            text = raw_bytes.decode("utf-8")
+            return 200, {"text": text, "content_type": content_type, "size": len(raw_bytes)}
+        except UnicodeDecodeError:
+            return 200, {
+                "text_b64": base64.b64encode(raw_bytes).decode("ascii"),
+                "content_type": content_type,
+                "size": len(raw_bytes),
+            }
+    except requests.Timeout:
+        return 400, {"error": "Timeout khi tải URL"}
+    except requests.RequestException as e:
+        return 400, {"error": f"Không tải được URL: {e}"}
+
+
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -793,6 +830,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_ehoadon_invoice_list(body)
         elif action == "parse_customs_declaration":
             status, payload = handle_parse_customs_declaration(body)
+        elif action == "fetch_vax1":
+            status, payload = handle_fetch_vax1(body)
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
