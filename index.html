@@ -73,6 +73,9 @@
         <div class="menu-item" id="tabEhoadonBtn" onclick="switchTab('ehoadon')">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-plus-icon lucide-file-plus"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg><span class="menu-text">Tạo hóa đơn eHoadon</span>
         </div>
+        <div class="menu-item" id="tabVax1Btn" onclick="switchTab('vax1')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round-icon lucide-key-round"><path d="M2.586 17.414A2 2 0 0 1 2 16V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-.586 1.414l-4.707 4.707a2 2 0 0 1-2.828 0z"/><circle cx="8.5" cy="11.5" r="2.5"/><path d="M15 9l4-4"/><path d="M17 7l2 2"/></svg><span class="menu-text">Giải mã VAX1</span>
+        </div>
       </div>
 
       <div class="sidebar-bottom">
@@ -229,6 +232,7 @@
               <button type="button" class="acc-seg-btn" id="empMainBtn-dinhkhoan" onclick="switchEmpMainTab('dinhkhoan')">Định khoản</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-chuyenkhoan" onclick="switchEmpMainTab('chuyenkhoan')">Chuyển khoản</button>
               <button type="button" class="acc-seg-btn" id="empMainBtn-kiemtra" onclick="switchEmpMainTab('kiemtra')">Kiểm tra lỗi <span id="empAuditBadge" class="emp-audit-badge" style="display:none;"></span></button>
+              <button type="button" class="acc-seg-btn" id="empMainBtn-congthuc" onclick="switchEmpMainTab('congthuc')">Công thức <span id="empFormulaBadge" class="emp-audit-badge" style="display:none;"></span></button>
             </div>
           </div>
           <!-- Banner cảnh báo lỗi CC ↔ Lương (P1) — hiện mọi tab khi tháng có lệch/cảnh báo -->
@@ -483,6 +487,73 @@
                 </div>
                 <div class="att-rules-note" style="margin-top:8px;">
                   Thứ tự dòng: <b style="color:var(--badge-err-text);">Lệch</b> → <b style="color:#e67e22;">Cảnh báo</b> → OK.
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <!-- Panel 6: Kiểm tra công thức lương -->
+          <div id="formulaAuditWrapper" style="display:none;">
+            <div class="att-layout">
+              <div class="att-table-pane">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 10px; flex-wrap: wrap;">
+                  <div class="text-muted-small" style="margin:0;" id="formulaAuditSummary">
+                    Kiểm tra công thức cộng tiền trên bảng lương tháng đang chọn.
+                  </div>
+                  <div class="text-muted-small" style="margin:0;">
+                    <span style="margin-right:10px;"><b style="color:var(--amount-in);">OK</b> Khớp</span>
+                    <span style="margin-right:10px;"><b style="color:var(--badge-err-text);">Lệch</b> Sai công thức</span>
+                    <span><b style="color:#e67e22;">Cảnh báo</b> Thiếu dữ liệu</span>
+                  </div>
+                </div>
+                <div class="table-responsive" id="formulaAuditTableScroll">
+                  <table class="sepay-table" id="formulaAuditTable">
+                    <thead>
+                      <tr>
+                        <th class="audit-th-stt">#</th>
+                        <th class="freeze-col-1">Mã NV</th>
+                        <th class="audit-th-sum" title="Lương tính toán = (H/K)×L + M+N+O+P">Lương TT<br><span class="text-muted-small">tính</span></th>
+                        <th class="audit-th-sum" title="Tổng thu nhập Excel (U)">Tổng TN<br><span class="text-muted-small">U</span></th>
+                        <th class="audit-th-sum" title="F1: Lương TT + Q+R+S+T">Tổng TN<br><span class="text-muted-small">tính</span></th>
+                        <th class="audit-th-sum" title="F2: V+W+X+Y">Σ trừ<br><span class="text-muted-small">tính</span></th>
+                        <th class="audit-th-sum" title="Tổng khấu trừ Excel (Z)">Σ trừ<br><span class="text-muted-small">Z</span></th>
+                        <th class="audit-th-sum" title="Thực nhận Excel (AE)">Thực nhận<br><span class="text-muted-small">AE</span></th>
+                        <th class="audit-th-sum" title="F3: U − (V+W+X+Y) − AC − AD">Thực nhận<br><span class="text-muted-small">tính</span></th>
+                        <th class="audit-th-status">TT</th>
+                        <th>Chi tiết</th>
+                      </tr>
+                    </thead>
+                    <tbody id="formulaAuditTbody"></tbody>
+                  </table>
+                </div>
+                <div id="formulaAuditEmptyMsg" class="msg" style="display:none; margin-top:12px;"></div>
+              </div>
+              <aside class="att-rules-pane" id="formulaRulesPane">
+                <div class="att-rules-title">Công thức đang kiểm tra</div>
+                <div class="att-rules-list att-rules-formula">
+                  <div><b>F0</b> Lương TT = round((H ÷ K) × L) + M + N + O + P</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin:-2px 0 4px 18px;">
+                    H lương CB · K ngày chuẩn · L ngày HL · M trách nhiệm · N trang phục · O cơm · P HT-BHXH
+                  </div>
+                  <div><b>F1</b> Tổng TN (U) ≟ Lương TT + Q + R + S + T</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin:-2px 0 4px 18px;">
+                    Q hoa hồng · R thưởng · S lương phép · T khác
+                  </div>
+                  <div><b>F2</b> Tổng trừ (Z) ≟ V + W + X + Y</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin:-2px 0 4px 18px;">
+                    V BHXH · W BHYT · X BHTN · Y CĐ (phía NLĐ)
+                  </div>
+                  <div><b>F3</b> Thực nhận (AE) ≟ U − (V+W+X+Y) − AC − AD</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin:-2px 0 4px 18px;">
+                    AC thuế TNCN · AD tạm ứng
+                  </div>
+                </div>
+                <div class="att-rules-note">
+                  Sai lệch cho phép: <b>≤ 1 đồng</b> (do làm tròn).<br>
+                  Dòng <b style="color:var(--badge-err-text);">Lệch</b> được dồn lên đầu.
+                </div>
+                <div class="att-rules-note" style="margin-top:8px;">
+                  Muốn đổi công thức: sửa hàm <code>computeFormulaAuditStats</code> trong <code>app.js</code> và cập nhật legend này cho khớp.
                 </div>
               </aside>
             </div>
@@ -816,6 +887,38 @@
             </div>
           </div>
           <div id="ehoadonListResults" style="margin-top: 12px;"></div>
+        </div>
+      </div>
+
+      <!-- TAB GIẢI MÃ VAX1 -->
+      <div id="tabVax1" class="hidden tab-panel">
+        <h2 style="margin:0 0 16px 0;">Giải mã VAX1</h2>
+        <div class="card">
+          <label for="vax1UrlInput">Đường link nguồn mã hóa (VAX1:…)</label>
+          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:240px;">
+              <input type="url" id="vax1UrlInput" placeholder="https://… (raw text chứa VAX1:...)" style="width:100%;" />
+            </div>
+            <div style="flex:0 0 auto; display:flex; gap:8px;">
+              <button id="vax1DecryptBtn" onclick="doDecryptVax1()">🔓 Giải mã</button>
+              <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa</button>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:10px;">
+            Dán link file/raw text chứa payload dạng <code>VAX1:&lt;base64&gt;</code>. Hệ thống tải nội dung qua proxy, giải mã AES-256-CBC (key từ mảng A ⊕ 0x5C → SHA-256) và hiển thị kết quả. Không lưu file.
+          </div>
+          <div id="vax1Status" class="msg" style="margin-top:12px; display:none;"></div>
+        </div>
+
+        <div id="vax1ResultCard" class="card" style="margin-top:16px; display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <h3 style="margin:0;">Kết quả giải mã</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-outline" id="vax1CopyBtn" onclick="copyVax1Result()" style="font-size:13px;">📋 Copy</button>
+            </div>
+          </div>
+          <div class="hint" id="vax1Meta" style="margin:0 0 8px 0;"></div>
+          <pre id="vax1ResultPre" style="margin:0; max-height:min(70vh, 640px); overflow:auto; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.45; padding:12px; border-radius:8px; background:var(--input-bg, rgba(0,0,0,0.04)); border:1px solid var(--border, #e5e7eb);"></pre>
         </div>
       </div>
 
