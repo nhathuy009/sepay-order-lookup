@@ -718,7 +718,11 @@ def handle_fetch_vax1(body):
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/plain, text/*, application/octet-stream, */*",
+        "Accept": "*/*",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "no-cache, no-store",
+        "Referer": "https://vkey.vn/",
+        "X-VAX-YB": "vax_yb_token_2030_1990",
     }
     extra = body.get("headers")
     if isinstance(extra, dict):
