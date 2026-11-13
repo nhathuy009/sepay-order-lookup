@@ -725,11 +725,40 @@
           <h2 style="margin:0">Tra cứu hóa đơn</h2>
           <button id="copyInvoiceBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceTable', 'copyInvoiceBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
         </div>
-        <div class="card">
-          <label>Danh sách số hóa đơn (cách nhau bằng phẩy hoặc xuống dòng)</label>
-          <textarea id="invoiceCodes" rows="5" placeholder="VD:&#10;1277&#10;1280"></textarea>
-          <div style="margin-top: 20px;">
-            <button id="invoiceBtn" onclick="doInvoiceLookup()">Chạy tiến trình tra cứu</button>
+        <div class="card inv-card">
+          <div class="inv-seg" role="tablist" aria-label="Cách tra cứu">
+            <button type="button" class="inv-seg-btn active" role="tab" aria-selected="true" onclick="switchInvMode('codes', this)">Theo số hóa đơn</button>
+            <button type="button" class="inv-seg-btn" role="tab" aria-selected="false" onclick="switchInvMode('date', this)">Theo khoảng ngày</button>
+          </div>
+          <div id="invModeCodes" class="inv-pane">
+            <label for="invoiceCodes">Số hóa đơn</label>
+            <textarea id="invoiceCodes" rows="4" placeholder="VD:&#10;1277&#10;1280"></textarea>
+            <div class="inv-foot">
+              <p class="inv-hint">Mỗi số một dòng, hoặc cách nhau bằng dấu phẩy.</p>
+              <button id="invoiceBtn" onclick="doInvoiceLookup()">Tra cứu</button>
+            </div>
+          </div>
+          <div id="invModeDate" class="inv-pane hidden">
+            <div class="inv-fields">
+              <div class="inv-field">
+                <label for="invDateRange">Khoảng ngày</label>
+                <input type="text" id="invDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+                <input type="hidden" id="invDateFrom" />
+                <input type="hidden" id="invDateTo" />
+              </div>
+              <div class="inv-field">
+                <label>Loại hóa đơn</label>
+                <div class="inv-seg mst-choice-group">
+                  <button type="button" class="inv-seg-btn mst-choice-btn active" id="invInvoiceKindBtnA" onclick="selectChoiceGroup('invInvoiceKind', '2', this)">Chỉ hóa đơn gốc</button>
+                  <button type="button" class="inv-seg-btn mst-choice-btn" id="invInvoiceKindBtnB" onclick="selectChoiceGroup('invInvoiceKind', '-1', this)">Gồm điều chỉnh / thay thế</button>
+                </div>
+                <input type="hidden" id="invInvoiceKind" value="2" />
+              </div>
+            </div>
+            <div class="inv-foot">
+              <p class="inv-hint">Lấy toàn bộ hóa đơn trong khoảng ngày đã chọn.</p>
+              <button id="invByDateBtn" onclick="doInvoiceLookupByDate()">Lấy hóa đơn</button>
+            </div>
           </div>
         </div>
         <div id="invoiceResultArea">
@@ -754,29 +783,6 @@
               </thead>
               <tbody id="invoiceTbody"></tbody>
             </table>
-          </div>
-        </div>
-        <div class="card" style="margin-top: 20px;">
-          <h3 style="margin: 0 0 14px 0;">Tra cứu theo khoảng ngày (lấy toàn bộ hóa đơn)</h3>
-          <div class="row" style="align-items: flex-end;">
-            <div style="flex: 1; min-width: 220px;">
-              <label>Khoảng ngày (Từ ngày - Đến ngày)</label>
-              <input type="text" id="invDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
-              <input type="hidden" id="invDateFrom" />
-              <input type="hidden" id="invDateTo" />
-            </div>
-            <div style="flex: 1; min-width: 200px;">
-              <label>Loại hóa đơn</label>
-              <div class="mst-choice-group">
-                <button type="button" class="mst-choice-btn active" id="invInvoiceKindBtnA" onclick="selectChoiceGroup('invInvoiceKind', '2', this)">Chỉ hóa đơn gốc</button>
-                <button type="button" class="mst-choice-btn" id="invInvoiceKindBtnB" onclick="selectChoiceGroup('invInvoiceKind', '-1', this)">Tất cả (gồm điều chỉnh/thay thế)</button>
-              </div>
-              <input type="hidden" id="invInvoiceKind" value="2" />
-            </div>
-            <div style="flex: 1; min-width: 140px;">
-              <label>&nbsp;</label>
-              <button id="invByDateBtn" onclick="doInvoiceLookupByDate()" style="width: 100%;">Lấy toàn bộ hóa đơn</button>
-            </div>
           </div>
         </div>
         <div id="invoiceByDateResultArea" style="margin-top: 16px;">
