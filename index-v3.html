@@ -1011,40 +1011,50 @@
       </div>
 
       <!-- TAB GIẢI MÃ VAX1 -->
-      <div id="tabVax1" class="hidden tab-panel">
-        <h2 style="margin:0 0 16px 0;">Giải mã VAX1</h2>
-        <div class="card">
-          <label for="vax1PasteInput">Dán nội dung mã hóa (ưu tiên)</label>
-          <textarea id="vax1PasteInput" rows="5" placeholder="VAX1:.... hoặc dán toàn bộ chuỗi base64" style="width:100%; resize:vertical; min-height:100px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
+      <div id="tabVax1" class="hidden tab-panel v3-vax">
+        <h2>Giải mã VAX1</h2>
 
-          <label for="vax1UrlInput" style="margin-top:14px; display:block;">Hoặc đường link nguồn</label>
-          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-            <div style="flex:1; min-width:240px;">
-              <input type="url" id="vax1UrlInput" placeholder="https://… (raw text chứa VAX1:...)" style="width:100%;" />
-            </div>
-            <div style="flex:0 0 auto; display:flex; gap:8px;">
-              <button id="vax1DecryptBtn" onclick="doDecryptVax1()">🔓 Giải mã</button>
-              <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa</button>
-            </div>
+        <section class="card v3-vax-card" aria-labelledby="vax1SourceTitle">
+          <div class="v3-vax-head">
+            <h3 id="vax1SourceTitle">Nguồn dữ liệu</h3>
+            <span class="v3-vax-badge">AES-256-CBC · không lưu file</span>
           </div>
-          <label for="vax1HeadersInput" style="margin-top:12px; display:block;">Headers khi tải URL (tùy chọn, mỗi dòng: <code>Tên: giá trị</code>)</label>
-          <textarea id="vax1HeadersInput" rows="2" placeholder="Referer: https://vkey.vn/&#10;User-Agent: Mozilla/5.0 …" style="width:100%; resize:vertical; min-height:56px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
-          <div class="hint" style="margin-top:10px;">
-            Có thể <strong>dán trực tiếp</strong> payload <code>VAX1:&lt;base64&gt;</code>, hoặc dán link để hệ thống tải qua proxy. Ưu tiên nội dung đã dán nếu có. Khi tải URL có thể thêm headers (vd. <code>Referer: https://vkey.vn/</code>). Giải mã AES-256-CBC (key = SHA-256(A ⊕ 0x5C)). Không lưu file.
-          </div>
-          <div id="vax1Status" class="msg" style="margin-top:12px; display:none;"></div>
-        </div>
 
-        <div id="vax1ResultCard" class="card" style="margin-top:16px; display:none;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-            <h3 style="margin:0;">Kết quả giải mã</h3>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn-outline" id="vax1CopyBtn" onclick="copyVax1Result()" style="font-size:13px;">📋 Copy</button>
+          <label for="vax1PasteInput">Chuỗi mã hóa</label>
+          <textarea id="vax1PasteInput" class="v3-mono" rows="6" spellcheck="false" placeholder="VAX1:… hoặc dán toàn bộ chuỗi base64"></textarea>
+          <p class="v3-field-hint">Dán payload dạng <code>VAX1:&lt;base64&gt;</code>. Nếu ô này có nội dung, hệ thống dùng nó trước.</p>
+
+          <details class="v3-vax-more">
+            <summary>
+              <span>Hoặc tải từ đường link</span>
+              <small>Chỉ dùng khi ô chuỗi mã hóa để trống</small>
+            </summary>
+            <div class="v3-vax-more-body">
+              <label for="vax1UrlInput">Đường link nguồn</label>
+              <input type="url" id="vax1UrlInput" inputmode="url" spellcheck="false" placeholder="https://… (file text chứa VAX1:…)" />
+              <label for="vax1HeadersInput">Headers khi tải <span class="v3-optional">tùy chọn, mỗi dòng một header</span></label>
+              <textarea id="vax1HeadersInput" class="v3-mono" rows="3" spellcheck="false" placeholder="Referer: https://vkey.vn/&#10;User-Agent: Mozilla/5.0 …"></textarea>
+              <p class="v3-field-hint">Link được tải qua proxy của hệ thống. Thêm <code>Referer</code> nếu trang nguồn chặn tải trực tiếp.</p>
             </div>
+          </details>
+
+          <div class="v3-vax-actions">
+            <button id="vax1DecryptBtn" onclick="doDecryptVax1()"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>Giải mã</button>
+            <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa hết</button>
+            <div id="vax1Status" class="msg v3-vax-status" role="status" style="display:none;"></div>
           </div>
-          <div class="hint" id="vax1Meta" style="margin:0 0 8px 0;"></div>
-          <pre id="vax1ResultPre" style="margin:0; max-height:min(70vh, 640px); overflow:auto; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.45; padding:12px; border-radius:8px; background:var(--input-bg, rgba(0,0,0,0.04)); border:1px solid var(--border, #e5e7eb);"></pre>
-        </div>
+        </section>
+
+        <section id="vax1ResultCard" class="card v3-vax-card" aria-labelledby="vax1ResultTitle" style="display:none;">
+          <div class="v3-vax-head">
+            <div>
+              <h3 id="vax1ResultTitle">Kết quả giải mã</h3>
+              <p class="v3-field-hint" id="vax1Meta"></p>
+            </div>
+            <button type="button" class="btn-outline" id="vax1CopyBtn" onclick="copyVax1Result()">Copy kết quả</button>
+          </div>
+          <pre id="vax1ResultPre" class="v3-mono v3-vax-pre"></pre>
+        </section>
       </div>
 
     

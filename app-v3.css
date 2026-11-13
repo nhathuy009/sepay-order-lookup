@@ -299,6 +299,81 @@ body.v3 .file-pick { border-radius: var(--v3-radius); }
 body.v3 table { font-variant-numeric: tabular-nums; }
 body.v3 .table-responsive, body.v3 .air-drop-zone, body.v3 .gdt-modal-box { border-radius: var(--v3-radius-lg); }
 
+/* ---------- CHI TIẾT Ô NHẬP DÙNG CHUNG ---------- */
+body.v3 .v3-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px; line-height: 1.55;
+}
+body.v3 .v3-field-hint {
+  margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--text-muted);
+}
+body.v3 .v3-field-hint code, body.v3 .v3-vax code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em;
+  padding: 1px 5px; border-radius: 5px; background: var(--v3-wash); color: var(--text-main);
+}
+body.v3 .v3-optional { font-weight: 500; color: var(--text-muted); margin-left: 4px; }
+
+/* ---------- MÀN GIẢI MÃ VAX1 ---------- */
+body.v3 .v3-vax { max-width: 880px; }
+body.v3 .v3-vax-card { padding: 22px 24px; }
+body.v3 .v3-vax-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 16px;
+}
+body.v3 .v3-vax-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+body.v3 .v3-vax-head .v3-field-hint { margin-top: 2px; }
+body.v3 .v3-vax-badge {
+  flex-shrink: 0; padding: 3px 10px; border-radius: 999px;
+  background: var(--v3-wash); color: var(--text-muted); font-size: 12px; font-weight: 600;
+}
+body.v3 .v3-vax textarea#vax1PasteInput { min-height: 132px; }
+
+body.v3 .v3-vax-more {
+  margin-top: 16px; border: 1px solid var(--border); border-radius: var(--v3-radius);
+  background: color-mix(in srgb, var(--input-bg) 60%, transparent);
+}
+body.v3 .v3-vax-more summary {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;
+  padding: 12px 14px 12px 36px; position: relative;
+  cursor: pointer; list-style: none; border-radius: var(--v3-radius);
+  font-size: 13.5px; font-weight: 600; color: var(--text-main);
+}
+body.v3 .v3-vax-more summary::-webkit-details-marker { display: none; }
+body.v3 .v3-vax-more summary::before {
+  content: ""; position: absolute; left: 15px; top: 17px; width: 7px; height: 7px;
+  border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted);
+  transform: rotate(-45deg); transition: transform 180ms var(--v3-ease);
+}
+body.v3 .v3-vax-more[open] summary::before { transform: rotate(45deg); top: 15px; }
+body.v3 .v3-vax-more summary small { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+body.v3 .v3-vax-more summary:hover { background: var(--v3-wash); }
+body.v3 .v3-vax-more summary:focus-visible { outline: none; box-shadow: var(--v3-focus); }
+body.v3 .v3-vax-more-body { padding: 4px 14px 14px; }
+body.v3 .v3-vax-more-body label:not(:first-child) { margin-top: 14px; }
+body.v3 .v3-vax-more[open] .v3-vax-more-body { animation: v3Fade 180ms ease; }
+
+body.v3 .v3-vax-actions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border);
+}
+body.v3 #vax1DecryptBtn { display: inline-flex; align-items: center; gap: 8px; }
+body.v3 .msg .err { color: var(--badge-err-text); font-weight: 600; }
+body.v3 .v3-vax-status.msg { margin: 0 0 0 4px; padding: 0; background: none; border: 0; font-size: 13.5px; }
+
+body.v3 .v3-vax-pre {
+  margin: 0; max-height: min(70vh, 640px); overflow: auto;
+  white-space: pre-wrap; word-break: break-word;
+  padding: 14px 16px; border-radius: var(--v3-radius);
+  background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main);
+}
+
+@media (max-width: 768px) {
+  body.v3 .v3-vax-card { padding: 16px; }
+  body.v3 .v3-vax-badge { display: none; }
+  body.v3 .v3-vax-actions > button { flex: 1 1 auto; justify-content: center; }
+  body.v3 .v3-vax-status.msg { flex: 1 1 100%; margin: 0; }
+}
+
 /* ---------- CHUYỂN CẢNH (View Transitions, nếu trình duyệt hỗ trợ) ---------- */
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; animation-timing-function: ease; }
 ::view-transition-group(v3-icon) { animation-duration: 260ms; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
