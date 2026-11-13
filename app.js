@@ -6916,11 +6916,24 @@ async function copyVax1Result() {
       if (!netUnsure && t.net) { prevNet = t.net; prevLabel = s.info.label; }
 
       var st = el("td");
-      var badge;
-      if (iss.open.length) badge = el("span", "v3-badge is-danger", iss.openPeople + " NV lỗi");
-      else if (iss.fixed.length) badge = el("span", "v3-badge is-info", "Tự tính lại " + iss.fixedPeople + " NV");
-      else badge = el("span", "v3-badge is-ok", "Ổn");
-      st.appendChild(badge);
+      // Một tháng có thể dính nhiều vấn đề: mỗi vấn đề một nhãn, không có vấn đề nào mới ghi "Ổn"
+      var audit = computeAuditStats(s.key);
+      var badges = [];
+      if (iss.open.length) badges.push(["is-danger", "Lỗi công thức " + iss.openPeople + " NV",
+        "Ô trong file Excel đang báo lỗi (#NAME?, #VALUE!...) và app không tự tính lại được"]);
+      if (audit.err) badges.push(["is-danger", "Lệch công " + audit.err + " NV",
+        "Ngày công trên bảng lương khác với chấm công — xem tab Kiểm tra lỗi"]);
+      if (iss.fixed.length) badges.push(["is-info", "Tự tính lại " + iss.fixedPeople + " NV",
+        "Ô Thuế TNCN / Thực nhận lỗi công thức trong file, app đã tự tính lại"]);
+      if (!badges.length) badges.push(["is-ok", "Ổn", audit.attCount
+        ? "Không có ô lỗi công thức, ngày công khớp với chấm công"
+        : "Không có ô lỗi công thức. Chưa có sheet chấm công của tháng này nên chưa đối soát công"]);
+      badges.forEach(function (b, i) {
+        if (i) st.appendChild(document.createTextNode(" "));
+        var badge = el("span", "v3-badge " + b[0], b[1]);
+        badge.title = b[2];
+        st.appendChild(badge);
+      });
       tr.appendChild(st);
 
       tr.addEventListener("click", function () { selectMonth(s.key); });
