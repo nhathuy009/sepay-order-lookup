@@ -2196,6 +2196,8 @@ body.v3 input[type=date], body.v3 textarea, body.v3 select {
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 body.v3 input:focus, body.v3 textarea:focus, body.v3 select:focus { box-shadow: var(--v3-focus); }
+/* Ô năm trong lịch flatpickr là input[type=number]: trả lại padding gốc, nếu không tiêu đề tháng bị đẩy xuống và che mất */
+body.v3 .flatpickr-calendar input.cur-year { padding: 0 0 0 0.5ch; border-radius: 0; box-shadow: none; }
 body.v3 button {
   padding: 10px 16px; border-radius: var(--v3-radius); font-weight: 600;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
