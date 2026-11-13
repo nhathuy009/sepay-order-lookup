@@ -355,7 +355,7 @@ function switchTab(which) {
   if (which === "transaction") {
     const dropdownEl = document.getElementById("txBankAccountIdDropdown");
     // Nếu dropdown trống (chưa có checkbox nào) thì mới tải dữ liệu
-    if (dropdownEl && dropdownEl.children.length === 0) {
+    if (dropdownEl && !dropdownEl.querySelector("input")) {
       loadBankAccounts();
     }
   }
@@ -3099,6 +3099,16 @@ async function loadBankAccounts() {
   // Chỉ dừng nếu không tìm thấy khung dropdown của multi-select
   if (!dropdownEl) return; 
 
+  // Báo trạng thái ngay trong dropdown thay vì để khung trống khi đang tải / tải lỗi
+  const setStatus = (text) => {
+    const el = document.createElement('div');
+    el.className = 'text-muted-small';
+    el.style.cssText = 'margin:0; padding:8px 10px;';
+    el.textContent = text;
+    dropdownEl.replaceChildren(el);
+  };
+  setStatus('Đang tải danh sách tài khoản…');
+
   try {
     const resp = await fetch("/api/index", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -3130,8 +3140,14 @@ async function loadBankAccounts() {
           selectBrandEl.appendChild(optionBrand);
         });
       }
+      if (!data.bank_accounts.length) setStatus('Không có tài khoản nào.');
+    } else {
+      setStatus('Không tải được danh sách tài khoản: ' + (data.error || 'lỗi server') + '. Đóng rồi mở lại ô này để thử lại.');
     }
-  } catch (e) { console.error("Lỗi tải danh sách ngân hàng:", e); }
+  } catch (e) {
+    console.error("Lỗi tải danh sách ngân hàng:", e);
+    setStatus('Không tải được danh sách tài khoản: ' + e.message + '. Đóng rồi mở lại ô này để thử lại.');
+  }
 }
 
 // Hàm phụ: Cập nhật chữ trên label khi tích chọn checkbox
@@ -3157,6 +3173,13 @@ document.addEventListener('click', function(e) {
 // Khai báo biến toàn cục
 let bankStatementBase64 = "";
 let bankStatementFileName = "";
+
+// Mở/đóng dropdown tài khoản; nếu lần tải trước thất bại (chưa có tài khoản nào) thì tải lại khi mở
+function toggleTxAccountDropdown() {
+  const dropdownEl = document.getElementById('txBankAccountIdDropdown');
+  const opened = dropdownEl.classList.toggle('show');
+  if (opened && !dropdownEl.querySelector('input')) loadBankAccounts();
+}
 
 function setBankDropZoneState(state, fileName) {
   const zone = document.getElementById("bankDropZone");
