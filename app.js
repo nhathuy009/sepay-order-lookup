@@ -7021,9 +7021,15 @@ async function copyVax1Result() {
   window.doFetchEmployeesExcel = async function () {
     var result = await origFetch.apply(this, arguments);
     renderOverview();
-    // Tự chọn tháng mới nhất để có ngay kết quả (vẫn đổi được bằng bảng tổng quan hoặc ô chọn)
+    // Tự mở tháng trước tháng hiện tại (kỳ lương đang làm); file không có tháng đó thì mở tháng mới nhất
     var list = sheets(), sel = $("sheetSelect");
-    if (list.length && sel && !sel.value) selectMonth(list[list.length - 1].key);
+    if (list.length && sel && !sel.value) {
+      var d = new Date();
+      d.setDate(1); d.setMonth(d.getMonth() - 1);
+      var want = d.getFullYear() * 100 + d.getMonth() + 1;
+      var hit = list.filter(function (s) { return s.info.order === want; })[0];
+      selectMonth((hit || list[list.length - 1]).key);
+    }
     return result;
   };
   var origDisplay = window.displaySheetData;
