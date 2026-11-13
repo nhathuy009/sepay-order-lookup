@@ -17,9 +17,7 @@ api/
   _invoiceBKAV.py          eHoadon (BKAV) — login, tạo HĐ, danh sách
   _customsdeclaration.py   Parse tờ khai hải quan từ file
 
-index-v3.html + app-v3.js + app-v3.css   Giao diện chính (v3, dùng chung app.js + app.css) → /
-index.html + app.js + app.css   Giao diện cũ (v1)               → /v1
-index-new.html + app-v2.*       Giao diện v2                    → /v2
+index.html + app.js + app.css   Giao diện chính (các tab chức năng)
 vercel.json                     Build + route (Python @vercel/python@4.8.0 + static)
 requirements.txt                requests, openpyxl, beautifulsoup4, xlrd
 .env.example                    Danh sách biến môi trường

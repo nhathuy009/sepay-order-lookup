@@ -4,25 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Công cụ tra cứu đơn hàng & Sao kê | 10X</title>
-
 <link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css">
-
-  <link rel="stylesheet" href="/app.css" />
-  <script>
-    // Phát hiện sớm iPhone để gắn class trước khi vẽ trang (tránh flash widget lịch).
-    if (/iPhone/i.test(navigator.userAgent)) {
-      document.documentElement.classList.add("is-iphone");
-    }
-  </script>
+<link rel="stylesheet" href="/app.css" />
+<script>
+  if (/iPhone/i.test(navigator.userAgent)) document.documentElement.classList.add("is-iphone");
+</script>
 </head>
-<body class="light-mode">
+<body class="light-mode v3" data-view="home">
 
-  <header class="top-header">
-    <div class="header-brand">
-      <button id="toggleSidebarBtn" onclick="toggleSidebar()" title="Thu gọn / Mở rộng Sidebar"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-menu-icon lucide-menu"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg></button>
+  <header class="top-header v3-top">
+    <div class="v3-top-left">
+      <a class="v3-brand" href="#/" aria-label="Về danh sách công việc">
+        <span class="brand-mark" aria-hidden="true">10X</span>
+        <span class="v3-brand-name">Công việc</span>
+      </a>
+      <span class="v3-top-crumb" id="v3TopCrumb" aria-hidden="true"></span>
     </div>
-    
-    <!-- MODULE LỊCH TUẦN -->
+
     <div class="weekly-calendar-widget" id="weeklyCalendar">
       <div class="cal-info">
         <div class="cal-month" id="calMonthText"></div>
@@ -31,58 +29,181 @@
       <div class="cal-days-wrap" id="calDaysWrap"></div>
     </div>
 
-    <div class="header-actions" id="authCard">
-      <select id="themeSelect" onchange="setTheme(this.value)" title="Chọn giao diện"
-        style="padding: 8px 10px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-main); font-size: 13px; font-weight: 600; outline: none; cursor: pointer;">
-        <option value="dark">🌙 Tối (mặc định)</option>
-        <option value="light">☀️ Sáng</option>
-        <option value="teal">🌿 Xanh Rêu</option>
-        <option value="earth-dark">🪵 Nâu Đất Tối</option>
-        <option value="coral-dark">🪸 San Hô Đêm</option>
-        <option value="lavender">💜 Tím Lavender</option>
-        <option value="accounting">🧾 Kế Toán</option>
+    <div class="v3-top-right">
+      <select id="themeSelect" onchange="setTheme(this.value)" title="Chọn giao diện" aria-label="Chọn giao diện">
+        <option value="dark">Tối</option>
+        <option value="light">Sáng</option>
+        <option value="teal">Xanh rêu</option>
+        <option value="earth-dark">Nâu đất tối</option>
+        <option value="coral-dark">San hô đêm</option>
+        <option value="lavender">Tím lavender</option>
+        <option value="accounting">Kế toán</option>
       </select>
-      <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" />
-      <button id="saveTokenBtn" onclick="saveToken()">Lưu khóa</button>
+      <div class="header-actions" id="authCard">
+        <span class="v3-lock" aria-hidden="true"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <input type="password" id="accessToken" placeholder="Mật khẩu hệ thống" aria-label="Mật khẩu hệ thống" onkeydown="if(event.key==='Enter') saveToken()" />
+        <button type="button" id="saveTokenBtn" onclick="saveToken()">Lưu khóa</button>
+      </div>
     </div>
   </header>
 
-  <div class="app-body">
-    
-    <aside class="sidebar" id="appSidebar">
-      <div class="sidebar-top">
-        <div class="sidebar-menu-title">Chức năng chính</div>
-        <div class="menu-item active" id="tabBulkBtn" onclick="switchTab('bulk')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-text-search-icon lucide-text-search"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><circle cx="17" cy="15" r="3"/><path d="m21 19-1.9-1.9"/></svg><span class="menu-text">Tra cứu hàng loạt</span>
-        </div>
-        <div class="menu-item" id="tabTransactionBtn" onclick="switchTab('transaction')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-piggy-bank-icon lucide-piggy-bank"><path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/></svg><span class="menu-text">Tra cứu CK (SePay)</span>
-        </div>
-        <div class="menu-item" id="tabInvoiceBtn" onclick="switchTab('invoice')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-search-icon lucide-file-search"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><circle cx="11.5" cy="14.5" r="2.5"/><path d="M13.3 16.3 15 18"/></svg><span class="menu-text">Tra cứu hóa đơn</span>
-        </div>
-        <div class="menu-item" id="tabGdtBtn" onclick="switchTab('gdt')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg><span class="menu-text">Tra cứu HĐĐT (GDT)</span>
-        </div>
-        <div class="menu-item" id="tabEmployeeBtn" onclick="switchTab('employee')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg><span class="menu-text">Xử lý bảng lương</span>
-        </div>
-        <div class="menu-item" id="tabAirBtn" onclick="switchTab('air')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plane-takeoff-icon lucide-plane-takeoff"><path d="M2 22h20"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span class="menu-text">Xuất Air Packing List</span>
-        </div>
-        <div class="menu-item" id="tabEhoadonBtn" onclick="switchTab('ehoadon')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-plus-icon lucide-file-plus"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg><span class="menu-text">Tạo hóa đơn eHoadon</span>
-        </div>
-        <div class="menu-item" id="tabVax1Btn" onclick="switchTab('vax1')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round-icon lucide-key-round"><path d="M2.586 17.414A2 2 0 0 1 2 16V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-.586 1.414l-4.707 4.707a2 2 0 0 1-2.828 0z"/><circle cx="8.5" cy="11.5" r="2.5"/><path d="M15 9l4-4"/><path d="M17 7l2 2"/></svg><span class="menu-text">Giải mã VAX1</span>
+  <!-- app.js đọc/ghi phần tử này khi khởi động (trạng thái sidebar cũ) -->
+  <div id="appSidebar" hidden></div>
+
+  <div class="v3-scroll" id="v3Scroll">
+
+    <main class="v3-home" id="v3Home" aria-labelledby="v3HomeTitle">
+      <div class="v3-hero">
+        <p class="v3-eyebrow" id="v3Today"></p>
+        <h1 id="v3HomeTitle">Hôm nay bạn cần làm gì?</h1>
+        <p class="v3-lead">Chọn một công việc. Mỗi việc đi theo 3 bước: nhập dữ liệu, kiểm tra, rồi xuất kết quả.</p>
+      </div>
+
+      <section class="v3-recent" id="v3Recent" aria-labelledby="v3RecentTitle" hidden>
+        <h2 class="v3-group-title" id="v3RecentTitle">Dùng gần đây</h2>
+        <div class="v3-recent-list" id="v3RecentList"></div>
+      </section>
+
+        <section class="v3-group" aria-labelledby="g0">
+          <h2 class="v3-group-title" id="g0">Đối soát và tra cứu</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/bulk" data-key="bulk" data-group="Đối soát và tra cứu" data-steps="Nhập mã|Xem kết quả|Copy sang Excel">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-text-search-icon lucide-text-search"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><circle cx="17" cy="15" r="3"/><path d="m21 19-1.9-1.9"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Tra cứu hàng loạt</span>
+              <span class="v3-task-desc">Dán danh sách mã DH, BIZ, SA để lấy thông tin khách, số tiền và số hóa đơn.</span>
+              <span class="v3-flow"><span>Nhập mã</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Xem kết quả</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy sang Excel</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="bulk">Chưa dùng trên máy này</span>
+          </a>
+          <a class="v3-task" href="#/transaction" data-key="transaction" data-group="Đối soát và tra cứu" data-steps="Nhập mã hoặc sao kê|Đối chiếu|Copy kết quả">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-piggy-bank-icon lucide-piggy-bank"><path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Giao dịch SePay</span>
+              <span class="v3-task-desc">Tìm chuyển khoản theo mã hoặc đối chiếu file sao kê ngân hàng.</span>
+              <span class="v3-flow"><span>Nhập mã hoặc sao kê</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Đối chiếu</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy kết quả</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="transaction">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
+        <section class="v3-group" aria-labelledby="g1">
+          <h2 class="v3-group-title" id="g1">Hóa đơn</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/invoice" data-key="invoice" data-group="Hóa đơn" data-steps="Nhập mã hoặc ngày|Xem hóa đơn|Copy sang Excel">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-search-icon lucide-file-search"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><circle cx="11.5" cy="14.5" r="2.5"/><path d="M13.3 16.3 15 18"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Hóa đơn nội bộ</span>
+              <span class="v3-task-desc">Tra hóa đơn điện tử theo mã đơn hoặc lấy toàn bộ theo khoảng ngày.</span>
+              <span class="v3-flow"><span>Nhập mã hoặc ngày</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Xem hóa đơn</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy sang Excel</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="invoice">Chưa dùng trên máy này</span>
+          </a>
+          <a class="v3-task" href="#/gdt" data-key="gdt" data-group="Hóa đơn" data-steps="Chọn MST và ngày|Xem hóa đơn|Tải XML">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">HĐĐT Tổng cục Thuế</span>
+              <span class="v3-task-desc">Lấy hóa đơn mua vào, bán ra từ cổng Thuế và tải file XML gốc.</span>
+              <span class="v3-flow"><span>Chọn MST và ngày</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Xem hóa đơn</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Tải XML</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="gdt">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
+        <section class="v3-group" aria-labelledby="g2">
+          <h2 class="v3-group-title" id="g2">Xuất nhập khẩu</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/air" data-key="air" data-group="Xuất nhập khẩu" data-steps="Chọn file|Kiểm tra kiện|Tải Excel">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plane-takeoff-icon lucide-plane-takeoff"><path d="M2 22h20"/><path d="M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Air Packing List</span>
+              <span class="v3-task-desc">Tạo packing list xuất hàng đường air từ file Excel.</span>
+              <span class="v3-flow"><span>Chọn file</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Kiểm tra kiện</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Tải Excel</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="air">Chưa dùng trên máy này</span>
+          </a>
+          <a class="v3-task" href="#/ehoadon" data-key="ehoadon" data-group="Xuất nhập khẩu" data-steps="Đăng nhập|Lập chứng từ|Lưu và tra cứu">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-plus-icon lucide-file-plus"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Tạo hóa đơn eHoadon</span>
+              <span class="v3-task-desc">Đọc tờ khai hải quan, lập hóa đơn và phiếu xuất kho trên van.ehoadon.vn.</span>
+              <span class="v3-flow"><span>Đăng nhập</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Lập chứng từ</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Lưu và tra cứu</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="ehoadon">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
+        <section class="v3-group" aria-labelledby="g3">
+          <h2 class="v3-group-title" id="g3">Nhân sự</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/employee" data-key="employee" data-group="Nhân sự" data-steps="Chọn file và sheet|Kiểm tra|Copy MISA, ngân hàng">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users-icon lucide-users"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Xử lý bảng lương</span>
+              <span class="v3-task-desc">Đọc file nhân sự, chấm công, soát công thức rồi xuất cho MISA và ngân hàng.</span>
+              <span class="v3-flow"><span>Chọn file và sheet</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Kiểm tra</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy MISA, ngân hàng</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="employee">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
+        <section class="v3-group" aria-labelledby="g4">
+          <h2 class="v3-group-title" id="g4">Tiện ích</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/vax1" data-key="vax1" data-group="Tiện ích" data-steps="Dán chuỗi|Giải mã|Copy">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round-icon lucide-key-round"><path d="M2.586 17.414A2 2 0 0 1 2 16V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-.586 1.414l-4.707 4.707a2 2 0 0 1-2.828 0z"/><circle cx="8.5" cy="11.5" r="2.5"/><path d="M15 9l4-4"/><path d="M17 7l2 2"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Giải mã VAX1</span>
+              <span class="v3-task-desc">Giải mã chuỗi VAX1 thành dữ liệu đọc được.</span>
+              <span class="v3-flow"><span>Dán chuỗi</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Giải mã</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="vax1">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
+    </main>
+
+    <section class="v3-tool" id="v3Tool" aria-labelledby="v3ToolTitle" hidden>
+      <div class="v3-tool-head">
+        <a class="v3-back" href="#/"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg><span>Tất cả công việc</span></a>
+        <div class="v3-tool-id">
+          <span class="v3-task-icon" id="v3ToolIcon"></span>
+          <div>
+            <p class="v3-eyebrow" id="v3ToolGroup"></p>
+            <h1 id="v3ToolTitle"></h1>
+            <p class="v3-lead" id="v3ToolDesc"></p>
+          </div>
         </div>
       </div>
 
-      <div class="sidebar-bottom">
-      </div>
-    </aside>
+      <nav class="v3-stepper-wrap" aria-label="Các bước thực hiện">
+        <div class="v3-stepper-inner">
+        <ol class="v3-stepper" id="v3Stepper">
+          <li class="v3-step" data-step="1">
+            <button type="button" class="v3-step-btn" data-step="1">
+              <span class="v3-step-dot"><span class="v3-step-num">1</span><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="v3-step-text"><span class="v3-step-kicker">Bước 1</span><span class="v3-step-label"></span></span>
+            </button>
+          </li>
+          <li class="v3-step" data-step="2">
+            <button type="button" class="v3-step-btn" data-step="2">
+              <span class="v3-step-dot"><span class="v3-step-num">2</span><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="v3-step-text"><span class="v3-step-kicker">Bước 2</span><span class="v3-step-label"></span></span>
+            </button>
+          </li>
+          <li class="v3-step" data-step="3">
+            <button type="button" class="v3-step-btn" data-step="3">
+              <span class="v3-step-dot"><span class="v3-step-num">3</span><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span class="v3-step-text"><span class="v3-step-kicker">Bước 3</span><span class="v3-step-label"></span></span>
+            </button>
+          </li>
+        </ol>
+        <div class="v3-progress" aria-hidden="true"><span class="v3-progress-bar" id="v3ProgressBar"></span></div>
+        </div>
+      </nav>
 
-    <main class="content main-content">
+      <div class="content main-content v3-panels" id="v3Panels">
+
 
       <div id="tabBulk" class="tab-panel">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -194,6 +315,23 @@
       <div id="tabEmployee" class="hidden tab-panel">
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
+          <!-- v3: đọc thẳng Google Sheet gốc bằng tài khoản Google của người dùng (app.js) -->
+          <div class="v3-gsheet" id="v3Gsheet">
+            <div class="v3-gsheet-head">
+              <span class="v3-gsheet-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M12 11v8"/></svg></span>
+              <div>
+                <h3>Đọc trực tiếp từ Google Sheet</h3>
+                <p class="v3-field-hint">Lấy đúng số Google đã tính, không cần tải file. Bạn đăng nhập bằng tài khoản Google có quyền xem file.</p>
+              </div>
+            </div>
+            <label for="v3GsheetUrl">Link Google Sheet bảng lương</label>
+            <div class="v3-gsheet-row">
+              <input type="url" id="v3GsheetUrl" inputmode="url" spellcheck="false" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/…" />
+              <button type="button" id="v3GsheetBtn"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M21 3v6h-6"/></svg><span id="v3GsheetBtnText">Đăng nhập Google và đọc</span></button>
+            </div>
+            <p class="v3-gsheet-status" id="v3GsheetStatus" role="status" aria-live="polite"></p>
+          </div>
+          <div class="v3-or" aria-hidden="true"><span>hoặc tải file Excel lên</span></div>
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
           <div id="employeeDropZone" class="air-drop-zone" role="button" tabindex="0" aria-label="Kéo thả hoặc chọn file Excel nhân sự" style="margin-top: 8px;">
             <input type="file" id="employeeExcelFile" accept=".xlsx" hidden />
@@ -223,6 +361,22 @@
           <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
         </div>
 
+        <!-- v3: tổng quan mọi tháng trong file + cảnh báo ô lỗi của tháng đang xem (app.js vẽ) -->
+        <section class="card v3-pay-overview" id="v3PayOverview" aria-labelledby="v3PayOverviewTitle" hidden>
+          <div class="v3-pay-head">
+            <div>
+              <h3 id="v3PayOverviewTitle">Tổng quan các tháng trong file</h3>
+              <p class="v3-field-hint" id="v3PayOverviewSub"></p>
+            </div>
+          </div>
+          <div class="table-responsive v3-pay-table-wrap">
+            <table class="v3-pay-table">
+              <thead><tr><th scope="col">Tháng</th><th scope="col" class="num">Nhân viên</th><th scope="col" class="num">Tổng thu nhập</th><th scope="col" class="num">Thuế TNCN</th><th scope="col" class="num">Thực nhận</th><th scope="col" class="num">So tháng trước</th><th scope="col">Tình trạng</th></tr></thead>
+              <tbody id="v3PayOverviewBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <div id="v3PayIssues" class="v3-pay-issues" hidden></div>
         <div class="card" id="employeeResultCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
             <h3 style="margin:0; font-size:16px;" id="employeeResultTitle">Bảng lương chi tiết</h3>
@@ -891,44 +1045,64 @@
       </div>
 
       <!-- TAB GIẢI MÃ VAX1 -->
-      <div id="tabVax1" class="hidden tab-panel">
-        <h2 style="margin:0 0 16px 0;">Giải mã VAX1</h2>
-        <div class="card">
-          <label for="vax1PasteInput">Dán nội dung mã hóa (ưu tiên)</label>
-          <textarea id="vax1PasteInput" rows="5" placeholder="VAX1:.... hoặc dán toàn bộ chuỗi base64" style="width:100%; resize:vertical; min-height:100px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
+      <div id="tabVax1" class="hidden tab-panel v3-vax">
+        <h2>Giải mã VAX1</h2>
 
-          <label for="vax1UrlInput" style="margin-top:14px; display:block;">Hoặc đường link nguồn</label>
-          <div class="row" style="align-items:flex-end; gap:10px; flex-wrap:wrap;">
-            <div style="flex:1; min-width:240px;">
-              <input type="url" id="vax1UrlInput" placeholder="https://… (raw text chứa VAX1:...)" style="width:100%;" />
-            </div>
-            <div style="flex:0 0 auto; display:flex; gap:8px;">
-              <button id="vax1DecryptBtn" onclick="doDecryptVax1()">🔓 Giải mã</button>
-              <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa</button>
-            </div>
+        <section class="card v3-vax-card" aria-labelledby="vax1SourceTitle">
+          <div class="v3-vax-head">
+            <h3 id="vax1SourceTitle">Nguồn dữ liệu</h3>
+            <span class="v3-vax-badge">AES-256-CBC · không lưu file</span>
           </div>
-          <label for="vax1HeadersInput" style="margin-top:12px; display:block;">Headers khi tải URL (tùy chọn, mỗi dòng: <code>Tên: giá trị</code>)</label>
-          <textarea id="vax1HeadersInput" rows="2" placeholder="Referer: https://vkey.vn/&#10;User-Agent: Mozilla/5.0 …" style="width:100%; resize:vertical; min-height:56px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px;"></textarea>
-          <div class="hint" style="margin-top:10px;">
-            Có thể <strong>dán trực tiếp</strong> payload <code>VAX1:&lt;base64&gt;</code>, hoặc dán link để hệ thống tải qua proxy. Ưu tiên nội dung đã dán nếu có. Khi tải URL có thể thêm headers (vd. <code>Referer: https://vkey.vn/</code>). Giải mã AES-256-CBC (key = SHA-256(A ⊕ 0x5C)). Không lưu file.
-          </div>
-          <div id="vax1Status" class="msg" style="margin-top:12px; display:none;"></div>
-        </div>
 
-        <div id="vax1ResultCard" class="card" style="margin-top:16px; display:none;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-            <h3 style="margin:0;">Kết quả giải mã</h3>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn-outline" id="vax1CopyBtn" onclick="copyVax1Result()" style="font-size:13px;">📋 Copy</button>
+          <label for="vax1PasteInput">Chuỗi mã hóa</label>
+          <textarea id="vax1PasteInput" class="v3-mono" rows="6" spellcheck="false" placeholder="VAX1:… hoặc dán toàn bộ chuỗi base64"></textarea>
+          <p class="v3-field-hint">Dán payload dạng <code>VAX1:&lt;base64&gt;</code>. Nếu ô này có nội dung, hệ thống dùng nó trước.</p>
+
+          <details class="v3-vax-more">
+            <summary>
+              <span>Hoặc tải từ đường link</span>
+              <small>Chỉ dùng khi ô chuỗi mã hóa để trống</small>
+            </summary>
+            <div class="v3-vax-more-body">
+              <label for="vax1UrlInput">Đường link nguồn</label>
+              <input type="url" id="vax1UrlInput" inputmode="url" spellcheck="false" placeholder="https://… (file text chứa VAX1:…)" />
+              <label for="vax1HeadersInput">Headers khi tải <span class="v3-optional">tùy chọn, mỗi dòng một header</span></label>
+              <textarea id="vax1HeadersInput" class="v3-mono" rows="3" spellcheck="false" placeholder="Referer: https://vkey.vn/&#10;User-Agent: Mozilla/5.0 …"></textarea>
+              <p class="v3-field-hint">Link được tải qua proxy của hệ thống. Thêm <code>Referer</code> nếu trang nguồn chặn tải trực tiếp.</p>
             </div>
+          </details>
+
+          <div class="v3-vax-actions">
+            <button id="vax1DecryptBtn" onclick="doDecryptVax1()"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>Giải mã</button>
+            <button type="button" class="btn-outline" id="vax1ClearBtn" onclick="clearVax1Result()">Xóa hết</button>
+            <div id="vax1Status" class="msg v3-vax-status" role="status" style="display:none;"></div>
           </div>
-          <div class="hint" id="vax1Meta" style="margin:0 0 8px 0;"></div>
-          <pre id="vax1ResultPre" style="margin:0; max-height:min(70vh, 640px); overflow:auto; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:13px; line-height:1.45; padding:12px; border-radius:8px; background:var(--input-bg, rgba(0,0,0,0.04)); border:1px solid var(--border, #e5e7eb);"></pre>
-        </div>
+        </section>
+
+        <section id="vax1ResultCard" class="card v3-vax-card" aria-labelledby="vax1ResultTitle" style="display:none;">
+          <div class="v3-vax-head">
+            <div>
+              <h3 id="vax1ResultTitle">Kết quả giải mã</h3>
+              <p class="v3-field-hint" id="vax1Meta"></p>
+            </div>
+            <button type="button" class="btn-outline" id="vax1CopyBtn" onclick="copyVax1Result()">Copy kết quả</button>
+          </div>
+          <pre id="vax1ResultPre" class="v3-mono v3-vax-pre"></pre>
+        </section>
       </div>
 
-    </main>
+    
+      </div>
+
+      <div class="v3-actionbar" id="v3ActionBar">
+        <a class="v3-actionbar-back" href="#/"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg><span>Tất cả công việc</span></a>
+        <p class="v3-actionbar-hint" id="v3ActionHint" aria-live="polite"></p>
+        <button type="button" class="v3-next" id="v3NextBtn"></button>
+      </div>
+    </section>
+
   </div>
+
 
 <div id="gdtDetailOverlay" class="gdt-modal-overlay hidden" onclick="if(event.target===this) closeGdtInvoiceDetail()">
   <div class="gdt-modal-box">
