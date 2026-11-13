@@ -5072,10 +5072,10 @@ let airProcessedData = null;
 
 // Bảng định mức & giá tiền theo từng phân loại hàng, dùng để tự động điền gợi ý vào 3 ô ghi chú
 const AIR_CATEGORY_RATES = {
-  "BLOUSE": { label: "Blouse", rate: "2m", price: "4,5$" },
-  "KID": { label: "Kid", rate: "1,8m", price: "5$" },
-  "JUBAH": { label: "Jubah", rate: "3.5m", price: "9$" },
-  "KURUNG": { label: "Kurung", rate: "3,5m", price: "10$" }
+  "BLOUSE": { label: "Blouse", unit: "cái", rate: "2m", price: "4,5$" },
+  "KID": { label: "Kid", unit: "cái", rate: "1,8m", price: "5$" },
+  "JUBAH": { label: "Jubah", unit: "cái", rate: "3.5m", price: "9$" },
+  "KURUNG": { label: "Kurung", unit: "bộ", rate: "3,5m", price: "10$" }
 };
 
 function setAirDropZoneState(state, fileName) {
@@ -5173,6 +5173,8 @@ async function doProcessAirPacking(fileOverride) {
       const colItems = headers.findIndex(h => String(h).toUpperCase().includes('ITEMS'));
       const colKgs = headers.findIndex(h => String(h).toUpperCase().includes('KGS'));
       const colQtity = headers.findIndex(h => String(h).toUpperCase().includes('QTITY'));
+      // Các cột size (S/M/L/XL...) nằm từ cột SIZE đến trước cột QTITY, dùng khi ô QTITY bị trống
+      const colSize = headers.findIndex(h => String(h).toUpperCase().includes('SIZE'));
 
       let currentBagNo = null;
       let currentKgs = null;
@@ -5192,7 +5194,15 @@ async function doProcessAirPacking(fileOverride) {
           if (!isNaN(kgs)) currentKgs = kgs;
         }
 
-        let qtity = parseFloat(row[colQtity]) || 0;
+        let qtity;
+        const qtityRaw = row[colQtity];
+        if ((qtityRaw === undefined || qtityRaw === null || String(qtityRaw).trim() === "") && colSize !== -1 && colSize < colQtity) {
+          // File gốc quên kéo công thức =SUM(...) xuống: tự cộng các cột size
+          qtity = 0;
+          for (let c = colSize; c < colQtity; c++) qtity += parseFloat(row[c]) || 0;
+        } else {
+          qtity = parseFloat(qtityRaw) || 0;
+        }
 
         if (currentBagNo) {
           if (!sheetBagsMap.has(currentBagNo)) {
@@ -5223,7 +5233,7 @@ async function doProcessAirPacking(fileOverride) {
       .slice(0, 3);
     const categoryNotes = topCategories.map(([key, qty]) => {
       const info = AIR_CATEGORY_RATES[key];
-      return `${qty} cái ${info.label}, định mức ${info.rate}, giá ${info.price}`;
+      return `${qty} ${info.unit} ${info.label}, định mức ${info.rate}, giá ${info.price}`;
     });
 
     // Lưu lại để tải về sau, không tự động tải xuống ngay
