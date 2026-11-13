@@ -1801,6 +1801,43 @@
   white-space: nowrap;
 }
 
+/* Ô chọn file tùy biến (thay giao diện "Choose File" mặc định của trình duyệt).
+   Input thật vẫn nằm trong label, chỉ ẩn bằng mắt nên vẫn focus/Tab được. */
+.file-pick {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; box-sizing: border-box; margin: 0;
+  padding: 5px 14px 5px 5px; min-height: 44px;
+  border: 1px dashed var(--input-border); border-radius: 11px;
+  background: var(--input-bg); color: var(--text-muted);
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.file-pick:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--input-bg));
+}
+.file-pick:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.file-pick-input {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.file-pick-btn {
+  display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+  padding: 7px 12px; border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+.file-pick:hover .file-pick-btn { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.file-pick-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.file-pick.has-file { border-style: solid; }
+.file-pick.has-file .file-pick-name { color: var(--text-main); font-weight: 600; }
+
 /* Login row eHoadon */
 #ehoadonLoginCard .row {
   align-items: flex-end;

@@ -205,6 +205,9 @@ body.v2 textarea:focus,
 body.v2 select:focus { box-shadow: var(--v2-focus); }
 body.v2 textarea { line-height: 1.5; font-variant-numeric: tabular-nums; }
 
+body.v2 .file-pick { border-radius: var(--v2-radius); min-height: 42px; padding-left: 4px; }
+body.v2 .file-pick-btn { border-radius: var(--v2-radius-sm); }
+
 /* ---------- NÚT ---------- */
 body.v2 button {
   padding: 10px 16px; border-radius: var(--v2-radius);

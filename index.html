@@ -790,7 +790,7 @@
               Tải lên file tờ khai hải quan (.xls/.xlsx, đọc từ sheet "TKX") để phân tích. Dữ liệu sẽ tự động điền vào form hóa đơn bên dưới.
             </div>
             <div class="row ehoadon-action-row">
-              <div class="ehoadon-action-field"><input type="file" id="ehoadonCustomsFile" accept=".xls,.xlsx" /></div>
+              <div class="ehoadon-action-field"><label class="file-pick" for="ehoadonCustomsFile"><input type="file" id="ehoadonCustomsFile" class="file-pick-input" accept=".xls,.xlsx" onchange="var n=this.files.length?this.files[0].name:'';var l=this.closest('.file-pick');l.classList.toggle('has-file',!!n);l.querySelector('.file-pick-name').textContent=n||'Chưa chọn file (.xls, .xlsx)';" /><span class="file-pick-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>Chọn file</span><span class="file-pick-name">Chưa chọn file (.xls, .xlsx)</span></label></div>
               <button id="ehoadonCustomsBtn" onclick="doEhoadonParseCustomsDeclaration()">Đọc file</button>
             </div>
             <div class="msg" id="ehoadonCustomsStatus" style="display:none; margin-top: 10px;"></div>
