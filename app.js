@@ -3505,14 +3505,14 @@ async function doTxList() {
       </tr>`;
       
     box.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap: wrap;">
-        <span class="badge ok">🎉 Đã tải ${txs.length} giao dịch</span>
-        <span class="text-muted-small" style="flex-shrink:0;">💡 Bấm vào tiêu đề cột "Thời gian" / "Tiền vào (+)" / "Tiền ra (-)" để sắp xếp. Bấm lại cột "Thời gian" bất cứ lúc nào để đưa bảng về đúng thứ tự thời gian ban đầu.</span>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; flex-wrap: wrap;">
+        <span class="badge ok">Đã tải ${txs.length} giao dịch</span>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button id="copyTxListBtn" class="btn-outline" onclick="copyTxListTable()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho Excel / Sheets</button>
           <button id="copyTxListMisaBtn" class="btn-outline" onclick="copyTxListForMisa()" style="font-size: 12px; padding: 6px 10px; white-space:nowrap; flex-shrink:0;">📋 Copy cho mẫu DS bán MISA</button>
         </div>
       </div>
+      <p class="text-muted-small" style="margin: 0 0 12px;">Bấm tiêu đề cột Thời gian, Tiền vào hoặc Tiền ra để sắp xếp; bấm lại Thời gian để về thứ tự ban đầu.</p>
       <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px;">
         <table class="sepay-table" id="txListTable">
           <thead>

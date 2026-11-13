@@ -2251,6 +2251,29 @@ body.v3 .inv-foot button { flex-shrink: 0; min-width: 132px; }
 body.v3 table { font-variant-numeric: tabular-nums; }
 body.v3 .table-responsive, body.v3 .air-drop-zone, body.v3 .gdt-modal-box { border-radius: var(--v3-radius-lg); }
 
+/* ---------- MỤC GIAO DỊCH SEPAY (dùng chung khung thẻ chia đôi .inv-card ở trên) ---------- */
+body.v3 .tx-search-row { display: flex; gap: 10px; }
+body.v3 .tx-search-row input { flex: 1 1 auto; min-width: 0; }
+body.v3 .tx-search-row button { flex-shrink: 0; }
+body.v3 .tx-hint { flex: none; margin-top: 8px; }
+body.v3 .inv-pane .msg:empty, body.v3 .tx-wide:empty, body.v3 .tx-list-result:empty { display: none; }
+body.v3 .tx-wide { grid-column: 1 / -1; padding: 18px 22px 20px; border-top: 1px solid var(--border); }
+body.v3 .inv-pane .air-drop-zone { min-height: 0; padding: 14px 16px; justify-content: flex-start; text-align: left; }
+body.v3 .inv-pane .air-drop-zone-inner { flex-direction: row; gap: 14px; }
+body.v3 .inv-pane .air-drop-text { font-size: 14px; }
+body.v3 .inv-pane .air-drop-file-info { flex-direction: row; justify-content: space-between; }
+body.v3 .tx-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+body.v3 .tx-filter-date { flex: 0 1 260px; min-width: 220px; }
+body.v3 .tx-filter-acc { flex: 1 1 220px; min-width: 200px; max-width: 420px; }
+body.v3 .tx-filters > button { flex-shrink: 0; min-width: 132px; }
+body.v3 .tx-list-result { margin-top: 18px; }
+body.v3 .multi-select-label { padding: 10px 12px; border-radius: var(--v3-radius); }
+@media (max-width: 760px) {
+  body.v3 .tx-wide { padding: 16px; }
+  body.v3 .tx-filter-date, body.v3 .tx-filter-acc { flex: 1 1 100%; max-width: none; }
+  body.v3 .tx-filters > button { width: 100%; }
+}
+
 /* ---------- CHI TIẾT Ô NHẬP DÙNG CHUNG ---------- */
 body.v3 .v3-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
