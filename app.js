@@ -6923,11 +6923,11 @@ async function copyVax1Result() {
         "Ô trong file Excel đang báo lỗi (#NAME?, #VALUE!...) và app không tự tính lại được"]);
       if (audit.err) badges.push(["is-danger", "Lệch công " + audit.err + " NV",
         "Ngày công trên bảng lương khác với chấm công — xem tab Kiểm tra lỗi"]);
+      if (!audit.attCount) badges.push(["is-warn", "Chưa có chấm công",
+        "Không tìm thấy sheet chấm công của tháng này nên chưa đối soát được ngày công"]);
       if (iss.fixed.length) badges.push(["is-info", "Tự tính lại " + iss.fixedPeople + " NV",
         "Ô Thuế TNCN / Thực nhận lỗi công thức trong file, app đã tự tính lại"]);
-      if (!badges.length) badges.push(["is-ok", "Ổn", audit.attCount
-        ? "Không có ô lỗi công thức, ngày công khớp với chấm công"
-        : "Không có ô lỗi công thức. Chưa có sheet chấm công của tháng này nên chưa đối soát công"]);
+      if (!badges.length) badges.push(["is-ok", "Ổn", "Không có ô lỗi công thức, ngày công khớp với chấm công"]);
       badges.forEach(function (b, i) {
         if (i) st.appendChild(document.createTextNode(" "));
         var badge = el("span", "v3-badge " + b[0], b[1]);

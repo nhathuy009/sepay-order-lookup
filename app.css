@@ -2355,6 +2355,7 @@ body.v3 .v3-badge {
 body.v3 .v3-badge.is-ok { background: var(--badge-ok-bg); color: var(--badge-ok-text); }
 body.v3 .v3-badge.is-info { background: var(--v3-accent-soft); color: var(--accent); }
 body.v3 .v3-badge.is-danger { background: var(--badge-err-bg); color: var(--badge-err-text); }
+body.v3 .v3-badge.is-warn { background: #fff3e0; color: #e67e22; }
 
 body.v3 .v3-pay-issues { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 body.v3 .v3-pay-issues[hidden] { display: none; }
