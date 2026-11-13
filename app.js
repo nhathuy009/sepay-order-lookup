@@ -4510,16 +4510,6 @@ function updateGdtBulkBar() {
   });
 }
 
-// Mục Hóa đơn nội bộ: đổi giữa tra theo số hóa đơn / theo khoảng ngày (chỉ ẩn/hiện ô nhập, kết quả giữ nguyên)
-function switchInvMode(mode, btnEl) {
-  document.getElementById("invModeCodes").classList.toggle("hidden", mode !== "codes");
-  document.getElementById("invModeDate").classList.toggle("hidden", mode !== "date");
-  btnEl.parentElement.querySelectorAll(".inv-seg-btn").forEach(b => {
-    b.classList.toggle("active", b === btnEl);
-    b.setAttribute("aria-selected", b === btnEl ? "true" : "false");
-  });
-}
-
 function selectChoiceGroup(hiddenInputId, value, btnEl) {
   document.getElementById(hiddenInputId).value = value;
   const group = btnEl.closest(".mst-choice-group");

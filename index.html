@@ -726,11 +726,8 @@
           <button id="copyInvoiceBtn" class="btn-outline" onclick="copyTableToClipboard('invoiceTable', 'copyInvoiceBtn')" style="display: none; font-size: 13px;">📋 Copy cho Excel / Sheets</button>
         </div>
         <div class="card inv-card">
-          <div class="inv-seg" role="tablist" aria-label="Cách tra cứu">
-            <button type="button" class="inv-seg-btn active" role="tab" aria-selected="true" onclick="switchInvMode('codes', this)">Theo số hóa đơn</button>
-            <button type="button" class="inv-seg-btn" role="tab" aria-selected="false" onclick="switchInvMode('date', this)">Theo khoảng ngày</button>
-          </div>
-          <div id="invModeCodes" class="inv-pane">
+          <div class="inv-pane">
+            <h3 class="inv-title">Theo số hóa đơn</h3>
             <label for="invoiceCodes">Số hóa đơn</label>
             <textarea id="invoiceCodes" rows="4" placeholder="VD:&#10;1277&#10;1280"></textarea>
             <div class="inv-foot">
@@ -738,23 +735,18 @@
               <button id="invoiceBtn" onclick="doInvoiceLookup()">Tra cứu</button>
             </div>
           </div>
-          <div id="invModeDate" class="inv-pane hidden">
-            <div class="inv-fields">
-              <div class="inv-field">
-                <label for="invDateRange">Khoảng ngày</label>
-                <input type="text" id="invDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
-                <input type="hidden" id="invDateFrom" />
-                <input type="hidden" id="invDateTo" />
-              </div>
-              <div class="inv-field">
-                <label>Loại hóa đơn</label>
-                <div class="inv-seg mst-choice-group">
-                  <button type="button" class="inv-seg-btn mst-choice-btn active" id="invInvoiceKindBtnA" onclick="selectChoiceGroup('invInvoiceKind', '2', this)">Chỉ hóa đơn gốc</button>
-                  <button type="button" class="inv-seg-btn mst-choice-btn" id="invInvoiceKindBtnB" onclick="selectChoiceGroup('invInvoiceKind', '-1', this)">Gồm điều chỉnh / thay thế</button>
-                </div>
-                <input type="hidden" id="invInvoiceKind" value="2" />
-              </div>
+          <div class="inv-pane">
+            <h3 class="inv-title">Theo khoảng ngày</h3>
+            <label for="invDateRange">Khoảng ngày</label>
+            <input type="text" id="invDateRange" placeholder="DD/MM/YYYY-DD/MM/YYYY" style="cursor: pointer;" />
+            <input type="hidden" id="invDateFrom" />
+            <input type="hidden" id="invDateTo" />
+            <label class="inv-label-gap">Loại hóa đơn</label>
+            <div class="inv-seg mst-choice-group">
+              <button type="button" class="inv-seg-btn mst-choice-btn active" id="invInvoiceKindBtnA" onclick="selectChoiceGroup('invInvoiceKind', '2', this)">Chỉ hóa đơn gốc</button>
+              <button type="button" class="inv-seg-btn mst-choice-btn" id="invInvoiceKindBtnB" onclick="selectChoiceGroup('invInvoiceKind', '-1', this)">Gồm điều chỉnh / thay thế</button>
             </div>
+            <input type="hidden" id="invInvoiceKind" value="2" />
             <div class="inv-foot">
               <p class="inv-hint">Lấy toàn bộ hóa đơn trong khoảng ngày đã chọn.</p>
               <button id="invByDateBtn" onclick="doInvoiceLookupByDate()">Lấy hóa đơn</button>
