@@ -43,7 +43,9 @@
     { "src": "/c12", "dest": "/C12_TS_editable.html" },
     { "src": "/ebook", "dest": "/ebook.html" },
 
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "/v1/?", "dest": "/index.html" },
+
+    { "src": "/(.*)", "dest": "/index-v3.html" }
   ],
 
   "regions": ["sin1"]
