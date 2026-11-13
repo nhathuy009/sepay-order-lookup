@@ -1916,7 +1916,7 @@ body.v3 {
   --v3-radius: 10px;
   --v3-radius-sm: 8px;
   --v3-top-h: 60px;
-  --v3-max: 1180px;
+  --v3-max: 100%;  /* giao diện dãn hết chiều ngang màn hình (trước đây đóng khung 1180px ở giữa) */
   --v3-accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --v3-accent-softer: color-mix(in srgb, var(--accent) 7%, transparent);
   --v3-wash: color-mix(in srgb, var(--text-main) 5%, transparent);
@@ -1977,7 +1977,7 @@ body.v3 .v3-scroll {
 
 /* ---------- TRANG CHỦ ---------- */
 body.v3 .v3-home {
-  max-width: 1000px; margin: 0 auto;
+  max-width: var(--v3-max); margin: 0 auto; box-sizing: border-box;
   padding: 40px clamp(16px, 4vw, 40px) 72px;
 }
 body.v3 .v3-hero { margin-bottom: 28px; }
@@ -2002,6 +2002,12 @@ body.v3 .v3-group-title {
 body.v3 .v3-grid {
   display: grid; gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+}
+/* Màn hình rộng: xếp các nhóm công việc thành 2 cột để lấp hết chiều ngang */
+@media (min-width: 1400px) {
+  body.v3 .v3-home { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-content: start; }
+  body.v3 .v3-home > .v3-hero, body.v3 .v3-home > .v3-recent { grid-column: 1 / -1; margin: 0; }
+  body.v3 .v3-home > .v3-group { margin-top: 0; }
 }
 
 body.v3 .v3-task {
