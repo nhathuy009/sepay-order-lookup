@@ -776,7 +776,10 @@ class handler(BaseHTTPRequestHandler):
         self._send(200, {
             "auth_required": bool(APP_ACCESS_TOKEN),
             "ehoadon_username": os.environ.get("ehoadon_username", ""),
-            "ehoadon_password": os.environ.get("ehoadon_password", "")
+            "ehoadon_password": os.environ.get("ehoadon_password", ""),
+            # OAuth Client ID (loại Web) để trang v3 đăng nhập Google và đọc thẳng Google Sheet bảng lương.
+            # Client ID không phải bí mật; quyền đọc file vẫn do tài khoản Google của người dùng quyết định.
+            "google_client_id": os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
         })
 
     def do_POST(self):

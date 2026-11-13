@@ -677,8 +677,8 @@ async function doFetchEmployeesExcel(fileOverride) {
   box.innerHTML = '<span class="spinner" style="color:var(--accent)"></span> Đang xử lý file...';
 
   try {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data, { type: 'array' });
+    // Bản v3 có thể đưa sẵn workbook dựng từ Google Sheet (file.__workbook) -> khỏi đọc lại từ byte
+    const workbook = file.__workbook || XLSX.read(await file.arrayBuffer(), { type: 'array' });
     
     const pattern = /^T\d{2}20\d{2}$/;
     globalSheetsData = {};

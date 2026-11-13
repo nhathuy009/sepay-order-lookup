@@ -316,6 +316,23 @@
       <div id="tabEmployee" class="hidden tab-panel">
         <h2>Lấy dữ liệu Nhân sự (Từ file Excel)</h2>
         <div class="card">
+          <!-- v3: đọc thẳng Google Sheet gốc bằng tài khoản Google của người dùng (app-v3.js) -->
+          <div class="v3-gsheet" id="v3Gsheet">
+            <div class="v3-gsheet-head">
+              <span class="v3-gsheet-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M12 11v8"/></svg></span>
+              <div>
+                <h3>Đọc trực tiếp từ Google Sheet</h3>
+                <p class="v3-field-hint">Lấy đúng số Google đã tính, không cần tải file. Bạn đăng nhập bằng tài khoản Google có quyền xem file.</p>
+              </div>
+            </div>
+            <label for="v3GsheetUrl">Link Google Sheet bảng lương</label>
+            <div class="v3-gsheet-row">
+              <input type="url" id="v3GsheetUrl" inputmode="url" spellcheck="false" autocomplete="off" placeholder="https://docs.google.com/spreadsheets/d/…" />
+              <button type="button" id="v3GsheetBtn"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><path d="M21 3v6h-6"/></svg><span id="v3GsheetBtnText">Đăng nhập Google và đọc</span></button>
+            </div>
+            <p class="v3-gsheet-status" id="v3GsheetStatus" role="status" aria-live="polite"></p>
+          </div>
+          <div class="v3-or" aria-hidden="true"><span>hoặc tải file Excel lên</span></div>
           <label>Chọn file Excel (.xlsx) chứa các sheet nhân sự (VD: T012026, T022026...)</label>
           <div id="employeeDropZone" class="air-drop-zone" role="button" tabindex="0" aria-label="Kéo thả hoặc chọn file Excel nhân sự" style="margin-top: 8px;">
             <input type="file" id="employeeExcelFile" accept=".xlsx" hidden />

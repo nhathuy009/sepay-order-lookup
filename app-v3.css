@@ -382,6 +382,39 @@ body.v3 .v3-vax-pre {
   body.v3 .v3-vax-status.msg { flex: 1 1 100%; margin: 0; }
 }
 
+/* ---------- BẢNG LƯƠNG: ĐỌC TỪ GOOGLE SHEET ---------- */
+body.v3 .v3-gsheet {
+  padding: 16px; border-radius: var(--v3-radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: var(--v3-accent-softer);
+}
+body.v3 .v3-gsheet-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+body.v3 .v3-gsheet-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+body.v3 .v3-gsheet-head .v3-field-hint { margin-top: 2px; }
+body.v3 .v3-gsheet-icon {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: var(--v3-radius-sm); background: var(--v3-accent-soft); color: var(--accent);
+}
+body.v3 .v3-gsheet-row { display: flex; gap: 10px; align-items: stretch; }
+body.v3 .v3-gsheet-row input { flex: 1 1 auto; min-width: 0; }
+body.v3 #v3GsheetBtn { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; white-space: nowrap; }
+body.v3 #v3GsheetBtn[aria-busy="true"] svg { animation: v3Spin 0.9s linear infinite; }
+@keyframes v3Spin { to { transform: rotate(360deg); } }
+body.v3 .v3-gsheet-status { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); min-height: 0; }
+body.v3 .v3-gsheet-status:empty { display: none; }
+body.v3 .v3-gsheet-status.is-ok { color: var(--badge-ok-text); font-weight: 600; }
+body.v3 .v3-gsheet-status.is-err { color: var(--badge-err-text); font-weight: 600; }
+body.v3 .v3-or {
+  display: flex; align-items: center; gap: 12px; margin: 18px 0 12px;
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+}
+body.v3 .v3-or::before, body.v3 .v3-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+@media (max-width: 768px) {
+  body.v3 .v3-gsheet-row { flex-direction: column; }
+  body.v3 #v3GsheetBtn { justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) { body.v3 #v3GsheetBtn[aria-busy="true"] svg { animation: none; } }
+
 /* ---------- BẢNG LƯƠNG: TỔNG QUAN CÁC THÁNG ---------- */
 body.v3 .v3-pay-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 body.v3 .v3-pay-head h3 { margin: 0; font-size: 16px; font-weight: 700; }

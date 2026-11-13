@@ -480,3 +480,171 @@
     return r;
   };
 })();
+
+/* ---------------- Bảng lương: đọc thẳng Google Sheet ----------------
+   Đăng nhập Google ngay trên trình duyệt (Google Identity Services, quyền chỉ-đọc Sheets),
+   gọi Google Sheets API lấy giá trị Google đã tính, dựng lại thành 1 workbook trong bộ nhớ
+   rồi đưa qua đúng hàm đọc file Excel sẵn có (doFetchEmployeesExcel) — không đổi logic xử lý.
+   Access token chỉ giữ trong bộ nhớ của tab (hết hạn sau ~1 giờ), không lưu ở đâu cả. */
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var btn = $("v3GsheetBtn"), input = $("v3GsheetUrl"), statusEl = $("v3GsheetStatus");
+  if (!btn || !input || !statusEl) return;
+
+  var SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+  var URL_KEY = "v3_payroll_gsheet_url";
+  var PAYROLL_RE = /^T\d{2}20\d{2}$/;
+  var ATTEND_RE = /ch[aấ]m\s*c[oô]ng/i;
+  var ERR_RE = /^#(N\/A|NAME\?|VALUE!|REF!|DIV\/0!|NUM!|NULL!|ERROR!)$/;
+  var ERR_CODE = { "#NULL!": 0, "#DIV/0!": 7, "#VALUE!": 15, "#REF!": 23, "#NAME?": 29, "#NUM!": 36, "#N/A": 42, "#ERROR!": 15 };
+
+  var token = null, tokenExp = 0, clientIdPromise = null, gsiPromise = null;
+
+  try { var saved = localStorage.getItem(URL_KEY); if (saved && !input.value) input.value = saved; } catch (e) {}
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text || "";
+    statusEl.className = "v3-gsheet-status" + (kind ? " is-" + kind : "");
+  }
+  function setBusy(on, label) {
+    btn.disabled = on;
+    btn.setAttribute("aria-busy", on ? "true" : "false");
+    $("v3GsheetBtnText").textContent = label || (token && Date.now() < tokenExp ? "Đọc lại từ Google Sheet" : "Đăng nhập Google và đọc");
+  }
+
+  function spreadsheetId(text) {
+    var s = String(text || "").trim();
+    var m = /\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/.exec(s);
+    if (m) return m[1];
+    return /^[a-zA-Z0-9_-]{20,}$/.test(s) ? s : "";
+  }
+
+  function getClientId() {
+    if (!clientIdPromise) {
+      clientIdPromise = fetch("/api/index", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (d) { return (d && d.google_client_id) || ""; })
+        .catch(function () { return ""; });
+    }
+    return clientIdPromise;
+  }
+
+  function loadGsi() {
+    if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+    if (!gsiPromise) {
+      gsiPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { gsiPromise = null; reject(new Error("Không tải được thư viện đăng nhập Google. Kiểm tra mạng rồi thử lại.")); };
+        document.head.appendChild(s);
+      });
+    }
+    return gsiPromise;
+  }
+
+  function getToken(clientId) {
+    if (token && Date.now() < tokenExp - 60000) return Promise.resolve(token);
+    return new Promise(function (resolve, reject) {
+      var client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: SCOPE,
+        callback: function (resp) {
+          if (resp && resp.access_token) {
+            token = resp.access_token;
+            tokenExp = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+            resolve(token);
+          } else reject(new Error((resp && resp.error_description) || "Đăng nhập Google không thành công."));
+        },
+        error_callback: function (err) {
+          var t = err && err.type;
+          reject(new Error(t === "popup_closed" ? "Bạn đã đóng cửa sổ đăng nhập Google."
+            : t === "popup_failed_to_open" ? "Trình duyệt chặn cửa sổ đăng nhập. Cho phép popup cho trang này rồi thử lại."
+            : "Đăng nhập Google không thành công."));
+        }
+      });
+      client.requestAccessToken({ prompt: token ? "" : "select_account" });
+    });
+  }
+
+  function api(url, tk) {
+    return fetch(url, { headers: { Authorization: "Bearer " + tk } }).then(function (r) {
+      if (r.ok) return r.json();
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        var msg = (body && body.error && body.error.message) || ("HTTP " + r.status);
+        if (r.status === 401) { token = null; msg = "Phiên đăng nhập Google đã hết hạn. Bấm lại để đăng nhập."; }
+        else if (r.status === 403) msg = "Tài khoản Google này chưa có quyền xem file, hoặc Google Sheets API chưa được bật cho ứng dụng. (" + msg + ")";
+        else if (r.status === 404) msg = "Không tìm thấy file. Kiểm tra lại link Google Sheet.";
+        throw new Error(msg);
+      });
+    });
+  }
+
+  // Dựng workbook trong bộ nhớ từ kết quả Sheets API; ô lỗi (#VALUE!...) giữ đúng kiểu "lỗi"
+  // để phần đọc bảng lương nhận ra và cảnh báo như khi đọc file Excel.
+  function toWorkbookFile(title, sheetTitles, valueRanges) {
+    var wb = XLSX.utils.book_new();
+    valueRanges.forEach(function (vr, i) {
+      var ws = XLSX.utils.aoa_to_sheet(vr.values || [[]]);
+      Object.keys(ws).forEach(function (addr) {
+        if (addr.charAt(0) === "!") return;
+        var c = ws[addr];
+        if (c && c.t === "s" && ERR_RE.test(c.v)) { ws[addr] = { t: "e", v: ERR_CODE[c.v] != null ? ERR_CODE[c.v] : 15, w: c.v }; }
+      });
+      XLSX.utils.book_append_sheet(wb, ws, sheetTitles[i].slice(0, 31));
+    });
+    // Không ghi ra byte rồi đọc lại: gắn workbook vào File để doFetchEmployeesExcel dùng thẳng
+    var file = new File([], title + " (Google Sheet).xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    file.__workbook = wb;
+    return file;
+  }
+
+  async function run() {
+    var id = spreadsheetId(input.value);
+    if (!id) { setStatus("Dán link Google Sheet dạng https://docs.google.com/spreadsheets/d/…", "err"); input.focus(); return; }
+    try { localStorage.setItem(URL_KEY, input.value.trim()); } catch (e) {}
+
+    setBusy(true, "Đang kết nối…");
+    try {
+      var clientId = await getClientId();
+      if (!clientId) throw new Error("Chưa cấu hình đăng nhập Google: thêm biến môi trường GOOGLE_OAUTH_CLIENT_ID trên Vercel rồi deploy lại.");
+      await loadGsi();
+      setStatus("Đang chờ đăng nhập Google…");
+      var tk = await getToken(clientId);
+
+      setBusy(true, "Đang đọc…");
+      setStatus("Đang lấy danh sách sheet…");
+      var base = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(id);
+      var meta = await api(base + "?fields=" + encodeURIComponent("properties.title,sheets.properties(title,sheetType)"), tk);
+      var titles = (meta.sheets || [])
+        .map(function (s) { return s.properties || {}; })
+        .filter(function (p) { return !p.sheetType || p.sheetType === "GRID"; })
+        .map(function (p) { return p.title; })
+        .filter(function (t) { var n = String(t).normalize("NFC").trim(); return PAYROLL_RE.test(n) || ATTEND_RE.test(n); });
+      if (!titles.some(function (t) { return PAYROLL_RE.test(String(t).trim()); })) {
+        throw new Error("File không có sheet lương dạng T072026, T082026…");
+      }
+
+      setStatus("Đang đọc " + titles.length + " sheet (lương và chấm công)…");
+      var qs = titles.map(function (t) { return "ranges=" + encodeURIComponent("'" + String(t).replace(/'/g, "''") + "'"); }).join("&");
+      var data = await api(base + "/values:batchGet?" + qs + "&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER&majorDimension=ROWS", tk);
+
+      var file = toWorkbookFile((meta.properties && meta.properties.title) || "Bảng lương", titles, data.valueRanges || []);
+      await window.doFetchEmployeesExcel(file);
+      var now = new Date();
+      setStatus("Đã đọc " + titles.length + " sheet từ “" + ((meta.properties && meta.properties.title) || "Google Sheet") + "” lúc " +
+        String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") + ".", "ok");
+    } catch (e) {
+      setStatus(e && e.message ? e.message : String(e), "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  btn.addEventListener("click", run);
+  input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); run(); } });
+  // Cho phép kiểm thử phần dựng workbook mà không cần đăng nhập
+  window.__v3GsheetToFile = toWorkbookFile;
+})();
