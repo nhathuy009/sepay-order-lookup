@@ -2501,12 +2501,14 @@ function resolveAttendanceForSheet(selectedSheet) {
  *   U = Không hưởng lương
  *   S = Nghỉ chế độ BHXH
  *   K = (cũ) Phép không lương — vẫn đếm nếu gặp
+ *   TN/KH = Nghỉ việc riêng có lương (hiếu, hỉ) — ô chấm công ghi TN, KH hoặc TN/KH
+ *   DL = Du lịch theo đoàn công ty
  *
  * Công thức:
  *   (1) Ngày công thực tế     = tổng L
  *   (2) Ngày công chuẩn       = số ngày trong tháng − N
- *   (3) Ngày công hưởng lương = L + H + P + V
- *   L + N + H + P + V + U + S = tổng số ngày trong tháng
+ *   (3) Ngày công hưởng lương = L + H + P + V + TN/KH + DL
+ *   L + N + H + P + V + U + S + TN/KH + DL = tổng số ngày trong tháng
  *
  * @returns {{ sheet, ok, err, warn, rows, attCount, payCount, hasData }}
  */
@@ -2532,7 +2534,7 @@ function computeAuditStats(selectedSheet) {
   (att && att.rows ? att.rows : []).forEach(r => {
     const ma = (r.ma_nv || "").trim().toUpperCase();
     if (!ma) return;
-    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0, U = 0, S = 0;
+    let L = 0, N = 0, P = 0, V = 0, K = 0, H = 0, U = 0, S = 0, TN = 0, DL = 0;
     (r.days || []).forEach(code => {
       const c = (code || "").toUpperCase();
       if (c === "L") L++;
@@ -2542,16 +2544,18 @@ function computeAuditStats(selectedSheet) {
       else if (c === "K") K++;
       else if (c === "U") U++;
       else if (c === "S") S++;
+      else if (c === "TN" || c === "KH" || c === "TN/KH") TN++;
+      else if (c === "DL") DL++;
       else if (c === "H" || c === "LE" || c === "LỄ") H++;
     });
     // (1) Công TT = tổng L
     // (2) Công chuẩn = daysInMonth − N (nếu biết số ngày tháng)
-    // (3) Công HL = L + H + P + V
+    // (3) Công HL = L + H + P + V + TN/KH + DL
     attMap[ma] = {
-      L_count: L, N, P, V, K, H, U, S,
+      L_count: L, N, P, V, K, H, U, S, TN, DL,
       cong_tt_cc: L,
       cong_chuan_cc: daysInMonth > 0 ? daysInMonth - N : "",
-      cong_hl_uoc: L + H + P + V
+      cong_hl_uoc: L + H + P + V + TN + DL
     };
   });
 
@@ -2591,7 +2595,7 @@ function computeAuditStats(selectedSheet) {
       }
       if (!isNaN(nchl) && nchl !== a.cong_hl_uoc) {
         status = "err";
-        issues.push(`Công HL: ước L+H+P+V=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
+        issues.push(`Công HL: ước L+H+P+V+TN/KH+DL=${a.cong_hl_uoc} ≠ Lương=${nchl}`);
       }
       if (issues.length === 0) {
         status = "ok";
@@ -2760,6 +2764,8 @@ function renderAuditTable() {
       ${cell(a ? a.H : "", "att-code-le")}
       ${cell(a ? a.P : "", "att-code-p")}
       ${cell(a ? a.V : "", "att-code-v")}
+      ${cell(a ? a.TN : "")}
+      ${cell(a ? a.DL : "")}
       ${cell(a ? a.U : "", "att-code-k")}
       ${cell(a ? a.S : "", "att-code-s")}
       ${cell(a ? a.N : "", "att-code-n")}
