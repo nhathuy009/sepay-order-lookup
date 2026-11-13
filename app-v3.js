@@ -280,3 +280,203 @@
     if (m && TOOLS[m[1]]) { showTool(m[1]); previousKey = m[1]; } else { showHome(); }
   });
 })();
+
+/* ---------------- Xử lý bảng lương: tổng quan mọi tháng + cảnh báo ô lỗi ----------------
+   Đọc globalSheetsData / globalSheetMeta do app.js tạo khi nạp file (không đổi dữ liệu). */
+(function () {
+  "use strict";
+  if (typeof window.doFetchEmployeesExcel !== "function" || typeof window.displaySheetData !== "function") return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+  var money = function (n) { return fmt.format(Math.round(n || 0)); };
+
+  function parseKey(k) {           // "T072026" -> { m: 7, y: 2026, label: "07/2026", order: 202607 }
+    var m = /^T(\d{2})(\d{4})$/.exec(k);
+    if (!m) return null;
+    return { m: +m[1], y: +m[2], label: m[1] + "/" + m[2], order: +m[2] * 100 + +m[1] };
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  // globalSheetsData khai báo bằng `let` trong app.js -> không nằm trên window, đọc qua tên biến
+  function sheetData() { return typeof globalSheetsData !== "undefined" && globalSheetsData ? globalSheetsData : {}; }
+  function sheets() {
+    var data = sheetData();
+    return Object.keys(data).map(function (k) { return { key: k, info: parseKey(k) }; })
+      .filter(function (s) { return s.info; })
+      .sort(function (a, b) { return a.info.order - b.info.order; });
+  }
+  function totals(rows) {
+    return rows.reduce(function (t, r) {
+      t.gross += r.tong_thu_nhap || 0; t.tax += r.thue_tncn || 0; t.net += r.thuc_nhan || 0; return t;
+    }, { gross: 0, tax: 0, net: 0 });
+  }
+  function issueSummary(meta) {
+    var list = (meta && meta.issues) || [];
+    var fixed = list.filter(function (i) { return i.fixed; });
+    var open = list.filter(function (i) { return !i.fixed; });
+    var people = function (arr) { var s = {}; arr.forEach(function (i) { s[i.ma_nv] = 1; }); return Object.keys(s).length; };
+    return { fixed: fixed, open: open, fixedPeople: people(fixed), openPeople: people(open) };
+  }
+
+  function selectMonth(key) {
+    var sel = $("sheetSelect");
+    if (!sel || sel.value === key) return;
+    sel.value = key;
+    window.displaySheetData();
+  }
+
+  function renderOverview() {
+    var box = $("v3PayOverview"), body = $("v3PayOverviewBody");
+    if (!box || !body) return;
+    var list = sheets();
+    body.textContent = "";
+    if (!list.length) { box.hidden = true; return; }
+
+    var prevNet = null, prevLabel = "";
+    list.forEach(function (s) {
+      var rows = sheetData()[s.key] || [];
+      var meta = (window.globalSheetMeta || {})[s.key] || {};
+      var t = totals(rows), iss = issueSummary(meta);
+      var netUnsure = iss.open.some(function (i) { return i.field === "thuc_nhan"; });
+      var grossUnsure = iss.open.some(function (i) { return i.field === "tong_thu_nhap"; });
+      var taxUnsure = iss.open.some(function (i) { return i.field === "thue_tncn"; });
+      var amount = function (v, unsure) {
+        var td = el("td", "num", unsure ? "Lỗi trong file" : money(v));
+        if (unsure) { td.classList.add("is-unsure"); td.title = "Một số ô của tháng này trong file Excel đang báo lỗi nên tổng không tin được"; }
+        return td;
+      };
+      var tr = el("tr");
+      tr.setAttribute("data-key", s.key);
+      tr.tabIndex = 0;
+      tr.setAttribute("role", "button");
+      tr.setAttribute("aria-label", "Xem bảng lương tháng " + s.info.label);
+
+      var th = el("th"); th.scope = "row";
+      th.appendChild(el("span", "v3-pay-month", "Tháng " + s.info.label));
+      tr.appendChild(th);
+      tr.appendChild(el("td", "num", String(rows.length)));
+      tr.appendChild(amount(t.gross, grossUnsure));
+      tr.appendChild(amount(t.tax, taxUnsure));
+      tr.appendChild(amount(t.net, netUnsure));
+
+      var delta = el("td", "num v3-pay-delta");
+      if (prevNet && t.net && !netUnsure) {
+        var pct = (t.net - prevNet) / prevNet * 100;
+        delta.textContent = (pct > 0 ? "+" : "") + pct.toFixed(1).replace(".", ",") + "%";
+        delta.classList.add(pct > 0.05 ? "is-up" : (pct < -0.05 ? "is-down" : "is-flat"));
+        delta.title = "Thực nhận so với tháng " + prevLabel;
+      } else delta.textContent = "–";
+      tr.appendChild(delta);
+      if (!netUnsure && t.net) { prevNet = t.net; prevLabel = s.info.label; }
+
+      var st = el("td");
+      var badge;
+      if (iss.open.length) badge = el("span", "v3-badge is-danger", iss.openPeople + " NV lỗi");
+      else if (iss.fixed.length) badge = el("span", "v3-badge is-info", "Tự tính lại " + iss.fixedPeople + " NV");
+      else badge = el("span", "v3-badge is-ok", "Ổn");
+      st.appendChild(badge);
+      tr.appendChild(st);
+
+      tr.addEventListener("click", function () { selectMonth(s.key); });
+      tr.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMonth(s.key); }
+      });
+      body.appendChild(tr);
+    });
+
+    // Tháng bị thiếu giữa tháng đầu và tháng cuối
+    var missing = [];
+    var last = list[list.length - 1].info.order;
+    for (var o = list[0].info.order; o < last;) {
+      var y = Math.floor(o / 100), m = o % 100 + 1;
+      if (m > 12) { m = 1; y++; }
+      o = y * 100 + m;
+      if (o < last && !list.some(function (s) { return s.info.order === o; })) missing.push((m < 10 ? "0" : "") + m + "/" + y);
+    }
+    var sub = list.length + " tháng lương, từ " + list[0].info.label + " đến " + list[list.length - 1].info.label + ".";
+    if (missing.length) sub += " Không có sheet lương tháng " + missing.join(", ") + ".";
+    sub += " Bấm vào một tháng để xem chi tiết.";
+    $("v3PayOverviewSub").textContent = sub;
+    box.hidden = false;
+    markActive();
+  }
+
+  function markActive() {
+    var key = $("sheetSelect") && $("sheetSelect").value;
+    document.querySelectorAll("#v3PayOverviewBody tr").forEach(function (tr) {
+      var on = tr.getAttribute("data-key") === key;
+      tr.classList.toggle("is-active", on);
+      if (on) tr.setAttribute("aria-current", "true"); else tr.removeAttribute("aria-current");
+    });
+  }
+
+  function renderIssues() {
+    var box = $("v3PayIssues");
+    if (!box) return;
+    var key = $("sheetSelect") && $("sheetSelect").value;
+    var meta = key && (window.globalSheetMeta || {})[key];
+    box.textContent = "";
+    if (!meta) { box.hidden = true; return; }
+    var info = parseKey(key) || { label: key }, iss = issueSummary(meta);
+    var notes = [];
+
+    if (iss.open.length) {
+      var d = el("div", "v3-alert is-danger");
+      d.appendChild(el("strong", null, "Tháng " + info.label + ": " + iss.open.length + " ô lỗi công thức chưa tự sửa được (" + iss.openPeople + " nhân viên)."));
+      var fields = {};
+      iss.open.forEach(function (i) { fields[i.label + " " + i.code] = 1; });
+      d.appendChild(el("p", null, "Các số liệu này trong file đang báo lỗi nên không dùng được: " + Object.keys(fields).join(", ") +
+        ". Mở file Excel, sửa công thức (thường là VLOOKUP sang sheet chấm công) rồi nạp lại."));
+      var det = el("details");
+      det.appendChild(el("summary", null, "Xem danh sách ô lỗi"));
+      var ul = el("ul", "v3-issue-list");
+      iss.open.slice(0, 80).forEach(function (i) {
+        ul.appendChild(el("li", null, "Dòng " + i.row + " · " + i.ma_nv + (i.ten_nv ? " – " + i.ten_nv : "") + " · " + i.label + ": " + i.code + (i.skipped ? " (dòng bị bỏ qua)" : "")));
+      });
+      if (iss.open.length > 80) ul.appendChild(el("li", null, "… và " + (iss.open.length - 80) + " ô khác"));
+      det.appendChild(ul);
+      d.appendChild(det);
+      box.appendChild(d);
+    }
+    if (iss.fixed.length) {
+      var f = el("div", "v3-alert is-info");
+      f.appendChild(el("strong", null, "Đã tự tính lại Thuế TNCN và Thực nhận cho " + iss.fixedPeople + " nhân viên."));
+      f.appendChild(el("p", null, "Các ô này trong file báo " + Array.from(new Set(iss.fixed.map(function (i) { return i.code; }))).join(", ") +
+        " (hàm IFS không chạy trên bản Excel đã lưu file). Công cụ tính lại theo đúng biểu thuế lũy tiến trong công thức của file; nên đối chiếu trước khi chi lương."));
+      box.appendChild(f);
+    }
+    if (meta.extraIncomeLabels && meta.extraIncomeLabels.length) {
+      notes.push("Cột " + meta.extraIncomeLabels.map(function (s) { return "“" + s.replace(/\s+/g, " ") + "”"; }).join(", ") + " được cộng vào mục Khác.");
+    }
+    if (!meta.hasStdDaysColumn) notes.push("Mẫu tháng này không có cột Ngày công chuẩn; dùng " + meta.stdDays + " ngày ghi trong sheet.");
+    if (meta.legacy) notes.push("Không nhận diện được tiêu đề cột, đang đọc theo vị trí cột của mẫu T10/2026. Hãy kiểm tra kỹ số liệu.");
+    if (notes.length) {
+      var n = el("div", "v3-alert is-note");
+      notes.forEach(function (t) { n.appendChild(el("p", null, t)); });
+      box.appendChild(n);
+    }
+    box.hidden = !box.children.length;
+  }
+
+  var origFetch = window.doFetchEmployeesExcel;
+  window.doFetchEmployeesExcel = async function () {
+    var result = await origFetch.apply(this, arguments);
+    renderOverview();
+    // Tự chọn tháng mới nhất để có ngay kết quả (vẫn đổi được bằng bảng tổng quan hoặc ô chọn)
+    var list = sheets(), sel = $("sheetSelect");
+    if (list.length && sel && !sel.value) selectMonth(list[list.length - 1].key);
+    return result;
+  };
+  var origDisplay = window.displaySheetData;
+  window.displaySheetData = function () {
+    var r = origDisplay.apply(this, arguments);
+    markActive();
+    renderIssues();
+    return r;
+  };
+})();

@@ -345,6 +345,22 @@
           <div id="sheetsResult" class="msg" style="margin-top: 12px;"></div>
         </div>
 
+        <!-- v3: tổng quan mọi tháng trong file + cảnh báo ô lỗi của tháng đang xem (app-v3.js vẽ) -->
+        <section class="card v3-pay-overview" id="v3PayOverview" aria-labelledby="v3PayOverviewTitle" hidden>
+          <div class="v3-pay-head">
+            <div>
+              <h3 id="v3PayOverviewTitle">Tổng quan các tháng trong file</h3>
+              <p class="v3-field-hint" id="v3PayOverviewSub"></p>
+            </div>
+          </div>
+          <div class="table-responsive v3-pay-table-wrap">
+            <table class="v3-pay-table">
+              <thead><tr><th scope="col">Tháng</th><th scope="col" class="num">Nhân viên</th><th scope="col" class="num">Tổng thu nhập</th><th scope="col" class="num">Thuế TNCN</th><th scope="col" class="num">Thực nhận</th><th scope="col" class="num">So tháng trước</th><th scope="col">Tình trạng</th></tr></thead>
+              <tbody id="v3PayOverviewBody"></tbody>
+            </table>
+          </div>
+        </section>
+        <div id="v3PayIssues" class="v3-pay-issues" hidden></div>
         <div class="card" id="employeeResultCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 16px;">
             <h3 style="margin:0; font-size:16px;" id="employeeResultTitle">Bảng lương chi tiết</h3>

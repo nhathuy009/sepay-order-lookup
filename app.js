@@ -505,6 +505,128 @@ function removeVietnameseDiacritics(str) {
   return s;
 }
 
+// =======================================================
+// BẢNG LƯƠNG: NHẬN DIỆN CỘT THEO TIÊU ĐỀ
+// Mẫu bảng lương đổi qua các tháng (T02 / T03–T06 / T07–T08 / T10… lệch cột khác nhau).
+// Tìm dòng tiêu đề có "MSNV", đọc dòng đó + dòng dưới (tiêu đề con) để biết cột nào là gì.
+// Không nhận diện đủ cột bắt buộc -> trả về vị trí cố định của mẫu T10/2026 (hành vi cũ).
+// =======================================================
+const PAYROLL_LEGACY_COLS = {
+  ma_nv: 1, ten_nv: 2, luong_cb: 7, ngay_cong_tt: 9, ngay_cong_chuan: 10, ngay_cong_hl: 11,
+  trach_nhiem: 12, trang_phuc: 13, com_trua: 14, bhxh: 15, hoa_hong: 16, thuong_dong_gop: 17,
+  luong_phep: 18, khac: 19, tong_thu_nhap: 20, bhxh_tru: 21, bhyt_tru: 22, bhtn_tru: 23, cd_tru: 24,
+  tong_khau_tru: 25, tntt: 27, thue_tncn: 28, tam_ung: 29, thuc_nhan: 30, stk: 31, ngan_hang: 32,
+  ht_tt: 36, od_ts: 37, tnld_bnn: 38, bhyt_cty: 39, bhtn_cty: 40, cd_cty: 41
+};
+const PAYROLL_FIELD_LABELS = {
+  ma_nv: "MSNV", ten_nv: "Họ tên", luong_cb: "Lương cơ bản", ngay_cong_tt: "Ngày công thực tế",
+  ngay_cong_chuan: "Ngày công chuẩn", ngay_cong_hl: "Ngày công hưởng lương", trach_nhiem: "Trách nhiệm",
+  trang_phuc: "Trang phục", com_trua: "Cơm trưa", bhxh: "Chi phí HT-BHXH", hoa_hong: "Hoa hồng",
+  thuong_dong_gop: "Thưởng", luong_phep: "Lương phép", khac: "Khác", tong_thu_nhap: "Tổng thu nhập",
+  bhxh_tru: "BHXH (NLĐ)", bhyt_tru: "BHYT (NLĐ)", bhtn_tru: "BHTN (NLĐ)", cd_tru: "CĐ (NLĐ)",
+  tong_khau_tru: "Tổng khấu trừ", tntt: "Thu nhập tính thuế", thue_tncn: "Thuế TNCN", tam_ung: "Tạm ứng",
+  thuc_nhan: "Thực nhận", stk: "STK", ngan_hang: "Ngân hàng", ht_tt: "HT-TT", od_ts: "ÔĐ-TS",
+  tnld_bnn: "TNLĐ-BNN", bhyt_cty: "BHYT (CTY)", bhtn_cty: "BHTN (CTY)", cd_cty: "CĐ (CTY)"
+};
+
+function detectPayrollColumns(rows) {
+  const norm = (v) => v == null ? "" : String(v).normalize("NFC").toUpperCase().replace(/\s+/g, " ").trim();
+  let h = -1;
+  for (let i = 0; i < Math.min(rows.length, 12); i++) {
+    if ((rows[i] || []).some(v => norm(v) === "MSNV")) { h = i; break; }
+  }
+  const legacy = { cols: Object.assign({}, PAYROLL_LEGACY_COLS), stdDays: 0, legacy: true, missing: [], extraIncome: [] };
+  if (h < 0) return legacy;
+
+  const r3 = (rows[h] || []).map(norm);
+  const r4 = (rows[h + 1] || []).map(norm);
+  const r5 = rows[h + 2] || [];
+  const test = (t, m) => m instanceof RegExp ? m.test(t) : t === m;
+  const inRow = (row, m, from) => { for (let c = from || 0; c < row.length; c++) if (row[c] && test(row[c], m)) return c; return -1; };
+  const any = (m) => { const a = inRow(r4, m); return a >= 0 ? a : inRow(r3, m); };
+
+  const cols = {
+    ma_nv: inRow(r3, "MSNV"),
+    ten_nv: inRow(r3, /^HỌ (VÀ )?TÊN/),
+    luong_cb: any(/^LƯƠNG CƠ BẢN/),
+    ngay_cong_tt: any(/^NGÀY CÔNG THỰC TẾ/),
+    ngay_cong_chuan: any(/^NGÀY CÔNG CHUẨN/),
+    ngay_cong_hl: (() => { const c = any(/^NGÀY CÔNG HƯỞNG LƯƠNG/); return c >= 0 ? c : any("NGÀY CÔNG"); })(),
+    trach_nhiem: any(/^TRÁCH NHIỆM/),
+    trang_phuc: any(/^TRANG PHỤC/),
+    com_trua: any(/^CƠM TRƯA/),
+    bhxh: any(/^CHI PHÍ/),
+    hoa_hong: any(/^HOA HỒNG/),
+    thuong_dong_gop: any(/^THƯỞNG/),
+    luong_phep: any(/^LƯƠNG PHÉP/),
+    khac: any("KHÁC"),
+    tong_thu_nhap: any(/^TỔNG THU NHẬP/),
+    tong_khau_tru: any(/^TỔNG KHẤU TRỪ/),
+    tntt: any(/^THU NHẬP TÍNH THUẾ/),
+    thue_tncn: any(/^TIỀN THUẾ/),
+    tam_ung: any(/^TẠM ỨNG/),
+    thuc_nhan: any(/^THỰC NHẬN/),
+    stk: inRow(r4, "STK"),
+    ngan_hang: inRow(r4, "NGÂN HÀNG"),
+    ht_tt: inRow(r4, "HT-TT"),
+    od_ts: inRow(r4, /^ÔĐ-TS/),
+    tnld_bnn: inRow(r4, /^TNLĐ/)
+  };
+  // Khấu trừ người lao động: tiêu đề con BHXH/BHYT/BHTN/CĐ nằm sau "Các khoản khấu trừ"
+  const kt = Math.max(0, inRow(r3, /^CÁC KHOẢN KHẤU TRỪ/));
+  cols.bhxh_tru = inRow(r4, "BHXH", kt);
+  cols.bhyt_tru = inRow(r4, "BHYT", kt);
+  cols.bhtn_tru = inRow(r4, "BHTN", kt);
+  cols.cd_tru = inRow(r4, "CĐ", kt);
+  // Công ty đóng: BHYT/BHTN/CĐ ở dòng tiêu đề chính, nằm sau cột HT-TT
+  const ct = cols.ht_tt >= 0 ? cols.ht_tt : 0;
+  cols.bhyt_cty = inRow(r3, "BHYT", ct);
+  cols.bhtn_cty = inRow(r3, "BHTN", ct);
+  cols.cd_cty = inRow(r3, "CĐ", ct);
+
+  // Số ngày công chuẩn kiểu cũ: 1 ô ở dòng tỷ lệ (ngay dưới tiêu đề), cột Tổng thu nhập
+  const r5Std = (() => { const v = parseFloat(r5[cols.tong_thu_nhap]); return v >= 20 && v <= 31 ? v : 0; })();
+  // T03/2026: cột ghi "Ngày công chuẩn" nhưng công thức dùng nó làm ngày công hưởng lương (H/$S$5*K)
+  if (cols.ngay_cong_hl < 0 && cols.ngay_cong_chuan >= 0 && r5Std) {
+    cols.ngay_cong_hl = cols.ngay_cong_chuan;
+    cols.ngay_cong_chuan = -1;
+  }
+
+  const required = ["ma_nv", "ten_nv", "luong_cb", "ngay_cong_hl", "tong_thu_nhap", "tong_khau_tru", "thuc_nhan"];
+  const missingRequired = required.filter(k => cols[k] < 0);
+  if (missingRequired.length) {
+    legacy.missing = missingRequired;
+    return legacy;
+  }
+  // Mẫu cũ không có cột "Ngày công chuẩn": số ngày chuẩn ghi 1 ô ở dòng tỷ lệ, dưới cột Tổng thu nhập
+  const stdDays = cols.ngay_cong_chuan < 0 ? r5Std : 0;
+  Object.keys(cols).forEach(k => { if (cols[k] < 0) cols[k] = null; });
+
+  // Khoản thu nhập khác không có tên chuẩn (Tăng ca, Thưởng lễ 30/4…): mọi cột có tiêu đề nằm giữa
+  // cột phụ cấp cuối cùng và cột Tổng thu nhập mà chưa gán -> cộng dồn vào "Khác".
+  const mapped = new Set(Object.values(cols).filter(v => v != null));
+  const incomeFrom = Math.max(...["trang_phuc", "com_trua", "trach_nhiem", "bhxh", "hoa_hong"].map(k => cols[k] == null ? -1 : cols[k]));
+  const extraIncome = [];
+  for (let c = incomeFrom + 1; c < cols.tong_thu_nhap; c++) {
+    if (!mapped.has(c) && (r3[c] || r4[c])) extraIncome.push(c);
+  }
+  const missing = Object.keys(PAYROLL_LEGACY_COLS).filter(k => cols[k] == null);
+  return { cols, stdDays, legacy: false, missing, extraIncome, headerRow: h };
+}
+
+// Biểu thuế lũy tiến đúng như công thức IFS trong file bảng lương (5 bậc).
+function calcPitProgressive(tntt) {
+  const t = Number(tntt) || 0;
+  if (t <= 0) return 0;
+  let v;
+  if (t <= 10000000) v = t * 0.05;
+  else if (t <= 30000000) v = t * 0.10 - 500000;
+  else if (t <= 60000000) v = t * 0.20 - 3500000;
+  else if (t <= 100000000) v = t * 0.30 - 9500000;
+  else v = t * 0.35 - 14500000;
+  return Math.max(0, Math.round(v));
+}
+
 function setEmployeeDropZoneState(state, fileName) {
   const zone = document.getElementById("employeeDropZone");
   const inner = document.getElementById("employeeDropZoneInner");
@@ -561,62 +683,75 @@ async function doFetchEmployeesExcel(fileOverride) {
     const pattern = /^T\d{2}20\d{2}$/;
     globalSheetsData = {};
     globalAttendanceData = {};
+    // Thông tin nhận diện + danh sách ô lỗi của từng sheet lương (giao diện v3 dùng để cảnh báo)
+    window.globalSheetMeta = {};
     
     workbook.SheetNames.forEach(sheetName => {
       const cleanName = sheetName.trim();
       if (pattern.test(cleanName)) {
         const worksheet = workbook.Sheets[sheetName];
         
-        // Số ngày công chuẩn mặc định (fallback). Ưu tiên lấy theo từng NV ở cột K.
-        // (Không đọc T5 nữa — ô T5 trong format mới là tỷ lệ BHXH, không phải ngày công)
-        const soNgayCongChuan = 26;
-
-        // Đọc dữ liệu từ dòng 8 (index 7)
-        // Mapping (sau khi chuyển Trách nhiệm từ O → M, các cột phúc lợi dời sang phải):
-        //   B=MSNV C=Họ tên H=Lương CB J=Ngày công TT K=Ngày công chuẩn
-        //   L=Ngày công hưởng lương
-        //   M=Trách nhiệm  N=Trang phục  O=Cơm trưa  P=HT-BHXH
-        //   Q=Hoa hồng R=Thưởng S=Lương phép T=Khác U=Tổng TN
-        //   V–Y=BHXH/BHYT/BHTN/CĐ trừ  AC=Thuế TNCN AD=Tạm ứng AE=Thực nhận
-        //   AF–AG=STK/NH  AK–AM=HT-TT/ÔĐ-TS/TNLĐ  AN–AP=BHYT/BHTN/CĐ CTY
+        // Nhận diện cột theo tiêu đề (xem detectPayrollColumns). Đọc dữ liệu từ dòng 8 (index 7) như trước.
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
-        // Skip first 7 rows (0-6) → start at index 7
-        const dataRows = jsonData.slice(7);
-        
+        const layout = detectPayrollColumns(jsonData);
+        const COL = layout.cols;
+        // Ngày công chuẩn: ưu tiên cột K của từng NV; mẫu cũ lấy ô số ngày chuẩn trong sheet; cuối cùng 26.
+        const soNgayCongChuan = layout.stdDays || 26;
+        const DATA_START = 7;
+        const sheetIssues = [];
+        // sheet_to_json trả null cho ô lỗi (#NAME?, #VALUE!...) -> đọc thẳng kiểu ô để phân biệt "trống" với "lỗi"
+        const cellErr = (ri, key) => {
+          const ci = COL[key];
+          if (ci == null) return null;
+          const cell = worksheet[XLSX.utils.encode_cell({ r: ri, c: ci })];
+          return cell && cell.t === "e" ? (cell.w || "#ERR") : null;
+        };
+        const dataRows = jsonData.slice(DATA_START);
+
         let sheetData = [];
-        dataRows.forEach(row => {
+        dataRows.forEach((row, rowOffset) => {
           if (!row || !Array.isArray(row)) return;
-          const ma_nv = row[1]; 
-          const ten_nv = row[2];
-          const luong_cb_raw = row[7];            // H: Lương cơ bản
-          const ngay_cong_tt_raw = row[9];        // J: Ngày công thực tế
-          const ngay_cong_chuan_raw = row[10];    // K: Ngày công chuẩn (mẫu số)
-          const ngay_cong_hl_raw = row[11];       // L: Ngày công hưởng lương
-          const trach_nhiem_raw = row[12];        // M: Trách nhiệm (đã chuyển từ O)
-          const trang_phuc_raw = row[13];         // N: Trang phục
-          const com_trua_raw = row[14];           // O: Cơm trưa
-          const bhxh_raw = row[15];               // P: Chi phí HT-BHXH
-          const hoa_hong_raw = row[16];           // Q: Hoa hồng bán hàng
-          const thuong_dong_gop_raw = row[17];    // R: Thưởng
-          const luong_phep_raw = row[18];         // S: Lương phép năm
-          const khac_raw = row[19];               // T: Khác
-          const tong_thu_nhap_raw = row[20];      // U: Tổng thu nhập trong tháng
-          const bhxh_tru_raw = row[21];           // V: BHXH (NLĐ trừ)
-          const bhyt_tru_raw = row[22];           // W: BHYT (NLĐ trừ)
-          const bhtn_tru_raw = row[23];           // X: BHTN (NLĐ trừ)
-          const cd_tru_raw = row[24];             // Y: CĐ (NLĐ trừ)
-          const tong_khau_tru_raw = row[25];      // Z: Tổng khấu trừ
-          const thue_tncn_raw = row[28];          // AC: Tiền thuế TNCN
-          const tam_ung_raw = row[29];            // AD: Tạm ứng
-          const thuc_nhan_raw = row[30];          // AE: Thực nhận
-          const stk_raw = row[31];                // AF: STK
-          const ngan_hang_raw = row[32];          // AG: Ngân hàng
-          const ht_tt_raw = row[36];              // AK: HT-TT
-          const od_ts_raw = row[37];              // AL: ÔĐ-TS
-          const tnld_bnn_raw = row[38];           // AM: TNLĐ-BNN
-          const bhyt_cty_raw = row[39];           // AN: BHYT (CTY)
-          const bhtn_cty_raw = row[40];           // AO: BHTN (CTY)
-          const cd_cty_raw = row[41];             // AP: CĐ (CTY)
+          const ri = DATA_START + rowOffset;
+          const at = (key) => COL[key] == null ? null : row[COL[key]];
+          const ma_nv = at("ma_nv");
+          const ten_nv = at("ten_nv");
+          const luong_cb_raw = at("luong_cb");
+          const ngay_cong_tt_raw = at("ngay_cong_tt");
+          const ngay_cong_chuan_raw = at("ngay_cong_chuan");
+          const ngay_cong_hl_raw = at("ngay_cong_hl");
+          const trach_nhiem_raw = at("trach_nhiem");
+          const trang_phuc_raw = at("trang_phuc");
+          const com_trua_raw = at("com_trua");
+          const bhxh_raw = at("bhxh");
+          const hoa_hong_raw = at("hoa_hong");
+          const thuong_dong_gop_raw = at("thuong_dong_gop");
+          const luong_phep_raw = at("luong_phep");
+          const khac_raw = (parseFloat(at("khac")) || 0) +
+            (layout.extraIncome || []).reduce((sum, c) => sum + (parseFloat(row[c]) || 0), 0);
+          const tong_thu_nhap_raw = at("tong_thu_nhap");
+          const bhxh_tru_raw = at("bhxh_tru");
+          const bhyt_tru_raw = at("bhyt_tru");
+          const bhtn_tru_raw = at("bhtn_tru");
+          const cd_tru_raw = at("cd_tru");
+          const tong_khau_tru_raw = at("tong_khau_tru");
+          const tntt_raw = at("tntt");
+          const thue_tncn_raw = at("thue_tncn");
+          const tam_ung_raw = at("tam_ung");
+          const thuc_nhan_raw = at("thuc_nhan");
+          const stk_raw = at("stk");
+          const ngan_hang_raw = at("ngan_hang");
+          const ht_tt_raw = at("ht_tt");
+          const od_ts_raw = at("od_ts");
+          const tnld_bnn_raw = at("tnld_bnn");
+          const bhyt_cty_raw = at("bhyt_cty");
+          const bhtn_cty_raw = at("bhtn_cty");
+          const cd_cty_raw = at("cd_cty");
+          // Có MSNV nhưng ô Họ tên lỗi công thức -> dòng không đọc được, báo lại thay vì bỏ qua im lặng
+          const tenErr = cellErr(ri, "ten_nv");
+          if (tenErr && ma_nv != null && String(ma_nv).trim() !== "") {
+            sheetIssues.push({ row: ri + 1, ma_nv: String(ma_nv).trim(), ten_nv: "", field: "ten_nv",
+              label: "Họ tên", code: tenErr, fixed: false, skipped: true });
+          }
           
           const ma_nv_str = ma_nv !== undefined && ma_nv !== null ? String(ma_nv).trim() : "";
           const ten_nv_str = ten_nv !== undefined && ten_nv !== null ? String(ten_nv).trim() : "";
@@ -624,7 +759,7 @@ async function doFetchEmployeesExcel(fileOverride) {
           if (ma_nv_str !== "" && ten_nv_str !== "") {
             const luong_cb = parseFloat(luong_cb_raw) || 0;
             const ngay_cong_tt = parseFloat(ngay_cong_tt_raw) || 0;
-            const ngay_cong_chuan = parseFloat(ngay_cong_chuan_raw) || 0;
+            let ngay_cong_chuan = parseFloat(ngay_cong_chuan_raw) || 0;
             const ngay_cong_hl = parseFloat(ngay_cong_hl_raw) || 0;
             const trach_nhiem = Math.round(parseFloat(trach_nhiem_raw) || 0);
             const trang_phuc = parseFloat(trang_phuc_raw) || 0;
@@ -640,9 +775,9 @@ async function doFetchEmployeesExcel(fileOverride) {
             const bhtn_tru = parseFloat(bhtn_tru_raw) || 0;
             const cd_tru = parseFloat(cd_tru_raw) || 0;
             const tong_khau_tru = parseFloat(tong_khau_tru_raw) || 0;
-            const thue_tncn = parseFloat(thue_tncn_raw) || 0;
+            let thue_tncn = parseFloat(thue_tncn_raw) || 0;
             const tam_ung = parseFloat(tam_ung_raw) || 0;
-            const thuc_nhan = parseFloat(thuc_nhan_raw) || 0;
+            let thuc_nhan = parseFloat(thuc_nhan_raw) || 0;
             const stk = stk_raw !== undefined && stk_raw !== null ? String(stk_raw).trim() : "";
             const ngan_hang = ngan_hang_raw !== undefined && ngan_hang_raw !== null ? String(ngan_hang_raw).trim() : "";
             const ht_tt = parseFloat(ht_tt_raw) || 0;
@@ -654,6 +789,35 @@ async function doFetchEmployeesExcel(fileOverride) {
             const tong_bhxh_nld = bhxh_tru + bhyt_tru + bhtn_tru; // V + W + X (BHXH người lao động đóng)
             const tong_ajakal = ht_tt + od_ts + tnld_bnn; // AK + AL + AM
             const tong_bhxh_moi = ht_tt + od_ts + tnld_bnn + bhyt_cty + bhtn_cty; // Tổng BHXH CTY Đóng (không gồm CĐ)
+
+            // --- Ô lỗi công thức ngay trong file Excel ---
+            // Vd. Thuế TNCN dùng hàm IFS bị lưu thành "_xludf.IFS" -> #NAME?, kéo theo Thực nhận #NAME?.
+            // Tự tính lại Thuế (theo đúng biểu lũy tiến trong công thức) và Thực nhận khi đủ dữ liệu;
+            // các ô lỗi khác chỉ ghi nhận để cảnh báo, không đoán giá trị.
+            const issue = (key, code, fixed, value) =>
+              sheetIssues.push({ row: ri + 1, ma_nv: ma_nv_str, ten_nv: ten_nv_str, field: key, label: PAYROLL_FIELD_LABELS[key] || key, code, fixed, value });
+            let thueOk = true;
+            const thueErr = cellErr(ri, "thue_tncn");
+            if (thueErr) {
+              if (COL.tntt != null && !cellErr(ri, "tntt")) {
+                thue_tncn = calcPitProgressive(parseFloat(tntt_raw) || 0);
+                issue("thue_tncn", thueErr, true, thue_tncn);
+              } else { thueOk = false; issue("thue_tncn", thueErr, false); }
+            }
+            const thucNhanErr = cellErr(ri, "thuc_nhan");
+            if (thucNhanErr) {
+              const blocked = ["tong_thu_nhap", "tong_khau_tru", "tam_ung"].some(k => cellErr(ri, k));
+              if (thueOk && !blocked) {
+                thuc_nhan = Math.round(tong_thu_nhap - tong_khau_tru - thue_tncn - tam_ung);
+                issue("thuc_nhan", thucNhanErr, true, thuc_nhan);
+              } else issue("thuc_nhan", thucNhanErr, false);
+            }
+            Object.keys(COL).forEach(k => {
+              if (k === "thue_tncn" || k === "thuc_nhan") return;
+              const e = cellErr(ri, k);
+              if (e) issue(k, e, false);
+            });
+            if (!(ngay_cong_chuan > 0) && COL.ngay_cong_chuan == null) ngay_cong_chuan = soNgayCongChuan;
             
             // Mẫu số chia: ưu tiên Ngày công chuẩn (cột K) của từng NV, fallback 26
             let mauSoChia = soNgayCongChuan;
@@ -706,6 +870,11 @@ async function doFetchEmployeesExcel(fileOverride) {
         });
         
         globalSheetsData[cleanName] = sheetData;
+        window.globalSheetMeta[cleanName] = {
+          legacy: layout.legacy, missing: layout.missing, stdDays: soNgayCongChuan,
+          extraIncomeLabels: (layout.extraIncome || []).map(c => String((jsonData[layout.headerRow] || [])[c] || "").trim()),
+          hasStdDaysColumn: COL.ngay_cong_chuan != null, issues: sheetIssues
+        };
       }
 
       // --- Parse sheet Chấm công ---
