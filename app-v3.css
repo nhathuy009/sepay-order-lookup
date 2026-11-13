@@ -182,16 +182,22 @@ body.v3 .v3-stepper-wrap {
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
 }
+/* Khung giữa: thanh bước + vạch tiến trình cùng bề rộng với nội dung, không kéo hết màn hình rộng */
+body.v3 .v3-stepper-inner {
+  position: relative; max-width: var(--v3-max); margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 40px); box-sizing: border-box;
+}
 body.v3 .v3-progress {
-  position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: transparent;
+  position: absolute; left: clamp(16px, 4vw, 40px); right: clamp(16px, 4vw, 40px);
+  bottom: -1px; height: 2px; border-radius: 2px; background: transparent;
 }
 body.v3 .v3-progress-bar {
   display: block; height: 100%; width: 0; background: var(--accent);
   transition: width 320ms var(--v3-ease);
 }
 body.v3 .v3-stepper {
-  list-style: none; margin: 0 auto; max-width: var(--v3-max); box-sizing: border-box;
-  padding: 8px clamp(10px, 4vw, 34px);
+  list-style: none; margin: 0 -10px; width: calc(100% + 20px) !important; box-sizing: border-box;
+  padding: 8px 0;
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
 }
 body.v3 .v3-step-btn {
@@ -247,7 +253,9 @@ body.v3 .v3-flash { animation: v3Flash 900ms ease; border-radius: var(--v3-radiu
 body.v3 .v3-actionbar {
   position: sticky; bottom: 0; z-index: 6;
   display: flex; align-items: center; gap: 12px;
-  padding: 10px clamp(16px, 4vw, 40px);
+  /* nội dung thanh đáy thẳng hàng với cột nội dung (tối đa --v3-max), nền vẫn tràn hết chiều ngang */
+  --v3-gutter: clamp(16px, 4vw, 40px);
+  padding: 10px max(var(--v3-gutter), calc((100% - var(--v3-max)) / 2 + var(--v3-gutter)));
   background: var(--v3-bar-bg);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
@@ -400,7 +408,7 @@ body.v3 .v3-vax-pre {
   body.v3 .v3-tool-id .v3-task-icon { width: 40px; height: 40px; }
   body.v3 .v3-tool-head .v3-lead { display: none; }
   /* Bước: chỉ hiện nhãn của bước hiện tại để không bị chật */
-  body.v3 .v3-stepper { display: flex; gap: 4px; padding: 6px 10px; }
+  body.v3 .v3-stepper { display: flex; gap: 4px; padding: 6px 0; }
   body.v3 .v3-step { flex: 0 0 auto; }
   body.v3 .v3-step.is-current { flex: 1 1 auto; min-width: 0; }
   body.v3 .v3-step:not(.is-current) .v3-step-text { display: none; }
