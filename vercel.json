@@ -15,7 +15,10 @@
     { "src": "app.js", "use": "@vercel/static" },
     { "src": "index-new.html", "use": "@vercel/static" },
     { "src": "app-v2.css", "use": "@vercel/static" },
-    { "src": "app-v2.js", "use": "@vercel/static" }
+    { "src": "app-v2.js", "use": "@vercel/static" },
+    { "src": "index-v3.html", "use": "@vercel/static" },
+    { "src": "app-v3.css", "use": "@vercel/static" },
+    { "src": "app-v3.js", "use": "@vercel/static" }
   ],
 
   "routes": [
@@ -30,6 +33,9 @@
     { "src": "/app-v2.css", "dest": "/app-v2.css" },
     { "src": "/app-v2.js", "dest": "/app-v2.js" },
     { "src": "/v2/?", "dest": "/index-new.html" },
+    { "src": "/app-v3.css", "dest": "/app-v3.css" },
+    { "src": "/app-v3.js", "dest": "/app-v3.js" },
+    { "src": "/v3/?", "dest": "/index-v3.html" },
     { "src": "/jotun", "dest": "/jotun.html" },
     { "src": "/123av", "dest": "/123av.html" },
     { "src": "/4k", "dest": "/indexplayer.html" },
