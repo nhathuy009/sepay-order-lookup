@@ -510,6 +510,8 @@ body.v3 .v3-issue-list {
   body.v3 .v3-actionbar { justify-content: space-between; }
   body.v3 .v3-next { flex: 1 1 auto; }
   body.v3 .card { padding: 16px; }
+  /* iOS Safari tự phóng to khi focus ô nhập có font < 16px và không thu lại */
+  body.v3 input, body.v3 select, body.v3 textarea { font-size: 16px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
