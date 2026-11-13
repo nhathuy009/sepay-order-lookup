@@ -3126,7 +3126,7 @@ async function loadBankAccounts() {
         // Tạo Checkbox cho từng tài khoản và chèn vào dropdown
         const label = document.createElement('label');
         label.className = 'ms-checkbox-item';
-        label.innerHTML = `<input type="checkbox" value="${bank.id}" onchange="updateMultiSelectLabel()" /> <span>${bank.bank_short_name} - ${bank.account_number}</span>`;
+        label.innerHTML = `<input type="checkbox" value="${escapeHtml(bank.id)}" onchange="updateMultiSelectLabel()" />${getBankIconHtml(bank.bank_short_name)}<span class="ms-acc-num">${escapeHtml(bank.account_number)}</span><span class="ms-acc-bank">${escapeHtml(bank.bank_short_name)}</span>`;
         dropdownEl.appendChild(label);
 
         if (bank.bank_short_name) uniqueBrands.add(bank.bank_short_name);
@@ -3155,7 +3155,7 @@ function updateMultiSelectLabel() {
   const checked = document.querySelectorAll('#txBankAccountIdDropdown input:checked');
   const labelEl = document.getElementById('txBankAccountIdLabel');
   if (checked.length === 0) {
-    labelEl.innerText = '-- Tất cả tài khoản --';
+    labelEl.innerText = 'Tất cả tài khoản';
   } else {
     labelEl.innerText = `Đã chọn ${checked.length} tài khoản`;
   }

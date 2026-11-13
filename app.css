@@ -2267,7 +2267,34 @@ body.v3 .tx-filter-date { flex: 0 1 260px; min-width: 220px; }
 body.v3 .tx-filter-acc { flex: 1 1 220px; min-width: 200px; max-width: 420px; }
 body.v3 .tx-filters > button { flex-shrink: 0; min-width: 132px; }
 body.v3 .tx-list-result { margin-top: 18px; }
-body.v3 .multi-select-label { padding: 10px 12px; border-radius: var(--v3-radius); }
+/* Dropdown chọn nhiều tài khoản */
+body.v3 .multi-select-label {
+  position: relative; padding: 10px 36px 10px 12px; border-radius: var(--v3-radius);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+body.v3 .multi-select-label::after {
+  content: ""; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; margin-top: -6px;
+  border-right: 1.75px solid var(--text-muted); border-bottom: 1.75px solid var(--text-muted);
+  transform: rotate(45deg); transition: transform 150ms ease, margin-top 150ms ease;
+}
+body.v3 .multi-select-container:has(.multi-select-dropdown.show) .multi-select-label { border-color: var(--accent); box-shadow: var(--v3-focus); }
+body.v3 .multi-select-container:has(.multi-select-dropdown.show) .multi-select-label::after { transform: rotate(-135deg); margin-top: -2px; }
+body.v3 .multi-select-dropdown {
+  margin-top: 6px; padding: 6px; border-radius: var(--v3-radius); background: var(--card-bg-solid);
+  box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+body.v3 .ms-checkbox-item {
+  gap: 10px; margin: 0; padding: 8px 10px; border-radius: calc(var(--v3-radius) - 3px);
+  font-size: 13.5px; font-weight: 500;
+}
+body.v3 .ms-checkbox-item + .ms-checkbox-item { margin-top: 2px; }
+body.v3 .ms-checkbox-item:hover { background: var(--v3-wash); }
+body.v3 .ms-checkbox-item:has(input:checked) { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+body.v3 .ms-checkbox-item input { flex-shrink: 0; width: 16px; height: 16px; }
+body.v3 .ms-checkbox-item input:focus:not(:focus-visible) { box-shadow: none; }
+body.v3 .ms-checkbox-item .bank-logo-img, body.v3 .ms-checkbox-item .bank-icon { flex-shrink: 0; }
+body.v3 .ms-acc-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+body.v3 .ms-acc-bank { margin-left: auto; padding-left: 12px; font-size: 12.5px; color: var(--text-muted); }
 @media (max-width: 760px) {
   body.v3 .tx-wide { padding: 16px; }
   body.v3 .tx-filter-date, body.v3 .tx-filter-acc { flex: 1 1 100%; max-width: none; }
