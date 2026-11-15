@@ -7910,6 +7910,17 @@ async function copyVax1Result() {
     if (!panelTimer) panelTimer = setTimeout(function () { panelTimer = 0; renderPanel(); }, 300);
   }
 
+  // "Ẩn tag": che số tiền, khối lượng, lãi/lỗ bằng ••• (giữ giá và %), để chụp ảnh gửi người khác.
+  var HIDE_KEY = "trade_hide_tags";
+  S.hideTags = store(HIDE_KEY) === "1";
+  function M(text) { return S.hideTags ? "•••" : text; }
+  function syncHideBtn() {
+    var b = $("tradeTagBtn");
+    b.setAttribute("aria-pressed", S.hideTags ? "true" : "false");
+    b.querySelector(".trade-tag-text").textContent = S.hideTags ? "Hiện tag" : "Ẩn tag";
+    b.title = S.hideTags ? "Đang ẩn số tiền/khối lượng — bấm để hiện lại" : "Ẩn số tiền/khối lượng trên đường ray để chụp ảnh";
+  }
+
   function renderPanel() {
     if (!S.series) return;
     var px = lastPrice();
@@ -7925,9 +7936,9 @@ async function copyVax1Result() {
       return '<div class="trade-item' + (S.selected === r.id ? " is-sel" : "") + '" data-id="' + esc(r.id) + '">' +
         '<div class="trade-item-top"><b>' + fP(r.price) + '</b><span class="trade-tag' + (r._filled ? " is-filled" : "") + '">' +
           (r._filled ? "Đã khớp" : "Chờ khớp") + "</span></div>" +
-        '<div class="trade-item-sub">' + fU(r.usdt) + " USDT → <b>" + fQ(q) + " " + esc(S.base) + "</b></div>" +
+        '<div class="trade-item-sub">' + M(fU(r.usdt)) + " USDT → <b>" + M(fQ(q)) + " " + esc(S.base) + "</b></div>" +
         '<div class="trade-item-sub">Lãi/lỗ: <span class="' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
-          sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
+          (S.hideTags ? "" : sg(pnl) + fU(pnl) + " USDT ") + "(" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
         '<div class="trade-item-acts"><button type="button" class="btn-outline" data-act="edit">Sửa</button>' +
           '<button type="button" class="btn-outline trade-danger" data-act="del">Xoá</button></div>' +
         "</div>";
@@ -7939,16 +7950,16 @@ async function copyVax1Result() {
     var b = esc(S.base);
     $("tradeSummary").innerHTML =
       "<span class='k'>Giá hiện tại</span><span class='v'>" + fP(px) + "</span>" +
-      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + fU(aU) + " USDT</span>" +
-      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + fQ(aQ) + " " + b + "</span>" +
+      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + M(fU(aU)) + " USDT</span>" +
+      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + M(fQ(aQ)) + " " + b + "</span>" +
       "<span class='k'>Giá TB nếu khớp hết</span><span class='v'>" + fP(aAvg) + "</span>" +
       '<span class="trade-sep"></span>' +
-      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + fU(fUs) + " USDT</span>" +
-      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + fQ(fQs) + " " + b + "</b></span>" +
+      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + M(fU(fUs)) + " USDT</span>" +
+      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + M(fQ(fQs)) + " " + b + "</b></span>" +
       '<span class="k">Giá TB đã khớp</span><span class="v" style="color:#f59e0b">' + fP(avg) + "</span>" +
-      "<span class='k'>Giá trị hiện tại</span><span class='v'>" + fU(val) + " USDT</span>" +
+      "<span class='k'>Giá trị hiện tại</span><span class='v'>" + M(fU(val)) + " USDT</span>" +
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
-        (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
+        (fN ? (S.hideTags ? "" : sg(pnl) + fU(pnl) + " USDT ") + "(" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
     S.avg = avg;
     updateActiveChipPrice();
     if (newlyFilled) saveRays();
@@ -8001,6 +8012,7 @@ async function copyVax1Result() {
       ctx.strokeStyle = col; ctx.lineWidth = sel ? 2.5 : 1.5;
       ctx.beginPath(); ctx.moveTo(g.x, g.y + 0.5); ctx.lineTo(paneW, g.y + 0.5); ctx.stroke();
       if (g.x0 >= 0) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(g.x, g.y, sel ? 4.5 : 3.5, 0, Math.PI * 2); ctx.fill(); }
+      if (S.hideTags) return;
       var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base + (r._filled ? "  ✓" : "");
       var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
       label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
@@ -8155,6 +8167,13 @@ async function copyVax1Result() {
   }
 
   $("tradeRayBtn").addEventListener("click", function () { setMode(S.mode === "ray" ? null : "ray"); });
+  syncHideBtn();
+  $("tradeTagBtn").addEventListener("click", function () {
+    S.hideTags = !S.hideTags;
+    store(HIDE_KEY, S.hideTags ? "1" : "0");
+    syncHideBtn();
+    renderPanel();
+  });
   $("tradeLoadBtn").addEventListener("click", load);
   $("tradeSym").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
   $("tradeIv").addEventListener("change", load);

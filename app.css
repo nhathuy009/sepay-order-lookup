@@ -2692,3 +2692,9 @@ body.v3 .v3-trade .trade-sync-row input { flex: 1; min-width: 0; width: auto; pa
 .v3-trade .trade-div button[data-div="hbull"][aria-pressed="true"] { background: #22ab94; border-color: #22ab94; color: #fff; }
 .v3-trade .trade-div button[data-div="bear"][aria-pressed="true"],
 .v3-trade .trade-div button[data-div="hbear"][aria-pressed="true"] { background: #f23645; border-color: #f23645; color: #fff; }
+
+/* Trade: nút Ẩn tag (che số tiền/khối lượng khi chụp ảnh) */
+body.v3 .v3-trade #tradeTagBtn { background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none; }
+body.v3 .v3-trade #tradeTagBtn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: var(--accent); color: var(--accent);
+}
