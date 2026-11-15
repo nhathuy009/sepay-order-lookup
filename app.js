@@ -7824,10 +7824,17 @@ async function copyVax1Result() {
 
   function renderWatch() {
     var box = $("tradeWatchList");
-    box.innerHTML = getWatch().map(function (sym) {
+    box.innerHTML = getWatch().map(function (sym, idx) {
+      if (isSep(sym)) {
+        var nm = sym.slice(1);
+        return '<div class="trade-sep" draggable="true" data-idx="' + idx + '" title="Nhấp đúp để đổi tên nhóm, kéo để di chuyển">' +
+          '<span class="trade-sep-name">' + (nm ? esc(nm) : "") + "</span>" +
+          '<button type="button" class="trade-chip-x" data-act="rm" aria-label="Bỏ dòng phân cách" title="Bỏ dòng phân cách">×</button>' +
+          "</div>";
+      }
       var t = tickers[sym] || {}, n = rayCount(sym), on = sym === S.symbol;
       var px = on && S.candles.length ? lastPrice() : t.price;
-      return '<div class="trade-chip' + (on ? " is-active" : "") + '" data-sym="' + esc(sym) + '">' +
+      return '<div class="trade-chip' + (on ? " is-active" : "") + '" draggable="true" data-idx="' + idx + '" data-sym="' + esc(sym) + '">' +
         '<button type="button" class="trade-chip-main" data-act="open" title="Xem ' + esc(sym) + '">' +
           '<span class="trade-chip-name"><b>' + esc(shortName(sym)) + "</b><small>" + (/USDT$/.test(sym) && sym.length > 4 ? "/USDT" : "") + "</small>" +
             (n ? '<span class="trade-chip-cnt" title="' + n + ' điểm mua">' + n + "</span>" : "") + "</span>" +
@@ -7839,8 +7846,10 @@ async function copyVax1Result() {
         "</div>";
     }).join("") || '<span class="trade-watch-empty">Chưa có cặp nào trong danh sách.</span>';
   }
+  // Dòng phân cách nhóm lưu chung trong danh sách dưới dạng "#Tên nhóm" (mã cặp Binance không bao giờ bắt đầu bằng "#")
+  function isSep(s) { return typeof s === "string" && s.charAt(0) === "#"; }
   function refreshTickers() {
-    var list = getWatch();
+    var list = getWatch().filter(function (s) { return !isSep(s); });
     if (!list.length) return;
     getJSON("/api/v3/ticker/24hr?symbols=" + encodeURIComponent(JSON.stringify(list))).then(function (arr) {
       arr.forEach(function (x) { tickers[x.symbol] = { price: +x.lastPrice, pct: +x.priceChangePercent }; });
@@ -7855,14 +7864,82 @@ async function copyVax1Result() {
   $("tradeWatchList").addEventListener("click", function (e) {
     var btn = e.target.closest("button[data-act]");
     if (!btn) return;
-    var sym = btn.closest(".trade-chip").getAttribute("data-sym");
+    var row = btn.closest("[data-idx]");
     if (btn.getAttribute("data-act") === "rm") {
-      setWatch(getWatch().filter(function (s) { return s !== sym; }));
-    } else if (sym !== S.symbol) {
+      var l = getWatch();
+      l.splice(+row.getAttribute("data-idx"), 1);
+      return setWatch(l);
+    }
+    var sym = row.getAttribute("data-sym");
+    if (sym !== S.symbol) {
       $("tradeSym").value = sym;
       load();
     }
   });
+  // Nhấp đúp dòng phân cách: đổi tên nhóm
+  $("tradeWatchList").addEventListener("dblclick", function (e) {
+    var row = e.target.closest(".trade-sep");
+    if (!row || e.target.closest("button")) return;
+    var l = getWatch(), i = +row.getAttribute("data-idx");
+    var nm = window.prompt("Tên nhóm (để trống = chỉ kẻ đường phân cách):", l[i].slice(1));
+    if (nm === null) return;
+    l[i] = "#" + nm.trim();
+    setWatch(l);
+  });
+  // Thêm dòng phân cách vào cuối danh sách, lấy tên nhóm từ ô nhập nếu có
+  $("tradeWatchSepBtn").addEventListener("click", function () {
+    var inp = $("tradeWatchInput"), l = getWatch();
+    l.push("#" + inp.value.trim());
+    inp.value = "";
+    setWatch(l);
+    var box = $("tradeWatchList");
+    box.scrollTop = box.scrollHeight;
+  });
+  // Kéo thả để sắp xếp coin và dòng phân cách
+  (function () {
+    var box = $("tradeWatchList"), from = -1;
+    function clearMarks() {
+      box.querySelectorAll(".drop-before,.drop-after,.is-dragging").forEach(function (x) {
+        x.classList.remove("drop-before", "drop-after", "is-dragging");
+      });
+    }
+    function target(e) {
+      var row = e.target.closest && e.target.closest("[data-idx]");
+      if (!row || !box.contains(row)) return null;
+      var r = row.getBoundingClientRect();
+      return { row: row, idx: +row.getAttribute("data-idx"), after: e.clientY > r.top + r.height / 2 };
+    }
+    box.addEventListener("dragstart", function (e) {
+      var row = e.target.closest && e.target.closest("[data-idx]");
+      if (!row) return;
+      from = +row.getAttribute("data-idx");
+      row.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", String(from)); } catch (err) {}
+    });
+    box.addEventListener("dragover", function (e) {
+      if (from < 0) return;
+      var t = target(e);
+      if (!t) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      box.querySelectorAll(".drop-before,.drop-after").forEach(function (x) { x.classList.remove("drop-before", "drop-after"); });
+      if (t.idx !== from) t.row.classList.add(t.after ? "drop-after" : "drop-before");
+    });
+    box.addEventListener("drop", function (e) {
+      if (from < 0) return;
+      e.preventDefault();
+      var t = target(e), f = from;
+      from = -1; clearMarks();
+      if (!t || t.idx === f) return;
+      var l = getWatch(), item = l.splice(f, 1)[0];
+      var to = t.idx + (t.after ? 1 : 0);
+      if (f < to) to--;
+      l.splice(to, 0, item);
+      setWatch(l);
+    });
+    box.addEventListener("dragend", function () { from = -1; clearMarks(); });
+  })();
   $("tradeWatchForm").addEventListener("submit", function (e) {
     e.preventDefault();
     var inp = $("tradeWatchInput");

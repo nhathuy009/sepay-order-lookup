@@ -2625,6 +2625,24 @@ body.v3 .v3-trade .trade-watch-add input { flex: 1; min-width: 0; width: auto; p
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center;
   background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
 }
+/* Trade: dòng phân cách nhóm + kéo thả sắp xếp */
+.trade-watch-tip { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); }
+.trade-sep {
+  position: relative; display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 0 0 0 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); cursor: grab;
+}
+.trade-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.trade-sep-name:empty { display: none; }
+.trade-sep .trade-chip-x { order: 2; }
+.v3-trade .trade-sep .trade-chip-x {
+  width: 26px; height: 20px; padding: 0; background: none; box-shadow: none; border: 0; color: var(--text-muted); font-size: 15px; opacity: 0;
+}
+.v3-trade .trade-sep:hover .trade-chip-x, .v3-trade .trade-sep .trade-chip-x:focus-visible { opacity: 1; }
+.v3-trade .trade-sep .trade-chip-x:hover { color: #dc2626; }
+@media (hover: none) { .v3-trade .trade-sep .trade-chip-x { opacity: .7; } }
+.trade-watch-list .is-dragging { opacity: .4; }
+.trade-watch-list .drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.trade-watch-list .drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
 @media (max-width: 1000px) {
   .trade-main { grid-template-columns: minmax(0, 1fr); }
   .trade-side { min-height: 0; }
