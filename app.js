@@ -7269,7 +7269,7 @@ async function copyVax1Result() {
   function qRound(v) { return Math.floor(v / S.step + 1e-9) * S.step; }
   function fQ(v) { return nf(qRound(v), dec(S.step)); }
   function sg(v) { return v >= 0 ? "+" : ""; }
-  function roundTick(p) { return Math.round(p / S.tick) * S.tick; }
+  function roundTick(p) { return +(Math.round(p / S.tick) * S.tick).toFixed(dec(S.tick)); }
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
   }
@@ -7663,9 +7663,11 @@ async function copyVax1Result() {
     store(key(), JSON.stringify(S.rays.map(function (r) {
       var o = { id: r.id, price: r.price, usdt: r.usdt, t: r.t };
       if (r.filled) o.filled = true;
+      if (r.u) o.u = r.u;
       return o;
     })));
     renderWatch();
+    gsChanged();
   }
 
   /* ---------- Danh sách cặp theo dõi (bấm nhanh) ---------- */
@@ -7768,6 +7770,7 @@ async function copyVax1Result() {
     S.series.removePriceLine(S.rays[i].pl);
     S.rays.splice(i, 1);
     if (S.selected === id) S.selected = null;
+    gsMarkDeleted([id]);
     saveRays(); renderPanel();
   }
 
@@ -7812,7 +7815,7 @@ async function copyVax1Result() {
     var rows = sorted(), newlyFilled = false;
     var html = rows.map(function (r) {
       r._filled = isFilled(r);
-      if (r._filled && !r.filled && !S.drag) { r.filled = true; newlyFilled = true; }
+      if (r._filled && !r.filled && !S.drag) { r.filled = true; r.u = Date.now(); newlyFilled = true; }
       r.pl.applyOptions({ color: r._filled ? BUY : S.colors.accent });
       var q = qtyOf(r), pnl = q * px - r.usdt;
       aU += r.usdt; aQ += q;
@@ -7945,10 +7948,13 @@ async function copyVax1Result() {
   });
   window.addEventListener("pointerup", function () {
     if (!S.drag) return;
-    var moved = S.drag.moved;
+    var moved = S.drag.moved, dragId = S.drag.id;
     S.drag = null;
     S.chart.applyOptions({ handleScroll: true, handleScale: true });
-    if (moved) { saveRays(); renderPanel(); }
+    if (moved) {
+      S.rays.forEach(function (r) { if (r.id === dragId) r.u = Date.now(); });
+      saveRays(); renderPanel();
+    }
   });
   wrap.addEventListener("dblclick", function (e) {
     var p = local(e), r = hit(p.x, p.y);
@@ -7995,6 +8001,7 @@ async function copyVax1Result() {
   });
   $("tradeClearBtn").addEventListener("click", function () {
     if (!S.rays.length || !confirm("Xoá toàn bộ " + S.rays.length + " điểm mua của " + S.symbol + "?")) return;
+    gsMarkDeleted(S.rays.map(function (r) { return r.id; }));
     S.rays.forEach(function (r) { S.series.removePriceLine(r.pl); });
     S.rays = []; S.selected = null;
     saveRays(); renderPanel();
@@ -8068,12 +8075,332 @@ async function copyVax1Result() {
     if (ed.id) {
       var r = S.rays.find(function (x) { return x.id === ed.id; });
       if (roundTick(p) !== r.price) r.filled = false;
-      r.price = roundTick(p); r.usdt = u; r.pl.applyOptions({ price: r.price });
+      r.price = roundTick(p); r.usdt = u; r.u = Date.now(); r.pl.applyOptions({ price: r.price });
     } else {
-      var nr = addRay({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), price: roundTick(p), usdt: u, t: ed.t });
+      var nr = addRay({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), price: roundTick(p), usdt: u, t: ed.t, u: Date.now() });
       S.selected = nr.id;
     }
     saveRays(); renderPanel();
+  });
+
+  /* ---------- Lưu điểm mua trên Google Sheet ----------
+     Mỗi điểm mua là 1 dòng trong tab "Điểm mua Trade" của file Google Sheet do người dùng chọn
+     (link lưu trong localStorage của từng máy, không ghi trong mã nguồn). Sheet là bản gốc dùng chung
+     giữa các máy; localStorage là bản đệm để mở trang thấy ngay. Access token Google chỉ giữ trong
+     bộ nhớ của tab (~1 giờ), không lưu ở đâu cả. */
+  var GS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+  var GS_TAB = "Điểm mua Trade";
+  var GS_HEAD = ["ID", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng", "Coin", "Thời điểm đặt (unix)", "Thời điểm đặt", "Đã khớp", "Cập nhật"];
+  var GS_URL_KEY = "trade_gsheet_url", GS_LINK_KEY = "trade_gsheet_linked", GS_SYNCED_KEY = "trade_gsheet_synced_at";
+  var GS_DIRTY_KEY = "trade_gsheet_dirty", GS_DEL_KEY = "trade_deleted";
+  var GS = { token: null, exp: 0, busy: false, again: false, rev: 0, pushTimer: 0, pullTimer: 0, clientId: "", gsi: null, tabOk: "", gid: null };
+
+  function gsSheetId() {
+    var v = String($("tradeSyncUrl").value || "").trim();
+    var m = /\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/.exec(v);
+    if (m) return m[1];
+    return /^[a-zA-Z0-9_-]{20,}$/.test(v) ? v : "";
+  }
+  function gsState(text, kind) {
+    var el = $("tradeSyncState");
+    el.textContent = text || "";
+    el.className = "trade-sync-state" + (kind ? " is-" + kind : "");
+  }
+  function gsUi() {
+    var b = $("tradeSyncBtn");
+    b.disabled = GS.busy;
+    b.textContent = GS.busy ? "Đang đồng bộ…" : "Đồng bộ";
+    var id = gsSheetId(), a = $("tradeSyncOpen");
+    a.hidden = !id;
+    if (id) a.href = "https://docs.google.com/spreadsheets/d/" + id + "/edit" + (GS.gid !== null && GS.tabOk === id ? "#gid=" + GS.gid : "");
+  }
+  function gsTokenValid() { return !!GS.token && Date.now() < GS.exp - 60000; }
+  function gsNeedAuth() {
+    var e = new Error("Bấm Đồng bộ để đăng nhập Google và lấy điểm mua mới nhất.");
+    e.needAuth = true;
+    return e;
+  }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function fmtDT(ms) {
+    var d = new Date(ms);
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
+  function hhmm() { var d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+
+  function gsLoadGsi() {
+    if (window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+    if (!GS.gsi) {
+      GS.gsi = new Promise(function (ok, fail) {
+        var s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.onload = ok;
+        s.onerror = function () { GS.gsi = null; fail(new Error("Không tải được thư viện đăng nhập Google. Kiểm tra mạng rồi thử lại.")); };
+        document.head.appendChild(s);
+      });
+    }
+    return GS.gsi;
+  }
+  function gsClientId() {
+    if (GS.clientId) return Promise.resolve(GS.clientId);
+    return fetch("/api/index", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : {}; }, function () { return {}; })
+      .then(function (d) { GS.clientId = (d && d.google_client_id) || ""; return GS.clientId; });
+  }
+  function gsGetToken(interactive) {
+    if (gsTokenValid()) return Promise.resolve(GS.token);
+    if (!interactive) return Promise.reject(gsNeedAuth());
+    return gsClientId().then(function (cid) {
+      if (!cid) throw new Error("Chưa cấu hình đăng nhập Google: thêm biến GOOGLE_OAUTH_CLIENT_ID trên Vercel rồi deploy lại.");
+      return gsLoadGsi().then(function () {
+        return new Promise(function (resolve, reject) {
+          var client = google.accounts.oauth2.initTokenClient({
+            client_id: cid,
+            scope: GS_SCOPE,
+            callback: function (resp) {
+              if (!resp || !resp.access_token) return reject(new Error((resp && resp.error_description) || "Đăng nhập Google không thành công."));
+              if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, GS_SCOPE)) {
+                return reject(new Error("Cần cho phép quyền “xem, sửa Google Sheets” thì mới lưu được điểm mua."));
+              }
+              GS.token = resp.access_token;
+              GS.exp = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+              resolve(GS.token);
+            },
+            error_callback: function (err) {
+              var t = err && err.type;
+              reject(new Error(t === "popup_closed" ? "Anh đã đóng cửa sổ đăng nhập Google."
+                : t === "popup_failed_to_open" ? "Trình duyệt chặn cửa sổ đăng nhập. Cho phép popup cho trang này rồi thử lại."
+                : "Đăng nhập Google không thành công."));
+            }
+          });
+          client.requestAccessToken({ prompt: "" });
+        });
+      });
+    });
+  }
+
+  function gsRange(a1) { return encodeURIComponent("'" + GS_TAB.replace(/'/g, "''") + "'!" + a1); }
+  function gsApi(id, method, path, body) {
+    return fetch("https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(id) + path, {
+      method: method,
+      headers: body ? { Authorization: "Bearer " + GS.token, "Content-Type": "application/json" } : { Authorization: "Bearer " + GS.token },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (r.ok) return r.json();
+      return r.json().catch(function () { return {}; }).then(function (b) {
+        var msg = (b && b.error && b.error.message) || ("HTTP " + r.status);
+        if (r.status === 401) { GS.token = null; throw gsNeedAuth(); }
+        if (r.status === 403) msg = "Tài khoản Google này chưa có quyền sửa file, hoặc Google Sheets API chưa được bật. (" + msg + ")";
+        if (r.status === 404) msg = "Không tìm thấy file. Kiểm tra lại link Google Sheet.";
+        throw new Error(msg);
+      });
+    });
+  }
+
+  // Tạo tab "Điểm mua Trade" nếu chưa có; không ghi đè một tab trùng tên đang chứa dữ liệu khác.
+  function gsEnsureTab(id) {
+    if (GS.tabOk === id) return Promise.resolve();
+    return gsApi(id, "GET", "?fields=" + encodeURIComponent("sheets.properties(sheetId,title)")).then(function (meta) {
+      var found = (meta.sheets || []).map(function (s) { return s.properties || {}; })
+        .filter(function (p) { return String(p.title).normalize("NFC") === GS_TAB.normalize("NFC"); })[0];
+      if (found) {
+        GS.gid = found.sheetId;
+        return gsApi(id, "GET", "/values/" + gsRange("A1:A1")).then(function (v) {
+          var a1 = v.values && v.values[0] && v.values[0][0];
+          if (a1 !== undefined && a1 !== "" && a1 !== "ID") {
+            throw new Error("Tab “" + GS_TAB + "” đã có dữ liệu khác nên em không ghi đè. Anh đổi tên tab đó rồi bấm Đồng bộ lại.");
+          }
+        });
+      }
+      return gsApi(id, "POST", ":batchUpdate", {
+        requests: [{ addSheet: { properties: { title: GS_TAB, gridProperties: { frozenRowCount: 1 } } } }]
+      }).then(function (res) {
+        GS.gid = res.replies[0].addSheet.properties.sheetId;
+        return gsApi(id, "POST", ":batchUpdate", {
+          requests: [{
+            repeatCell: {
+              range: { sheetId: GS.gid, startRowIndex: 0, endRowIndex: 1 },
+              cell: { userEnteredFormat: { textFormat: { bold: true } } },
+              fields: "userEnteredFormat.textFormat.bold"
+            }
+          }]
+        });
+      });
+    }).then(function () { GS.tabOk = id; gsUi(); });
+  }
+
+  function gsNum(v) {
+    if (typeof v === "number") return v;
+    var s = String(v === null || v === undefined ? "" : v).trim();
+    return s ? parseAmount(s) : NaN;
+  }
+  function gsParse(rows) {
+    var rays = [], junk = [], missingId = false;
+    (rows || []).forEach(function (row, i) {
+      var sym = String(row[1] || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      var price = gsNum(row[2]), usdt = gsNum(row[3]), t = gsNum(row[6]);
+      if (!sym || !(price > 0) || !(usdt > 0)) {
+        // Dòng anh tự gõ chưa đủ cột: giữ nguyên khi ghi lại, không xoá
+        if (row.some(function (c) { return c !== "" && c !== null && c !== undefined; })) junk.push(row.slice(0, GS_HEAD.length));
+        return;
+      }
+      var id = String(row[0] || "").trim();
+      if (!id) { id = "gs" + Date.now().toString(36) + i; missingId = true; }
+      var u = Date.parse(String(row[9] || "").replace(" ", "T"));
+      rays.push({
+        id: id, sym: sym, price: price, usdt: usdt,
+        t: t > 0 ? t : Math.floor(Date.now() / 1000),
+        filled: row[8] === true || /^(có|co|x|true|1|đã khớp)$/i.test(String(row[8] || "").trim()) || undefined,
+        u: isFinite(u) ? u : undefined
+      });
+    });
+    return { rays: rays, junk: junk, missingId: missingId };
+  }
+  function gsRow(r) {
+    return [r.id, r.sym, +r.price.toPrecision(12), +r.usdt.toPrecision(12), +(r.usdt / r.price).toFixed(8), shortName(r.sym), r.t, fmtDT(r.t * 1000),
+            r.filled ? "Có" : "", fmtDT(r.u || Date.now())];
+  }
+  function gsPull(id) {
+    return gsApi(id, "GET", "/values/" + gsRange("A2:J") + "?valueRenderOption=UNFORMATTED_VALUE")
+      .then(function (v) { return gsParse(v.values); });
+  }
+  function gsPush(id, rays, junk) {
+    var rows = [GS_HEAD].concat(rays.slice().sort(function (a, b) {
+      return a.sym < b.sym ? -1 : a.sym > b.sym ? 1 : a.t - b.t;
+    }).map(gsRow)).concat(junk);
+    return gsApi(id, "PUT", "/values/" + gsRange("A1:J" + rows.length) + "?valueInputOption=RAW", { values: rows })
+      .then(function () { return gsApi(id, "POST", "/values/" + gsRange("A" + (rows.length + 1) + ":J") + ":clear", {}); });
+  }
+
+  // Toàn bộ điểm mua của mọi cặp đang có trên máy này
+  function localAll() {
+    var out = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf("trade_rays_") !== 0) continue;
+        var sym = k.slice(11);
+        (JSON.parse(localStorage.getItem(k) || "[]") || []).forEach(function (r) { r.sym = sym; out.push(r); });
+      }
+    } catch (e) {}
+    return out;
+  }
+  function writeLocalAll(rays) {
+    var by = {}, keys = [];
+    rays.forEach(function (r) {
+      (by[r.sym] = by[r.sym] || []).push({ id: r.id, price: r.price, usdt: r.usdt, t: r.t, filled: r.filled || undefined, u: r.u || undefined });
+    });
+    try {
+      for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("trade_rays_") === 0) keys.push(k); }
+    } catch (e) {}
+    keys.forEach(function (k) { if (!by[k.slice(11)]) { try { localStorage.removeItem(k); } catch (e) {} } });
+    Object.keys(by).forEach(function (sym) { store("trade_rays_" + sym, JSON.stringify(by[sym])); });
+  }
+  function gsDeleted() { try { var a = JSON.parse(store(GS_DEL_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function gsMarkDeleted(ids) { store(GS_DEL_KEY, JSON.stringify(gsDeleted().concat(ids).slice(-500))); }
+
+  // Gộp khi máy này có thay đổi chưa lên Sheet (hoặc lần đầu nối Sheet):
+  // - xoá ở máy này thì bỏ; cùng ID thì lấy bản sửa sau cùng;
+  // - dòng chỉ có ở máy này: giữ nếu tạo/sửa sau lần đồng bộ trước, còn không là đã bị xoá ở máy khác.
+  function gsMerge(local, remote, deleted, syncedAt, firstLink) {
+    var map = {}, del = {};
+    deleted.forEach(function (id) { del[id] = 1; });
+    remote.forEach(function (r) { if (!del[r.id]) map[r.id] = r; });
+    local.forEach(function (l) {
+      if (del[l.id]) return;
+      var r = map[l.id];
+      if (!r) { if (firstLink || (l.u || 0) > syncedAt) map[l.id] = l; return; }
+      var w = (l.u || 0) > (r.u || 0) ? l : r, o = w === l ? r : l;
+      map[l.id] = Object.assign({}, w, { filled: w.filled || (o.filled && o.price === w.price) || undefined });
+    });
+    return Object.keys(map).map(function (k) { return map[k]; });
+  }
+
+  // Nạp lại điểm mua của cặp đang xem nếu Sheet vừa đổi dữ liệu của nó
+  function gsRefreshCurrent() {
+    renderWatch();
+    if (!S.series || !S.symbol || S.drag || $("tradeDlg").open) return;
+    var sig = function (arr) { return JSON.stringify(arr.map(function (r) { return [r.id, r.price, r.usdt, r.t, !!r.filled]; })); };
+    var stored = [];
+    try { stored = JSON.parse(store(key()) || "[]"); } catch (e) {}
+    if (sig(stored) === sig(S.rays)) return;
+    var sel = S.selected;
+    loadRays();
+    if (S.rays.some(function (r) { return r.id === sel; })) S.selected = sel;
+    renderPanel();
+  }
+
+  function gsSync(interactive) {
+    var id = gsSheetId();
+    if (!id) { gsState("Dán link Google Sheet để lưu điểm mua dùng chung giữa các máy."); return Promise.resolve(); }
+    if (GS.busy) { GS.again = true; return Promise.resolve(); }
+    GS.busy = true; gsUi();
+    gsState("Đang đồng bộ với Google Sheet…");
+    var revAtWrite = 0;
+    return gsGetToken(interactive)
+      .then(function () { return gsEnsureTab(id); })
+      .then(function () { return gsPull(id); })
+      .then(function (res) {
+        var firstLink = store(GS_LINK_KEY) !== id, dirty = store(GS_DIRTY_KEY) === "1";
+        var merged = firstLink || dirty
+          ? gsMerge(localAll(), res.rays, gsDeleted(), Number(store(GS_SYNCED_KEY)) || 0, firstLink)
+          : res.rays;
+        revAtWrite = GS.rev;
+        writeLocalAll(merged);
+        gsRefreshCurrent();
+        return (firstLink || dirty || res.missingId ? gsPush(id, merged, res.junk) : null);
+      })
+      .then(function () {
+        store(GS_LINK_KEY, id);
+        store(GS_SYNCED_KEY, String(Date.now()));
+        if (GS.rev === revAtWrite) { store(GS_DIRTY_KEY, "0"); store(GS_DEL_KEY, "[]"); }
+        else GS.again = true;    // có thay đổi trong lúc đang ghi: đồng bộ thêm lượt nữa
+        gsState("Đã đồng bộ với Google Sheet lúc " + hhmm() + ".", "ok");
+      })
+      .catch(function (e) { gsState(e && e.message ? e.message : String(e), e && e.needAuth ? "warn" : "err"); })
+      .then(function () {
+        GS.busy = false; gsUi();
+        if (GS.again) { GS.again = false; return gsSync(false); }
+      });
+  }
+
+  // Gọi sau mỗi lần điểm mua thay đổi trên máy này
+  function gsChanged() {
+    GS.rev++;
+    store(GS_DIRTY_KEY, "1");
+    if (!gsSheetId()) return;
+    if (gsTokenValid()) {
+      clearTimeout(GS.pushTimer);
+      GS.pushTimer = setTimeout(function () { gsSync(false); }, 800);
+    } else {
+      gsState("Có thay đổi chưa lưu lên Google Sheet. Bấm Đồng bộ để lưu.", "warn");
+    }
+  }
+
+  function gsOnEnter() {
+    gsUi();
+    if (!gsSheetId()) { gsState("Dán link Google Sheet để lưu điểm mua dùng chung giữa các máy."); return; }
+    if (gsTokenValid()) gsSync(false);
+    else if (store(GS_DIRTY_KEY) === "1" && store(GS_LINK_KEY) === gsSheetId()) gsState("Có thay đổi chưa lưu lên Google Sheet. Bấm Đồng bộ để lưu.", "warn");
+    else gsState("Bấm Đồng bộ để đăng nhập Google và lấy điểm mua mới nhất.", "warn");
+    if (!GS.pullTimer) GS.pullTimer = setInterval(function () { if (S.active && gsTokenValid()) gsSync(false); }, 60000);
+  }
+  function gsOnLeave() { if (GS.pullTimer) { clearInterval(GS.pullTimer); GS.pullTimer = 0; } }
+
+  try { var savedUrl = store(GS_URL_KEY); if (savedUrl) $("tradeSyncUrl").value = savedUrl; } catch (e) {}
+  $("tradeSyncUrl").addEventListener("change", function () {
+    store(GS_URL_KEY, $("tradeSyncUrl").value.trim());
+    GS.tabOk = ""; GS.gid = null;
+    gsUi();
+    if (gsSheetId()) gsState("Bấm Đồng bộ để nối với Google Sheet này.", "warn");
+  });
+  $("tradeSyncUrl").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); $("tradeSyncUrl").dispatchEvent(new Event("change")); gsSync(true); } });
+  $("tradeSyncBtn").addEventListener("click", function () {
+    store(GS_URL_KEY, $("tradeSyncUrl").value.trim());
+    gsSync(true);
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && S.active && gsTokenValid()) gsSync(false);
   });
 
   /* ---------- Mở / rời tab ---------- */
@@ -8093,6 +8420,7 @@ async function copyVax1Result() {
       }
       load();   // lần sau mở lại: tải lại nến để bù khoảng thời gian đã rời tab
       renderWatch();
+      gsOnEnter();
       refreshTickers();
       if (!tickerTimer) tickerTimer = setInterval(refreshTickers, 30000);
       if (!S.raf) S.raf = requestAnimationFrame(draw);
@@ -8105,6 +8433,7 @@ async function copyVax1Result() {
     setMode(null);
     closeWs();
     if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = 0; }
+    gsOnLeave();
     if (S.raf) { cancelAnimationFrame(S.raf); S.raf = 0; }
   }
 

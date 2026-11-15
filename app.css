@@ -2663,3 +2663,18 @@ body.v3 .v3-trade .trade-watch-add input { flex: 1; min-width: 0; width: auto; p
 }
 .v3-trade .trade-ivs button:hover { filter: none; color: var(--text-main); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .v3-trade .trade-ivs button[aria-pressed="true"] { color: var(--text-main); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* Trade: lưu điểm mua trên Google Sheet */
+.trade-sync { margin: 10px 0 4px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--v3-radius, 10px); }
+.trade-sync-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.trade-sync-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-main); }
+.trade-sync-title svg { color: #16a34a; }
+.trade-sync-open { font-size: 12.5px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.trade-sync-open:hover { text-decoration: underline; }
+.trade-sync-row { display: flex; gap: 6px; }
+body.v3 .v3-trade .trade-sync-row input { flex: 1; min-width: 0; width: auto; padding: 7px 10px; font-size: 13px; }
+.v3-trade .trade-sync-row button { padding: 6px 12px !important; font-size: 13px; white-space: nowrap; }
+.trade-sync-state { margin: 6px 0 0; min-height: 1.3em; font-size: 12.5px; color: var(--text-muted); }
+.trade-sync-state.is-ok { color: #16a34a; }
+.trade-sync-state.is-warn { color: #d97706; }
+.trade-sync-state.is-err { color: #dc2626; }
