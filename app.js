@@ -7379,8 +7379,8 @@ async function copyVax1Result() {
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   }
 
-  /* ---------- Chỉ báo: MA(7,25,99), Volume, RSI(14), MACD(12,26,9) ---------- */
-  var MA_DEF = [{ n: 7, color: "#f0b90b" }, { n: 25, color: "#eb40b5" }, { n: 99, color: "#b385f8" }];
+  /* ---------- Chỉ báo: EMA(34,89,200), Volume, RSI(14), MACD(12,26,9) ---------- */
+  var MA_DEF = [{ n: 34, color: "#f0b90b" }, { n: 89, color: "#eb40b5" }, { n: 200, color: "#b385f8" }];   // EMA
   var C_MACD = "#f0b90b", C_SIG = "#b385f8", C_RSI = "#b385f8";
   var IND_KEY = "trade_ind";
   var IND = { ma: true, vol: true, rsi: true, macd: true };
@@ -7391,15 +7391,6 @@ async function copyVax1Result() {
 
   function allCharts() { return [S.chart, S.rsiChart, S.macdChart].filter(Boolean); }
 
-  function sma(v, n) {
-    var out = new Array(v.length).fill(null), s = 0;
-    for (var i = 0; i < v.length; i++) {
-      s += v[i];
-      if (i >= n) s -= v[i - n];
-      if (i >= n - 1) out[i] = s / n;
-    }
-    return out;
-  }
   function ema(v, n) {
     var out = new Array(v.length).fill(null), k = 2 / (n + 1), prev = null, s = 0, cnt = 0;
     for (var i = 0; i < v.length; i++) {
@@ -7431,7 +7422,7 @@ async function copyVax1Result() {
     var m = cl.map(function (_, i) { return e12[i] !== null && e26[i] !== null ? e12[i] - e26[i] : null; });
     var s = ema(m, 9);
     S.ind = {
-      ma: MA_DEF.map(function (d) { return sma(cl, d.n); }),
+      ma: MA_DEF.map(function (d) { return ema(cl, d.n); }),
       rsi: rsiCalc(cl, 14),
       m: m, s: s,
       h: m.map(function (v, i) { return v !== null && s[i] !== null ? v - s[i] : null; })
@@ -7584,7 +7575,7 @@ async function copyVax1Result() {
     var i = S.hoverIdx === null || S.hoverIdx === undefined ? n - 1 : S.hoverIdx;
     var pd = dec(S.tick), md = Math.min(8, pd + 1), parts = [];
     if (IND.ma) MA_DEF.forEach(function (d, k) {
-      parts.push('<span style="color:' + d.color + '">MA(' + d.n + ") " + fx(S.ind.ma[k][i], pd) + "</span>");
+      parts.push('<span style="color:' + d.color + '">EMA(' + d.n + ") " + fx(S.ind.ma[k][i], pd) + "</span>");
     });
     if (IND.vol) parts.push("<span>Vol(" + esc(S.base) + ") " + fVol(S.candles[i].vol) + "</span>");
     $("tradeLegendMain").innerHTML = parts.join("");
