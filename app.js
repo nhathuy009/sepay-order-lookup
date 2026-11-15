@@ -7502,12 +7502,35 @@ async function copyVax1Result() {
       h: m.map(function (v, i) { return v !== null && s[i] !== null ? v - s[i] : null; })
     };
     S.ind.div = divCalc(S.ind.rsi, S.candles.map(function (c) { return c.low; }), S.candles.map(function (c) { return c.high; }));
+    S.ind.vsa = vsaCalc(S.candles.map(function (c) { return c.vol || 0; }));
   }
   function ok(v) { return v !== null && v !== undefined && isFinite(v); }
   function pt(arr, i) { var t = S.candles[i].time, v = arr[i]; return ok(v) ? { time: t, value: v } : { time: t }; }
+  // VSA Wyckoff Volume — chuyển từ Pine "VSA Wyckoff Volume", giữ tham số mặc định:
+  // volumeMA := nz(volumeMA[1]) + (volume - nz(volumeMA[1])) / 20 (MA kiểu Wilder, bắt đầu từ 0),
+  // màu cột theo volume / volumeMA: >= 2.2 tím, >= 1.8 đỏ, >= 1.2 cam, >= 0.8 xanh lá, >= 0.4 xanh dương, còn lại bạc.
+  var VSA_LEN = 20;
+  var VSA_LEVELS = [
+    { min: 2.2, color: "#9C27B0", name: "Cực cao" },
+    { min: 1.8, color: "#FF5252", name: "Rất cao" },
+    { min: 1.2, color: "#FF9800", name: "Cao" },
+    { min: 0.8, color: "#4CAF50", name: "Bình thường" },
+    { min: 0.4, color: "#2196F3", name: "Thấp" },
+    { min: -Infinity, color: "#B2B5BE", name: "Rất thấp" }
+  ];
+  function vsaCalc(vols) {
+    var ma = 0, out = new Array(vols.length);
+    for (var i = 0; i < vols.length; i++) {
+      ma = ma + (vols[i] - ma) / VSA_LEN;
+      var lv = VSA_LEVELS[VSA_LEVELS.length - 1];
+      for (var k = 0; k < VSA_LEVELS.length; k++) { if (vols[i] >= ma * VSA_LEVELS[k].min) { lv = VSA_LEVELS[k]; break; } }
+      out[i] = { ma: ma, lv: lv };
+    }
+    return out;
+  }
   function volPt(i) {
-    var c = S.candles[i];
-    return { time: c.time, value: c.vol || 0, color: c.close >= c.open ? "rgba(22,163,74,.45)" : "rgba(220,38,38,.45)" };
+    var c = S.candles[i], v = S.ind && S.ind.vsa && S.ind.vsa[i];
+    return { time: c.time, value: c.vol || 0, color: v ? v.lv.color : "#B2B5BE" };
   }
   function histPt(i) {
     var v = S.ind.h[i], t = S.candles[i].time;
@@ -7678,7 +7701,11 @@ async function copyVax1Result() {
     if (IND.ma) MA_DEF.forEach(function (d, k) {
       parts.push('<span style="color:' + d.color + '">EMA(' + d.n + ") " + fx(S.ind.ma[k][i], pd) + "</span>");
     });
-    if (IND.vol) parts.push("<span>Vol(" + esc(S.base) + ") " + fVol(S.candles[i].vol) + "</span>");
+    if (IND.vol) {
+      var vs = S.ind.vsa && S.ind.vsa[i];
+      parts.push("<span>Vol(" + esc(S.base) + ") " + fVol(S.candles[i].vol) +
+        (vs ? ' <span style="color:' + vs.lv.color + '">● ' + vs.lv.name + "</span>" : "") + "</span>");
+    }
     $("tradeLegendMain").innerHTML = parts.join("");
     $("tradeLegendRsi").innerHTML = "<span>RSI(14)</span>" + '<span style="color:' + C_RSI + '">' + fx(S.ind.rsi[i], 2) + "</span>";
     var h = S.ind.h[i];
@@ -7910,15 +7937,16 @@ async function copyVax1Result() {
     if (!panelTimer) panelTimer = setTimeout(function () { panelTimer = 0; renderPanel(); }, 300);
   }
 
-  // "Ẩn tag": che số tiền, khối lượng, lãi/lỗ bằng ••• (giữ giá và %), để chụp ảnh gửi người khác.
-  var HIDE_KEY = "trade_hide_tags";
-  S.hideTags = store(HIDE_KEY) === "1";
-  function M(text) { return S.hideTags ? "•••" : text; }
-  function syncHideBtn() {
-    var b = $("tradeTagBtn");
-    b.setAttribute("aria-pressed", S.hideTags ? "true" : "false");
-    b.querySelector(".trade-tag-text").textContent = S.hideTags ? "Hiện tag" : "Ẩn tag";
-    b.title = S.hideTags ? "Đang ẩn số tiền/khối lượng — bấm để hiện lại" : "Ẩn số tiền/khối lượng trên đường ray để chụp ảnh";
+  // Ẩn tag từng ray: bấm vào hộp "x USDT → y coin" trên biểu đồ để ẩn (chụp ảnh không lộ khối lượng),
+  // bấm vào đường ray (không kéo) hoặc nút "Hiện tag" trong danh sách để hiện lại. Lưu theo máy.
+  var HIDDEN_KEY = "trade_hidden_tags";
+  var hiddenTags = {};
+  try { hiddenTags = JSON.parse(store(HIDDEN_KEY) || "{}") || {}; } catch (e) { hiddenTags = {}; }
+  function tagHidden(r) { return !!hiddenTags[r.id]; }
+  function setTagHidden(r, on) {
+    if (on) hiddenTags[r.id] = 1; else delete hiddenTags[r.id];
+    store(HIDDEN_KEY, JSON.stringify(hiddenTags));
+    renderPanel();
   }
 
   function renderPanel() {
@@ -7936,10 +7964,11 @@ async function copyVax1Result() {
       return '<div class="trade-item' + (S.selected === r.id ? " is-sel" : "") + '" data-id="' + esc(r.id) + '">' +
         '<div class="trade-item-top"><b>' + fP(r.price) + '</b><span class="trade-tag' + (r._filled ? " is-filled" : "") + '">' +
           (r._filled ? "Đã khớp" : "Chờ khớp") + "</span></div>" +
-        '<div class="trade-item-sub">' + M(fU(r.usdt)) + " USDT → <b>" + M(fQ(q)) + " " + esc(S.base) + "</b></div>" +
+        '<div class="trade-item-sub">' + fU(r.usdt) + " USDT → <b>" + fQ(q) + " " + esc(S.base) + "</b></div>" +
         '<div class="trade-item-sub">Lãi/lỗ: <span class="' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
-          (S.hideTags ? "" : sg(pnl) + fU(pnl) + " USDT ") + "(" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
+          sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
         '<div class="trade-item-acts"><button type="button" class="btn-outline" data-act="edit">Sửa</button>' +
+          '<button type="button" class="btn-outline" data-act="tag">' + (tagHidden(r) ? "Hiện tag" : "Ẩn tag") + "</button>" +
           '<button type="button" class="btn-outline trade-danger" data-act="del">Xoá</button></div>' +
         "</div>";
     }).join("");
@@ -7950,16 +7979,16 @@ async function copyVax1Result() {
     var b = esc(S.base);
     $("tradeSummary").innerHTML =
       "<span class='k'>Giá hiện tại</span><span class='v'>" + fP(px) + "</span>" +
-      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + M(fU(aU)) + " USDT</span>" +
-      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + M(fQ(aQ)) + " " + b + "</span>" +
+      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + fU(aU) + " USDT</span>" +
+      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + fQ(aQ) + " " + b + "</span>" +
       "<span class='k'>Giá TB nếu khớp hết</span><span class='v'>" + fP(aAvg) + "</span>" +
       '<span class="trade-sep"></span>' +
-      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + M(fU(fUs)) + " USDT</span>" +
-      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + M(fQ(fQs)) + " " + b + "</b></span>" +
+      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + fU(fUs) + " USDT</span>" +
+      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + fQ(fQs) + " " + b + "</b></span>" +
       '<span class="k">Giá TB đã khớp</span><span class="v" style="color:#f59e0b">' + fP(avg) + "</span>" +
-      "<span class='k'>Giá trị hiện tại</span><span class='v'>" + M(fU(val)) + " USDT</span>" +
+      "<span class='k'>Giá trị hiện tại</span><span class='v'>" + fU(val) + " USDT</span>" +
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
-        (fN ? (S.hideTags ? "" : sg(pnl) + fU(pnl) + " USDT ") + "(" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
+        (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
     S.avg = avg;
     updateActiveChipPrice();
     if (newlyFilled) saveRays();
@@ -7983,6 +8012,7 @@ async function copyVax1Result() {
     ctx.globalAlpha = 0.92; ctx.fillStyle = S.colors.card; ctx.fillRect(bx, by, tw + pad * 2, bh); ctx.globalAlpha = 1;
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, tw + pad * 2 - 1, bh - 1);
     ctx.fillStyle = col; ctx.textBaseline = "middle"; ctx.fillText(text, bx + pad, by + bh / 2 + 0.5);
+    return { x: bx, y: by, w: tw + pad * 2, h: bh };
   }
   function draw() {
     S.raf = 0;
@@ -8012,10 +8042,11 @@ async function copyVax1Result() {
       ctx.strokeStyle = col; ctx.lineWidth = sel ? 2.5 : 1.5;
       ctx.beginPath(); ctx.moveTo(g.x, g.y + 0.5); ctx.lineTo(paneW, g.y + 0.5); ctx.stroke();
       if (g.x0 >= 0) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(g.x, g.y, sel ? 4.5 : 3.5, 0, Math.PI * 2); ctx.fill(); }
-      if (S.hideTags) return;
+      r._lbl = null;
+      if (tagHidden(r)) return;
       var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base + (r._filled ? "  ✓" : "");
       var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
-      label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
+      r._lbl = label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
     });
     drawPriceDivs(paneW);   // vẽ sau cùng để nhãn ray điểm mua không che đường phân kỳ
     ctx.restore();
@@ -8106,17 +8137,35 @@ async function copyVax1Result() {
     });
     return best;
   }
+  function tagHit(x, y) {
+    for (var i = S.rays.length - 1; i >= 0; i--) {
+      var b = S.rays[i]._lbl;
+      if (b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return S.rays[i];
+    }
+    return null;
+  }
+  var swallowMouse = false;
   wrap.addEventListener("pointerdown", function (e) {
     if (S.mode === "ray" || e.button !== 0) return;
-    var p = local(e), r = hit(p.x, p.y);
+    var p = local(e), t = tagHit(p.x, p.y);
+    if (t) {   // bấm vào hộp tag -> ẩn tag của ray này
+      e.stopPropagation(); e.preventDefault();
+      swallowMouse = true;
+      S.selected = t.id;
+      setTagHidden(t, true);
+      return;
+    }
+    var r = hit(p.x, p.y);
     if (r) {
       e.stopPropagation(); e.preventDefault();
-      S.selected = r.id; S.drag = { id: r.id, moved: false };
+      S.selected = r.id; S.drag = { id: r.id, moved: false, wasHidden: tagHidden(r) };
       S.chart.applyOptions({ handleScroll: false, handleScale: false });
       renderPanel();
     } else if (S.selected) { S.selected = null; renderPanel(); }
   }, true);
-  wrap.addEventListener("mousedown", function (e) { if (S.drag) { e.stopPropagation(); e.preventDefault(); } }, true);
+  wrap.addEventListener("mousedown", function (e) {
+    if (S.drag || swallowMouse) { e.stopPropagation(); e.preventDefault(); swallowMouse = false; }
+  }, true);
   window.addEventListener("pointermove", function (e) {
     if (!S.active) return;
     var p = local(e);
@@ -8129,14 +8178,20 @@ async function copyVax1Result() {
       return;
     }
     if (e.target && e.target.closest && e.target.closest("#tradeChartWrap")) {
-      wrap.classList.toggle("is-hover", !S.mode && !!hit(p.x, p.y));
+      var onTag = !S.mode && !!tagHit(p.x, p.y);
+      wrap.classList.toggle("is-tag", onTag);
+      wrap.classList.toggle("is-hover", !S.mode && !onTag && !!hit(p.x, p.y));
     }
   });
   window.addEventListener("pointerup", function () {
     if (!S.drag) return;
-    var moved = S.drag.moved, dragId = S.drag.id;
+    var moved = S.drag.moved, dragId = S.drag.id, wasHidden = S.drag.wasHidden;
     S.drag = null;
     S.chart.applyOptions({ handleScroll: true, handleScale: true });
+    if (!moved && wasHidden) {   // bấm (không kéo) vào ray đang ẩn tag -> hiện lại
+      var hr = S.rays.find(function (x) { return x.id === dragId; });
+      if (hr) setTagHidden(hr, false);
+    }
     if (moved) {
       S.rays.forEach(function (r) { if (r.id === dragId) r.u = Date.now(); });
       saveRays(); renderPanel();
@@ -8167,13 +8222,7 @@ async function copyVax1Result() {
   }
 
   $("tradeRayBtn").addEventListener("click", function () { setMode(S.mode === "ray" ? null : "ray"); });
-  syncHideBtn();
-  $("tradeTagBtn").addEventListener("click", function () {
-    S.hideTags = !S.hideTags;
-    store(HIDE_KEY, S.hideTags ? "1" : "0");
-    syncHideBtn();
-    renderPanel();
-  });
+
   $("tradeLoadBtn").addEventListener("click", load);
   $("tradeSym").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
   $("tradeIv").addEventListener("change", load);
@@ -8221,6 +8270,7 @@ async function copyVax1Result() {
     if (act === "del") return removeRay(id);
     var r = S.rays.find(function (x) { return x.id === id; });
     if (act === "edit") return openDialog(r);
+    if (act === "tag") return setTagHidden(r, !tagHidden(r));
     S.selected = id; renderPanel();
   });
 
