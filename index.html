@@ -1110,10 +1110,20 @@
         <section class="card trade-chart-card" aria-label="Biểu đồ">
           <div class="trade-toolbar">
             <input type="text" id="tradeSym" value="BTCUSDT" spellcheck="false" autocomplete="off" aria-label="Cặp giao dịch Binance" />
-            <select id="tradeIv" aria-label="Khung thời gian">
-              <option>1m</option><option>5m</option><option>15m</option><option>30m</option>
-              <option selected>1h</option><option>4h</option><option>8h</option><option>12h</option><option>1d</option><option>3d</option><option>1w</option>
-            </select>
+            <select id="tradeIv" hidden aria-hidden="true" tabindex="-1"><option>1m</option><option>5m</option><option>15m</option><option>30m</option><option selected>1h</option><option>4h</option><option>8h</option><option>12h</option><option>1d</option><option>3d</option><option>1w</option></select>
+            <div class="trade-ivs" id="tradeIvs" role="group" aria-label="Khung thời gian">
+              <button type="button" data-iv="1m" aria-pressed="false" title="Khung 1m">1m</button>
+              <button type="button" data-iv="5m" aria-pressed="false" title="Khung 5m">5m</button>
+              <button type="button" data-iv="15m" aria-pressed="false" title="Khung 15m">15m</button>
+              <button type="button" data-iv="30m" aria-pressed="false" title="Khung 30m">30m</button>
+              <button type="button" data-iv="1h" aria-pressed="true" title="Khung 1h">1h</button>
+              <button type="button" data-iv="4h" aria-pressed="false" title="Khung 4h">4h</button>
+              <button type="button" data-iv="8h" aria-pressed="false" title="Khung 8h">8h</button>
+              <button type="button" data-iv="12h" aria-pressed="false" title="Khung 12h">12h</button>
+              <button type="button" data-iv="1d" aria-pressed="false" title="1 ngày">D</button>
+              <button type="button" data-iv="3d" aria-pressed="false" title="3 ngày">3D</button>
+              <button type="button" data-iv="1w" aria-pressed="false" title="1 tuần">W</button>
+            </div>
             <button type="button" class="btn-outline" id="tradeLoadBtn">Xem</button>
             <button type="button" id="tradeRayBtn" title="Phím tắt: H"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><path d="M7 12h15"/></svg>Horizontal Ray (H)</button>
             <div class="trade-ind" id="tradeInd" role="group" aria-label="Chỉ báo">

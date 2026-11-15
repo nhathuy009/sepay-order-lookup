@@ -7596,6 +7596,7 @@ async function copyVax1Result() {
   function load() {
     var sym = $("tradeSym").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     var iv = $("tradeIv").value;
+    syncIv();
     if (!sym || !S.chart) return;
     $("tradeSym").value = sym;
     var seq = ++S.loadSeq;
@@ -7974,6 +7975,21 @@ async function copyVax1Result() {
   $("tradeLoadBtn").addEventListener("click", load);
   $("tradeSym").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
   $("tradeIv").addEventListener("change", load);
+  // Hàng nút khung thời gian (ô <select id="tradeIv"> ẩn vẫn giữ giá trị đang chọn)
+  function syncIv() {
+    var v = $("tradeIv").value;
+    document.querySelectorAll("#tradeIvs button").forEach(function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-iv") === v ? "true" : "false");
+    });
+  }
+  $("tradeIvs").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-iv]");
+    if (!b) return;
+    var v = b.getAttribute("data-iv");
+    if (v === S.interval && v === $("tradeIv").value) return;
+    $("tradeIv").value = v;
+    load();
+  });
   $("tradeClearBtn").addEventListener("click", function () {
     if (!S.rays.length || !confirm("Xoá toàn bộ " + S.rays.length + " điểm mua của " + S.symbol + "?")) return;
     S.rays.forEach(function (r) { S.series.removePriceLine(r.pl); });

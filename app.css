@@ -2630,3 +2630,17 @@ body.v3 .v3-trade .trade-watch-add input { width: 170px; padding: 7px 10px; font
 .v3-trade .trade-ind button + button { border-left: 1px solid var(--input-border); }
 .v3-trade .trade-ind button[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .v3-trade .trade-ind button:hover { filter: none; color: var(--text-main); }
+
+/* Trade: hàng nút khung thời gian */
+.trade-ivs {
+  display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+  border: 1px solid var(--input-border); border-radius: var(--v3-radius, 10px);
+  max-width: 100%; overflow-x: auto; scrollbar-width: none;
+}
+.trade-ivs::-webkit-scrollbar { display: none; }
+.v3-trade .trade-ivs button {
+  background: none; box-shadow: none; border: 0; border-radius: 7px; padding: 6px 9px; min-width: 34px;
+  font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap;
+}
+.v3-trade .trade-ivs button:hover { filter: none; color: var(--text-main); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.v3-trade .trade-ivs button[aria-pressed="true"] { color: var(--text-main); background: color-mix(in srgb, var(--accent) 16%, transparent); }
