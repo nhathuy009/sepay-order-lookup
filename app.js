@@ -7618,6 +7618,8 @@ async function copyVax1Result() {
       S.series.setData(S.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
       setIndicatorData();
       S.series.applyOptions({ priceFormat: { type: "price", precision: dec(S.tick), minMove: S.tick } });
+      // Kéo/zoom trục giá làm thư viện tắt autoScale; đổi cặp/khung thì bật lại để thang giá theo nến mới
+      allCharts().forEach(function (ch) { ch.priceScale("right").applyOptions({ autoScale: true }); });
       S.chart.timeScale().scrollToRealTime();
       $("tradePair").textContent = S.base + "/" + S.quote;
       loadRays();
