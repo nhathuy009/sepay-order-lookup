@@ -7244,7 +7244,7 @@ async function copyVax1Result() {
 
   var LWC_SRC = "https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js";
   var API = ["https://api.binance.com", "https://data-api.binance.vision"];
-  var IV_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
+  var IV_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "8h": 28800, "12h": 43200, "1d": 86400, "3d": 259200, "1w": 604800 };
   var TZ = -new Date().getTimezoneOffset() * 60;   // biểu đồ hiển thị theo giờ máy
   var BUY = "#16a34a";
 
