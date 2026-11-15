@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function switchTab(which) {
-  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon", "vax1"];
+  const tabs = ["bulk", "transaction", "invoice", "gdt", "employee", "air", "ehoadon", "vax1", "trade"];
   
   tabs.forEach(tab => {
     const idSuffix = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -6578,7 +6578,8 @@ async function copyVax1Result() {
     air:         { ready: "#airResultArea" },
     ehoadon:     { ready: "#ehoadonInvoiceCard, #ehoadonCustomsCard", input: "#ehoadonLoginCard" },
     employee:    { ready: "#employeeResultCard" },
-    vax1:        { ready: "#vax1ResultCard" }
+    vax1:        { ready: "#vax1ResultCard" },
+    trade:       { ready: "#tradeList .trade-item" }
   };
   var EXPORT_RE = /copy|tải|lưu hóa đơn|lưu phiếu|tạo\s*&|tạo và lưu/i;
   var RECENT_KEY = "v3_recent";
@@ -7230,4 +7231,541 @@ async function copyVax1Result() {
   input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); run(); } });
   // Cho phép kiểm thử phần dựng workbook mà không cần đăng nhập
   window.__v3GsheetToFile = toWorkbookFile;
+})();
+
+/* ---------------- Trade: điểm mua theo USDT (#/trade) ----------------
+   - Biểu đồ nến Binance (lightweight-charts, chỉ tải khi mở tab) + giá trực tiếp qua WebSocket.
+   - Horizontal Ray = điểm mua: click lên chart, nhập "số tiền _ USDT" -> khối lượng = USDT / giá
+     (làm tròn xuống theo LOT_SIZE của Binance). Kéo đường để đổi giá, nhấp đúp để sửa.
+   - Điểm mua lưu trong localStorage theo từng cặp (trade_rays_<SYMBOL>). */
+(function () {
+  "use strict";
+  if (!document.getElementById("tabTrade")) return;
+
+  var LWC_SRC = "https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js";
+  var API = ["https://api.binance.com", "https://data-api.binance.vision"];
+  var IV_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
+  var TZ = -new Date().getTimezoneOffset() * 60;   // biểu đồ hiển thị theo giờ máy
+  var BUY = "#16a34a";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var S = {
+    symbol: "", interval: "1h", base: "", quote: "USDT", tick: 0.01, step: 1e-5,
+    candles: [], rays: [], mode: null, selected: null, drag: null, ws: null, editing: null,
+    active: false, chart: null, series: null, colors: null, font: "system-ui, sans-serif",
+    avg: NaN, raf: 0, loadSeq: 0
+  };
+
+  function store(k, v) {
+    try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {}
+    return null;
+  }
+
+  /* ---------- Định dạng số ---------- */
+  function dec(x) { return Math.max(0, Math.round(-Math.log10(x))); }
+  function nf(v, d) { return isFinite(v) ? v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–"; }
+  function fP(v) { return nf(v, dec(S.tick)); }
+  function fU(v) { return nf(v, 2); }
+  function qRound(v) { return Math.floor(v / S.step + 1e-9) * S.step; }
+  function fQ(v) { return nf(qRound(v), dec(S.step)); }
+  function sg(v) { return v >= 0 ? "+" : ""; }
+  function roundTick(p) { return Math.round(p / S.tick) * S.tick; }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+
+  // "2000 USDT", "2,000 USDT", "2.000 usdt", "1500.5 USDT"
+  function parseAmount(s) {
+    var m = String(s).replace(/\s/g, "").match(/(\d[\d.,]*)/);
+    if (!m) return NaN;
+    var n = m[1];
+    if (/^\d{1,3}([.,]\d{3})+$/.test(n)) n = n.replace(/[.,]/g, "");
+    else if (n.indexOf(",") >= 0 && n.indexOf(".") >= 0)
+      n = n.lastIndexOf(",") > n.lastIndexOf(".") ? n.replace(/\./g, "").replace(",", ".") : n.replace(/,/g, "");
+    else n = n.replace(",", ".");
+    return parseFloat(n);
+  }
+  function parsePrice(s) { return parseFloat(String(s).replace(/[\s,]/g, "")); }
+
+  function getJSON(path) {
+    var i = 0, lastErr;
+    function next() {
+      if (i >= API.length) return Promise.reject(lastErr);
+      var base = API[i++];
+      return fetch(base + path).then(function (r) {
+        if (r.ok) return r.json();
+        return r.text().then(function (t) { lastErr = new Error(r.status + " " + t); return next(); });
+      }, function (e) { lastErr = e; return next(); });
+    }
+    return next();
+  }
+
+  var libPromise = null;
+  function loadLib() {
+    if (window.LightweightCharts) return Promise.resolve();
+    if (libPromise) return libPromise;
+    libPromise = new Promise(function (ok, fail) {
+      var s = document.createElement("script");
+      s.src = LWC_SRC;
+      s.onload = ok;
+      s.onerror = function () { libPromise = null; fail(new Error("Không tải được thư viện biểu đồ")); };
+      document.head.appendChild(s);
+    });
+    return libPromise;
+  }
+
+  /* ---------- Màu theo theme của app ---------- */
+  var probe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  function cssColor(name, fallback) {
+    var el = document.createElement("span");
+    el.style.color = "var(" + name + ")";
+    el.style.display = "none";
+    document.body.appendChild(el);
+    var c = getComputedStyle(el).color;
+    el.remove();
+    probe.clearRect(0, 0, 1, 1);
+    probe.fillStyle = fallback;
+    probe.fillStyle = c;            // canvas hiểu cả color-mix()/color(srgb ...) -> quy về rgba
+    probe.fillRect(0, 0, 1, 1);
+    var d = probe.getImageData(0, 0, 1, 1).data;
+    return "rgba(" + d[0] + "," + d[1] + "," + d[2] + "," + (d[3] / 255).toFixed(3) + ")";
+  }
+  function readColors() {
+    S.colors = {
+      text: cssColor("--text-main", "#111"),
+      muted: cssColor("--text-muted", "#666"),
+      border: cssColor("--border", "#ddd"),
+      accent: cssColor("--accent", "#2e97e0"),
+      card: cssColor("--card-bg-solid", "#fff"),
+      avg: "#f59e0b"
+    };
+    S.font = getComputedStyle(document.body).fontFamily || S.font;
+  }
+  function applyTheme() {
+    if (!S.chart) return;
+    readColors();
+    var c = S.colors;
+    S.chart.applyOptions({
+      layout: { background: { type: "solid", color: "transparent" }, textColor: c.muted, fontFamily: S.font },
+      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+      rightPriceScale: { borderColor: c.border },
+      timeScale: { borderColor: c.border }
+    });
+    renderPanel();
+  }
+
+  /* ---------- Biểu đồ ---------- */
+  function initChart() {
+    readColors();
+    var LW = window.LightweightCharts;
+    S.chart = LW.createChart($("tradeChart"), {
+      autoSize: true,
+      crosshair: { mode: LW.CrosshairMode.Normal },
+      timeScale: { timeVisible: true, rightOffset: 12 }
+    });
+    S.series = S.chart.addCandlestickSeries({
+      upColor: "#16a34a", downColor: "#dc2626", borderVisible: false, wickUpColor: "#16a34a", wickDownColor: "#dc2626"
+    });
+    S.chart.subscribeClick(onChartClick);
+    applyTheme();
+    new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  function setStatus(t, err) {
+    var el = $("tradeStatus");
+    el.textContent = t;
+    el.classList.toggle("is-err", !!err);
+  }
+
+  function load() {
+    var sym = $("tradeSym").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    var iv = $("tradeIv").value;
+    if (!sym || !S.chart) return;
+    $("tradeSym").value = sym;
+    var seq = ++S.loadSeq;
+    setStatus("Đang tải " + sym + "…");
+    var info;
+    getJSON("/api/v3/exchangeInfo?symbol=" + sym).then(function (j) {
+      info = j.symbols[0];
+      return getJSON("/api/v3/klines?symbol=" + sym + "&interval=" + iv + "&limit=1000");
+    }).then(function (kl) {
+      if (seq !== S.loadSeq) return;
+      closeWs();
+      S.symbol = sym; S.interval = iv; S.base = info.baseAsset; S.quote = info.quoteAsset;
+      S.tick = +info.filters.find(function (f) { return f.filterType === "PRICE_FILTER"; }).tickSize;
+      S.step = +info.filters.find(function (f) { return f.filterType === "LOT_SIZE"; }).stepSize;
+      S.candles = kl.map(function (k) {
+        return { time: k[0] / 1000 + TZ, real: k[0] / 1000, open: +k[1], high: +k[2], low: +k[3], close: +k[4] };
+      });
+      S.series.setData(S.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
+      S.series.applyOptions({ priceFormat: { type: "price", precision: dec(S.tick), minMove: S.tick } });
+      S.chart.timeScale().scrollToRealTime();
+      $("tradePair").textContent = S.base + "/" + S.quote;
+      loadRays();
+      renderPanel();
+      if (S.active) openWs();
+      setStatus(S.quote === "USDT" ? "Giá trực tiếp từ Binance" : "Cặp này không định giá bằng USDT", S.quote !== "USDT");
+      store("trade_last", JSON.stringify({ sym: sym, iv: iv }));
+    }).catch(function (e) {
+      if (seq === S.loadSeq) setStatus("Không tải được " + sym + ": " + ((e && e.message) || e), true);
+    });
+  }
+
+  function openWs() {
+    if (S.ws || !S.symbol) return;
+    var ws = new WebSocket("wss://stream.binance.com:9443/ws/" + S.symbol.toLowerCase() + "@kline_" + S.interval);
+    S.ws = ws;
+    ws.onmessage = function (ev) {
+      if (S.ws !== ws) return;
+      var k = JSON.parse(ev.data).k;
+      var c = { time: k.t / 1000 + TZ, real: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c };
+      var last = S.candles[S.candles.length - 1];
+      if (last && last.real === c.real) S.candles[S.candles.length - 1] = c;
+      else if (!last || c.real > last.real) S.candles.push(c);
+      else return;
+      S.series.update({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close });
+      schedulePanel();
+    };
+    ws.onclose = function () {
+      if (S.ws !== ws) return;
+      S.ws = null;
+      setTimeout(function () { if (S.active && !S.ws) openWs(); }, 3000);
+    };
+  }
+  function closeWs() { var w = S.ws; S.ws = null; if (w) w.close(); }
+
+  /* ---------- Lưu điểm mua theo cặp ---------- */
+  function key() { return "trade_rays_" + S.symbol; }
+  function saveRays() {
+    store(key(), JSON.stringify(S.rays.map(function (r) { return { id: r.id, price: r.price, usdt: r.usdt, t: r.t }; })));
+  }
+  function loadRays() {
+    S.rays.forEach(function (r) { if (r.pl) S.series.removePriceLine(r.pl); });
+    S.rays = []; S.selected = null;
+    var arr = [];
+    try { arr = JSON.parse(store(key()) || "[]"); } catch (e) {}
+    arr.forEach(addRay);
+  }
+  function addRay(r) {
+    r.pl = S.series.createPriceLine({ price: r.price, color: S.colors.accent, lineVisible: false, axisLabelVisible: true, title: "" });
+    S.rays.push(r);
+    return r;
+  }
+  function removeRay(id) {
+    var i = S.rays.findIndex(function (r) { return r.id === id; });
+    if (i < 0) return;
+    S.series.removePriceLine(S.rays[i].pl);
+    S.rays.splice(i, 1);
+    if (S.selected === id) S.selected = null;
+    saveRays(); renderPanel();
+  }
+
+  /* ---------- Tính toán ---------- */
+  function idxOf(t) {
+    var c = S.candles, n = c.length;
+    if (!n) return 0;
+    var lastR = c[n - 1].real;
+    if (t > lastR) return n - 1 + (t - lastR) / IV_SEC[S.interval];
+    var lo = 0, hi = n - 1;
+    while (lo < hi) { var m = (lo + hi) >> 1; if (c[m].real < t) lo = m + 1; else hi = m; }
+    return lo;
+  }
+  function isFilled(r) {
+    var c = S.candles;
+    for (var i = Math.max(0, Math.ceil(idxOf(r.t) - 1e-9)); i < c.length; i++) {
+      if (c[i].low <= r.price && c[i].high >= r.price) return true;
+    }
+    return false;
+  }
+  function qtyOf(r) { return r.usdt / r.price; }
+  function lastPrice() { var l = S.candles[S.candles.length - 1]; return l ? l.close : NaN; }
+  function sorted() { return S.rays.slice().sort(function (a, b) { return b.price - a.price; }); }
+
+  var panelTimer = 0;
+  function schedulePanel() {
+    if (!panelTimer) panelTimer = setTimeout(function () { panelTimer = 0; renderPanel(); }, 300);
+  }
+
+  function renderPanel() {
+    if (!S.series) return;
+    var px = lastPrice();
+    var aU = 0, aQ = 0, fUs = 0, fQs = 0, fN = 0;
+    var rows = sorted();
+    var html = rows.map(function (r) {
+      r._filled = isFilled(r);
+      r.pl.applyOptions({ color: r._filled ? BUY : S.colors.accent });
+      var q = qtyOf(r), pnl = q * px - r.usdt;
+      aU += r.usdt; aQ += q;
+      if (r._filled) { fUs += r.usdt; fQs += q; fN++; }
+      return '<div class="trade-item' + (S.selected === r.id ? " is-sel" : "") + '" data-id="' + esc(r.id) + '">' +
+        '<div class="trade-item-top"><b>' + fP(r.price) + '</b><span class="trade-tag' + (r._filled ? " is-filled" : "") + '">' +
+          (r._filled ? "Đã khớp" : "Chờ khớp") + "</span></div>" +
+        '<div class="trade-item-sub">' + fU(r.usdt) + " USDT → <b>" + fQ(q) + " " + esc(S.base) + "</b></div>" +
+        '<div class="trade-item-sub">Lãi/lỗ: <span class="' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
+          sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
+        '<div class="trade-item-acts"><button type="button" class="btn-outline" data-act="edit">Sửa</button>' +
+          '<button type="button" class="btn-outline trade-danger" data-act="del">Xoá</button></div>' +
+        "</div>";
+    }).join("");
+    $("tradeList").innerHTML = html ||
+      '<div class="trade-empty">Chưa có điểm mua.<br>Bấm <b>Horizontal Ray (H)</b> rồi click lên biểu đồ.</div>';
+
+    var avg = fQs ? fUs / fQs : NaN, val = fQs * px, pnl = val - fUs, aAvg = aQ ? aU / aQ : NaN;
+    var b = esc(S.base);
+    $("tradeSummary").innerHTML =
+      "<span class='k'>Giá hiện tại</span><span class='v'>" + fP(px) + "</span>" +
+      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + fU(aU) + " USDT</span>" +
+      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + fQ(aQ) + " " + b + "</span>" +
+      "<span class='k'>Giá TB nếu khớp hết</span><span class='v'>" + fP(aAvg) + "</span>" +
+      '<span class="trade-sep"></span>' +
+      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + fU(fUs) + " USDT</span>" +
+      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + fQ(fQs) + " " + b + "</b></span>" +
+      '<span class="k">Giá TB đã khớp</span><span class="v" style="color:#f59e0b">' + fP(avg) + "</span>" +
+      "<span class='k'>Giá trị hiện tại</span><span class='v'>" + fU(val) + " USDT</span>" +
+      '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
+        (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
+    S.avg = avg;
+  }
+
+  /* ---------- Lớp vẽ Ray (canvas phủ trên biểu đồ) ---------- */
+  var wrap = $("tradeChartWrap"), cv = $("tradeOverlay"), ctx = cv.getContext("2d");
+  function rayGeom(r) {
+    var y = S.series.priceToCoordinate(r.price);
+    if (y === null) return null;
+    var x = S.chart.timeScale().logicalToCoordinate(idxOf(r.t));
+    if (x === null) x = 0;
+    return { x: Math.max(0, x), y: y, x0: x };
+  }
+  function label(text, x, y, col, align) {
+    var tw = ctx.measureText(text).width, pad = 5, bh = 18;
+    var bx = align === "right" ? x - tw - pad * 2 : x, by = y - bh - 3;
+    ctx.globalAlpha = 0.92; ctx.fillStyle = S.colors.card; ctx.fillRect(bx, by, tw + pad * 2, bh); ctx.globalAlpha = 1;
+    ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, tw + pad * 2 - 1, bh - 1);
+    ctx.fillStyle = col; ctx.textBaseline = "middle"; ctx.fillText(text, bx + pad, by + bh / 2 + 0.5);
+  }
+  function draw() {
+    S.raf = 0;
+    if (!S.active || !S.chart) return;
+    var w = wrap.clientWidth, h = wrap.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = "600 12px " + S.font;
+    var paneW = S.chart.timeScale().width();
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, paneW, h); ctx.clip();
+
+    if (isFinite(S.avg)) {
+      var ay = S.series.priceToCoordinate(S.avg);
+      if (ay !== null) {
+        ctx.strokeStyle = S.colors.avg; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(0, ay + 0.5); ctx.lineTo(paneW, ay + 0.5); ctx.stroke(); ctx.setLineDash([]);
+        label("Giá TB " + fP(S.avg), paneW - 8, ay, S.colors.avg, "right");
+      }
+    }
+    S.rays.forEach(function (r) {
+      var g = rayGeom(r);
+      if (!g || g.x > paneW) return;
+      var col = r._filled ? BUY : S.colors.accent, sel = S.selected === r.id;
+      ctx.strokeStyle = col; ctx.lineWidth = sel ? 2.5 : 1.5;
+      ctx.beginPath(); ctx.moveTo(g.x, g.y + 0.5); ctx.lineTo(paneW, g.y + 0.5); ctx.stroke();
+      if (g.x0 >= 0) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(g.x, g.y, sel ? 4.5 : 3.5, 0, Math.PI * 2); ctx.fill(); }
+      var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base + (r._filled ? "  ✓" : "");
+      var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
+      label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
+    });
+    ctx.restore();
+    S.raf = requestAnimationFrame(draw);
+  }
+
+  /* ---------- Chuột / phím ---------- */
+  function local(e) { var b = wrap.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
+  function hit(x, y) {
+    if (!S.chart) return null;
+    var paneW = S.chart.timeScale().width(), best = null, bd = 6;
+    S.rays.forEach(function (r) {
+      var g = rayGeom(r);
+      if (!g) return;
+      var d = Math.abs(g.y - y);
+      if (d <= bd && x >= g.x - 6 && x <= paneW) { best = r; bd = d; }
+    });
+    return best;
+  }
+  wrap.addEventListener("pointerdown", function (e) {
+    if (S.mode === "ray" || e.button !== 0) return;
+    var p = local(e), r = hit(p.x, p.y);
+    if (r) {
+      e.stopPropagation(); e.preventDefault();
+      S.selected = r.id; S.drag = { id: r.id, moved: false };
+      S.chart.applyOptions({ handleScroll: false, handleScale: false });
+      renderPanel();
+    } else if (S.selected) { S.selected = null; renderPanel(); }
+  }, true);
+  wrap.addEventListener("mousedown", function (e) { if (S.drag) { e.stopPropagation(); e.preventDefault(); } }, true);
+  window.addEventListener("pointermove", function (e) {
+    if (!S.active) return;
+    var p = local(e);
+    if (S.drag) {
+      var r = S.rays.find(function (q) { return q.id === S.drag.id; });
+      var price = S.series.coordinateToPrice(p.y);
+      if (r && price !== null && price > 0) {
+        r.price = roundTick(price); r.pl.applyOptions({ price: r.price }); S.drag.moved = true; schedulePanel();
+      }
+      return;
+    }
+    if (e.target && e.target.closest && e.target.closest("#tradeChartWrap")) {
+      wrap.classList.toggle("is-hover", !S.mode && !!hit(p.x, p.y));
+    }
+  });
+  window.addEventListener("pointerup", function () {
+    if (!S.drag) return;
+    var moved = S.drag.moved;
+    S.drag = null;
+    S.chart.applyOptions({ handleScroll: true, handleScale: true });
+    if (moved) { saveRays(); renderPanel(); }
+  });
+  wrap.addEventListener("dblclick", function (e) {
+    var p = local(e), r = hit(p.x, p.y);
+    if (r) { e.stopPropagation(); openDialog(r); }
+  }, true);
+
+  function onChartClick(param) {
+    if (S.mode !== "ray" || !param.point || !S.candles.length) return;
+    var p = S.series.coordinateToPrice(param.point.y);
+    var lg = S.chart.timeScale().coordinateToLogical(param.point.x);
+    if (p === null || lg === null) return;
+    var n = S.candles.length, i = Math.round(lg);
+    var t = i < 0 ? S.candles[0].real
+          : i < n ? S.candles[i].real
+          : S.candles[n - 1].real + (i - (n - 1)) * IV_SEC[S.interval];
+    setMode(null);
+    openDialog(null, roundTick(p), t);
+  }
+
+  function setMode(m) {
+    S.mode = m;
+    $("tradeRayBtn").classList.toggle("is-on", m === "ray");
+    wrap.classList.toggle("is-placing", m === "ray");
+  }
+
+  $("tradeRayBtn").addEventListener("click", function () { setMode(S.mode === "ray" ? null : "ray"); });
+  $("tradeLoadBtn").addEventListener("click", load);
+  $("tradeSym").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
+  $("tradeIv").addEventListener("change", load);
+  $("tradeClearBtn").addEventListener("click", function () {
+    if (!S.rays.length || !confirm("Xoá toàn bộ " + S.rays.length + " điểm mua của " + S.symbol + "?")) return;
+    S.rays.forEach(function (r) { S.series.removePriceLine(r.pl); });
+    S.rays = []; S.selected = null;
+    saveRays(); renderPanel();
+  });
+  $("tradeCopyBtn").addEventListener("click", function () {
+    var px = lastPrice();
+    var lines = [["STT", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng (" + S.base + ")", "Trạng thái",
+                  "Giá hiện tại", "Lãi/lỗ (USDT)", "Lãi/lỗ (%)"].join("\t")];
+    sorted().forEach(function (r, i) {
+      var q = qtyOf(r), pnl = q * px - r.usdt;
+      lines.push([i + 1, S.symbol, r.price, r.usdt, qRound(q).toFixed(dec(S.step)), r._filled ? "Đã khớp" : "Chờ khớp",
+                  px, pnl.toFixed(2), (pnl / r.usdt * 100).toFixed(2)].join("\t"));
+    });
+    var btn = $("tradeCopyBtn"), old = btn.textContent;
+    navigator.clipboard.writeText(lines.join("\n")).then(function () {
+      btn.textContent = "Đã copy ✓";
+      setTimeout(function () { btn.textContent = old; }, 1500);
+    }, function (e) { alert("Không copy được: " + (e.message || e)); });
+  });
+  $("tradeList").addEventListener("click", function (e) {
+    var item = e.target.closest(".trade-item");
+    if (!item) return;
+    var id = item.getAttribute("data-id"), act = e.target.getAttribute("data-act");
+    if (act === "del") return removeRay(id);
+    var r = S.rays.find(function (x) { return x.id === id; });
+    if (act === "edit") return openDialog(r);
+    S.selected = id; renderPanel();
+  });
+
+  var dlg = $("tradeDlg");
+  document.addEventListener("keydown", function (e) {
+    if (!S.active || dlg.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    var a = document.activeElement;
+    if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
+    if (e.key === "h" || e.key === "H") setMode(S.mode === "ray" ? null : "ray");
+    else if (e.key === "Escape") setMode(null);
+    else if ((e.key === "Delete" || e.key === "Backspace") && S.selected) { e.preventDefault(); removeRay(S.selected); }
+  });
+
+  /* ---------- Hộp nhập "số tiền _ USDT" ---------- */
+  function openDialog(r, price, t) {
+    S.editing = r ? { id: r.id } : { id: null, t: t };
+    $("tradeDlgTitle").textContent = r ? "Sửa điểm mua" : "Điểm mua mới";
+    $("tradeDlgPrice").value = (r ? r.price : price).toFixed(dec(S.tick));
+    $("tradeDlgText").value = r ? r.usdt + " USDT" : (store("trade_last_usdt") || "");
+    $("tradeDlgDel").style.display = r ? "" : "none";
+    preview();
+    dlg.showModal();
+    $("tradeDlgText").focus();
+    $("tradeDlgText").select();
+  }
+  function preview() {
+    var p = parsePrice($("tradeDlgPrice").value), u = parseAmount($("tradeDlgText").value);
+    $("tradeDlgPreview").innerHTML = (p > 0 && u > 0)
+      ? "Mua <b>" + fU(u) + " USDT</b> tại " + fP(p) + ' = <b class="trade-pos">' + fQ(u / p) + " " + esc(S.base) + "</b>"
+      : "Nhập theo dạng “2000 USDT”";
+  }
+  $("tradeDlgPrice").addEventListener("input", preview);
+  $("tradeDlgText").addEventListener("input", preview);
+  $("tradeDlgForm").addEventListener("submit", function (e) {
+    var act = e.submitter ? e.submitter.value : "ok", ed = S.editing;
+    if (act === "del" && ed.id) { removeRay(ed.id); return; }
+    if (act !== "ok") return;
+    var p = parsePrice($("tradeDlgPrice").value), u = parseAmount($("tradeDlgText").value);
+    if (!(p > 0 && u > 0)) {
+      e.preventDefault();
+      $("tradeDlgPreview").innerHTML = '<span class="trade-neg">Giá hoặc số tiền chưa hợp lệ. Ví dụ: 2000 USDT</span>';
+      return;
+    }
+    store("trade_last_usdt", u + " USDT");
+    if (ed.id) {
+      var r = S.rays.find(function (x) { return x.id === ed.id; });
+      r.price = roundTick(p); r.usdt = u; r.pl.applyOptions({ price: r.price });
+    } else {
+      var nr = addRay({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), price: roundTick(p), usdt: u, t: ed.t });
+      S.selected = nr.id;
+    }
+    saveRays(); renderPanel();
+  });
+
+  /* ---------- Mở / rời tab ---------- */
+  function enter() {
+    if (S.active) return;
+    S.active = true;
+    if (!S.chart) setStatus("Đang tải thư viện biểu đồ…");
+    loadLib().then(function () {
+      if (!S.active) return;
+      if (!S.chart) {
+        try {
+          var l = JSON.parse(store("trade_last") || "null");
+          if (l) { $("tradeSym").value = l.sym; $("tradeIv").value = l.iv; }
+        } catch (e) {}
+        initChart();
+      }
+      load();   // lần sau mở lại: tải lại nến để bù khoảng thời gian đã rời tab
+      if (!S.raf) S.raf = requestAnimationFrame(draw);
+    }, function (e) { setStatus(e.message, true); });
+  }
+  function leave() {
+    if (!S.active) return;
+    S.active = false;
+    setMode(null);
+    closeWs();
+    if (S.raf) { cancelAnimationFrame(S.raf); S.raf = 0; }
+  }
+
+  var origSwitch = window.switchTab;
+  window.switchTab = function (which) {
+    origSwitch(which);
+    if (which === "trade") enter(); else leave();
+  };
+  window.addEventListener("hashchange", function () { if (!/^#\/trade\b/.test(location.hash)) leave(); });
+  window.__tradeState = S;   // để kiểm thử trên trình duyệt
 })();

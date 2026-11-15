@@ -2517,3 +2517,65 @@ body.v3 .v3-issue-list {
   ::view-transition-old(root), ::view-transition-new(root), ::view-transition-group(v3-icon) { animation: none; }
 }
 @keyframes v3Fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------------- Trade: điểm mua theo USDT (#/trade) ---------------- */
+body.v3 .v3-trade .trade-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+body.v3 .v3-trade .trade-toolbar input#tradeSym { width: 140px; text-transform: uppercase; }
+body.v3 .v3-trade .trade-toolbar select { width: auto; }
+body.v3 .v3-trade .trade-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
+body.v3 .v3-trade #tradeRayBtn:not(.is-on) { background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none; }
+body.v3 .v3-trade .trade-status { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
+body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
+.trade-chart-wrap {
+  position: relative; height: clamp(360px, 58vh, 640px);
+  border: 1px solid var(--border); border-radius: var(--v3-radius, 10px); overflow: hidden;
+}
+#tradeChart { position: absolute; inset: 0; }
+#tradeOverlay { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+.trade-chart-wrap.is-hover #tradeChart * { cursor: ns-resize !important; }
+.trade-chart-wrap.is-placing #tradeChart * { cursor: crosshair !important; }
+.trade-hint {
+  display: none; position: absolute; left: 12px; top: 10px; z-index: 5;
+  padding: 6px 10px; border-radius: 8px; font-size: 12.5px;
+  background: var(--accent); color: #fff;
+}
+.trade-chart-wrap.is-placing .trade-hint { display: block; }
+.v3-trade .trade-chart-card .v3-field-hint { margin: 10px 0 0; }
+.trade-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 16px; align-items: start; }
+.trade-cols .card { margin-bottom: 0; }
+@media (max-width: 860px) { .trade-cols { grid-template-columns: minmax(0, 1fr); } }
+.trade-pair { color: var(--text-muted); font-weight: 600; margin-left: 4px; }
+.trade-list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.trade-list-actions button { padding: 6px 12px !important; font-size: 13px; }
+.trade-danger { color: #dc2626 !important; }
+.trade-kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin-top: 10px; font-size: 13.5px; }
+.trade-kv .k { color: var(--text-muted); }
+.trade-kv .v { text-align: right; font-variant-numeric: tabular-nums; }
+.trade-kv .trade-sep { grid-column: 1 / -1; border-top: 1px solid var(--border); margin: 4px 0; }
+.trade-pos { color: #16a34a; } .trade-neg { color: #dc2626; }
+#tradeList { margin-top: 10px; display: grid; gap: 8px; }
+.trade-item {
+  border: 1px solid var(--border); border-radius: var(--v3-radius, 10px);
+  padding: 10px 12px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.trade-item.is-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.trade-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.trade-item-top b { font-size: 14.5px; }
+.trade-item-sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+.trade-item-sub b { color: var(--text-main); }
+.trade-tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--badge-ok-bg); color: var(--text-muted); }
+.trade-tag.is-filled { background: rgba(22, 163, 74, .15); color: #16a34a; }
+.trade-item-acts { display: flex; gap: 6px; margin-top: 8px; }
+.trade-item-acts button { padding: 4px 10px !important; font-size: 12.5px; }
+.trade-empty { color: var(--text-muted); border: 1px dashed var(--border); border-radius: var(--v3-radius, 10px); padding: 16px; text-align: center; font-size: 13.5px; }
+.trade-dlg {
+  width: min(380px, 92vw); padding: 20px; border: 1px solid var(--border); border-radius: var(--v3-radius-lg, 14px);
+  background: var(--card-bg-solid); color: var(--text-main); box-shadow: 0 20px 50px -12px rgba(0, 0, 0, .35);
+}
+.trade-dlg::backdrop { background: rgba(0, 0, 0, .45); }
+.trade-dlg h3 { margin: 0 0 6px; }
+.trade-dlg label { margin-top: 12px; }
+.trade-dlg .v3-field-hint { min-height: 1.4em; margin-top: 8px; }
+.trade-dlg-row { display: flex; gap: 8px; margin-top: 16px; }
+.trade-dlg-row .trade-sp { flex: 1; order: 1; }
+#tradeDlgOk { order: 3; } #tradeDlgCancel { order: 2; } #tradeDlgDel { order: 0; }

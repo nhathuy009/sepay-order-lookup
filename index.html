@@ -161,6 +161,20 @@
           </a>
           </div>
         </section>
+        <section class="v3-group" aria-labelledby="g5">
+          <h2 class="v3-group-title" id="g5">Đầu tư</h2>
+          <div class="v3-grid">
+          <a class="v3-task" href="#/trade" data-key="trade" data-group="Đầu tư" data-steps="Chọn cặp coin|Vẽ điểm mua|Copy sang Excel">
+            <span class="v3-task-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-candlestick-icon lucide-chart-candlestick"><path d="M9 5v4"/><rect width="4" height="6" x="7" y="9" rx="1"/><path d="M9 15v2"/><path d="M17 3v2"/><rect width="4" height="8" x="15" y="5" rx="1"/><path d="M17 13v3"/><path d="M3 3v16a2 2 0 0 0 2 2h16"/></svg></span>
+            <span class="v3-task-body">
+              <span class="v3-task-title">Trade</span>
+              <span class="v3-task-desc">Vẽ Horizontal Ray làm điểm mua, nhập “số tiền USDT” để tính khối lượng coin, giá trung bình và lãi lỗ.</span>
+              <span class="v3-flow"><span>Chọn cặp coin</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Vẽ điểm mua</span><span class="v3-flow-sep" aria-hidden="true">→</span><span>Copy sang Excel</span></span>
+            </span>
+            <span class="v3-task-meta" data-last="trade">Chưa dùng trên máy này</span>
+          </a>
+          </div>
+        </section>
     </main>
 
     <section class="v3-tool" id="v3Tool" aria-labelledby="v3ToolTitle" hidden>
@@ -1087,6 +1101,64 @@
           </div>
           <pre id="vax1ResultPre" class="v3-mono v3-vax-pre"></pre>
         </section>
+      </div>
+
+      <!-- TAB TRADE: ĐIỂM MUA THEO USDT (biểu đồ Binance, lightweight-charts tải khi mở tab) -->
+      <div id="tabTrade" class="hidden tab-panel v3-trade">
+        <h2>Trade · Điểm mua theo USDT</h2>
+
+        <section class="card trade-chart-card" aria-label="Biểu đồ">
+          <div class="trade-toolbar">
+            <input type="text" id="tradeSym" value="BTCUSDT" spellcheck="false" autocomplete="off" aria-label="Cặp giao dịch Binance" />
+            <select id="tradeIv" aria-label="Khung thời gian">
+              <option>1m</option><option>5m</option><option>15m</option><option>30m</option>
+              <option selected>1h</option><option>4h</option><option>1d</option><option>1w</option>
+            </select>
+            <button type="button" class="btn-outline" id="tradeLoadBtn">Xem</button>
+            <button type="button" id="tradeRayBtn" title="Phím tắt: H"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><path d="M7 12h15"/></svg>Horizontal Ray (H)</button>
+            <span class="trade-status" id="tradeStatus" role="status"></span>
+          </div>
+          <div class="trade-chart-wrap" id="tradeChartWrap">
+            <div id="tradeChart"></div>
+            <canvas id="tradeOverlay"></canvas>
+            <div class="trade-hint">Click lên biểu đồ để đặt điểm mua · Esc để huỷ</div>
+          </div>
+          <p class="v3-field-hint">Kéo đường để đổi giá · Nhấp đúp để sửa · Chọn rồi bấm Delete để xoá. “Đã khớp” = sau thời điểm đặt, giá đã chạm mức đó.</p>
+        </section>
+
+        <div class="trade-cols">
+          <section class="card" aria-labelledby="tradeSumTitle">
+            <div class="v3-vax-head"><h3 id="tradeSumTitle">Tổng hợp <span id="tradePair" class="trade-pair"></span></h3></div>
+            <div class="trade-kv" id="tradeSummary"></div>
+          </section>
+          <section class="card" aria-labelledby="tradeListTitle">
+            <div class="v3-vax-head">
+              <h3 id="tradeListTitle">Điểm mua</h3>
+              <div class="trade-list-actions">
+                <button type="button" class="btn-outline" id="tradeCopyBtn">Copy sang Excel</button>
+                <button type="button" class="btn-outline trade-danger" id="tradeClearBtn">Xoá hết</button>
+              </div>
+            </div>
+            <div id="tradeList"></div>
+          </section>
+        </div>
+
+        <dialog id="tradeDlg" class="trade-dlg">
+          <form method="dialog" id="tradeDlgForm">
+            <h3 id="tradeDlgTitle">Điểm mua mới</h3>
+            <label for="tradeDlgPrice">Giá mua</label>
+            <input type="text" id="tradeDlgPrice" inputmode="decimal" autocomplete="off" />
+            <label for="tradeDlgText">Số tiền _ USDT</label>
+            <input type="text" id="tradeDlgText" placeholder="2000 USDT" autocomplete="off" />
+            <p class="v3-field-hint" id="tradeDlgPreview"></p>
+            <div class="trade-dlg-row">
+              <button value="ok" id="tradeDlgOk">Lưu điểm mua</button>
+              <button value="cancel" class="btn-outline" id="tradeDlgCancel">Huỷ</button>
+              <span class="trade-sp"></span>
+              <button value="del" class="btn-outline trade-danger" id="tradeDlgDel">Xoá</button>
+            </div>
+          </form>
+        </dialog>
       </div>
 
     
