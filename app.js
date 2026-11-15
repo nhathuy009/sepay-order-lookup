@@ -287,16 +287,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const authCard = document.getElementById("authCard");
         if (authCard) authCard.classList.add("hidden");
       }
-      
-      // Tự động điền tài khoản eHoadon từ Vercel Environment Variables
-      if (d.ehoadon_username) {
-        document.getElementById("ehoadonUsername").value = d.ehoadon_username;
-      }
-      if (d.ehoadon_password) {
-        document.getElementById("ehoadonPassword").value = d.ehoadon_password;
-      }
     }
   }).catch(() => {});
+  loadEhoadonConfig();
   
   initColumnSelector();
 
@@ -352,6 +345,8 @@ function switchTab(which) {
   });
 
   // Bắt sự kiện tải tài khoản ngân hàng khi vào tab transaction
+  if (which === "ehoadon") loadEhoadonConfig();
+
   if (which === "transaction") {
     const dropdownEl = document.getElementById("txBankAccountIdDropdown");
     // Nếu dropdown trống (chưa có checkbox nào) thì mới tải dữ liệu
@@ -5885,13 +5880,37 @@ async function doEhoadonParseCustomsDeclaration() {
 
 // EHOADON - TẠO HÓA ĐƠN TỰ ĐỘNG (van.ehoadon.vn)
 // =======================================================
+// Tài khoản eHoadon lưu trên Vercel: chỉ lấy username (qua POST có mật khẩu truy cập)
+// để điền sẵn form. Mật khẩu không bao giờ về trình duyệt; bỏ trống ô mật khẩu thì
+// server tự dùng mật khẩu đã lưu khi đăng nhập.
+let ehoadonHasSavedPassword = false;
+let ehoadonSavedUsername = "";
+async function loadEhoadonConfig() {
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ehoadon_config", access_token: getToken() })
+    });
+    if (!resp.ok) return;
+    const d = await resp.json();
+    ehoadonSavedUsername = d.username || "";
+    ehoadonHasSavedPassword = !!d.has_saved_password;
+    const userEl = document.getElementById("ehoadonUsername");
+    const passEl = document.getElementById("ehoadonPassword");
+    if (userEl && ehoadonSavedUsername && !userEl.value) userEl.value = ehoadonSavedUsername;
+    if (passEl && ehoadonHasSavedPassword) passEl.placeholder = "Để trống = dùng mật khẩu đã lưu";
+  } catch (e) {}
+}
+
 async function doEhoadonLogin() {
   const username = document.getElementById("ehoadonUsername").value.trim();
   const password = document.getElementById("ehoadonPassword").value;
   const statusEl = document.getElementById("ehoadonLoginStatus");
   const btn = document.getElementById("ehoadonLoginBtn");
 
-  if (!username || !password) {
+  const useSaved = !password && ehoadonHasSavedPassword && (!username || username === ehoadonSavedUsername);
+  if (!useSaved && (!username || !password)) {
     statusEl.style.display = "block";
     statusEl.innerHTML = '<span class="err">Vui lòng nhập tài khoản và mật khẩu.</span>';
     return;

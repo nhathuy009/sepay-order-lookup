@@ -634,9 +634,26 @@ def handle_bank_statement(body):
 # nằm trong _invoiceBKAV.py. Ở đây chỉ validate request body + quyết định
 # HTTP status code, giống hệt cách các action khác (vd. handle_gdt_invoice)
 # đang điều hướng sang _gdt_invoice.py.
+def _ehoadon_env_credentials():
+    """Tài khoản eHoadon lưu trong Vercel Environment Variables (có thể trống)."""
+    return (os.environ.get("ehoadon_username", "") or "").strip(), os.environ.get("ehoadon_password", "") or ""
+
+
+def handle_ehoadon_config(body):
+    # Chỉ trả username để điền sẵn form, KHÔNG BAO GIỜ trả mật khẩu về trình duyệt.
+    env_user, env_pass = _ehoadon_env_credentials()
+    return 200, {"username": env_user, "has_saved_password": bool(env_user and env_pass)}
+
+
 def handle_ehoadon_login(body):
     username = (body.get("username") or "").strip()
     password = body.get("password") or ""
+    # Bỏ trống mật khẩu -> dùng tài khoản lưu trên server (chỉ khi username trống
+    # hoặc trùng username đã lưu, để không ghép nhầm mật khẩu cho tài khoản khác).
+    if not password:
+        env_user, env_pass = _ehoadon_env_credentials()
+        if env_user and env_pass and (not username or username == env_user):
+            username, password = env_user, env_pass
     if not username or not password:
         return 400, {"error": "Thiếu username hoặc password eHoadon"}
     res = ehoadon_login(username, password)
@@ -775,8 +792,8 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self._send(200, {
             "auth_required": bool(APP_ACCESS_TOKEN),
-            "ehoadon_username": os.environ.get("ehoadon_username", ""),
-            "ehoadon_password": os.environ.get("ehoadon_password", ""),
+            # KHÔNG trả tài khoản eHoadon ở đây: GET này không cần mật khẩu truy cập.
+            # Username lấy qua POST action "ehoadon_config"; mật khẩu chỉ dùng phía server.
             # OAuth Client ID (loại Web) để trang v3 đăng nhập Google và đọc thẳng Google Sheet bảng lương.
             # Client ID không phải bí mật; quyền đọc file vẫn do tài khoản Google của người dùng quyết định.
             "google_client_id": os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
@@ -839,6 +856,8 @@ class handler(BaseHTTPRequestHandler):
         elif action == "get_bank_accounts":
             res = get_sepay_bank_accounts()
             status, payload = (400 if "error" in res else 200), res
+        elif action == "ehoadon_config":
+            status, payload = handle_ehoadon_config(body)
         elif action == "ehoadon_login":
             status, payload = handle_ehoadon_login(body)
         elif action == "ehoadon_buyer_search":
