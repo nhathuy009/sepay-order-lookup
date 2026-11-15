@@ -1118,6 +1118,13 @@
             <button type="button" id="tradeRayBtn" title="Phím tắt: H"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><path d="M7 12h15"/></svg>Horizontal Ray (H)</button>
             <span class="trade-status" id="tradeStatus" role="status"></span>
           </div>
+          <div class="trade-watch" aria-label="Danh sách cặp theo dõi">
+            <div class="trade-watch-list" id="tradeWatchList"></div>
+            <form class="trade-watch-add" id="tradeWatchForm" autocomplete="off">
+              <input type="text" id="tradeWatchInput" spellcheck="false" placeholder="Thêm cặp, VD: SOL" aria-label="Thêm cặp vào danh sách" />
+              <button type="submit" class="btn-outline" id="tradeWatchAddBtn">+ Thêm</button>
+            </form>
+          </div>
           <div class="trade-chart-wrap" id="tradeChartWrap">
             <div id="tradeChart"></div>
             <canvas id="tradeOverlay"></canvas>

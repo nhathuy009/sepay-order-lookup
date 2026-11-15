@@ -7406,6 +7406,7 @@ async function copyVax1Result() {
       if (S.active) openWs();
       setStatus(S.quote === "USDT" ? "Giá trực tiếp từ Binance" : "Cặp này không định giá bằng USDT", S.quote !== "USDT");
       store("trade_last", JSON.stringify({ sym: sym, iv: iv }));
+      renderWatch();
     }).catch(function (e) {
       if (seq === S.loadSeq) setStatus("Không tải được " + sym + ": " + ((e && e.message) || e), true);
     });
@@ -7438,7 +7439,90 @@ async function copyVax1Result() {
   function key() { return "trade_rays_" + S.symbol; }
   function saveRays() {
     store(key(), JSON.stringify(S.rays.map(function (r) { return { id: r.id, price: r.price, usdt: r.usdt, t: r.t }; })));
+    renderWatch();
   }
+
+  /* ---------- Danh sách cặp theo dõi (bấm nhanh) ---------- */
+  var WATCH_KEY = "trade_watchlist";
+  var WATCH_DEFAULT = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
+  var tickers = {};          // SYMBOL -> { price, pct }
+  var tickerTimer = 0;
+
+  function getWatch() {
+    var v = null;
+    try { v = JSON.parse(store(WATCH_KEY) || "null"); } catch (e) {}
+    return Array.isArray(v) ? v : WATCH_DEFAULT.slice();
+  }
+  function setWatch(list) { store(WATCH_KEY, JSON.stringify(list)); renderWatch(); refreshTickers(); }
+  function rayCount(sym) {
+    if (sym === S.symbol) return S.rays.length;
+    try { var a = JSON.parse(store("trade_rays_" + sym) || "[]"); return Array.isArray(a) ? a.length : 0; } catch (e) { return 0; }
+  }
+  function fAny(v) {
+    if (!isFinite(v)) return "–";
+    var d = v >= 1000 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 6 : 8;
+    return v.toLocaleString("en-US", { minimumFractionDigits: Math.min(2, d), maximumFractionDigits: d });
+  }
+  function shortName(sym) { return /USDT$/.test(sym) && sym.length > 4 ? sym.slice(0, -4) : sym; }
+
+  function renderWatch() {
+    var box = $("tradeWatchList");
+    box.innerHTML = getWatch().map(function (sym) {
+      var t = tickers[sym] || {}, n = rayCount(sym), on = sym === S.symbol;
+      var px = on && S.candles.length ? lastPrice() : t.price;
+      return '<div class="trade-chip' + (on ? " is-active" : "") + '" data-sym="' + esc(sym) + '">' +
+        '<button type="button" class="trade-chip-main" data-act="open" title="Xem ' + esc(sym) + '">' +
+          "<b>" + esc(shortName(sym)) + "</b>" +
+          '<span class="trade-chip-px">' + fAny(px) + "</span>" +
+          (isFinite(t.pct) ? '<span class="trade-chip-chg ' + (t.pct >= 0 ? "trade-pos" : "trade-neg") + '">' + sg(t.pct) + t.pct.toFixed(2) + "%</span>" : "") +
+          (n ? '<span class="trade-chip-cnt" title="' + n + ' điểm mua">' + n + "</span>" : "") +
+        "</button>" +
+        '<button type="button" class="trade-chip-x" data-act="rm" aria-label="Bỏ ' + esc(sym) + ' khỏi danh sách" title="Bỏ khỏi danh sách">×</button>' +
+        "</div>";
+    }).join("") || '<span class="trade-watch-empty">Chưa có cặp nào trong danh sách.</span>';
+  }
+  function refreshTickers() {
+    var list = getWatch();
+    if (!list.length) return;
+    getJSON("/api/v3/ticker/24hr?symbols=" + encodeURIComponent(JSON.stringify(list))).then(function (arr) {
+      arr.forEach(function (x) { tickers[x.symbol] = { price: +x.lastPrice, pct: +x.priceChangePercent }; });
+      renderWatch();
+    }, function () {});
+  }
+  function updateActiveChipPrice() {
+    var el = document.querySelector('#tradeWatchList .trade-chip.is-active .trade-chip-px');
+    if (el && S.candles.length) el.textContent = fAny(lastPrice());
+  }
+
+  $("tradeWatchList").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var sym = btn.closest(".trade-chip").getAttribute("data-sym");
+    if (btn.getAttribute("data-act") === "rm") {
+      setWatch(getWatch().filter(function (s) { return s !== sym; }));
+    } else if (sym !== S.symbol) {
+      $("tradeSym").value = sym;
+      load();
+    }
+  });
+  $("tradeWatchForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var inp = $("tradeWatchInput");
+    var sym = inp.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!sym) return;
+    if (!/(USDT|USDC|FDUSD|BTC|ETH|BNB|TRY|EUR)$/.test(sym) || sym.length <= 4) sym += "USDT";
+    var list = getWatch();
+    if (list.indexOf(sym) >= 0) { inp.value = ""; return; }
+    var btn = $("tradeWatchAddBtn");
+    btn.disabled = true;
+    getJSON("/api/v3/exchangeInfo?symbol=" + sym).then(function () {
+      inp.value = "";
+      list.push(sym);
+      setWatch(list);
+    }, function () {
+      setStatus("Không có cặp " + sym + " trên Binance", true);
+    }).then(function () { btn.disabled = false; });
+  });
   function loadRays() {
     S.rays.forEach(function (r) { if (r.pl) S.series.removePriceLine(r.pl); });
     S.rays = []; S.selected = null;
@@ -7525,6 +7609,7 @@ async function copyVax1Result() {
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
         (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
     S.avg = avg;
+    updateActiveChipPrice();
   }
 
   /* ---------- Lớp vẽ Ray (canvas phủ trên biểu đồ) ---------- */
@@ -7750,6 +7835,9 @@ async function copyVax1Result() {
         initChart();
       }
       load();   // lần sau mở lại: tải lại nến để bù khoảng thời gian đã rời tab
+      renderWatch();
+      refreshTickers();
+      if (!tickerTimer) tickerTimer = setInterval(refreshTickers, 30000);
       if (!S.raf) S.raf = requestAnimationFrame(draw);
     }, function (e) { setStatus(e.message, true); });
   }
@@ -7758,6 +7846,7 @@ async function copyVax1Result() {
     S.active = false;
     setMode(null);
     closeWs();
+    if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = 0; }
     if (S.raf) { cancelAnimationFrame(S.raf); S.raf = 0; }
   }
 
