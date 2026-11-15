@@ -7794,7 +7794,6 @@ async function copyVax1Result() {
   function saveRays() {
     store(key(), JSON.stringify(S.rays.map(function (r) {
       var o = { id: r.id, price: r.price, usdt: r.usdt, t: r.t };
-      if (r.filled) o.filled = true;
       if (r.u) o.u = r.u;
       return o;
     })));
@@ -7969,7 +7968,7 @@ async function copyVax1Result() {
     arr.forEach(addRay);
   }
   function addRay(r) {
-    r.pl = S.series.createPriceLine({ price: r.price, color: S.colors.accent, lineVisible: false, axisLabelVisible: true, title: "" });
+    r.pl = S.series.createPriceLine({ price: r.price, color: BUY, lineVisible: false, axisLabelVisible: true, title: "" });
     S.rays.push(r);
     return r;
   }
@@ -7995,19 +7994,6 @@ async function copyVax1Result() {
     while (lo < hi) { var m = (lo + hi + 1) >> 1; if (c[m].real <= t) lo = m; else hi = m - 1; }
     return lo;
   }
-  // Đã khớp = sau thời điểm đặt, giá đã chạm mức đó. Nếu t rơi giữa cây nến (khung lớn hơn
-  // khung lúc đặt) thì không biết râu nến chạm trước hay sau t, nên bỏ qua cây nến đó; kết quả
-  // "đã khớp" thấy được ở khung nhỏ được lưu lại (r.filled) để khung lớn dùng tiếp.
-  function isFilled(r) {
-    if (r.filled) return true;
-    var c = S.candles, i0 = idxOf(r.t);
-    if (i0 >= c.length) return false;
-    if (c[i0].real < r.t) i0++;
-    for (var i = i0; i < c.length; i++) {
-      if (c[i].low <= r.price && c[i].high >= r.price) return true;
-    }
-    return false;
-  }
   function qtyOf(r) { return r.usdt / r.price; }
   function lastPrice() { var l = S.candles[S.candles.length - 1]; return l ? l.close : NaN; }
   function sorted() { return S.rays.slice().sort(function (a, b) { return b.price - a.price; }); }
@@ -8032,18 +8018,14 @@ async function copyVax1Result() {
   function renderPanel() {
     if (!S.series) return;
     var px = lastPrice();
-    var aU = 0, aQ = 0, fUs = 0, fQs = 0, fN = 0;
-    var rows = sorted(), newlyFilled = false;
+    // Mọi ray đều coi như đã khớp đúng giá và số tiền đã nhập.
+    var aU = 0, aQ = 0;
+    var rows = sorted();
     var html = rows.map(function (r) {
-      r._filled = isFilled(r);
-      if (r._filled && !r.filled && !S.drag) { r.filled = true; r.u = Date.now(); newlyFilled = true; }
-      r.pl.applyOptions({ color: r._filled ? BUY : S.colors.accent });
       var q = qtyOf(r), pnl = q * px - r.usdt;
       aU += r.usdt; aQ += q;
-      if (r._filled) { fUs += r.usdt; fQs += q; fN++; }
       return '<div class="trade-item' + (S.selected === r.id ? " is-sel" : "") + '" data-id="' + esc(r.id) + '">' +
-        '<div class="trade-item-top"><b>' + fP(r.price) + '</b><span class="trade-tag' + (r._filled ? " is-filled" : "") + '">' +
-          (r._filled ? "Đã khớp" : "Chờ khớp") + "</span></div>" +
+        '<div class="trade-item-top"><b>' + fP(r.price) + "</b></div>" +
         '<div class="trade-item-sub">' + fU(r.usdt) + " USDT → <b>" + fQ(q) + " " + esc(S.base) + "</b></div>" +
         '<div class="trade-item-sub">Lãi/lỗ: <span class="' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
           sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / r.usdt * 100, 2) + "%)</span></div>" +
@@ -8055,23 +8037,18 @@ async function copyVax1Result() {
     $("tradeList").innerHTML = html ||
       '<div class="trade-empty">Chưa có điểm mua.<br>Bấm <b>Horizontal Ray (H)</b> rồi click lên biểu đồ.</div>';
 
-    var avg = fQs ? fUs / fQs : NaN, val = fQs * px, pnl = val - fUs, aAvg = aQ ? aU / aQ : NaN;
+    var avg = aQ ? aU / aQ : NaN, val = aQ * px, pnl = val - aU;
     var b = esc(S.base);
     $("tradeSummary").innerHTML =
       "<span class='k'>Giá hiện tại</span><span class='v'>" + fP(px) + "</span>" +
-      "<span class='k'>Tổng đặt mua (" + rows.length + ")</span><span class='v'>" + fU(aU) + " USDT</span>" +
-      "<span class='k'>Khối lượng nếu khớp hết</span><span class='v'>" + fQ(aQ) + " " + b + "</span>" +
-      "<span class='k'>Giá TB nếu khớp hết</span><span class='v'>" + fP(aAvg) + "</span>" +
-      '<span class="trade-sep"></span>' +
-      "<span class='k'>Đã khớp (" + fN + ")</span><span class='v'>" + fU(fUs) + " USDT</span>" +
-      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + fQ(fQs) + " " + b + "</b></span>" +
-      '<span class="k">Giá TB đã khớp</span><span class="v" style="color:#f59e0b">' + fP(avg) + "</span>" +
+      "<span class='k'>Tổng mua (" + rows.length + ")</span><span class='v'>" + fU(aU) + " USDT</span>" +
+      "<span class='k'>Khối lượng đang giữ</span><span class='v'><b>" + fQ(aQ) + " " + b + "</b></span>" +
+      '<span class="k">Giá TB</span><span class="v" style="color:#f59e0b">' + fP(avg) + "</span>" +
       "<span class='k'>Giá trị hiện tại</span><span class='v'>" + fU(val) + " USDT</span>" +
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
-        (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
+        (rows.length ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / aU * 100, 2) + "%)" : "–") + "</span>";
     S.avg = avg;
     updateActiveChipPrice();
-    if (newlyFilled) saveRays();
   }
 
   /* ---------- Lớp vẽ Ray (canvas phủ trên biểu đồ) ---------- */
@@ -8118,13 +8095,13 @@ async function copyVax1Result() {
     S.rays.forEach(function (r) {
       var g = rayGeom(r);
       if (!g || g.x > paneW) return;
-      var col = r._filled ? BUY : S.colors.accent, sel = S.selected === r.id;
+      var col = BUY, sel = S.selected === r.id;
       ctx.strokeStyle = col; ctx.lineWidth = sel ? 2.5 : 1.5;
       ctx.beginPath(); ctx.moveTo(g.x, g.y + 0.5); ctx.lineTo(paneW, g.y + 0.5); ctx.stroke();
       if (g.x0 >= 0) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(g.x, g.y, sel ? 4.5 : 3.5, 0, Math.PI * 2); ctx.fill(); }
       r._lbl = null;
       if (tagHidden(r)) return;
-      var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base + (r._filled ? "  ✓" : "");
+      var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base;
       var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
       r._lbl = label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
     });
@@ -8253,7 +8230,7 @@ async function copyVax1Result() {
       var r = S.rays.find(function (q) { return q.id === S.drag.id; });
       var price = S.series.coordinateToPrice(p.y);
       if (r && price !== null && price > 0) {
-        r.price = roundTick(price); r.filled = false; r.pl.applyOptions({ price: r.price }); S.drag.moved = true; schedulePanel();
+        r.price = roundTick(price); r.pl.applyOptions({ price: r.price }); S.drag.moved = true; schedulePanel();
       }
       return;
     }
@@ -8330,11 +8307,11 @@ async function copyVax1Result() {
   });
   $("tradeCopyBtn").addEventListener("click", function () {
     var px = lastPrice();
-    var lines = [["STT", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng (" + S.base + ")", "Trạng thái",
+    var lines = [["STT", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng (" + S.base + ")",
                   "Giá hiện tại", "Lãi/lỗ (USDT)", "Lãi/lỗ (%)"].join("\t")];
     sorted().forEach(function (r, i) {
       var q = qtyOf(r), pnl = q * px - r.usdt;
-      lines.push([i + 1, S.symbol, r.price, r.usdt, qRound(q).toFixed(dec(S.step)), r._filled ? "Đã khớp" : "Chờ khớp",
+      lines.push([i + 1, S.symbol, r.price, r.usdt, qRound(q).toFixed(dec(S.step)),
                   px, pnl.toFixed(2), (pnl / r.usdt * 100).toFixed(2)].join("\t"));
     });
     var btn = $("tradeCopyBtn"), old = btn.textContent;
@@ -8397,7 +8374,6 @@ async function copyVax1Result() {
     store("trade_last_usdt", u + " USDT");
     if (ed.id) {
       var r = S.rays.find(function (x) { return x.id === ed.id; });
-      if (roundTick(p) !== r.price) r.filled = false;
       r.price = roundTick(p); r.usdt = u; r.u = Date.now(); r.pl.applyOptions({ price: r.price });
     } else {
       var nr = addRay({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), price: roundTick(p), usdt: u, t: ed.t, u: Date.now() });
@@ -8413,7 +8389,7 @@ async function copyVax1Result() {
      bộ nhớ của tab (~1 giờ), không lưu ở đâu cả. */
   var GS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
   var GS_TAB = "Điểm mua Trade";
-  var GS_HEAD = ["ID", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng", "Coin", "Thời điểm đặt (unix)", "Thời điểm đặt", "Đã khớp", "Cập nhật"];
+  var GS_HEAD = ["ID", "Cặp", "Giá mua", "Số tiền (USDT)", "Khối lượng", "Coin", "Thời điểm đặt (unix)", "Thời điểm đặt", "Cập nhật"];
   var GS_URL_KEY = "trade_gsheet_url", GS_LINK_KEY = "trade_gsheet_linked", GS_SYNCED_KEY = "trade_gsheet_synced_at";
   var GS_DIRTY_KEY = "trade_gsheet_dirty", GS_DEL_KEY = "trade_deleted";
   var GS = { token: null, exp: 0, busy: false, again: false, rev: 0, pushTimer: 0, pullTimer: 0, clientId: "", gsi: null, tabOk: "", gid: null };
@@ -8569,11 +8545,12 @@ async function copyVax1Result() {
       }
       var id = String(row[0] || "").trim();
       if (!id) { id = "gs" + Date.now().toString(36) + i; missingId = true; }
+      // Sheet cũ còn cột "Đã khớp" ở I nên "Cập nhật" nằm ở J; sheet mới thì "Cập nhật" ở I.
       var u = Date.parse(String(row[9] || "").replace(" ", "T"));
+      if (!isFinite(u)) u = Date.parse(String(row[8] || "").replace(" ", "T"));
       rays.push({
         id: id, sym: sym, price: price, usdt: usdt,
         t: t > 0 ? t : Math.floor(Date.now() / 1000),
-        filled: row[8] === true || /^(có|co|x|true|1|đã khớp)$/i.test(String(row[8] || "").trim()) || undefined,
         u: isFinite(u) ? u : undefined
       });
     });
@@ -8581,7 +8558,7 @@ async function copyVax1Result() {
   }
   function gsRow(r) {
     return [r.id, r.sym, +r.price.toPrecision(12), +r.usdt.toPrecision(12), +(r.usdt / r.price).toFixed(8), shortName(r.sym), r.t, fmtDT(r.t * 1000),
-            r.filled ? "Có" : "", fmtDT(r.u || Date.now())];
+            fmtDT(r.u || Date.now())];
   }
   function gsPull(id) {
     return gsApi(id, "GET", "/values/" + gsRange("A2:J") + "?valueRenderOption=UNFORMATTED_VALUE")
@@ -8590,7 +8567,9 @@ async function copyVax1Result() {
   function gsPush(id, rays, junk) {
     var rows = [GS_HEAD].concat(rays.slice().sort(function (a, b) {
       return a.sym < b.sym ? -1 : a.sym > b.sym ? 1 : a.t - b.t;
-    }).map(gsRow)).concat(junk);
+    }).map(gsRow)).concat(junk)
+      // Ghi rỗng vào cột J để xoá cột "Cập nhật" còn sót của sheet cũ (trước đây có thêm cột "Đã khớp").
+      .map(function (row) { row = row.slice(0, 9); while (row.length < 10) row.push(""); return row; });
     return gsApi(id, "PUT", "/values/" + gsRange("A1:J" + rows.length) + "?valueInputOption=RAW", { values: rows })
       .then(function () { return gsApi(id, "POST", "/values/" + gsRange("A" + (rows.length + 1) + ":J") + ":clear", {}); });
   }
@@ -8611,7 +8590,7 @@ async function copyVax1Result() {
   function writeLocalAll(rays) {
     var by = {}, keys = [];
     rays.forEach(function (r) {
-      (by[r.sym] = by[r.sym] || []).push({ id: r.id, price: r.price, usdt: r.usdt, t: r.t, filled: r.filled || undefined, u: r.u || undefined });
+      (by[r.sym] = by[r.sym] || []).push({ id: r.id, price: r.price, usdt: r.usdt, t: r.t, u: r.u || undefined });
     });
     try {
       for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("trade_rays_") === 0) keys.push(k); }
@@ -8633,8 +8612,7 @@ async function copyVax1Result() {
       if (del[l.id]) return;
       var r = map[l.id];
       if (!r) { if (firstLink || (l.u || 0) > syncedAt) map[l.id] = l; return; }
-      var w = (l.u || 0) > (r.u || 0) ? l : r, o = w === l ? r : l;
-      map[l.id] = Object.assign({}, w, { filled: w.filled || (o.filled && o.price === w.price) || undefined });
+      map[l.id] = (l.u || 0) > (r.u || 0) ? l : r;
     });
     return Object.keys(map).map(function (k) { return map[k]; });
   }
@@ -8643,7 +8621,7 @@ async function copyVax1Result() {
   function gsRefreshCurrent() {
     renderWatch();
     if (!S.series || !S.symbol || S.drag || $("tradeDlg").open) return;
-    var sig = function (arr) { return JSON.stringify(arr.map(function (r) { return [r.id, r.price, r.usdt, r.t, !!r.filled]; })); };
+    var sig = function (arr) { return JSON.stringify(arr.map(function (r) { return [r.id, r.price, r.usdt, r.t]; })); };
     var stored = [];
     try { stored = JSON.parse(store(key()) || "[]"); } catch (e) {}
     if (sig(stored) === sig(S.rays)) return;
