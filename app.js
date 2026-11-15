@@ -7657,7 +7657,11 @@ async function copyVax1Result() {
   /* ---------- Lưu điểm mua theo cặp ---------- */
   function key() { return "trade_rays_" + S.symbol; }
   function saveRays() {
-    store(key(), JSON.stringify(S.rays.map(function (r) { return { id: r.id, price: r.price, usdt: r.usdt, t: r.t }; })));
+    store(key(), JSON.stringify(S.rays.map(function (r) {
+      var o = { id: r.id, price: r.price, usdt: r.usdt, t: r.t };
+      if (r.filled) o.filled = true;
+      return o;
+    })));
     renderWatch();
   }
 
@@ -7764,18 +7768,26 @@ async function copyVax1Result() {
   }
 
   /* ---------- Tính toán ---------- */
+  // Vị trí (chỉ số nến) của thời điểm t: là cây nến CHỨA t ở khung đang xem,
+  // để ray đặt ở 1H vẫn neo đúng nến khi chuyển sang 4H/1D (và ngược lại).
   function idxOf(t) {
     var c = S.candles, n = c.length;
-    if (!n) return 0;
+    if (!n || t <= c[0].real) return 0;
     var lastR = c[n - 1].real;
-    if (t > lastR) return n - 1 + (t - lastR) / IV_SEC[S.interval];
+    if (t >= lastR) return n - 1 + Math.floor((t - lastR) / IV_SEC[S.interval]);
     var lo = 0, hi = n - 1;
-    while (lo < hi) { var m = (lo + hi) >> 1; if (c[m].real < t) lo = m + 1; else hi = m; }
+    while (lo < hi) { var m = (lo + hi + 1) >> 1; if (c[m].real <= t) lo = m; else hi = m - 1; }
     return lo;
   }
+  // Đã khớp = sau thời điểm đặt, giá đã chạm mức đó. Nếu t rơi giữa cây nến (khung lớn hơn
+  // khung lúc đặt) thì không biết râu nến chạm trước hay sau t, nên bỏ qua cây nến đó; kết quả
+  // "đã khớp" thấy được ở khung nhỏ được lưu lại (r.filled) để khung lớn dùng tiếp.
   function isFilled(r) {
-    var c = S.candles;
-    for (var i = Math.max(0, Math.ceil(idxOf(r.t) - 1e-9)); i < c.length; i++) {
+    if (r.filled) return true;
+    var c = S.candles, i0 = idxOf(r.t);
+    if (i0 >= c.length) return false;
+    if (c[i0].real < r.t) i0++;
+    for (var i = i0; i < c.length; i++) {
       if (c[i].low <= r.price && c[i].high >= r.price) return true;
     }
     return false;
@@ -7793,9 +7805,10 @@ async function copyVax1Result() {
     if (!S.series) return;
     var px = lastPrice();
     var aU = 0, aQ = 0, fUs = 0, fQs = 0, fN = 0;
-    var rows = sorted();
+    var rows = sorted(), newlyFilled = false;
     var html = rows.map(function (r) {
       r._filled = isFilled(r);
+      if (r._filled && !r.filled && !S.drag) { r.filled = true; newlyFilled = true; }
       r.pl.applyOptions({ color: r._filled ? BUY : S.colors.accent });
       var q = qtyOf(r), pnl = q * px - r.usdt;
       aU += r.usdt; aQ += q;
@@ -7829,6 +7842,7 @@ async function copyVax1Result() {
         (fN ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / fUs * 100, 2) + "%)" : "–") + "</span>";
     S.avg = avg;
     updateActiveChipPrice();
+    if (newlyFilled) saveRays();
   }
 
   /* ---------- Lớp vẽ Ray (canvas phủ trên biểu đồ) ---------- */
@@ -7917,7 +7931,7 @@ async function copyVax1Result() {
       var r = S.rays.find(function (q) { return q.id === S.drag.id; });
       var price = S.series.coordinateToPrice(p.y);
       if (r && price !== null && price > 0) {
-        r.price = roundTick(price); r.pl.applyOptions({ price: r.price }); S.drag.moved = true; schedulePanel();
+        r.price = roundTick(price); r.filled = false; r.pl.applyOptions({ price: r.price }); S.drag.moved = true; schedulePanel();
       }
       return;
     }
@@ -8034,6 +8048,7 @@ async function copyVax1Result() {
     store("trade_last_usdt", u + " USDT");
     if (ed.id) {
       var r = S.rays.find(function (x) { return x.id === ed.id; });
+      if (roundTick(p) !== r.price) r.filled = false;
       r.price = roundTick(p); r.usdt = u; r.pl.applyOptions({ price: r.price });
     } else {
       var nr = addRay({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), price: roundTick(p), usdt: u, t: ed.t });
