@@ -7696,10 +7696,11 @@ async function copyVax1Result() {
       var px = on && S.candles.length ? lastPrice() : t.price;
       return '<div class="trade-chip' + (on ? " is-active" : "") + '" data-sym="' + esc(sym) + '">' +
         '<button type="button" class="trade-chip-main" data-act="open" title="Xem ' + esc(sym) + '">' +
-          "<b>" + esc(shortName(sym)) + "</b>" +
+          '<span class="trade-chip-name"><b>' + esc(shortName(sym)) + "</b><small>" + (/USDT$/.test(sym) && sym.length > 4 ? "/USDT" : "") + "</small>" +
+            (n ? '<span class="trade-chip-cnt" title="' + n + ' điểm mua">' + n + "</span>" : "") + "</span>" +
           '<span class="trade-chip-px">' + fAny(px) + "</span>" +
-          (isFinite(t.pct) ? '<span class="trade-chip-chg ' + (t.pct >= 0 ? "trade-pos" : "trade-neg") + '">' + sg(t.pct) + t.pct.toFixed(2) + "%</span>" : "") +
-          (n ? '<span class="trade-chip-cnt" title="' + n + ' điểm mua">' + n + "</span>" : "") +
+          '<span class="trade-chip-chg ' + (isFinite(t.pct) ? (t.pct >= 0 ? "trade-pos" : "trade-neg") : "") + '">' +
+            (isFinite(t.pct) ? sg(t.pct) + t.pct.toFixed(2) + "%" : "–") + "</span>" +
         "</button>" +
         '<button type="button" class="trade-chip-x" data-act="rm" aria-label="Bỏ ' + esc(sym) + ' khỏi danh sách" title="Bỏ khỏi danh sách">×</button>' +
         "</div>";
@@ -8077,6 +8078,7 @@ async function copyVax1Result() {
   function enter() {
     if (S.active) return;
     S.active = true;
+    document.body.classList.add("trade-wide");
     if (!S.chart) setStatus("Đang tải thư viện biểu đồ…");
     loadLib().then(function () {
       if (!S.active) return;
@@ -8097,6 +8099,7 @@ async function copyVax1Result() {
   function leave() {
     if (!S.active) return;
     S.active = false;
+    document.body.classList.remove("trade-wide");
     setMode(null);
     closeWs();
     if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = 0; }

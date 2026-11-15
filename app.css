@@ -2580,36 +2580,55 @@ body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
 .trade-dlg-row .trade-sp { flex: 1; order: 1; }
 #tradeDlgOk { order: 3; } #tradeDlgCancel { order: 2; } #tradeDlgDel { order: 0; }
 
-/* Trade: danh sách cặp theo dõi */
-.trade-watch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -2px 0 12px; }
-.trade-watch-list { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: 0; }
-.trade-watch-empty { color: var(--text-muted); font-size: 13px; }
-.trade-chip {
-  display: inline-flex; align-items: stretch; border: 1px solid var(--input-border);
-  border-radius: 999px; background: var(--input-bg); overflow: hidden; font-variant-numeric: tabular-nums;
+/* Trade: mở rộng hết bề ngang trình duyệt (chỉ khi đang ở #/trade) */
+body.v3.trade-wide { --v3-max: 100%; }
+
+/* Trade: biểu đồ + cột danh sách coin bên phải */
+.trade-main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; align-items: stretch; }
+.trade-side { position: relative; min-height: 320px; border: 1px solid var(--border); border-radius: var(--v3-radius, 10px); }
+.trade-side-inner { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
+.trade-side-head { padding: 10px 10px 8px; border-bottom: 1px solid var(--border); }
+.trade-side-head h3 { margin: 0 0 8px; font-size: 13.5px; }
+.trade-watch-add { display: flex; gap: 6px; }
+body.v3 .v3-trade .trade-watch-add input { flex: 1; min-width: 0; width: auto; padding: 7px 10px; font-size: 13px; }
+.v3-trade .trade-watch-add button { padding: 6px 12px !important; font-size: 15px; line-height: 1; }
+.trade-side-cols, .v3-trade .trade-chip-main {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 62px; gap: 8px; align-items: center;
 }
-.trade-chip.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.trade-side-cols {
+  padding: 6px 30px 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.trade-side-cols span:nth-child(n+2) { text-align: right; }
+.trade-watch-list { flex: 1; overflow-y: auto; min-height: 0; padding: 4px 0; }
+.trade-watch-empty { display: block; padding: 14px 12px; color: var(--text-muted); font-size: 13px; }
+.trade-chip { position: relative; display: flex; align-items: stretch; font-variant-numeric: tabular-nums; }
+.trade-chip.is-active { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
 .v3-trade .trade-chip button {
   background: none; box-shadow: none; border: 0; border-radius: 0; color: var(--text-main);
-  font-weight: 500; font-size: 12.5px; line-height: 1;
+  font-weight: 500; font-size: 13px; line-height: 1.2;
 }
-.v3-trade .trade-chip button:hover { filter: none; background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.v3-trade .trade-chip .trade-chip-main { display: inline-flex; align-items: center; gap: 6px; padding: 7px 4px 7px 12px; }
-.v3-trade .trade-chip .trade-chip-x { padding: 7px 10px 7px 6px; color: var(--text-muted); font-size: 15px; }
+.v3-trade .trade-chip button:hover { filter: none; }
+.v3-trade .trade-chip:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.v3-trade .trade-chip.is-active:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.v3-trade .trade-chip .trade-chip-main { flex: 1; min-width: 0; padding: 8px 4px 8px 12px; text-align: left; }
+.v3-trade .trade-chip .trade-chip-x { width: 26px; padding: 0; color: var(--text-muted); font-size: 15px; opacity: 0; }
+.v3-trade .trade-chip:hover .trade-chip-x, .v3-trade .trade-chip .trade-chip-x:focus-visible { opacity: 1; }
 .v3-trade .trade-chip .trade-chip-x:hover { color: #dc2626; }
-.trade-chip-main b { font-weight: 700; }
-.trade-chip-px { color: var(--text-muted); }
-.trade-chip-chg { font-size: 11.5px; }
+@media (hover: none) { .v3-trade .trade-chip .trade-chip-x { opacity: .7; } }
+.trade-chip-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; }
+.trade-chip-name b { font-weight: 700; }
+.trade-chip-name small { color: var(--text-muted); font-size: 11px; }
+.trade-chip-px { text-align: right; }
+.trade-chip-chg { text-align: right; font-size: 12.5px; font-weight: 600; }
 .trade-chip-cnt {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center;
   background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
 }
-.trade-watch-add { display: flex; gap: 6px; flex: 0 0 auto; }
-body.v3 .v3-trade .trade-watch-add input { width: 170px; padding: 7px 10px; font-size: 13px; }
-.v3-trade .trade-watch-add button { padding: 7px 12px !important; font-size: 13px; }
-@media (max-width: 600px) {
-  .trade-watch-add { flex: 1 1 100%; }
-  body.v3 .v3-trade .trade-watch-add input { flex: 1; width: auto; }
+@media (max-width: 1000px) {
+  .trade-main { grid-template-columns: minmax(0, 1fr); }
+  .trade-side { min-height: 0; }
+  .trade-side-inner { position: static; max-height: 380px; }
 }
 
 /* Trade: chỉ báo MA / VOL / RSI / MACD */

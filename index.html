@@ -1134,28 +1134,36 @@
             </div>
             <span class="trade-status" id="tradeStatus" role="status"></span>
           </div>
-          <div class="trade-watch" aria-label="Danh sách cặp theo dõi">
-            <div class="trade-watch-list" id="tradeWatchList"></div>
-            <form class="trade-watch-add" id="tradeWatchForm" autocomplete="off">
-              <input type="text" id="tradeWatchInput" spellcheck="false" placeholder="Thêm cặp, VD: SOL" aria-label="Thêm cặp vào danh sách" />
-              <button type="submit" class="btn-outline" id="tradeWatchAddBtn">+ Thêm</button>
-            </form>
-          </div>
-          <div class="trade-charts">
-            <div class="trade-chart-wrap" id="tradeChartWrap">
-              <div id="tradeChart"></div>
-              <canvas id="tradeOverlay"></canvas>
-              <div class="trade-legend" id="tradeLegendMain"></div>
-              <div class="trade-hint">Click lên biểu đồ để đặt điểm mua · Esc để huỷ</div>
+          <div class="trade-main">
+            <div class="trade-charts">
+              <div class="trade-chart-wrap" id="tradeChartWrap">
+                <div id="tradeChart"></div>
+                <canvas id="tradeOverlay"></canvas>
+                <div class="trade-legend" id="tradeLegendMain"></div>
+                <div class="trade-hint">Click lên biểu đồ để đặt điểm mua · Esc để huỷ</div>
+              </div>
+              <div class="trade-pane" id="tradePaneRsi">
+                <div class="trade-pane-chart" id="tradeChartRsi"></div>
+                <div class="trade-legend" id="tradeLegendRsi"></div>
+              </div>
+              <div class="trade-pane trade-pane-macd" id="tradePaneMacd">
+                <div class="trade-pane-chart" id="tradeChartMacd"></div>
+                <div class="trade-legend" id="tradeLegendMacd"></div>
+              </div>
             </div>
-            <div class="trade-pane" id="tradePaneRsi">
-              <div class="trade-pane-chart" id="tradeChartRsi"></div>
-              <div class="trade-legend" id="tradeLegendRsi"></div>
-            </div>
-            <div class="trade-pane trade-pane-macd" id="tradePaneMacd">
-              <div class="trade-pane-chart" id="tradeChartMacd"></div>
-              <div class="trade-legend" id="tradeLegendMacd"></div>
-            </div>
+            <aside class="trade-side" aria-label="Danh sách coin">
+              <div class="trade-side-inner">
+                <div class="trade-side-head">
+                  <h3>Danh sách coin</h3>
+                  <form class="trade-watch-add" id="tradeWatchForm" autocomplete="off">
+                    <input type="text" id="tradeWatchInput" spellcheck="false" placeholder="Thêm cặp, VD: SOL" aria-label="Thêm cặp vào danh sách" />
+                    <button type="submit" class="btn-outline" id="tradeWatchAddBtn" aria-label="Thêm cặp">+</button>
+                  </form>
+                </div>
+                <div class="trade-side-cols" aria-hidden="true"><span>Cặp</span><span>Giá</span><span>24h</span></div>
+                <div class="trade-watch-list" id="tradeWatchList"></div>
+              </div>
+            </aside>
           </div>
           <p class="v3-field-hint">Kéo đường để đổi giá · Nhấp đúp để sửa · Chọn rồi bấm Delete để xoá. “Đã khớp” = sau thời điểm đặt, giá đã chạm mức đó.</p>
         </section>
