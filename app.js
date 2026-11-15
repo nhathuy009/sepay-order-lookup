@@ -7550,8 +7550,11 @@ async function copyVax1Result() {
 
     S.rsiChart = LW.createChart($("tradeChartRsi"), chartOpts());
     S.rsiChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
+    // Luôn thấy đủ thang 0–100: cố định vùng giá và không cho kéo trục giá để co giãn.
+    S.rsiChart.applyOptions({ handleScale: { axisPressedMouseMove: { time: true, price: false } } });
     S.rsi = S.rsiChart.addLineSeries({ color: C_RSI, lineWidth: 2, priceLineVisible: false, crosshairMarkerVisible: false,
-      priceFormat: { type: "price", precision: 2, minMove: 0.01 } });
+      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+      autoscaleInfoProvider: function () { return { priceRange: { minValue: 0, maxValue: 100 } }; } });
     [70, 50, 30].forEach(function (lv) {
       S.rsi.createPriceLine({ price: lv, color: "#787B86", lineStyle: LW.LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false });
     });
