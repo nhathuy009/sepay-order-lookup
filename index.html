@@ -1144,7 +1144,14 @@
               </div>
               <div class="trade-pane" id="tradePaneRsi">
                 <div class="trade-pane-chart" id="tradeChartRsi"></div>
+                <canvas class="trade-pane-overlay" id="tradeOverlayRsi"></canvas>
                 <div class="trade-legend" id="tradeLegendRsi"></div>
+                <div class="trade-div" id="tradeDiv" role="group" aria-label="Phân kỳ RSI">
+                  <button type="button" data-div="bull" title="Phân kỳ tăng: RSI đáy cao hơn, giá đáy thấp hơn">Bull</button>
+                  <button type="button" data-div="hbull" title="Phân kỳ tăng ẩn: RSI đáy thấp hơn, giá đáy cao hơn">H Bull</button>
+                  <button type="button" data-div="bear" title="Phân kỳ giảm: RSI đỉnh thấp hơn, giá đỉnh cao hơn">Bear</button>
+                  <button type="button" data-div="hbear" title="Phân kỳ giảm ẩn: RSI đỉnh cao hơn, giá đỉnh thấp hơn">H Bear</button>
+                </div>
               </div>
               <div class="trade-pane trade-pane-macd" id="tradePaneMacd">
                 <div class="trade-pane-chart" id="tradeChartMacd"></div>

@@ -7400,13 +7400,68 @@ async function copyVax1Result() {
 
   /* ---------- Chỉ báo: EMA(34,89,200), Volume, RSI(14), MACD(12,26,9) ---------- */
   var MA_DEF = [{ n: 34, color: "#f0b90b" }, { n: 89, color: "#eb40b5" }, { n: 200, color: "#b385f8" }];   // EMA
-  var C_MACD = "#f0b90b", C_SIG = "#b385f8", C_RSI = "#b385f8";
+  var C_MACD = "#f0b90b", C_SIG = "#b385f8", C_RSI = "#2962FF";
   var IND_KEY = "trade_ind";
   var IND = { ma: true, vol: true, rsi: true, macd: true };
   try {
     var savedInd = JSON.parse(store(IND_KEY) || "null");
     if (savedInd) Object.keys(IND).forEach(function (k) { if (k in savedInd) IND[k] = !!savedInd[k]; });
   } catch (e) {}
+
+  // Phân kỳ RSI — chuyển từ Pine "RSI divergence indicator" (TradingView), giữ nguyên tham số mặc định:
+  // RSI 14, Pivot Lookback Left/Right = 5/5, khoảng cách giữa 2 pivot 5..60 nến.
+  var DIV_CFG = { lbL: 5, lbR: 5, rangeLower: 5, rangeUpper: 60 };
+  var DIV_TYPES = {
+    bull:  { text: "Bull",   line: "#22ab94", label: "#22ab94", up: true },
+    hbull: { text: "H Bull", line: "rgba(34,171,148,.35)", label: "#22ab94", up: true },
+    bear:  { text: "Bear",   line: "#f23645", label: "#f23645", up: false },
+    hbear: { text: "H Bear", line: "rgba(242,54,69,.35)", label: "#f23645", up: false }
+  };
+  var DIV_KEY = "trade_div";
+  var DIV_ON = { bull: true, hbull: false, bear: true, hbear: false };   // như plotBull/plotHiddenBull/... của bản gốc
+  try {
+    var savedDiv = JSON.parse(store(DIV_KEY) || "null");
+    if (savedDiv) Object.keys(DIV_ON).forEach(function (k) { if (k in savedDiv) DIV_ON[k] = !!savedDiv[k]; });
+  } catch (e) {}
+
+  // ta.pivotlow/pivothigh + ta.valuewhen(..., 1) + _inRange(found[1]) của bản Pine.
+  // Pivot ở nến p chỉ được xác nhận tại nến i = p + lbR (giống Pine: tín hiệu trễ lbR nến).
+  function divCalc(osc, lows, highs) {
+    var lbL = DIV_CFG.lbL, lbR = DIV_CFG.lbR, out = [], lastPL = -1, lastPH = -1;
+    for (var i = lbL + lbR; i < osc.length; i++) {
+      var p = i - lbR, v = osc[p];
+      if (v === null) continue;
+      var isL = true, isH = true;
+      for (var j = p - lbL; j <= p + lbR; j++) {
+        if (j === p) continue;
+        var w = osc[j];
+        if (w === null) { isL = isH = false; break; }
+        if (j < p) { if (w <= v) isL = false; if (w >= v) isH = false; }
+        else { if (w < v) isL = false; if (w > v) isH = false; }
+      }
+      if (isL) {
+        if (lastPL >= 0) {
+          var bars = i - lastPL - 1, q = lastPL - lbR;
+          if (bars >= DIV_CFG.rangeLower && bars <= DIV_CFG.rangeUpper) {
+            if (v > osc[q] && lows[p] < lows[q]) out.push({ type: "bull", a: q, b: p, va: osc[q], vb: v });    // RSI đáy cao hơn, giá đáy thấp hơn
+            if (v < osc[q] && lows[p] > lows[q]) out.push({ type: "hbull", a: q, b: p, va: osc[q], vb: v });   // RSI đáy thấp hơn, giá đáy cao hơn
+          }
+        }
+        lastPL = i;
+      }
+      if (isH) {
+        if (lastPH >= 0) {
+          var barsH = i - lastPH - 1, qh = lastPH - lbR;
+          if (barsH >= DIV_CFG.rangeLower && barsH <= DIV_CFG.rangeUpper) {
+            if (v < osc[qh] && highs[p] > highs[qh]) out.push({ type: "bear", a: qh, b: p, va: osc[qh], vb: v });   // RSI đỉnh thấp hơn, giá đỉnh cao hơn
+            if (v > osc[qh] && highs[p] < highs[qh]) out.push({ type: "hbear", a: qh, b: p, va: osc[qh], vb: v });  // RSI đỉnh cao hơn, giá đỉnh thấp hơn
+          }
+        }
+        lastPH = i;
+      }
+    }
+    return out;
+  }
 
   function allCharts() { return [S.chart, S.rsiChart, S.macdChart].filter(Boolean); }
 
@@ -7446,6 +7501,7 @@ async function copyVax1Result() {
       m: m, s: s,
       h: m.map(function (v, i) { return v !== null && s[i] !== null ? v - s[i] : null; })
     };
+    S.ind.div = divCalc(S.ind.rsi, S.candles.map(function (c) { return c.low; }), S.candles.map(function (c) { return c.high; }));
   }
   function pt(arr, i) { var t = S.candles[i].time; return arr[i] === null ? { time: t } : { time: t, value: arr[i] }; }
   function volPt(i) {
@@ -7470,10 +7526,11 @@ async function copyVax1Result() {
 
     S.rsiChart = LW.createChart($("tradeChartRsi"), chartOpts());
     S.rsiChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
-    S.rsi = S.rsiChart.addLineSeries({ color: C_RSI, lineWidth: 1.5, priceLineVisible: false, crosshairMarkerVisible: false,
+    S.rsi = S.rsiChart.addLineSeries({ color: C_RSI, lineWidth: 2, priceLineVisible: false, crosshairMarkerVisible: false,
       priceFormat: { type: "price", precision: 2, minMove: 0.01 } });
-    S.rsi.createPriceLine({ price: 70, color: "rgba(220,38,38,.55)", lineStyle: LW.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false });
-    S.rsi.createPriceLine({ price: 30, color: "rgba(22,163,74,.55)", lineStyle: LW.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false });
+    [70, 50, 30].forEach(function (lv) {
+      S.rsi.createPriceLine({ price: lv, color: "#787B86", lineStyle: LW.LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false });
+    });
 
     S.macdChart = LW.createChart($("tradeChartMacd"), chartOpts());
     S.macdChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
@@ -7498,6 +7555,15 @@ async function copyVax1Result() {
       });
     });
 
+    document.querySelectorAll("#tradeDiv button").forEach(function (b) {
+      var k = b.getAttribute("data-div");
+      b.setAttribute("aria-pressed", DIV_ON[k] ? "true" : "false");
+      b.addEventListener("click", function () {
+        DIV_ON[k] = !DIV_ON[k];
+        b.setAttribute("aria-pressed", DIV_ON[k] ? "true" : "false");
+        store(DIV_KEY, JSON.stringify(DIV_ON));
+      });
+    });
     document.querySelectorAll("#tradeInd button").forEach(function (b) {
       b.addEventListener("click", function () {
         var k = b.getAttribute("data-ind");
@@ -7923,7 +7989,49 @@ async function copyVax1Result() {
       label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
     });
     ctx.restore();
+    drawRsiOverlay(dpr);
     S.raf = requestAnimationFrame(draw);
+  }
+
+  var cvR = $("tradeOverlayRsi"), ctxR = cvR.getContext("2d");
+  function drawRsiOverlay(dpr) {
+    if (!IND.rsi || !S.rsiChart || !S.ind) return;
+    var box = $("tradePaneRsi"), w = box.clientWidth, h = box.clientHeight;
+    if (cvR.width !== Math.round(w * dpr) || cvR.height !== Math.round(h * dpr)) { cvR.width = Math.round(w * dpr); cvR.height = Math.round(h * dpr); }
+    ctxR.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxR.clearRect(0, 0, w, h);
+    var pw = Math.max(0, $("tradeChartRsi").clientWidth - S.rsiChart.priceScale("right").width());
+    ctxR.save(); ctxR.beginPath(); ctxR.rect(0, 0, pw, h); ctxR.clip();
+    // Nền giữa 70 và 30 (fill(obLevel, osLevel) của bản gốc)
+    var y70 = S.rsi.priceToCoordinate(70), y30 = S.rsi.priceToCoordinate(30);
+    if (y70 !== null && y30 !== null) { ctxR.fillStyle = "rgba(33,150,243,.10)"; ctxR.fillRect(0, y70, pw, y30 - y70); }
+    var ts = S.rsiChart.timeScale();
+    ctxR.font = "600 11px " + S.font;
+    ctxR.lineCap = "round";
+    (S.ind.div || []).forEach(function (d) {
+      if (!DIV_ON[d.type]) return;
+      var x1 = ts.logicalToCoordinate(d.a), x2 = ts.logicalToCoordinate(d.b);
+      var y1 = S.rsi.priceToCoordinate(d.va), y2 = S.rsi.priceToCoordinate(d.vb);
+      if (x1 === null || x2 === null || y1 === null || y2 === null || x2 < 0 || x1 > pw) return;
+      var t = DIV_TYPES[d.type];
+      ctxR.strokeStyle = t.line; ctxR.lineWidth = 2;
+      ctxR.beginPath(); ctxR.moveTo(x1, y1); ctxR.lineTo(x2, y2); ctxR.stroke();
+      // Nhãn kiểu labelup/labeldown: hộp màu chữ trắng, mũi nhọn chỉ vào pivot
+      var tw = ctxR.measureText(t.text).width, bw = tw + 10, bh = 15, ar = 4;
+      var by = t.up ? y2 + ar : y2 - ar - bh, bx = x2 - bw / 2;
+      ctxR.fillStyle = t.label;
+      ctxR.beginPath();
+      if (t.up) { ctxR.moveTo(x2, y2); ctxR.lineTo(x2 - ar, by); ctxR.lineTo(x2 + ar, by); }
+      else { ctxR.moveTo(x2, y2); ctxR.lineTo(x2 - ar, by + bh); ctxR.lineTo(x2 + ar, by + bh); }
+      ctxR.fill();
+      ctxR.beginPath();
+      if (ctxR.roundRect) ctxR.roundRect(bx, by, bw, bh, 3); else ctxR.rect(bx, by, bw, bh);
+      ctxR.fill();
+      ctxR.fillStyle = "#fff"; ctxR.textBaseline = "middle"; ctxR.textAlign = "center";
+      ctxR.fillText(t.text, x2, by + bh / 2 + 0.5);
+      ctxR.textAlign = "left";
+    });
+    ctxR.restore();
   }
 
   /* ---------- Chuột / phím ---------- */
