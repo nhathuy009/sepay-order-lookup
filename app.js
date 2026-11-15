@@ -7443,8 +7443,8 @@ async function copyVax1Result() {
         if (lastPL >= 0) {
           var bars = i - lastPL - 1, q = lastPL - lbR;
           if (bars >= DIV_CFG.rangeLower && bars <= DIV_CFG.rangeUpper) {
-            if (v > osc[q] && lows[p] < lows[q]) out.push({ type: "bull", a: q, b: p, va: osc[q], vb: v });    // RSI đáy cao hơn, giá đáy thấp hơn
-            if (v < osc[q] && lows[p] > lows[q]) out.push({ type: "hbull", a: q, b: p, va: osc[q], vb: v });   // RSI đáy thấp hơn, giá đáy cao hơn
+            if (v > osc[q] && lows[p] < lows[q]) out.push({ type: "bull", a: q, b: p, va: osc[q], vb: v, pa: lows[q], pb: lows[p] });    // RSI đáy cao hơn, giá đáy thấp hơn
+            if (v < osc[q] && lows[p] > lows[q]) out.push({ type: "hbull", a: q, b: p, va: osc[q], vb: v, pa: lows[q], pb: lows[p] });   // RSI đáy thấp hơn, giá đáy cao hơn
           }
         }
         lastPL = i;
@@ -7453,8 +7453,8 @@ async function copyVax1Result() {
         if (lastPH >= 0) {
           var barsH = i - lastPH - 1, qh = lastPH - lbR;
           if (barsH >= DIV_CFG.rangeLower && barsH <= DIV_CFG.rangeUpper) {
-            if (v < osc[qh] && highs[p] > highs[qh]) out.push({ type: "bear", a: qh, b: p, va: osc[qh], vb: v });   // RSI đỉnh thấp hơn, giá đỉnh cao hơn
-            if (v > osc[qh] && highs[p] < highs[qh]) out.push({ type: "hbear", a: qh, b: p, va: osc[qh], vb: v });  // RSI đỉnh cao hơn, giá đỉnh thấp hơn
+            if (v < osc[qh] && highs[p] > highs[qh]) out.push({ type: "bear", a: qh, b: p, va: osc[qh], vb: v, pa: highs[qh], pb: highs[p] });   // RSI đỉnh thấp hơn, giá đỉnh cao hơn
+            if (v > osc[qh] && highs[p] < highs[qh]) out.push({ type: "hbear", a: qh, b: p, va: osc[qh], vb: v, pa: highs[qh], pb: highs[p] });  // RSI đỉnh cao hơn, giá đỉnh thấp hơn
           }
         }
         lastPH = i;
@@ -7503,14 +7503,15 @@ async function copyVax1Result() {
     };
     S.ind.div = divCalc(S.ind.rsi, S.candles.map(function (c) { return c.low; }), S.candles.map(function (c) { return c.high; }));
   }
-  function pt(arr, i) { var t = S.candles[i].time; return arr[i] === null ? { time: t } : { time: t, value: arr[i] }; }
+  function ok(v) { return v !== null && v !== undefined && isFinite(v); }
+  function pt(arr, i) { var t = S.candles[i].time, v = arr[i]; return ok(v) ? { time: t, value: v } : { time: t }; }
   function volPt(i) {
     var c = S.candles[i];
     return { time: c.time, value: c.vol || 0, color: c.close >= c.open ? "rgba(22,163,74,.45)" : "rgba(220,38,38,.45)" };
   }
   function histPt(i) {
     var v = S.ind.h[i], t = S.candles[i].time;
-    if (v === null) return { time: t };
+    if (!ok(v)) return { time: t };
     var prev = i > 0 ? S.ind.h[i - 1] : null, grow = prev === null || Math.abs(v) >= Math.abs(prev);
     return { time: t, value: v, color: v >= 0 ? (grow ? "#16a34a" : "rgba(22,163,74,.45)") : (grow ? "#dc2626" : "rgba(220,38,38,.45)") };
   }
@@ -7612,38 +7613,53 @@ async function copyVax1Result() {
     updateLegend();
   }
 
+  var indErrShown = "";
+  function safe(name, fn) {
+    try { fn(); return true; }
+    catch (e) {
+      var msg = "Lỗi chỉ báo " + name + ": " + ((e && e.message) || e);
+      if (window.console) console.error("[Trade] " + msg, e);
+      if (indErrShown !== msg) { indErrShown = msg; setStatus(msg, true); }
+      return false;
+    }
+  }
   function setIndicatorData() {
     if (!S.vol || !S.candles.length) return;
-    calcInd();
+    indErrShown = "";
+    if (!safe("tính toán", calcInd)) return;
     S.timeIdx = {};
     S.candles.forEach(function (c, i) { S.timeIdx[c.time] = i; });
     var idx = S.candles.map(function (_, i) { return i; });
-    S.vol.setData(idx.map(volPt));
-    S.ma.forEach(function (s, k) { s.setData(idx.map(function (i) { return pt(S.ind.ma[k], i); })); });
-    S.rsi.setData(idx.map(function (i) { return pt(S.ind.rsi, i); }));
-    S.macdHist.setData(idx.map(histPt));
-    S.macdLine.setData(idx.map(function (i) { return pt(S.ind.m, i); }));
-    S.macdSig.setData(idx.map(function (i) { return pt(S.ind.s, i); }));
-    var p = Math.min(8, dec(S.tick) + 1);
-    [S.macdHist, S.macdLine, S.macdSig].forEach(function (s) {
-      s.applyOptions({ priceFormat: { type: "price", precision: p, minMove: Math.pow(10, -p) } });
+    safe("Volume", function () { S.vol.setData(idx.map(volPt)); });
+    S.ma.forEach(function (s, k) { safe("EMA(" + MA_DEF[k].n + ")", function () { s.setData(idx.map(function (i) { return pt(S.ind.ma[k], i); })); }); });
+    safe("RSI", function () { S.rsi.setData(idx.map(function (i) { return pt(S.ind.rsi, i); })); });
+    safe("MACD", function () {
+      S.macdHist.setData(idx.map(histPt));
+      S.macdLine.setData(idx.map(function (i) { return pt(S.ind.m, i); }));
+      S.macdSig.setData(idx.map(function (i) { return pt(S.ind.s, i); }));
+      var p = Math.min(8, dec(S.tick) + 1);
+      [S.macdHist, S.macdLine, S.macdSig].forEach(function (s) {
+        s.applyOptions({ priceFormat: { type: "price", precision: p, minMove: Math.pow(10, -p) } });
+      });
     });
     var r = S.chart.timeScale().getVisibleLogicalRange();
     if (r) [S.rsiChart, S.macdChart].forEach(function (c) { c.timeScale().setVisibleLogicalRange(r); });
-    updateLegend();
+    safe("chú thích", updateLegend);
   }
   function updateIndicatorsLast() {
     if (!S.vol || !S.candles.length) return;
-    calcInd();
+    if (!safe("tính toán", calcInd)) return;
     var i = S.candles.length - 1;
     S.timeIdx[S.candles[i].time] = i;
-    S.vol.update(volPt(i));
-    S.ma.forEach(function (s, k) { s.update(pt(S.ind.ma[k], i)); });
-    S.rsi.update(pt(S.ind.rsi, i));
-    S.macdHist.update(histPt(i));
-    S.macdLine.update(pt(S.ind.m, i));
-    S.macdSig.update(pt(S.ind.s, i));
-    if (S.hoverIdx === null || S.hoverIdx === undefined) updateLegend();
+    safe("Volume", function () { S.vol.update(volPt(i)); });
+    S.ma.forEach(function (s, k) { safe("EMA(" + MA_DEF[k].n + ")", function () { s.update(pt(S.ind.ma[k], i)); }); });
+    safe("RSI", function () { S.rsi.update(pt(S.ind.rsi, i)); });
+    safe("MACD", function () {
+      S.macdHist.update(histPt(i));
+      S.macdLine.update(pt(S.ind.m, i));
+      S.macdSig.update(pt(S.ind.s, i));
+    });
+    if (S.hoverIdx === null || S.hoverIdx === undefined) safe("chú thích", updateLegend);
   }
 
   function fx(v, d) { return v === null || v === undefined || !isFinite(v) ? "–" : nf(v, d); }
@@ -7711,6 +7727,7 @@ async function copyVax1Result() {
       renderPanel();
       if (S.active) openWs();
       setStatus(S.quote === "USDT" ? "Giá trực tiếp từ Binance" : "Cặp này không định giá bằng USDT", S.quote !== "USDT");
+      if (indErrShown) setStatus(indErrShown, true);   // giữ thông báo lỗi chỉ báo (nếu có) để dễ báo lại
       store("trade_last", JSON.stringify({ sym: sym, iv: iv }));
       renderWatch();
     }).catch(function (e) {
@@ -7988,6 +8005,7 @@ async function copyVax1Result() {
       var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
       label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
     });
+    drawPriceDivs(paneW);   // vẽ sau cùng để nhãn ray điểm mua không che đường phân kỳ
     ctx.restore();
     drawRsiOverlay(dpr);
     S.raf = requestAnimationFrame(draw);
@@ -8016,22 +8034,51 @@ async function copyVax1Result() {
       var t = DIV_TYPES[d.type];
       ctxR.strokeStyle = t.line; ctxR.lineWidth = 2;
       ctxR.beginPath(); ctxR.moveTo(x1, y1); ctxR.lineTo(x2, y2); ctxR.stroke();
-      // Nhãn kiểu labelup/labeldown: hộp màu chữ trắng, mũi nhọn chỉ vào pivot
-      var tw = ctxR.measureText(t.text).width, bw = tw + 10, bh = 15, ar = 4;
-      var by = t.up ? y2 + ar : y2 - ar - bh, bx = x2 - bw / 2;
-      ctxR.fillStyle = t.label;
-      ctxR.beginPath();
-      if (t.up) { ctxR.moveTo(x2, y2); ctxR.lineTo(x2 - ar, by); ctxR.lineTo(x2 + ar, by); }
-      else { ctxR.moveTo(x2, y2); ctxR.lineTo(x2 - ar, by + bh); ctxR.lineTo(x2 + ar, by + bh); }
-      ctxR.fill();
-      ctxR.beginPath();
-      if (ctxR.roundRect) ctxR.roundRect(bx, by, bw, bh, 3); else ctxR.rect(bx, by, bw, bh);
-      ctxR.fill();
-      ctxR.fillStyle = "#fff"; ctxR.textBaseline = "middle"; ctxR.textAlign = "center";
-      ctxR.fillText(t.text, x2, by + bh / 2 + 0.5);
-      ctxR.textAlign = "left";
+      divLabel(ctxR, t, x2, y2, 0);
     });
     ctxR.restore();
+  }
+
+  // Nhãn kiểu labelup/labeldown của Pine: hộp màu chữ trắng, mũi nhọn chỉ vào điểm (x, y);
+  // gap = khoảng hở thêm giữa mũi nhọn và điểm (dùng trên khung nến để không che râu nến).
+  function divLabel(c, t, x, y, gap) {
+    var tw = c.measureText(t.text).width, bw = tw + 10, bh = 15, ar = 4;
+    var tip = t.up ? y + gap : y - gap;
+    var by = t.up ? tip + ar : tip - ar - bh, bx = x - bw / 2;
+    c.fillStyle = t.label;
+    c.beginPath();
+    if (t.up) { c.moveTo(x, tip); c.lineTo(x - ar, by); c.lineTo(x + ar, by); }
+    else { c.moveTo(x, tip); c.lineTo(x - ar, by + bh); c.lineTo(x + ar, by + bh); }
+    c.fill();
+    c.beginPath();
+    if (c.roundRect) c.roundRect(bx, by, bw, bh, 3); else c.rect(bx, by, bw, bh);
+    c.fill();
+    c.fillStyle = "#fff"; c.textBaseline = "middle"; c.textAlign = "center";
+    c.fillText(t.text, x, by + bh / 2 + 0.5);
+    c.textAlign = "left";
+  }
+
+  // Phân kỳ trên khung nến: Bull/H Bull nối đáy (low) 2 cây nến, Bear/H Bear nối đỉnh (high).
+  function drawPriceDivs(paneW) {
+    if (!IND.rsi || !S.ind || !S.ind.div) return;
+    var ts = S.chart.timeScale();
+    ctx.save();
+    ctx.font = "600 11px " + S.font;
+    ctx.lineCap = "round";
+    S.ind.div.forEach(function (d) {
+      if (!DIV_ON[d.type]) return;
+      var x1 = ts.logicalToCoordinate(d.a), x2 = ts.logicalToCoordinate(d.b);
+      var y1 = S.series.priceToCoordinate(d.pa), y2 = S.series.priceToCoordinate(d.pb);
+      if (x1 === null || x2 === null || y1 === null || y2 === null || x2 < 0 || x1 > paneW) return;
+      var t = DIV_TYPES[d.type], hidden = d.type.charAt(0) === "h";
+      ctx.strokeStyle = t.label; ctx.lineWidth = 2;
+      ctx.globalAlpha = hidden ? 0.55 : 1;
+      ctx.setLineDash(hidden ? [5, 4] : []);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      divLabel(ctx, t, x2, y2, 3);
+    });
+    ctx.restore();
   }
 
   /* ---------- Chuột / phím ---------- */
