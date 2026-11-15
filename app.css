@@ -2582,6 +2582,9 @@ body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
 
 /* Trade: mở rộng hết bề ngang trình duyệt (chỉ khi đang ở #/trade) */
 body.v3.trade-wide { --v3-max: 100%; }
+/* Trang Trade không cần thanh 3 bước và thanh hành động ở đáy */
+body.v3.trade-wide .v3-stepper-wrap,
+body.v3.trade-wide .v3-actionbar { display: none; }
 
 /* Trade: biểu đồ + cột danh sách coin bên phải */
 .trade-main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; align-items: stretch; }
