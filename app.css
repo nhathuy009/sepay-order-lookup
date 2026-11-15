@@ -2526,16 +2526,16 @@ body.v3 .v3-trade .trade-toolbar button { display: inline-flex; align-items: cen
 body.v3 .v3-trade #tradeRayBtn:not(.is-on) { background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none; }
 body.v3 .v3-trade .trade-status { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
 body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
-.trade-chart-wrap {
-  position: relative; height: clamp(360px, 58vh, 640px);
+.trade-charts {
   border: 1px solid var(--border); border-radius: var(--v3-radius, 10px); overflow: hidden;
 }
+.trade-chart-wrap { position: relative; height: clamp(340px, 52vh, 600px); }
 #tradeChart { position: absolute; inset: 0; }
 #tradeOverlay { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .trade-chart-wrap.is-hover #tradeChart * { cursor: ns-resize !important; }
 .trade-chart-wrap.is-placing #tradeChart * { cursor: crosshair !important; }
 .trade-hint {
-  display: none; position: absolute; left: 12px; top: 10px; z-index: 5;
+  display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; z-index: 6; white-space: nowrap;
   padding: 6px 10px; border-radius: 8px; font-size: 12.5px;
   background: var(--accent); color: #fff;
 }
@@ -2611,3 +2611,22 @@ body.v3 .v3-trade .trade-watch-add input { width: 170px; padding: 7px 10px; font
   .trade-watch-add { flex: 1 1 100%; }
   body.v3 .v3-trade .trade-watch-add input { flex: 1; width: auto; }
 }
+
+/* Trade: chỉ báo MA / VOL / RSI / MACD */
+.trade-pane { position: relative; height: 130px; border-top: 1px solid var(--border); }
+.trade-pane-macd { height: 150px; }
+.trade-pane[hidden] { display: none; }
+.trade-pane-chart { position: absolute; inset: 0; }
+.trade-legend {
+  position: absolute; left: 10px; top: 6px; z-index: 5; pointer-events: none;
+  display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: calc(100% - 110px);
+  font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted);
+}
+.trade-ind { display: inline-flex; border: 1px solid var(--input-border); border-radius: var(--v3-radius, 10px); overflow: hidden; }
+.v3-trade .trade-ind button {
+  background: none; box-shadow: none; border: 0; border-radius: 0; padding: 8px 11px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-muted);
+}
+.v3-trade .trade-ind button + button { border-left: 1px solid var(--input-border); }
+.v3-trade .trade-ind button[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.v3-trade .trade-ind button:hover { filter: none; color: var(--text-main); }

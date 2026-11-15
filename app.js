@@ -7345,30 +7345,255 @@ async function copyVax1Result() {
     if (!S.chart) return;
     readColors();
     var c = S.colors;
-    S.chart.applyOptions({
-      layout: { background: { type: "solid", color: "transparent" }, textColor: c.muted, fontFamily: S.font },
-      grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
-      rightPriceScale: { borderColor: c.border },
-      timeScale: { borderColor: c.border }
+    allCharts().forEach(function (ch) {
+      ch.applyOptions({
+        layout: { background: { type: "solid", color: "transparent" }, textColor: c.muted, fontFamily: S.font },
+        grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+        rightPriceScale: { borderColor: c.border },
+        timeScale: { borderColor: c.border }
+      });
     });
     renderPanel();
   }
 
   /* ---------- Biểu đồ ---------- */
+  function chartOpts() {
+    var LW = window.LightweightCharts;
+    return {
+      autoSize: true,
+      crosshair: { mode: LW.CrosshairMode.Normal },
+      rightPriceScale: { minimumWidth: 84 },
+      timeScale: { timeVisible: true, rightOffset: 12 }
+    };
+  }
   function initChart() {
     readColors();
     var LW = window.LightweightCharts;
-    S.chart = LW.createChart($("tradeChart"), {
-      autoSize: true,
-      crosshair: { mode: LW.CrosshairMode.Normal },
-      timeScale: { timeVisible: true, rightOffset: 12 }
-    });
+    S.chart = LW.createChart($("tradeChart"), chartOpts());
     S.series = S.chart.addCandlestickSeries({
       upColor: "#16a34a", downColor: "#dc2626", borderVisible: false, wickUpColor: "#16a34a", wickDownColor: "#dc2626"
     });
     S.chart.subscribeClick(onChartClick);
+    initIndicators();
     applyTheme();
     new MutationObserver(applyTheme).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  /* ---------- Chỉ báo: MA(7,25,99), Volume, RSI(14), MACD(12,26,9) ---------- */
+  var MA_DEF = [{ n: 7, color: "#f0b90b" }, { n: 25, color: "#eb40b5" }, { n: 99, color: "#b385f8" }];
+  var C_MACD = "#f0b90b", C_SIG = "#b385f8", C_RSI = "#b385f8";
+  var IND_KEY = "trade_ind";
+  var IND = { ma: true, vol: true, rsi: true, macd: true };
+  try {
+    var savedInd = JSON.parse(store(IND_KEY) || "null");
+    if (savedInd) Object.keys(IND).forEach(function (k) { if (k in savedInd) IND[k] = !!savedInd[k]; });
+  } catch (e) {}
+
+  function allCharts() { return [S.chart, S.rsiChart, S.macdChart].filter(Boolean); }
+
+  function sma(v, n) {
+    var out = new Array(v.length).fill(null), s = 0;
+    for (var i = 0; i < v.length; i++) {
+      s += v[i];
+      if (i >= n) s -= v[i - n];
+      if (i >= n - 1) out[i] = s / n;
+    }
+    return out;
+  }
+  function ema(v, n) {
+    var out = new Array(v.length).fill(null), k = 2 / (n + 1), prev = null, s = 0, cnt = 0;
+    for (var i = 0; i < v.length; i++) {
+      var x = v[i];
+      if (x === null) continue;
+      if (prev === null) { s += x; cnt++; if (cnt === n) { prev = s / n; out[i] = prev; } }
+      else { prev = x * k + prev * (1 - k); out[i] = prev; }
+    }
+    return out;
+  }
+  function rsiCalc(c, n) {   // RSI kiểu Wilder, giống Binance/TradingView
+    var out = new Array(c.length).fill(null), g = 0, l = 0;
+    for (var i = 1; i < c.length; i++) {
+      var d = c[i] - c[i - 1], up = d > 0 ? d : 0, dn = d < 0 ? -d : 0;
+      if (i <= n) {
+        g += up; l += dn;
+        if (i < n) continue;
+        g /= n; l /= n;
+      } else {
+        g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n;
+      }
+      out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
+    }
+    return out;
+  }
+  function calcInd() {
+    var cl = S.candles.map(function (c) { return c.close; });
+    var e12 = ema(cl, 12), e26 = ema(cl, 26);
+    var m = cl.map(function (_, i) { return e12[i] !== null && e26[i] !== null ? e12[i] - e26[i] : null; });
+    var s = ema(m, 9);
+    S.ind = {
+      ma: MA_DEF.map(function (d) { return sma(cl, d.n); }),
+      rsi: rsiCalc(cl, 14),
+      m: m, s: s,
+      h: m.map(function (v, i) { return v !== null && s[i] !== null ? v - s[i] : null; })
+    };
+  }
+  function pt(arr, i) { var t = S.candles[i].time; return arr[i] === null ? { time: t } : { time: t, value: arr[i] }; }
+  function volPt(i) {
+    var c = S.candles[i];
+    return { time: c.time, value: c.vol || 0, color: c.close >= c.open ? "rgba(22,163,74,.45)" : "rgba(220,38,38,.45)" };
+  }
+  function histPt(i) {
+    var v = S.ind.h[i], t = S.candles[i].time;
+    if (v === null) return { time: t };
+    var prev = i > 0 ? S.ind.h[i - 1] : null, grow = prev === null || Math.abs(v) >= Math.abs(prev);
+    return { time: t, value: v, color: v >= 0 ? (grow ? "#16a34a" : "rgba(22,163,74,.45)") : (grow ? "#dc2626" : "rgba(220,38,38,.45)") };
+  }
+  function lineOpts(color, w) {
+    return { color: color, lineWidth: w || 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+  }
+
+  function initIndicators() {
+    var LW = window.LightweightCharts;
+    S.vol = S.chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false });
+    S.chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    S.ma = MA_DEF.map(function (d) { return S.chart.addLineSeries(lineOpts(d.color)); });
+
+    S.rsiChart = LW.createChart($("tradeChartRsi"), chartOpts());
+    S.rsiChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
+    S.rsi = S.rsiChart.addLineSeries({ color: C_RSI, lineWidth: 1.5, priceLineVisible: false, crosshairMarkerVisible: false,
+      priceFormat: { type: "price", precision: 2, minMove: 0.01 } });
+    S.rsi.createPriceLine({ price: 70, color: "rgba(220,38,38,.55)", lineStyle: LW.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false });
+    S.rsi.createPriceLine({ price: 30, color: "rgba(22,163,74,.55)", lineStyle: LW.LineStyle.Dashed, lineWidth: 1, axisLabelVisible: false });
+
+    S.macdChart = LW.createChart($("tradeChartMacd"), chartOpts());
+    S.macdChart.priceScale("right").applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
+    S.macdHist = S.macdChart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
+    S.macdLine = S.macdChart.addLineSeries(lineOpts(C_MACD, 1.5));
+    S.macdSig = S.macdChart.addLineSeries(lineOpts(C_SIG, 1.5));
+
+    // Đồng bộ cuộn/zoom và crosshair giữa khung nến, RSI, MACD
+    var busy = false;
+    allCharts().forEach(function (src) {
+      src.timeScale().subscribeVisibleLogicalRangeChange(function (r) {
+        if (busy || !r) return;
+        busy = true;
+        allCharts().forEach(function (c) { if (c !== src) c.timeScale().setVisibleLogicalRange(r); });
+        busy = false;
+      });
+      src.subscribeCrosshairMove(function (p) {
+        if (busy) return;
+        busy = true;
+        onCross(src, p);
+        busy = false;
+      });
+    });
+
+    document.querySelectorAll("#tradeInd button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var k = b.getAttribute("data-ind");
+        IND[k] = !IND[k];
+        store(IND_KEY, JSON.stringify(IND));
+        applyInd();
+      });
+    });
+    applyInd();
+  }
+
+  function onCross(src, p) {
+    var i = p && p.time !== undefined && S.timeIdx ? S.timeIdx[p.time] : undefined;
+    S.hoverIdx = i === undefined ? null : i;
+    var targets = [
+      { chart: S.chart, series: S.series, val: function () { return S.candles[i].close; } },
+      { chart: S.rsiChart, series: S.rsi, val: function () { var v = S.ind.rsi[i]; return v === null ? 50 : v; } },
+      { chart: S.macdChart, series: S.macdLine, val: function () { var v = S.ind.m[i]; return v === null ? 0 : v; } }
+    ];
+    targets.forEach(function (t) {
+      if (t.chart === src || typeof t.chart.setCrosshairPosition !== "function") return;
+      if (i === undefined || !S.ind) t.chart.clearCrosshairPosition();
+      else t.chart.setCrosshairPosition(t.val(), p.time, t.series);
+    });
+    updateLegend();
+  }
+
+  function applyInd() {
+    document.querySelectorAll("#tradeInd button").forEach(function (b) {
+      b.setAttribute("aria-pressed", IND[b.getAttribute("data-ind")] ? "true" : "false");
+    });
+    if (!S.chart) return;
+    S.ma.forEach(function (s) { s.applyOptions({ visible: IND.ma }); });
+    S.vol.applyOptions({ visible: IND.vol });
+    S.chart.priceScale("right").applyOptions({ scaleMargins: { top: 0.08, bottom: IND.vol ? 0.2 : 0.06 } });
+    $("tradePaneRsi").hidden = !IND.rsi;
+    $("tradePaneMacd").hidden = !IND.macd;
+    // Chỉ hiện trục thời gian ở khung dưới cùng
+    S.chart.timeScale().applyOptions({ visible: !IND.rsi && !IND.macd });
+    S.rsiChart.timeScale().applyOptions({ visible: IND.rsi && !IND.macd });
+    S.macdChart.timeScale().applyOptions({ visible: IND.macd });
+    var r = S.chart.timeScale().getVisibleLogicalRange();
+    if (r) requestAnimationFrame(function () {
+      [S.rsiChart, S.macdChart].forEach(function (c) { c.timeScale().setVisibleLogicalRange(r); });
+    });
+    updateLegend();
+  }
+
+  function setIndicatorData() {
+    if (!S.vol || !S.candles.length) return;
+    calcInd();
+    S.timeIdx = {};
+    S.candles.forEach(function (c, i) { S.timeIdx[c.time] = i; });
+    var idx = S.candles.map(function (_, i) { return i; });
+    S.vol.setData(idx.map(volPt));
+    S.ma.forEach(function (s, k) { s.setData(idx.map(function (i) { return pt(S.ind.ma[k], i); })); });
+    S.rsi.setData(idx.map(function (i) { return pt(S.ind.rsi, i); }));
+    S.macdHist.setData(idx.map(histPt));
+    S.macdLine.setData(idx.map(function (i) { return pt(S.ind.m, i); }));
+    S.macdSig.setData(idx.map(function (i) { return pt(S.ind.s, i); }));
+    var p = Math.min(8, dec(S.tick) + 1);
+    [S.macdHist, S.macdLine, S.macdSig].forEach(function (s) {
+      s.applyOptions({ priceFormat: { type: "price", precision: p, minMove: Math.pow(10, -p) } });
+    });
+    var r = S.chart.timeScale().getVisibleLogicalRange();
+    if (r) [S.rsiChart, S.macdChart].forEach(function (c) { c.timeScale().setVisibleLogicalRange(r); });
+    updateLegend();
+  }
+  function updateIndicatorsLast() {
+    if (!S.vol || !S.candles.length) return;
+    calcInd();
+    var i = S.candles.length - 1;
+    S.timeIdx[S.candles[i].time] = i;
+    S.vol.update(volPt(i));
+    S.ma.forEach(function (s, k) { s.update(pt(S.ind.ma[k], i)); });
+    S.rsi.update(pt(S.ind.rsi, i));
+    S.macdHist.update(histPt(i));
+    S.macdLine.update(pt(S.ind.m, i));
+    S.macdSig.update(pt(S.ind.s, i));
+    if (S.hoverIdx === null || S.hoverIdx === undefined) updateLegend();
+  }
+
+  function fx(v, d) { return v === null || v === undefined || !isFinite(v) ? "–" : nf(v, d); }
+  function fVol(v) {
+    if (!isFinite(v)) return "–";
+    if (v >= 1e9) return nf(v / 1e9, 2) + "B";
+    if (v >= 1e6) return nf(v / 1e6, 2) + "M";
+    if (v >= 1e3) return nf(v / 1e3, 2) + "K";
+    return nf(v, 2);
+  }
+  function updateLegend() {
+    var n = S.candles.length;
+    if (!n || !S.ind) { ["tradeLegendMain", "tradeLegendRsi", "tradeLegendMacd"].forEach(function (id) { $(id).innerHTML = ""; }); return; }
+    var i = S.hoverIdx === null || S.hoverIdx === undefined ? n - 1 : S.hoverIdx;
+    var pd = dec(S.tick), md = Math.min(8, pd + 1), parts = [];
+    if (IND.ma) MA_DEF.forEach(function (d, k) {
+      parts.push('<span style="color:' + d.color + '">MA(' + d.n + ") " + fx(S.ind.ma[k][i], pd) + "</span>");
+    });
+    if (IND.vol) parts.push("<span>Vol(" + esc(S.base) + ") " + fVol(S.candles[i].vol) + "</span>");
+    $("tradeLegendMain").innerHTML = parts.join("");
+    $("tradeLegendRsi").innerHTML = "<span>RSI(14)</span>" + '<span style="color:' + C_RSI + '">' + fx(S.ind.rsi[i], 2) + "</span>";
+    var h = S.ind.h[i];
+    $("tradeLegendMacd").innerHTML = "<span>MACD(12,26,9)</span>" +
+      '<span style="color:' + C_MACD + '">MACD ' + fx(S.ind.m[i], md) + "</span>" +
+      '<span style="color:' + C_SIG + '">Signal ' + fx(S.ind.s[i], md) + "</span>" +
+      '<span class="' + (h >= 0 ? "trade-pos" : "trade-neg") + '">Hist ' + fx(h, md) + "</span>";
   }
 
   function setStatus(t, err) {
@@ -7395,9 +7620,11 @@ async function copyVax1Result() {
       S.tick = +info.filters.find(function (f) { return f.filterType === "PRICE_FILTER"; }).tickSize;
       S.step = +info.filters.find(function (f) { return f.filterType === "LOT_SIZE"; }).stepSize;
       S.candles = kl.map(function (k) {
-        return { time: k[0] / 1000 + TZ, real: k[0] / 1000, open: +k[1], high: +k[2], low: +k[3], close: +k[4] };
+        return { time: k[0] / 1000 + TZ, real: k[0] / 1000, open: +k[1], high: +k[2], low: +k[3], close: +k[4], vol: +k[5] };
       });
+      S.hoverIdx = null;
       S.series.setData(S.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
+      setIndicatorData();
       S.series.applyOptions({ priceFormat: { type: "price", precision: dec(S.tick), minMove: S.tick } });
       S.chart.timeScale().scrollToRealTime();
       $("tradePair").textContent = S.base + "/" + S.quote;
@@ -7419,12 +7646,13 @@ async function copyVax1Result() {
     ws.onmessage = function (ev) {
       if (S.ws !== ws) return;
       var k = JSON.parse(ev.data).k;
-      var c = { time: k.t / 1000 + TZ, real: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c };
+      var c = { time: k.t / 1000 + TZ, real: k.t / 1000, open: +k.o, high: +k.h, low: +k.l, close: +k.c, vol: +k.v };
       var last = S.candles[S.candles.length - 1];
       if (last && last.real === c.real) S.candles[S.candles.length - 1] = c;
       else if (!last || c.real > last.real) S.candles.push(c);
       else return;
       S.series.update({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close });
+      updateIndicatorsLast();
       schedulePanel();
     };
     ws.onclose = function () {
@@ -7613,6 +7841,9 @@ async function copyVax1Result() {
   }
 
   /* ---------- Lớp vẽ Ray (canvas phủ trên biểu đồ) ---------- */
+  // Bề rộng vùng nến (không tính trục giá). Không dùng timeScale().width() vì trục thời gian có thể bị ẩn.
+  function paneWidth() { return Math.max(0, $("tradeChart").clientWidth - S.chart.priceScale("right").width()); }
+
   var wrap = $("tradeChartWrap"), cv = $("tradeOverlay"), ctx = cv.getContext("2d");
   function rayGeom(r) {
     var y = S.series.priceToCoordinate(r.price);
@@ -7638,7 +7869,7 @@ async function copyVax1Result() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.font = "600 12px " + S.font;
-    var paneW = S.chart.timeScale().width();
+    var paneW = paneWidth();
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, paneW, h); ctx.clip();
 
     if (isFinite(S.avg)) {
@@ -7668,7 +7899,7 @@ async function copyVax1Result() {
   function local(e) { var b = wrap.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
   function hit(x, y) {
     if (!S.chart) return null;
-    var paneW = S.chart.timeScale().width(), best = null, bd = 6;
+    var paneW = paneWidth(), best = null, bd = 6;
     S.rays.forEach(function (r) {
       var g = rayGeom(r);
       if (!g) return;
