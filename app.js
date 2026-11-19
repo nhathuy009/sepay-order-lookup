@@ -8102,8 +8102,7 @@ async function copyVax1Result() {
       r._lbl = null;
       if (tagHidden(r)) return;
       var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base;
-      var fits = g.x + 8 + ctx.measureText(txt).width + 12 <= paneW;
-      r._lbl = label(txt, fits ? g.x + 8 : paneW - 8, g.y, col, fits ? "left" : "right");
+      r._lbl = label(txt, paneW - 8, g.y, col, "right");   // luôn sát mép phải để không che nến
     });
     drawPriceDivs(paneW);   // vẽ sau cùng để nhãn ray điểm mua không che đường phân kỳ
     ctx.restore();
