@@ -8081,6 +8081,11 @@ async function copyVax1Result() {
     if (ext) { ctx.fillStyle = ext.col; ctx.fillText(ext.text, bx + pad + tw1, by + bh / 2 + 0.5); }
     return { x: bx, y: by, w: tw + pad * 2, h: bh };
   }
+  function pnlExt(pnl, cost) {   // phần lãi/lỗ tô màu riêng ở cuối tag
+    if (!isFinite(pnl) || !cost) return null;
+    return { text: " · " + (pnl < 0 ? "-" : "+") + "$" + fC(Math.abs(pnl)) + " (" + sg(pnl) + nf(pnl / cost * 100, 1) + "%)",
+      col: pnl >= 0 ? BUY : "#dc2626" };
+  }
   function draw() {
     S.raf = 0;
     if (!S.active || !S.chart) return;
@@ -8094,15 +8099,17 @@ async function copyVax1Result() {
     var paneW = paneWidth();
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, paneW, h); ctx.clip();
 
+    var px = lastPrice();
     if (isFinite(S.avg)) {
       var ay = S.series.priceToCoordinate(S.avg);
       if (ay !== null) {
         ctx.strokeStyle = S.colors.avg; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
         ctx.beginPath(); ctx.moveTo(0, ay + 0.5); ctx.lineTo(paneW, ay + 0.5); ctx.stroke(); ctx.setLineDash([]);
-        label("Giá TB " + fP(S.avg), paneW - 8, ay, S.colors.avg, "right");
+        var tU = 0, tQ = 0;
+        S.rays.forEach(function (r) { tU += r.usdt; tQ += qtyOf(r); });
+        label("Giá TB " + fP(S.avg), paneW - 8, ay, S.colors.avg, "right", pnlExt(tQ * px - tU, tU));
       }
     }
-    var px = lastPrice();
     S.rays.forEach(function (r) {
       var g = rayGeom(r);
       if (!g || g.x > paneW) return;
@@ -8114,9 +8121,7 @@ async function copyVax1Result() {
       if (tagHidden(r)) return;
       var q = qtyOf(r), pnl = q * px - r.usdt;
       var txt = "$" + fC(r.usdt) + " → " + fC(q) + " " + S.base;
-      var ext = isFinite(pnl) ? { text: " · " + (pnl < 0 ? "-" : "+") + "$" + fC(Math.abs(pnl)) + " (" + sg(pnl) + nf(pnl / r.usdt * 100, 1) + "%)",
-        col: pnl >= 0 ? BUY : "#dc2626" } : null;
-      r._lbl = label(txt, paneW - 8, g.y, col, "right", ext);   // luôn sát mép phải để không che nến
+      r._lbl = label(txt, paneW - 8, g.y, col, "right", pnlExt(pnl, r.usdt));   // luôn sát mép phải để không che nến
     });
     drawPriceDivs(paneW);   // vẽ sau cùng để nhãn ray điểm mua không che đường phân kỳ
     ctx.restore();
