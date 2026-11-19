@@ -7288,6 +7288,15 @@ async function copyVax1Result() {
   function qRound(v) { return Math.floor(v / S.step + 1e-9) * S.step; }
   function fQ(v) { return nf(qRound(v), dec(S.step)); }
   function sg(v) { return v >= 0 ? "+" : ""; }
+  // Số gọn cho tag trên chart: 1.25K, 2.4M, 0.00123
+  function fC(v) {
+    if (!isFinite(v)) return "–";
+    var a = Math.abs(v), t = function (x) { return String(+x.toFixed(2)); };
+    if (a >= 1e6) return t(v / 1e6) + "M";
+    if (a >= 1e3) return t(v / 1e3) + "K";
+    if (a >= 1) return t(v);
+    return String(+v.toPrecision(3));
+  }
   function roundTick(p) { return +(Math.round(p / S.tick) * S.tick).toFixed(dec(S.tick)); }
   function esc(s) {
     return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
@@ -8063,12 +8072,13 @@ async function copyVax1Result() {
     if (x === null) x = 0;
     return { x: Math.max(0, x), y: y, x0: x };
   }
-  function label(text, x, y, col, align) {
-    var tw = ctx.measureText(text).width, pad = 5, bh = 18;
+  function label(text, x, y, col, align, ext) {   // ext: phần chữ thêm phía sau có màu riêng {text, col}
+    var tw1 = ctx.measureText(text).width, tw = tw1 + (ext ? ctx.measureText(ext.text).width : 0), pad = 5, bh = 18;
     var bx = align === "right" ? x - tw - pad * 2 : x, by = y - bh - 3;
     ctx.globalAlpha = 0.92; ctx.fillStyle = S.colors.card; ctx.fillRect(bx, by, tw + pad * 2, bh); ctx.globalAlpha = 1;
     ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, tw + pad * 2 - 1, bh - 1);
     ctx.fillStyle = col; ctx.textBaseline = "middle"; ctx.fillText(text, bx + pad, by + bh / 2 + 0.5);
+    if (ext) { ctx.fillStyle = ext.col; ctx.fillText(ext.text, bx + pad + tw1, by + bh / 2 + 0.5); }
     return { x: bx, y: by, w: tw + pad * 2, h: bh };
   }
   function draw() {
@@ -8092,6 +8102,7 @@ async function copyVax1Result() {
         label("Giá TB " + fP(S.avg), paneW - 8, ay, S.colors.avg, "right");
       }
     }
+    var px = lastPrice();
     S.rays.forEach(function (r) {
       var g = rayGeom(r);
       if (!g || g.x > paneW) return;
@@ -8101,8 +8112,11 @@ async function copyVax1Result() {
       if (g.x0 >= 0) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(g.x, g.y, sel ? 4.5 : 3.5, 0, Math.PI * 2); ctx.fill(); }
       r._lbl = null;
       if (tagHidden(r)) return;
-      var txt = fU(r.usdt) + " USDT → " + fQ(qtyOf(r)) + " " + S.base;
-      r._lbl = label(txt, paneW - 8, g.y, col, "right");   // luôn sát mép phải để không che nến
+      var q = qtyOf(r), pnl = q * px - r.usdt;
+      var txt = "$" + fC(r.usdt) + " → " + fC(q) + " " + S.base;
+      var ext = isFinite(pnl) ? { text: " · " + (pnl < 0 ? "-" : "+") + "$" + fC(Math.abs(pnl)) + " (" + sg(pnl) + nf(pnl / r.usdt * 100, 1) + "%)",
+        col: pnl >= 0 ? BUY : "#dc2626" } : null;
+      r._lbl = label(txt, paneW - 8, g.y, col, "right", ext);   // luôn sát mép phải để không che nến
     });
     drawPriceDivs(paneW);   // vẽ sau cùng để nhãn ray điểm mua không che đường phân kỳ
     ctx.restore();
