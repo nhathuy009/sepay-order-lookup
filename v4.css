@@ -79,6 +79,12 @@ body.theme-glass-light {
   --cal-block-bg: var(--glass-bg-thin);
   --cal-weekend-bg: color-mix(in srgb, var(--ios-green) 16%, transparent);
   --cal-weekend-text: #1E7A35;
+
+  /* Cảnh báo (cam iOS): chữ đậm hơn để đủ tương phản trên nền sáng */
+  --warn-solid: var(--ios-orange);
+  --warn-text: #B35C00;
+  --warn-bg: color-mix(in srgb, var(--ios-orange) 16%, transparent);
+  --warn-border: color-mix(in srgb, var(--ios-orange) 30%, transparent);
 }
 
 body.theme-glass-dark {
@@ -152,6 +158,11 @@ body.theme-glass-dark {
   --cal-block-bg: var(--glass-bg-thin);
   --cal-weekend-bg: color-mix(in srgb, var(--ios-green) 18%, transparent);
   --cal-weekend-text: #7EE2A0;
+
+  --warn-solid: var(--ios-orange);
+  --warn-text: #FFB65C;
+  --warn-bg: color-mix(in srgb, var(--ios-orange) 20%, transparent);
+  --warn-border: color-mix(in srgb, var(--ios-orange) 34%, transparent);
 }
 
 body.v4 {
@@ -176,9 +187,7 @@ body.v4 .v3-chip,
 body.v4 .table-responsive,
 body.v4 .air-drop-zone,
 body.v4 .trade-side,
-body.v4 .trade-charts,
-body.v4 .gdt-bulk-bar,
-body.v4 .emp-audit-banner {
+body.v4 .trade-charts {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
@@ -200,8 +209,6 @@ body.v4 .flatpickr-calendar {
 /* Kính lồng trong kính không blur được nền thật -> các khối con chỉ dùng nền mờ nhẹ, không blur */
 body.v4 .card .table-responsive,
 body.v4 .card .air-drop-zone,
-body.v4 .card .gdt-bulk-bar,
-body.v4 .card .emp-audit-banner,
 body.v4 .card .trade-side,
 body.v4 .card .trade-charts {
   -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -349,6 +356,21 @@ body.v4 input:checked + .slider { background: var(--ios-green); }
 
 /* ---------- NHÃN / CHIP ---------- */
 body.v4 .badge, body.v4 .stat-pill, body.v4 .emp-audit-badge { border-radius: var(--v4-capsule); }
+
+/* ---------- CẢNH BÁO (màu cam theo theme, thay cho mã màu gán cứng ở app.css) ---------- */
+body.v4 .emp-audit-badge.is-warn { background: var(--warn-solid); color: #FFFFFF; }
+body.v4 .acc-seg-btn.active .emp-audit-badge.is-warn { background: var(--warn-bg); color: var(--warn-text); }
+/* Thanh tải XML hàng loạt + banner lỗi: giữ sắc màu báo hiệu, chỉ đổi sang nền trong suốt */
+body.v4 .gdt-bulk-bar {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent); border-radius: var(--v3-radius);
+}
+body.v4 .emp-audit-banner { border-radius: var(--v3-radius); }
+body.v4 .emp-audit-banner.is-err { border-color: color-mix(in srgb, var(--ios-red) 30%, transparent); }
+body.v4 .emp-audit-banner.is-warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
+body.v4 #auditTable tbody tr.audit-row-warn { background: color-mix(in srgb, var(--warn-solid) 8%, transparent); }
+body.v4 .v3-badge.is-warn { background: var(--warn-bg); color: var(--warn-text); }
+body.v4 .trade-sync-state.is-warn { color: var(--warn-text); }
 
 /* ---------- BẢNG ---------- */
 body.v4 .table-responsive { border-bottom: 1px solid var(--glass-border); overflow: auto; }

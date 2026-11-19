@@ -2731,7 +2731,7 @@ function renderAuditTable() {
       ? `<span class="badge ok">OK</span>`
       : status === "err"
         ? `<span class="badge err">Lệch</span>`
-        : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
+        : `<span class="badge" style="background:var(--warn-bg, #fff3e0);color:var(--warn-text, #e67e22);">Cảnh báo</span>`;
 
     const cell = (v, cls) => {
       const empty = v === undefined || v === null || v === "";
@@ -2798,7 +2798,7 @@ function renderAuditTable() {
     summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · ${attNote} · ${payNote} · ` +
       `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
       `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
-      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
+      `<span style="color:var(--warn-text, #e67e22);">Cảnh báo ${stats.warn}</span>`;
   }
 
   updateAuditAlerts();
@@ -2965,7 +2965,7 @@ function renderFormulaAuditTable() {
       ? `<span class="badge ok">OK</span>`
       : row.status === "err"
         ? `<span class="badge err">Lệch</span>`
-        : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
+        : `<span class="badge" style="background:var(--warn-bg, #fff3e0);color:var(--warn-text, #e67e22);">Cảnh báo</span>`;
 
     tr.innerHTML = `
       <td class="audit-td audit-td-stt">${idx + 1}</td>
@@ -2987,7 +2987,7 @@ function renderFormulaAuditTable() {
     summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · Lương: ${stats.payCount} NV · ` +
       `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
       `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
-      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
+      `<span style="color:var(--warn-text, #e67e22);">Cảnh báo ${stats.warn}</span>`;
   }
 }
 
