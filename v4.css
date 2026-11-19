@@ -428,3 +428,120 @@ body.v4 .trade-hint { border-radius: var(--v4-capsule); }
   body.v4 .v3-home h1 { font-size: 28px; }
   body.v4 .card { padding: 16px; border-radius: 20px; }
 }
+
+/* =====================================================================
+   LIQUID GLASS — lớp nâng cấp trên nền glass, bật bởi v4-liquid.js (body.lg).
+   - Viền khúc xạ: dải sáng chạy quanh mép (::before) + ánh sáng dội ở mép dưới (inset shadow).
+   - Ánh sáng phản chiếu theo con trỏ (::after, --lg-x / --lg-y do JS cập nhật).
+   - body.lg-refract (Chromium): nền phía sau bị bẻ cong dọc mép bằng bộ lọc SVG (--lg-filter).
+   - Nhóm nút chọn: viên kính trượt + co giãn (.lg-seg-pill).
+   - Nút: phình nhẹ khi bấm, nảy lại kiểu lò xo khi thả.
+   ===================================================================== */
+body.lg.theme-glass-light {
+  --glass-highlight:
+    inset 1px 1px 1px rgba(255, 255, 255, 0.95), inset -1px -1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -10px 18px -12px rgba(255, 255, 255, 0.75), inset 0 12px 20px -16px rgba(255, 255, 255, 0.7);
+  --lg-rim-a: rgba(255, 255, 255, 1);
+  --lg-rim-b: rgba(255, 255, 255, 0.75);
+  --lg-shine: rgba(255, 255, 255, 0.6);
+  --lg-tint: rgba(255, 255, 255, 0.30);
+  --lg-pill-bg: rgba(255, 255, 255, 0.78);
+}
+body.lg.theme-glass-dark {
+  --glass-highlight:
+    inset 1px 1px 1px rgba(255, 255, 255, 0.22), inset -1px -1px 1px rgba(255, 255, 255, 0.08),
+    inset 0 -10px 18px -12px rgba(255, 255, 255, 0.16), inset 0 12px 20px -16px rgba(255, 255, 255, 0.14);
+  --lg-rim-a: rgba(255, 255, 255, 0.5);
+  --lg-rim-b: rgba(255, 255, 255, 0.22);
+  --lg-shine: rgba(255, 255, 255, 0.16);
+  --lg-tint: rgba(28, 30, 40, 0.34);
+  --lg-pill-bg: rgba(255, 255, 255, 0.16);
+}
+body.lg { --lg-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Bề mặt "lỏng": tạo stacking context riêng để 2 lớp giả nằm giữa nền và nội dung */
+body.lg .v3-top, body.lg .v3-back, body.lg .v3-chip, body.lg .v3-task, body.lg .card,
+body.lg button, body.lg .gdt-modal-box, body.lg .trade-dlg, body.lg .lg-seg-pill { isolation: isolate; }
+body.lg .v3-back, body.lg .v3-chip, body.lg .card, body.lg button, body.lg .gdt-modal-box { position: relative; }
+
+/* Viền khúc xạ: gradient sáng ở góc trên-trái và dưới-phải, chỉ hiện ở dải viền 1.2px */
+body.lg .v3-top::before, body.lg .v3-back::before, body.lg .v3-chip::before, body.lg .v3-task::before,
+body.lg .card::before, body.lg .gdt-modal-box::before, body.lg .trade-dlg::before, body.lg .lg-seg-pill::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit; padding: 1.2px;
+  background: linear-gradient(135deg, var(--lg-rim-a) 0%, transparent 34%, transparent 64%, var(--lg-rim-b) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* Ánh sáng phản chiếu theo con trỏ */
+body.lg .v3-top::after, body.lg .v3-back::after, body.lg .v3-chip::after, body.lg .v3-task::after,
+body.lg .card::after, body.lg button::after, body.lg .gdt-modal-box::after, body.lg .trade-dlg::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(circle 160px at var(--lg-x, 30%) var(--lg-y, 0%), var(--lg-shine), transparent 70%);
+  opacity: 0; transition: opacity 320ms ease;
+}
+body.lg .lg-lit::after { opacity: 1; }
+body.lg .card.lg-lit::after { opacity: 0.55; }
+
+/* Khúc xạ thật (Chromium): kính trong hơn, blur nhẹ, nền bị bẻ cong dọc mép */
+body.lg-refract .v3-top, body.lg-refract .v3-back, body.lg-refract .v3-chip {
+  background: var(--lg-tint);
+  -webkit-backdrop-filter: var(--lg-filter,) blur(7px) saturate(190%) brightness(1.04);
+  backdrop-filter: var(--lg-filter,) blur(7px) saturate(190%) brightness(1.04);
+}
+body.lg-refract .gdt-modal-box, body.lg-refract .trade-dlg {
+  -webkit-backdrop-filter: var(--lg-filter,) blur(18px) saturate(180%);
+  backdrop-filter: var(--lg-filter,) blur(18px) saturate(180%);
+}
+
+/* Nút: phình nhẹ khi bấm, thả ra thì nảy lại kiểu lò xo */
+body.v4.lg button {
+  transition: transform 460ms var(--lg-spring), filter 150ms ease, box-shadow 200ms ease, background-color 150ms ease;
+}
+body.v4.lg button:active { transform: scale(1.06); filter: brightness(1.08); transition-duration: 140ms; }
+body.v4.lg .v3-task:active { transform: scale(1.012); transition-duration: 140ms; }
+
+/* Nhóm nút chọn: viên kính trượt */
+body.lg .lg-seg { position: relative; }
+body.lg .lg-seg-pill {
+  position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none;
+  border-radius: 999px; background: var(--lg-pill-bg);
+  box-shadow: var(--glass-highlight), 0 4px 12px rgba(0, 0, 0, 0.12), 0 0 0 0.5px var(--glass-edge);
+  opacity: 0; transition: opacity 200ms ease; will-change: transform;
+}
+body.lg-refract .lg-seg-pill {
+  -webkit-backdrop-filter: var(--lg-filter,) saturate(160%);
+  backdrop-filter: var(--lg-filter,) saturate(160%);
+}
+body.lg .acc-seg-wrap > .lg-seg-pill { border-radius: 10px; }
+body.v4.lg .lg-seg > button { position: relative; z-index: 1; }
+body.v4.lg .lg-seg > button.active { background: transparent; box-shadow: none; color: var(--text-main); }
+body.v4.lg .lg-seg > button:active { transform: scale(0.96); filter: none; }
+
+/* Thanh trên thu gọn khi cuộn xuống (kiểu tab bar iOS) */
+body.lg .v3-top {
+  transition: height 420ms var(--v3-ease), margin 420ms var(--v3-ease), top 420ms var(--v3-ease), box-shadow 300ms ease;
+}
+body.lg.lg-scrolled .v3-top { top: 6px; margin-left: clamp(16px, 5vw, 72px); margin-right: clamp(16px, 5vw, 72px); }
+@media (min-width: 769px) { body.lg.lg-scrolled .v3-top { height: 50px; } }
+
+/* Mép cuộn (scroll edge effect): nội dung chạy lên dưới thanh trên thì mờ + nhạt dần, không lộ chữ ở khe phía trên */
+body.lg::before {
+  content: ""; position: fixed; left: 0; right: 0; top: 0; height: 88px; z-index: 39; pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--bg-app) 70%, transparent), transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  -webkit-mask-image: linear-gradient(#000 45%, transparent); mask-image: linear-gradient(#000 45%, transparent);
+  opacity: 0; transition: opacity 300ms ease;
+}
+body.lg.lg-scrolled::before { opacity: 1; }
+
+/* Tắt hiệu ứng khi người dùng yêu cầu */
+body.lg-flat .v3-top::before, body.lg-flat .v3-back::before, body.lg-flat .v3-chip::before, body.lg-flat .v3-task::before,
+body.lg-flat .card::before, body.lg-flat .gdt-modal-box::before, body.lg-flat .trade-dlg::before { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  body.v4.lg button, body.lg .v3-top { transition: none; }
+  body.v4.lg button:active, body.v4.lg .v3-task:active { transform: none; }
+}
