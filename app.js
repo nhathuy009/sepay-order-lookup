@@ -241,11 +241,17 @@ const THEMES = {
   "coral-dark":  { class: "theme-coral-dark",   flatpickr: "dark"  },
   "lavender":    { class: "theme-lavender",     flatpickr: "light" },
   "accounting":  { class: "theme-accounting",   flatpickr: "light" },
+  // Chỉ dùng trên bản v4 (v4.html + v4.css)
+  "glass-light": { class: "theme-glass-light",  flatpickr: "light" },
+  "glass-dark":  { class: "theme-glass-dark",   flatpickr: "dark"  },
 };
 const THEME_CLASSES = Object.values(THEMES).map(t => t.class).filter(Boolean);
+// v4.html khai báo data-theme-store / data-theme-default trên <body> để không dùng chung lựa chọn theme với bản v3
+const THEME_STORE = document.body.dataset.themeStore || "app_theme";
+const THEME_DEFAULT = document.body.dataset.themeDefault || "light";
 
 function setTheme(themeName) {
-  if (!THEMES[themeName]) themeName = "dark";
+  if (!THEMES[themeName]) themeName = THEME_DEFAULT === "light" ? "dark" : THEME_DEFAULT;
   const cfg = THEMES[themeName];
 
   // Gỡ hết class theme cũ trước khi gắn theme mới (không đụng tới các class khác như "has-token").
@@ -260,7 +266,7 @@ function setTheme(themeName) {
   const select = document.getElementById("themeSelect");
   if (select) select.value = themeName;
 
-  try { localStorage.setItem("app_theme", themeName); } catch(e) {}
+  try { localStorage.setItem(THEME_STORE, themeName); } catch(e) {}
 }
 /* ----------------------------------------------------------- */
 
@@ -276,9 +282,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Tương thích ngược: người dùng cũ chỉ có "light" hoặc "dark" trong localStorage,
     // người dùng mới có thể đã chọn "teal" / "earth-dark" / "coral-dark".
-    const savedTheme = localStorage.getItem("app_theme");
-    setTheme(savedTheme || "light");
-  } catch(e) { setTheme("light"); }
+    const savedTheme = localStorage.getItem(THEME_STORE);
+    setTheme(savedTheme || THEME_DEFAULT);
+  } catch(e) { setTheme(THEME_DEFAULT); }
 
   fetch("/api/index").then(r => r.json()).then(d => {
     if (d) {
@@ -2725,7 +2731,7 @@ function renderAuditTable() {
       ? `<span class="badge ok">OK</span>`
       : status === "err"
         ? `<span class="badge err">Lệch</span>`
-        : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
+        : `<span class="badge" style="background:var(--warn-bg, #fff3e0);color:var(--warn-text, #e67e22);">Cảnh báo</span>`;
 
     const cell = (v, cls) => {
       const empty = v === undefined || v === null || v === "";
@@ -2792,7 +2798,7 @@ function renderAuditTable() {
     summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · ${attNote} · ${payNote} · ` +
       `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
       `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
-      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
+      `<span style="color:var(--warn-text, #e67e22);">Cảnh báo ${stats.warn}</span>`;
   }
 
   updateAuditAlerts();
@@ -2959,7 +2965,7 @@ function renderFormulaAuditTable() {
       ? `<span class="badge ok">OK</span>`
       : row.status === "err"
         ? `<span class="badge err">Lệch</span>`
-        : `<span class="badge" style="background:#fff3e0;color:#e67e22;">Cảnh báo</span>`;
+        : `<span class="badge" style="background:var(--warn-bg, #fff3e0);color:var(--warn-text, #e67e22);">Cảnh báo</span>`;
 
     tr.innerHTML = `
       <td class="audit-td audit-td-stt">${idx + 1}</td>
@@ -2981,7 +2987,7 @@ function renderFormulaAuditTable() {
     summaryEl.innerHTML = `Tháng <b>${escapeHtml(selectedSheet)}</b> · Lương: ${stats.payCount} NV · ` +
       `<span style="color:var(--amount-in);">OK ${stats.ok}</span> · ` +
       `<span style="color:var(--badge-err-text);">Lệch ${stats.err}</span> · ` +
-      `<span style="color:#e67e22;">Cảnh báo ${stats.warn}</span>`;
+      `<span style="color:var(--warn-text, #e67e22);">Cảnh báo ${stats.warn}</span>`;
   }
 }
 
@@ -6717,7 +6723,7 @@ async function copyVax1Result() {
   }
 
   function renderSteps() {
-    if (!activeKey) return;
+    if (!activeKey || !$("v3Stepper")) return;  // v4 không có thanh 3 bước
     var labels = (cardOf(activeKey).getAttribute("data-steps") || "").split("|");
     var cur = stepOf(activeKey);
     document.querySelectorAll("#v3Stepper .v3-step").forEach(function (li) {

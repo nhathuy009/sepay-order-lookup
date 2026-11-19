@@ -5,6 +5,8 @@
     { "src": "api/hlsproxy.py", "use": "@vercel/python@4.8.0" },
     
     { "src": "index.html", "use": "@vercel/static" },
+    { "src": "v4.html", "use": "@vercel/static" },
+    { "src": "v4.css", "use": "@vercel/static" },
     { "src": "ebook.html", "use": "@vercel/static" },
     { "src": "jotun.html", "use": "@vercel/static" },
     { "src": "123av.html", "use": "@vercel/static" },
@@ -24,6 +26,8 @@
 
     { "src": "/app.css", "dest": "/app.css" },
     { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/v4.css", "dest": "/v4.css" },
+    { "src": "/v4", "dest": "/v4.html" },
     { "src": "/jotun", "dest": "/jotun.html" },
     { "src": "/123av", "dest": "/123av.html" },
     { "src": "/4k", "dest": "/indexplayer.html" },

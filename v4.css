@@ -1,0 +1,430 @@
+/* =====================================================================
+   APP V4 — giao diện kính (glass) kiểu iOS. Nạp SAU app.css, chỉ dùng trong v4.html.
+   - Chỉ có 2 theme: body.theme-glass-light / body.theme-glass-dark.
+   - Lớp 1: token màu + token kính cho từng theme (mọi component cũ đọc token nên tự đổi màu).
+   - Lớp 2: vật liệu kính gắn lên các bề mặt (thanh trên, thẻ, modal, popover...).
+   - Không blur từng dòng bảng (bảng có thể hàng nghìn dòng) — chỉ blur khung chứa.
+   - Mọi rule neo dưới body.v4 để thắng app.css + phần body.v3 mà không cần !important.
+   ===================================================================== */
+
+/* ---------------- LỚP 1: TOKEN ---------------- */
+body.theme-glass-light {
+  --ios-blue: #007AFF;
+  --ios-green: #34C759;
+  --ios-red: #FF3B30;
+  --ios-orange: #FF9500;
+  --ios-indigo: #5856D6;
+  --ios-pink: #FF2D55;
+  --ios-teal: #30B0C7;
+
+  --glass-bg: rgba(255, 255, 255, 0.56);
+  --glass-bg-thick: rgba(255, 255, 255, 0.80);
+  --glass-bg-thin: rgba(255, 255, 255, 0.34);
+  --glass-border: rgba(255, 255, 255, 0.70);
+  --glass-edge: rgba(15, 23, 42, 0.08);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+  --glass-shadow: 0 10px 34px -12px rgba(28, 40, 90, 0.22), 0 2px 6px rgba(28, 40, 90, 0.06);
+  --glass-shadow-lg: 0 30px 70px -20px rgba(28, 40, 90, 0.38), 0 4px 14px rgba(28, 40, 90, 0.08);
+  --glass-filter: blur(24px) saturate(180%);
+  --glass-fill: rgba(118, 118, 128, 0.12);   /* nền ô nhập / track segmented (iOS "fill") */
+  --glass-scrim: rgba(20, 24, 40, 0.28);
+
+  --bg-app: #EEF1F8;
+  --bg-gradient:
+    radial-gradient(700px 520px at 8% 0%, color-mix(in srgb, var(--ios-blue) 34%, transparent), transparent 70%),
+    radial-gradient(640px 520px at 96% 12%, color-mix(in srgb, var(--ios-pink) 24%, transparent), transparent 70%),
+    radial-gradient(760px 620px at 70% 100%, color-mix(in srgb, var(--ios-teal) 28%, transparent), transparent 70%),
+    radial-gradient(600px 500px at 0% 90%, color-mix(in srgb, var(--ios-indigo) 22%, transparent), transparent 70%),
+    linear-gradient(180deg, #F4F6FB, #E9EDF6);
+  --header-bg: var(--glass-bg);
+  --card-bg: var(--glass-bg);
+  --card-bg-solid: #F7F8FC;
+  --border: rgba(15, 23, 42, 0.09);
+
+  --text-main: #1C1C1E;
+  --text-muted: rgba(60, 60, 67, 0.68);
+  --heading-color: #000000;
+  --brand-color: var(--ios-orange);
+
+  --accent: var(--ios-blue);
+  --accent-gradient: linear-gradient(180deg, #2F8FFF, #007AFF);
+  --accent-hover: #0A6CE0;
+
+  --btn-orange: linear-gradient(180deg, #FFAD33, #FF9500);
+  --btn-orange-text: #FFFFFF;
+  --btn-text: #FFFFFF;
+
+  --badge-ok-bg: color-mix(in srgb, var(--ios-green) 18%, transparent);
+  --badge-ok-text: #1E7A35;
+  --badge-err-bg: color-mix(in srgb, var(--ios-red) 15%, transparent);
+  --badge-err-text: #C4261D;
+
+  --input-bg: var(--glass-fill);
+  --input-border: transparent;
+
+  --card-shadow: var(--glass-shadow);
+  --table-th-bg: rgba(255, 255, 255, 0.55);
+  --table-th-text: rgba(60, 60, 67, 0.75);
+  --table-row-hover: rgba(0, 122, 255, 0.06);
+
+  --amount-in: #1E8E3E;
+  --amount-out: #D7261E;
+  --total-row-bg: color-mix(in srgb, var(--ios-blue) 10%, transparent);
+  --total-row-bg-solid: #E6EEFB;
+  --checkbox-bg: var(--glass-bg-thin);
+  --settings-panel-bg: var(--glass-bg-thin);
+
+  --cal-active-bg: var(--ios-red);
+  --cal-active-text: #FFFFFF;
+  --cal-block-bg: var(--glass-bg-thin);
+  --cal-weekend-bg: color-mix(in srgb, var(--ios-green) 16%, transparent);
+  --cal-weekend-text: #1E7A35;
+
+  /* Cảnh báo (cam iOS): chữ đậm hơn để đủ tương phản trên nền sáng */
+  --warn-solid: var(--ios-orange);
+  --warn-text: #B35C00;
+  --warn-bg: color-mix(in srgb, var(--ios-orange) 16%, transparent);
+  --warn-border: color-mix(in srgb, var(--ios-orange) 30%, transparent);
+}
+
+body.theme-glass-dark {
+  --ios-blue: #0A84FF;
+  --ios-green: #30D158;
+  --ios-red: #FF453A;
+  --ios-orange: #FF9F0A;
+  --ios-indigo: #5E5CE6;
+  --ios-pink: #FF375F;
+  --ios-teal: #40C8E0;
+
+  --glass-bg: rgba(40, 42, 54, 0.48);
+  --glass-bg-thick: rgba(36, 38, 48, 0.82);
+  --glass-bg-thin: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-edge: rgba(0, 0, 0, 0.35);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --glass-shadow: 0 12px 36px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --glass-shadow-lg: 0 30px 80px -20px rgba(0, 0, 0, 0.75), 0 4px 14px rgba(0, 0, 0, 0.3);
+  --glass-filter: blur(28px) saturate(170%);
+  --glass-fill: rgba(118, 118, 128, 0.24);
+  --glass-scrim: rgba(0, 0, 0, 0.45);
+
+  --bg-app: #0B0C12;
+  --bg-gradient:
+    radial-gradient(700px 520px at 8% 0%, color-mix(in srgb, var(--ios-blue) 40%, transparent), transparent 70%),
+    radial-gradient(640px 520px at 96% 10%, color-mix(in srgb, var(--ios-pink) 26%, transparent), transparent 70%),
+    radial-gradient(760px 620px at 70% 100%, color-mix(in srgb, var(--ios-teal) 22%, transparent), transparent 70%),
+    radial-gradient(600px 500px at 0% 90%, color-mix(in srgb, var(--ios-indigo) 34%, transparent), transparent 70%),
+    linear-gradient(180deg, #0E1018, #07080C);
+  --header-bg: var(--glass-bg);
+  --card-bg: var(--glass-bg);
+  --card-bg-solid: #1C1D26;
+  --border: rgba(255, 255, 255, 0.10);
+
+  --text-main: #F5F5F7;
+  --text-muted: rgba(235, 235, 245, 0.62);
+  --heading-color: #FFFFFF;
+  --brand-color: var(--ios-orange);
+
+  --accent: var(--ios-blue);
+  --accent-gradient: linear-gradient(180deg, #3A9BFF, #0A84FF);
+  --accent-hover: #409CFF;
+
+  --btn-orange: linear-gradient(180deg, #FFB340, #FF9F0A);
+  --btn-orange-text: #1A1000;
+  --btn-text: #FFFFFF;
+
+  --badge-ok-bg: color-mix(in srgb, var(--ios-green) 20%, transparent);
+  --badge-ok-text: #7EE2A0;
+  --badge-err-bg: color-mix(in srgb, var(--ios-red) 20%, transparent);
+  --badge-err-text: #FF9B94;
+
+  --input-bg: var(--glass-fill);
+  --input-border: transparent;
+
+  --card-shadow: var(--glass-shadow);
+  --table-th-bg: rgba(255, 255, 255, 0.06);
+  --table-th-text: rgba(235, 235, 245, 0.7);
+  --table-row-hover: rgba(10, 132, 255, 0.10);
+
+  --amount-in: #5BD982;
+  --amount-out: #FF7A70;
+  --total-row-bg: color-mix(in srgb, var(--ios-blue) 18%, transparent);
+  --total-row-bg-solid: #1E2A40;
+  --checkbox-bg: var(--glass-bg-thin);
+  --settings-panel-bg: var(--glass-bg-thin);
+
+  --cal-active-bg: var(--ios-red);
+  --cal-active-text: #FFFFFF;
+  --cal-block-bg: var(--glass-bg-thin);
+  --cal-weekend-bg: color-mix(in srgb, var(--ios-green) 18%, transparent);
+  --cal-weekend-text: #7EE2A0;
+
+  --warn-solid: var(--ios-orange);
+  --warn-text: #FFB65C;
+  --warn-bg: color-mix(in srgb, var(--ios-orange) 20%, transparent);
+  --warn-border: color-mix(in srgb, var(--ios-orange) 34%, transparent);
+}
+
+body.v4 {
+  --v3-radius-lg: 22px;
+  --v3-radius: 14px;
+  --v3-radius-sm: 10px;
+  --v4-capsule: 999px;
+  --v3-wash: var(--glass-fill);
+  --v3-accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --v3-accent-softer: color-mix(in srgb, var(--accent) 9%, transparent);
+  --v3-focus: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent);
+  --v3-ease: cubic-bezier(0.32, 0.72, 0, 1);   /* đường cong "spring" kiểu iOS */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.005em;
+}
+
+/* ---------------- LỚP 2: VẬT LIỆU KÍNH ---------------- */
+/* Bề mặt kính thường */
+body.v4 .card,
+body.v4 .v3-task,
+body.v4 .v3-chip,
+body.v4 .table-responsive,
+body.v4 .air-drop-zone,
+body.v4 .trade-side,
+body.v4 .trade-charts {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+/* Kính dày: modal, popover, dialog */
+body.v4 .gdt-modal-box,
+body.v4 .trade-dlg,
+body.v4 .multi-select-dropdown,
+body.v4 .flatpickr-calendar {
+  background: var(--glass-bg-thick);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow-lg);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  color: var(--text-main);
+}
+/* Kính lồng trong kính không blur được nền thật -> các khối con chỉ dùng nền mờ nhẹ, không blur */
+body.v4 .card .table-responsive,
+body.v4 .card .air-drop-zone,
+body.v4 .card .trade-side,
+body.v4 .card .trade-charts {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: var(--glass-bg-thin);
+  box-shadow: none;
+  border-color: var(--border);
+}
+/* Popover mở bên trong thẻ: đẩy thẻ lên trên các thẻ kế tiếp (backdrop-filter tạo stacking context) */
+body.v4 .card:has(.multi-select-dropdown.show) { position: relative; z-index: 30; }
+
+/* ---------- THANH TRÊN: viên kính nổi, nội dung trượt bên dưới ---------- */
+body.v4 .v3-top {
+  position: sticky; top: 10px; z-index: 40;
+  margin: 10px clamp(10px, 2vw, 20px) 0;
+  border-radius: var(--v3-radius-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+body.v4 .brand-mark { border-radius: 11px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+body.v4 #themeSelect,
+body.v4 .header-actions input { border-radius: var(--v4-capsule); }
+body.v4 .header-actions button:not(.acc-seg-btn) { border-radius: var(--v4-capsule); }
+body.v4.has-token .header-actions button:not(.acc-seg-btn) {
+  background: var(--glass-fill); border: 0; color: var(--text-main);
+}
+
+/* Lịch tuần */
+body.v4 .cal-day-block { border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight); border-radius: 12px; }
+body.v4 .cal-day-block.weekend { background: var(--cal-weekend-bg); border-color: transparent; }
+body.v4 .cal-day-block.weekend .cal-dow { color: var(--cal-weekend-text); }
+body.v4 .cal-day-block.weekend .cal-date { color: var(--text-main); }
+body.v4 .cal-day-block.weekend .cal-lunar-date { color: var(--text-muted); }
+body.v4 .cal-day-block.active,
+body.v4 .cal-day-block.active.weekend {
+  background: var(--cal-active-bg); border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 14px -4px color-mix(in srgb, var(--cal-active-bg) 60%, transparent);
+}
+
+/* ---------- TRANG CHỦ ---------- */
+body.v4 h1 { font-weight: 700; letter-spacing: -0.025em; }
+body.v4 .v3-home h1 { font-size: 34px; }
+body.v4 .v3-eyebrow { letter-spacing: 0.02em; }
+body.v4 .v3-task {
+  border-radius: var(--v3-radius-lg);
+  transition: transform 260ms var(--v3-ease), box-shadow 260ms var(--v3-ease), background-color 200ms ease;
+}
+body.v4 .v3-task:hover {
+  border-color: var(--glass-border);
+  background: var(--glass-bg-thick);
+  transform: translateY(-2px);
+  box-shadow: var(--glass-highlight), var(--glass-shadow-lg);
+}
+body.v4 .v3-task:active { transform: scale(0.98); }
+body.v4 .v3-task-icon {
+  border-radius: 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 12%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+body.v4 .v3-task-meta { grid-column: 2; }
+body.v4 .v3-chip { border-radius: var(--v4-capsule); }
+body.v4 .v3-chip:hover { border-color: var(--glass-border); background: var(--glass-bg-thick); }
+
+/* ---------- MÀN HÌNH CÔNG CỤ ---------- */
+body.v4 .v3-tool-head { padding-top: 26px; }
+body.v4 .v3-back {
+  margin-left: 0; padding: 6px 14px 6px 8px; border-radius: var(--v4-capsule);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+  -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
+  color: var(--accent);
+}
+body.v4 .v3-back:hover { background: var(--glass-bg-thick); color: var(--accent); }
+body.v4 .v3-panels.main-content { padding-top: 4px; padding-bottom: 48px; }
+
+/* ---------- THẺ ---------- */
+body.v4 .card { border-radius: var(--v3-radius-lg); padding: 22px 24px; }
+body.v4 .card:hover { border-color: var(--glass-border); }
+body.v4 .inv-pane + .inv-pane,
+body.v4 .tx-wide { border-color: var(--border); }
+
+/* ---------- NÚT ---------- */
+body.v4 button {
+  border-radius: var(--v4-capsule);
+  padding: 10px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: transform 220ms var(--v3-ease), filter 150ms ease, box-shadow 200ms ease, background-color 150ms ease;
+}
+body.v4 button:hover { filter: brightness(1.05); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 18px -4px color-mix(in srgb, var(--accent) 60%, transparent); }
+body.v4 button:active { transform: scale(0.96); }
+body.v4 button:focus-visible { box-shadow: var(--v3-focus); }
+/* Nút phụ: kính trong */
+body.v4 .btn-outline,
+body.v4 .air-drop-change-btn,
+body.v4 .gdt-xml-btn,
+body.v4 .v3-trade #tradeRayBtn:not(.is-on) {
+  background: var(--glass-fill); color: var(--text-main); border: 0; box-shadow: none;
+}
+body.v4 .btn-outline:hover,
+body.v4 .air-drop-change-btn:hover,
+body.v4 .gdt-xml-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--glass-fill)); color: var(--text-main); filter: none; }
+body.v4 .gdt-modal-close {
+  width: 30px; height: 30px; padding: 0; display: inline-grid; place-items: center;
+  border-radius: 50%; background: var(--glass-fill); font-size: 14px; box-shadow: none;
+}
+
+/* ---------- NHÓM NÚT CHỌN (segmented control) ---------- */
+body.v4 .inv-seg { border-radius: var(--v4-capsule); background: var(--glass-fill); border: 0; padding: 3px; }
+body.v4 .inv-seg-btn { border-radius: var(--v4-capsule); }
+body.v4 .inv-seg-btn.active,
+body.v4 .acc-seg-btn.active {
+  background: var(--glass-bg-thick); color: var(--text-main);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 3px 8px rgba(0, 0, 0, 0.12), 0 0 0 0.5px var(--glass-edge);
+}
+body.v4 .mst-choice-btn {
+  border-radius: var(--v3-radius); border: 1px solid transparent; background: var(--glass-fill); box-shadow: none;
+}
+body.v4 .mst-choice-btn:not(.active):hover { background: color-mix(in srgb, var(--accent) 12%, var(--glass-fill)); border-color: transparent; color: var(--text-main); }
+body.v4 .mst-choice-btn.active { background: var(--accent-gradient); color: var(--btn-text); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+body.v4 .course-tab { border-radius: var(--v4-capsule); }
+
+/* ---------- Ô NHẬP ---------- */
+body.v4 input[type=text], body.v4 input[type=password], body.v4 input[type=number],
+body.v4 input[type=url], body.v4 input[type=email], body.v4 input[type=date],
+body.v4 textarea, body.v4 select, body.v4 .multi-select-label, body.v4 .table-filter-input {
+  background: var(--glass-fill); border: 1px solid transparent; border-radius: var(--v3-radius);
+}
+body.v4 input:focus, body.v4 textarea:focus, body.v4 select:focus {
+  background: var(--glass-bg-thick); border-color: var(--accent); box-shadow: var(--v3-focus);
+}
+body.v4 select option { background: var(--card-bg-solid); }
+body.v4 .flatpickr-calendar input.cur-year { background: transparent; border: 0; box-shadow: none; }
+body.v4 .file-pick,
+body.v4 .air-drop-zone { border-radius: var(--v3-radius-lg); }
+body.v4 .air-drop-zone { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 40%, var(--glass-border)); }
+body.v4 .checkbox-group { border-radius: var(--v3-radius); border-color: var(--border); }
+body.v4 .checkbox-item { background: var(--glass-bg); border-color: var(--glass-border); border-radius: var(--v4-capsule); padding: 6px 12px; }
+
+/* ---------- CÔNG TẮC kiểu iOS ---------- */
+body.v4 .slider { background: var(--glass-fill); }
+body.v4 .slider:before { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.06); }
+body.v4 input:checked + .slider { background: var(--ios-green); }
+
+/* ---------- NHÃN / CHIP ---------- */
+body.v4 .badge, body.v4 .stat-pill, body.v4 .emp-audit-badge { border-radius: var(--v4-capsule); }
+
+/* ---------- CẢNH BÁO (màu cam theo theme, thay cho mã màu gán cứng ở app.css) ---------- */
+body.v4 .emp-audit-badge.is-warn { background: var(--warn-solid); color: #FFFFFF; }
+body.v4 .acc-seg-btn.active .emp-audit-badge.is-warn { background: var(--warn-bg); color: var(--warn-text); }
+/* Thanh tải XML hàng loạt + banner lỗi: giữ sắc màu báo hiệu, chỉ đổi sang nền trong suốt */
+body.v4 .gdt-bulk-bar {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent); border-radius: var(--v3-radius);
+}
+body.v4 .emp-audit-banner { border-radius: var(--v3-radius); }
+body.v4 .emp-audit-banner.is-err { border-color: color-mix(in srgb, var(--ios-red) 30%, transparent); }
+body.v4 .emp-audit-banner.is-warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
+body.v4 #auditTable tbody tr.audit-row-warn { background: color-mix(in srgb, var(--warn-solid) 8%, transparent); }
+body.v4 .v3-badge.is-warn { background: var(--warn-bg); color: var(--warn-text); }
+body.v4 .trade-sync-state.is-warn { color: var(--warn-text); }
+
+/* ---------- BẢNG ---------- */
+body.v4 .table-responsive { border-bottom: 1px solid var(--glass-border); overflow: auto; }
+body.v4 th, body.v4 .sepay-table th { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+body.v4 th, body.v4 td, body.v4 .sepay-table th, body.v4 .sepay-table td { border-color: var(--border); }
+
+/* ---------- MODAL ---------- */
+body.v4 .gdt-modal-overlay {
+  background: var(--glass-scrim);
+  -webkit-backdrop-filter: blur(8px) saturate(120%); backdrop-filter: blur(8px) saturate(120%);
+}
+body.v4 .gdt-modal-box { border-radius: 28px; animation: v4SheetIn 420ms var(--v3-ease); }
+body.v4 .gdt-modal-header { border-color: var(--border); }
+body.v4 .trade-dlg { border-radius: 26px; }
+body.v4 .trade-dlg::backdrop { background: var(--glass-scrim); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+@keyframes v4SheetIn { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* ---------- POPOVER ---------- */
+body.v4 .multi-select-dropdown { border-radius: 18px; }
+body.v4 .ms-checkbox-item { border-radius: 10px; }
+body.v4 .flatpickr-calendar { border-radius: 20px; }
+body.v4 .flatpickr-calendar.arrowTop:before, body.v4 .flatpickr-calendar.arrowTop:after,
+body.v4 .flatpickr-calendar.arrowBottom:before, body.v4 .flatpickr-calendar.arrowBottom:after { display: none; }
+body.v4 .flatpickr-months .flatpickr-month,
+body.v4 .flatpickr-weekdays, body.v4 span.flatpickr-weekday,
+body.v4 .flatpickr-monthDropdown-months { background: transparent; }
+body.v4 .flatpickr-day.selected, body.v4 .flatpickr-day.startRange, body.v4 .flatpickr-day.endRange {
+  background: var(--accent); border-color: var(--accent);
+}
+
+/* ---------- TRADE ---------- */
+body.v4 .trade-item { background: var(--glass-bg-thin); border-color: var(--border); border-radius: 14px; }
+body.v4 .trade-item.is-sel { border-color: var(--accent); }
+body.v4 .trade-hint { border-radius: var(--v4-capsule); }
+
+/* ---------- PHƯƠNG ÁN DỰ PHÒNG ---------- */
+/* Trình duyệt không hỗ trợ blur, hoặc người dùng bật "Giảm độ trong suốt": dùng nền đặc */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body.theme-glass-light { --glass-bg: rgba(255, 255, 255, 0.94); --glass-bg-thick: #FFFFFF; }
+  body.theme-glass-dark { --glass-bg: rgba(30, 31, 40, 0.96); --glass-bg-thick: #22232D; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  body.theme-glass-light { --glass-bg: #FFFFFF; --glass-bg-thick: #FFFFFF; --glass-bg-thin: #F3F4F8; --glass-filter: none; }
+  body.theme-glass-dark { --glass-bg: #1E1F28; --glass-bg-thick: #22232D; --glass-bg-thin: #262733; --glass-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.v4 .v3-task, body.v4 button { transition: none; }
+  body.v4 .v3-task:hover { transform: none; }
+  body.v4 .gdt-modal-box { animation: none; }
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 768px) {
+  body.v4 .v3-top { top: 8px; margin: 8px 8px 0; border-radius: 20px; }
+  body.v4 .v3-home h1 { font-size: 28px; }
+  body.v4 .card { padding: 16px; border-radius: 20px; }
+}
