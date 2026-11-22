@@ -1931,7 +1931,7 @@ body.v3 .v3-trade .trade-toolbar { display: flex; flex-wrap: wrap; align-items: 
 body.v3 .v3-trade .trade-toolbar input#tradeSym { width: 140px; text-transform: uppercase; }
 body.v3 .v3-trade .trade-toolbar select { width: auto; }
 body.v3 .v3-trade .trade-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
-body.v3 .v3-trade #tradeRayBtn:not(.is-on) { background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none; }
+body.v3 .v3-trade #tradeRayBtn:not(.is-on), body.v3 .v3-trade #tradeTpBtn:not(.is-on) { background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none; }
 body.v3 .v3-trade .trade-status { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
 body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
 .trade-charts {

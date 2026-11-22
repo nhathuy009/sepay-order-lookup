@@ -306,7 +306,8 @@ body.v4 button:focus-visible { box-shadow: var(--v3-focus); }
 body.v4 .btn-outline,
 body.v4 .air-drop-change-btn,
 body.v4 .gdt-xml-btn,
-body.v4 .v3-trade #tradeRayBtn:not(.is-on) {
+body.v4 .v3-trade #tradeRayBtn:not(.is-on),
+body.v4 .v3-trade #tradeTpBtn:not(.is-on) {
   background: var(--glass-fill); color: var(--text-main); border: 0; box-shadow: none;
 }
 body.v4 .btn-outline:hover,
