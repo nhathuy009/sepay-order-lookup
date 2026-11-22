@@ -232,13 +232,6 @@
   /* Ẩn ô nhập mật khẩu khi đã có mật khẩu lưu sẵn */
   body.has-token #accessToken { display: none; }
 
-  /* Ẩn hẳn widget lịch tuần trên iPhone (mọi kích thước), kể cả khi đã có has-token
-     (không áp dụng cho Android/Samsung - chỉ nhắm riêng thiết bị iPhone). */
-  html.is-iphone .weekly-calendar-widget,
-  html.is-iphone body.has-token .weekly-calendar-widget {
-    display: none !important;
-  }
-
   /* BODY LAYOUT */
   .app-body { display: flex; flex-grow: 1; overflow: hidden; }
 

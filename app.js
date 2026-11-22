@@ -154,6 +154,13 @@ function renderWeeklyCalendar() {
         if (isToday) {
             if (monthText) monthText.innerText = `Tháng ${monthNum} - ${yearNum}`;
             if (lunarText) lunarText.innerText = `Âm Lịch tháng ${lunar.lunarMonth}`;
+            // Viên gọn trên màn hình cảm ứng / nhỏ
+            const cDow = document.getElementById("calCompactDow");
+            if (cDow) {
+                cDow.textContent = daysOfWeek[i];
+                document.getElementById("calCompactDate").textContent = dateNum;
+                document.getElementById("calCompactLunar").textContent = `ÂL ${lunar.lunarDay}/${lunar.lunarMonth}`;
+            }
         }
 
         let classes = "cal-day-block";
@@ -195,7 +202,12 @@ async function loadP2PPrices() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "p2p_usdt_vnd", access_token: getToken() })
     });
-    if (resp.status === 401) { widget.hidden = true; return; }   // chưa nhập mật khẩu hệ thống
+    const compact = document.getElementById("calCompactP2P");
+    if (resp.status === 401) {   // chưa nhập mật khẩu hệ thống
+      widget.hidden = true;
+      if (compact) compact.hidden = true;
+      return;
+    }
     const data = await resp.json();
     if (!resp.ok || !data.ads || !data.ads.length) throw new Error(data.error || "Không có dữ liệu");
 
@@ -216,11 +228,28 @@ async function loadP2PPrices() {
     widget.classList.remove("is-stale");
     widget.removeAttribute("title");
     widget.hidden = false;
+    if (compact) { compact.textContent = "₮ " + p2pVnd(data.ads[0].price); compact.hidden = false; }
   } catch (e) {
     // Giữ giá cũ (nếu có), làm mờ để báo đang không cập nhật được
     widget.classList.add("is-stale");
     widget.title = "Không cập nhật được giá: " + (e.message || e);
   }
+}
+
+// Màn hình cảm ứng / nhỏ: bấm viên gọn để mở / đóng bảng lịch + giá; bấm ra ngoài hoặc Esc để đóng
+function initCalCompact() {
+  const btn = document.getElementById("calCompactBtn");
+  const panel = document.getElementById("weeklyCalendar");
+  if (!btn || !panel) return;
+  const setOpen = open => {
+    document.body.classList.toggle("cal-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  btn.addEventListener("click", () => setOpen(!document.body.classList.contains("cal-open")));
+  document.addEventListener("pointerdown", e => {
+    if (document.body.classList.contains("cal-open") && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") setOpen(false); });
 }
 
 const FIELDS = [
@@ -380,6 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
+  initCalCompact();
   // Bảng giá mua USDT cạnh lịch: nạp ngay, làm mới mỗi 60 giây (bỏ qua khi tab đang ẩn), nạp lại khi quay lại tab
   loadP2PPrices();
   setInterval(loadP2PPrices, P2P_REFRESH_MS);
