@@ -3,15 +3,14 @@
 // =======================================================
 const PI = Math.PI;
 
+// Số ngày Julian (số nguyên) của ngày dương lịch dd/mm/yyyy
 function jdFromDate(dd, mm, yyyy) {
-    let a, b, c, e, f;
-    if (mm < 3) { yyyy--; mm += 12; }
-    a = Math.floor(yyyy / 100);
-    b = Math.floor(a / 4);
-    c = 2 - a + b;
-    e = Math.floor(365.25 * (yyyy + 4716));
-    f = Math.floor(30.6001 * (mm + 1));
-    return dd + c + e + f - 1524.5;
+    const a = Math.floor((14 - mm) / 12);
+    const y = yyyy + 4800 - a;
+    const m = mm + 12 * a - 3;
+    let jd = dd + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+    if (jd < 2299161) jd = dd + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - 32083;   // lịch Julius (trước 1582)
+    return jd;
 }
 
 function jdToDate(jd) {
@@ -34,82 +33,95 @@ function jdToDate(jd) {
     return [day, month, year];
 }
 
-function getSunLongitude(jdn, timeZone) {
-    let T = (jdn - 2451545.0 - timeZone / 24.0) / 36525.0;
-    let T2 = T * T;
-    let dr = PI / 180.0;
-    let L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T2;
-    let M = 357.52911 + 35999.05029 * T - 0.0001537 * T2;
-    let e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T2;
-    let C = (1.914602 - 0.004817 * T - 0.000014 * T2) * Math.sin(M * dr) +
-            (0.019993 - 0.000101 * T) * Math.sin(2 * M * dr) +
-            0.000289 * Math.sin(3 * M * dr);
-    let theta = L0 + C;
-    return theta - 360.0 * Math.floor(theta / 360.0);
-}
-
+// Ngày bắt đầu (số ngày Julian) của tháng âm thứ k kể từ điểm sóc 1/1/1900
 function getNewMoonDay(k, timeZone) {
-    let T = k / 1236.85;
-    let T2 = T * T;
-    let T3 = T2 * T;
-    let dr = PI / 180.0;
+    const T = k / 1236.85, T2 = T * T, T3 = T2 * T, dr = PI / 180;
     let Jd1 = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
-    let Jd2 = Jd1 + 0.1734 - 0.000393 * T * Math.sin(145.1 * dr) + 0.0021 * Math.sin(199.5 * dr);
-    let M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
-    let Mprime = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
-    let F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
-    let deltaJd = (0.1734 - 0.000393 * T) * Math.sin(M * dr) +
-                  0.0021 * Math.sin(2 * M * dr) - 0.4068 * Math.sin(Mprime * dr) +
-                  0.0161 * Math.sin(2 * Mprime * dr) - 0.0004 * Math.sin(3 * Mprime * dr) +
-                  0.0104 * Math.sin(2 * F * dr) - 0.0051 * Math.sin(M * dr + Mprime * dr) -
-                  0.0074 * Math.sin(M * dr - Mprime * dr) + 0.0004 * Math.sin(2 * F * dr + M * dr) -
-                  0.0004 * Math.sin(2 * F * dr - M * dr) - 0.0006 * Math.sin(2 * F * dr + Mprime * dr) +
-                  0.0010 * Math.sin(2 * F * dr - Mprime * dr) + 0.0005 * Math.sin(M * dr + 2 * Mprime * dr);
-    return Math.floor(Jd1 + deltaJd + 0.5 + timeZone / 24.0);
+    Jd1 += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * dr);
+    const M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;     // độ dị thường trung bình của Mặt Trời
+    const Mpr = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;  // của Mặt Trăng
+    const F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;     // đối số vĩ độ Mặt Trăng
+    let C1 = (0.1734 - 0.000393 * T) * Math.sin(M * dr) + 0.0021 * Math.sin(2 * dr * M);
+    C1 = C1 - 0.4068 * Math.sin(Mpr * dr) + 0.0161 * Math.sin(dr * 2 * Mpr);
+    C1 = C1 - 0.0004 * Math.sin(dr * 3 * Mpr);
+    C1 = C1 + 0.0104 * Math.sin(dr * 2 * F) - 0.0051 * Math.sin(dr * (M + Mpr));
+    C1 = C1 - 0.0074 * Math.sin(dr * (M - Mpr)) + 0.0004 * Math.sin(dr * (2 * F + M));
+    C1 = C1 - 0.0004 * Math.sin(dr * (2 * F - M)) - 0.0006 * Math.sin(dr * (2 * F + Mpr));
+    C1 = C1 + 0.0010 * Math.sin(dr * (2 * F - Mpr)) + 0.0005 * Math.sin(dr * (2 * Mpr + M));
+    const deltat = T < -11
+        ? 0.001 + 0.000839 * T + 0.0002261 * T2 - 0.00000845 * T3 - 0.000000081 * T * T3
+        : -0.000278 + 0.000265 * T + 0.000262 * T2;
+    return Math.floor(Jd1 + C1 - deltat + 0.5 + timeZone / 24);
 }
 
+// Cung hoàng đạo (0..11, mỗi cung 30°) của Mặt Trời lúc 0h ngày jdn
+function getSunLongitude(jdn, timeZone) {
+    const T = (jdn - 2451545.5 - timeZone / 24) / 36525, T2 = T * T, dr = PI / 180;
+    const M = 357.52910 + 35999.05030 * T - 0.0001559 * T2 - 0.00000048 * T * T2;
+    const L0 = 280.46645 + 36000.76983 * T + 0.0003032 * T2;
+    let DL = (1.914600 - 0.004817 * T - 0.000014 * T2) * Math.sin(dr * M);
+    DL = DL + (0.019993 - 0.000101 * T) * Math.sin(dr * 2 * M) + 0.000290 * Math.sin(dr * 3 * M);
+    let L = (L0 + DL) * dr;
+    L = L - PI * 2 * Math.floor(L / (PI * 2));
+    return Math.floor(L / PI * 6);
+}
+
+// Ngày bắt đầu tháng 11 âm lịch (tháng chứa Đông chí) của năm yy
 function getLunarMonth11(yy, timeZone) {
-    let off = yy - 1900;
-    let k = Math.floor(off * 12.3685);
+    const off = jdFromDate(31, 12, yy) - 2415021;
+    const k = Math.floor(off / 29.530588853);
     let nm = getNewMoonDay(k, timeZone);
-    let sunLong = getSunLongitude(nm, timeZone);
-    if (sunLong >= 9) nm = getNewMoonDay(k - 1, timeZone);
+    if (getSunLongitude(nm, timeZone) >= 9) nm = getNewMoonDay(k - 1, timeZone);
     return nm;
 }
 
+// Vị trí tháng nhuận (tính từ tháng 11 âm năm trước) trong năm có 13 tháng: tháng đầu tiên không chứa trung khí
 function getLeapMonthOffset(a11, timeZone) {
-    let k, arc, i, leapMonth = 0, isLeap = false;
-    let last = a11;
-    arc = getSunLongitude(last, timeZone);
-    for (i = 1; i <= 14; i++) {
-        let next = getNewMoonDay(1, timeZone); 
-    }
-    return leapMonth;
+    const k = Math.floor((a11 - 2415021.076998695) / 29.530588853 + 0.5);
+    let last, i = 1;
+    let arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+    do {
+        last = arc;
+        i++;
+        arc = getSunLongitude(getNewMoonDay(k + i, timeZone), timeZone);
+    } while (arc !== last && i < 14);
+    return i - 1;
 }
 
 function convertSolar2Lunar(dd, mm, yyyy, timeZone) {
-    let jdn = jdFromDate(dd, mm, yyyy);
-    let k = Math.floor((jdn - 2415021.076998695) / 29.530588853);
+    const dayNumber = jdFromDate(dd, mm, yyyy);
+    const k = Math.floor((dayNumber - 2415021.076998695) / 29.530588853);
     let monthStart = getNewMoonDay(k + 1, timeZone);
-    if (monthStart > jdn) monthStart = getNewMoonDay(k, timeZone);
+    if (monthStart > dayNumber) monthStart = getNewMoonDay(k, timeZone);
     let a11 = getLunarMonth11(yyyy, timeZone);
     let b11 = a11;
+    let lunarYear;
     if (a11 >= monthStart) {
+        lunarYear = yyyy;
         a11 = getLunarMonth11(yyyy - 1, timeZone);
     } else {
+        lunarYear = yyyy + 1;
         b11 = getLunarMonth11(yyyy + 1, timeZone);
     }
-    let lunarDay = Math.floor(jdn + 0.5) - monthStart + 1;
-    let diff = Math.floor((monthStart - a11) / 29);
+    const lunarDay = dayNumber - monthStart + 1;
+    const diff = Math.floor((monthStart - a11) / 29);
+    let lunarLeap = false;
     let lunarMonth = diff + 11;
-    let lunarYear = yyyy;
-    if (lunarMonth > 12) { lunarMonth -= 12; }
-    if (lunarMonth < 11) { lunarYear++; }
-    
-    return { 
-        lunarDay: lunarDay, 
-        lunarMonth: lunarMonth, 
-        lunarYear: lunarYear 
+    if (b11 - a11 > 365) {   // năm âm có tháng nhuận
+        const leapMonthDiff = getLeapMonthOffset(a11, timeZone);
+        if (diff >= leapMonthDiff) {
+            lunarMonth = diff + 10;
+            if (diff === leapMonthDiff) lunarLeap = true;
+        }
+    }
+    if (lunarMonth > 12) lunarMonth -= 12;
+    if (lunarMonth >= 11 && diff < 4) lunarYear -= 1;
+
+    return {
+        lunarDay: lunarDay,
+        lunarMonth: lunarMonth,
+        lunarYear: lunarYear,
+        lunarLeap: lunarLeap
     };
 }
 
@@ -153,7 +165,14 @@ function renderWeeklyCalendar() {
         
         if (isToday) {
             if (monthText) monthText.innerText = `Tháng ${monthNum} - ${yearNum}`;
-            if (lunarText) lunarText.innerText = `Âm Lịch tháng ${lunar.lunarMonth}`;
+            if (lunarText) lunarText.innerText = `Âm Lịch tháng ${lunar.lunarMonth}${lunar.lunarLeap ? " nhuận" : ""}`;
+            // Viên gọn trên màn hình cảm ứng / nhỏ
+            const cDow = document.getElementById("calCompactDow");
+            if (cDow) {
+                cDow.textContent = daysOfWeek[i];
+                document.getElementById("calCompactDate").textContent = dateNum;
+                document.getElementById("calCompactLunar").textContent = `ÂL ${lunar.lunarDay}/${lunar.lunarMonth}${lunar.lunarLeap ? "N" : ""}`;
+            }
         }
 
         let classes = "cal-day-block";
@@ -195,7 +214,12 @@ async function loadP2PPrices() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "p2p_usdt_vnd", access_token: getToken() })
     });
-    if (resp.status === 401) { widget.hidden = true; return; }   // chưa nhập mật khẩu hệ thống
+    const compact = document.getElementById("calCompactP2P");
+    if (resp.status === 401) {   // chưa nhập mật khẩu hệ thống
+      widget.hidden = true;
+      if (compact) compact.hidden = true;
+      return;
+    }
     const data = await resp.json();
     if (!resp.ok || !data.ads || !data.ads.length) throw new Error(data.error || "Không có dữ liệu");
 
@@ -216,11 +240,28 @@ async function loadP2PPrices() {
     widget.classList.remove("is-stale");
     widget.removeAttribute("title");
     widget.hidden = false;
+    if (compact) { compact.textContent = "₮ " + p2pVnd(data.ads[0].price); compact.hidden = false; }
   } catch (e) {
     // Giữ giá cũ (nếu có), làm mờ để báo đang không cập nhật được
     widget.classList.add("is-stale");
     widget.title = "Không cập nhật được giá: " + (e.message || e);
   }
+}
+
+// Màn hình cảm ứng / nhỏ: bấm viên gọn để mở / đóng bảng lịch + giá; bấm ra ngoài hoặc Esc để đóng
+function initCalCompact() {
+  const btn = document.getElementById("calCompactBtn");
+  const panel = document.getElementById("weeklyCalendar");
+  if (!btn || !panel) return;
+  const setOpen = open => {
+    document.body.classList.toggle("cal-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  btn.addEventListener("click", () => setOpen(!document.body.classList.contains("cal-open")));
+  document.addEventListener("pointerdown", e => {
+    if (document.body.classList.contains("cal-open") && !panel.contains(e.target) && !btn.contains(e.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") setOpen(false); });
 }
 
 const FIELDS = [
@@ -380,6 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
+  initCalCompact();
   // Bảng giá mua USDT cạnh lịch: nạp ngay, làm mới mỗi 60 giây (bỏ qua khi tab đang ẩn), nạp lại khi quay lại tab
   loadP2PPrices();
   setInterval(loadP2PPrices, P2P_REFRESH_MS);

@@ -7,9 +7,6 @@
 <link id="flatpickr-theme" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/light.css">
 <link rel="stylesheet" href="/app.css" />
 <link rel="stylesheet" href="/v4.css" />
-<script>
-  if (/iPhone/i.test(navigator.userAgent)) document.documentElement.classList.add("is-iphone");
-</script>
 </head>
 <body class="v3 v4 theme-glass-light" data-view="home">
 
@@ -28,6 +25,13 @@
       </a>
       <span class="v3-top-crumb" id="v3TopCrumb" aria-hidden="true"></span>
     </div>
+
+    <!-- Màn hình cảm ứng / nhỏ: lịch + giá USDT gộp thành 1 viên, bấm để mở bảng đầy đủ (#weeklyCalendar) -->
+    <button type="button" class="cal-compact" id="calCompactBtn" aria-expanded="false" aria-controls="weeklyCalendar" aria-label="Xem lịch tuần và giá mua USDT">
+      <span class="cal-compact-day"><span id="calCompactDow"></span><b id="calCompactDate"></b></span>
+      <span class="cal-compact-lunar" id="calCompactLunar"></span>
+      <span class="cal-compact-p2p" id="calCompactP2P" hidden></span>
+    </button>
 
     <div class="weekly-calendar-widget" id="weeklyCalendar">
       <div class="cal-info">

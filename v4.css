@@ -571,3 +571,74 @@ body.v4 .v3-brand-name, body.v4 .cal-month, body.v4 .cal-lunar { white-space: no
 @media (max-width: 1440px) {
   body.v4:not(.has-token) .weekly-calendar-widget .cal-info { display: none; }
 }
+
+/* ---------- LỊCH + GIÁ USDT GỌN TRÊN MÀN HÌNH CẢM ỨNG / NHỎ ----------
+   Thiết bị cảm ứng là cách nhập chính (iPhone, điện thoại Android, máy tính bảng kể cả khi xoay ngang)
+   hoặc màn hình <= 1024px: lịch tuần + giá P2P gộp thành 1 viên (.cal-compact) trên header,
+   bấm vào thì #weeklyCalendar mở thành bảng kính đầy đủ bên dưới header. Laptop / PC dùng chuột: giữ nguyên. */
+body.v4 .cal-compact { display: none; }
+@media (pointer: coarse), (max-width: 1024px) {
+  body.v4 .v3-top .v3-top-right { margin-left: 0; }
+  body.v4 .cal-compact {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto;
+    min-height: 40px; padding: 3px 12px 3px 3px; border-radius: var(--v4-capsule);
+    background: var(--glass-fill); color: var(--text-main); box-shadow: none;
+    font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  }
+  body.v4 .cal-compact:hover { filter: none; box-shadow: none; }
+  body.v4.cal-open .cal-compact { background: var(--v3-accent-soft); }
+  body.v4 .cal-compact-day {
+    display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 11px; line-height: 1;
+    background: var(--cal-active-bg); color: var(--cal-active-text);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  body.v4 .cal-compact-day span { font-size: 8.5px; font-weight: 700; opacity: 0.9; }
+  body.v4 .cal-compact-day b { font-size: 14px; font-weight: 800; margin-top: 1px; }
+  body.v4 .cal-compact-lunar { color: var(--text-muted); }
+  body.v4 .cal-compact-p2p {
+    padding-left: 7px; border-left: 1px solid var(--border);
+    color: var(--badge-ok-text); font-variant-numeric: tabular-nums;
+  }
+  body.v4 .cal-compact-p2p[hidden] { display: none; }
+
+  /* Bảng đầy đủ khi mở */
+  body.v4 #weeklyCalendar { display: none; }
+  body.v4.cal-open #weeklyCalendar {
+    display: flex; flex-direction: column; align-items: stretch; gap: 12px;
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 5;
+    width: min(380px, calc(100vw - 16px)); height: auto; margin: 0; padding: 14px;
+    /* Nằm trong thanh trên (đã là kính) nên không blur được nền trang -> dùng nền gần đặc để chữ phía sau không lộ */
+    border-radius: 22px; background: color-mix(in srgb, var(--card-bg-solid) 97%, transparent);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-highlight), var(--glass-shadow-lg);
+    animation: v4SheetIn 360ms var(--v3-ease);
+  }
+  body.v4 #weeklyCalendar .cal-info {
+    display: flex; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px;
+  }
+  body.v4 #weeklyCalendar .cal-month { font-size: 13px; }
+  body.v4 #weeklyCalendar .cal-lunar { font-size: 11.5px; margin: 0; }
+  body.v4 #weeklyCalendar .cal-days-wrap { justify-content: space-between; }
+  body.v4 #weeklyCalendar .cal-day-block { flex: 1 1 0; width: auto; height: 50px; }
+  body.v4 #weeklyCalendar .p2p-widget {
+    flex-direction: column; align-items: stretch; gap: 8px;
+    margin: 0; padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--border);
+  }
+  body.v4 #weeklyCalendar .p2p-widget[hidden] { display: none; }
+  body.v4 #weeklyCalendar .p2p-list .cal-day-block { min-width: 0; height: 54px; }
+  body.v4 #weeklyCalendar .p2p-block .cal-date { font-size: 15px; }
+}
+@media (max-width: 480px) {
+  /* Điện thoại: chừa chỗ cho viên gọn trên cùng hàng với logo + chọn theme */
+  body.v4 .v3-top { gap: 8px; }
+  body.v4 .v3-brand-name { display: none; }
+  body.v4 #themeSelect { max-width: 140px; }
+  /* Đã có mật khẩu: nút "Đổi mật khẩu" chỉ rộng theo chữ để nằm cùng hàng với ô chọn theme */
+  body.v4.has-token .v3-top #authCard { width: auto; }
+  body.v4 .cal-compact { min-height: 36px; }
+  body.v4 .cal-compact-day { width: 30px; height: 30px; border-radius: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.v4.cal-open #weeklyCalendar { animation: none; }
+}
