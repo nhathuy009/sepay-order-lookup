@@ -7974,18 +7974,27 @@ async function copyVax1Result() {
   function lastPrice() { var l = S.candles[S.candles.length - 1]; return l ? l.close : NaN; }
   function sorted() { return S.rays.slice().sort(function (a, b) { return b.price - a.price; }); }
 
-  /* ---------- Đường chốt lời (TP): kéo lên/xuống để ước tính lãi nếu chốt toàn bộ điểm mua ở giá đó ----------
-     Lưu riêng theo từng cặp coin trên máy. Lãi/lỗ chưa trừ phí giao dịch. */
+  /* ---------- Đường chốt lời (TP): kéo lên/xuống để ước tính lãi nếu chốt ở giá đó ----------
+     Mặc định tính trên toàn bộ điểm mua; chọn trước 1 Horizontal Ray rồi bấm "Chốt lời" thì chỉ tính điểm mua đó
+     (S.tpRay = id ray). Lưu riêng theo từng cặp coin trên máy. Lãi/lỗ chưa trừ phí giao dịch. */
   var TP_COL = "#8b5cf6";
   function tpKey() { return "trade_tp_" + S.symbol; }
+  // Ray đang được tính riêng (null = tính tổng; ray đã bị xoá thì cũng quay về tính tổng)
+  function tpRay() { return S.tpRay ? S.rays.find(function (r) { return r.id === S.tpRay; }) || null : null; }
   function loadTp() {
-    var v = parseFloat(store(tpKey()));
+    var o = null;
+    try { o = JSON.parse(store(tpKey())); } catch (e) {}
+    if (typeof o === "number") o = { p: o };   // định dạng cũ: chỉ lưu giá
+    var v = o ? parseFloat(o.p) : NaN;
     S.tp = isFinite(v) && v > 0 ? v : null;
+    S.tpRay = S.tp && o.ray ? o.ray : null;
     syncTp();
   }
-  function setTp(v) {
+  function setTp(v, rayId) {   // rayId: undefined = giữ cách tính hiện tại
     S.tp = v || null;
-    store(tpKey(), S.tp ? String(S.tp) : "");
+    if (rayId !== undefined) S.tpRay = rayId;
+    if (!S.tp) S.tpRay = null;
+    store(tpKey(), S.tp ? JSON.stringify({ p: S.tp, ray: S.tpRay || null }) : "");
     syncTp();
     renderPanel();
   }
@@ -7999,16 +8008,22 @@ async function copyVax1Result() {
     else if (S.tp) S.tpLine.applyOptions({ price: S.tp });
     else if (S.tpLine) { S.series.removePriceLine(S.tpLine); S.tpLine = null; }
   }
+  // Bấm nút / phím T: đang chọn 1 ray -> TP tính riêng ray đó, không chọn -> tính tổng.
+  // TP đang bật đúng cách tính đó -> tắt; đang bật cách tính khác -> chỉ đổi cách tính, giữ giá TP.
   function toggleTp() {
     if (!S.symbol) return;
-    if (S.tp) { setTp(null); return; }
-    var px = lastPrice(), base = isFinite(S.avg) ? Math.max(S.avg, px) : px;
-    if (isFinite(base)) setTp(roundTick(base * 1.05));   // đặt sẵn cao hơn 5%, kéo để chỉnh
+    var pick = S.selected ? S.rays.find(function (r) { return r.id === S.selected; }) || null : null;
+    var want = pick ? pick.id : null, cur = tpRay();
+    if (S.tp && (cur ? cur.id : null) === want) { setTp(null); return; }
+    if (S.tp) { setTp(S.tp, want); return; }
+    var px = lastPrice(), ref = pick ? pick.price : S.avg;
+    var base = isFinite(ref) ? Math.max(ref, px) : px;
+    if (isFinite(base)) setTp(roundTick(base * 1.05), want);   // đặt sẵn cao hơn 5%, kéo để chỉnh
   }
-  function tpPnl() {   // { cost, pnl } nếu chốt toàn bộ điểm mua ở S.tp
-    var u = 0, q = 0;
-    S.rays.forEach(function (r) { u += r.usdt; q += qtyOf(r); });
-    return { cost: u, pnl: q * S.tp - u };
+  function tpPnl() {   // { cost, pnl, ray } nếu chốt ở S.tp: 1 điểm mua (ray) hoặc toàn bộ (ray = null)
+    var only = tpRay(), u = 0, q = 0;
+    (only ? [only] : S.rays).forEach(function (r) { u += r.usdt; q += qtyOf(r); });
+    return { cost: u, pnl: q * S.tp - u, ray: only };
   }
 
   var panelTimer = 0;
@@ -8061,11 +8076,12 @@ async function copyVax1Result() {
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
         (rows.length ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / aU * 100, 2) + "%)" : "–") + "</span>";
     if (S.tp) {
-      var tpP = aQ * S.tp - aU;
+      var tpr = tpPnl();
       $("tradeSummary").innerHTML += '<span class="trade-sep"></span>' +
-        '<span class="k" style="color:' + TP_COL + '">Chốt ở TP ' + fP(S.tp) + "</span>" +
-        '<span class="v ' + (tpP >= 0 ? "trade-pos" : "trade-neg") + '">' +
-          (rows.length ? sg(tpP) + fU(tpP) + " USDT (" + sg(tpP) + nf(tpP / aU * 100, 2) + "%)" : "–") + "</span>";
+        '<span class="k" style="color:' + TP_COL + '">Chốt ở TP ' + fP(S.tp) +
+          (tpr.ray ? " · riêng điểm " + fP(tpr.ray.price) : "") + "</span>" +
+        '<span class="v ' + (tpr.pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
+          (tpr.cost ? sg(tpr.pnl) + fU(tpr.pnl) + " USDT (" + sg(tpr.pnl) + nf(tpr.pnl / tpr.cost * 100, 2) + "%)" : "–") + "</span>";
     }
     S.avg = avg;
     updateActiveChipPrice();
@@ -8130,7 +8146,8 @@ async function copyVax1Result() {
         ctx.beginPath(); ctx.moveTo(0, ty + 0.5); ctx.lineTo(paneW, ty + 0.5); ctx.stroke(); ctx.setLineDash([]);
         var dist = (S.tp / px - 1) * 100, tp = tpPnl();
         // Sát mép phải như nhãn điểm mua (bên trái là dòng chú thích EMA / VOL)
-        S.tpLbl = label("TP " + fP(S.tp) + " (" + sg(dist) + nf(dist, 1) + "%)", paneW - 8, ty, TP_COL, "right", pnlExt(tp.pnl, tp.cost));
+        S.tpLbl = label("TP " + fP(S.tp) + " (" + sg(dist) + nf(dist, 1) + "%)" + (tp.ray ? " · điểm " + fP(tp.ray.price) : ""),
+          paneW - 8, ty, TP_COL, "right", pnlExt(tp.pnl, tp.cost));
       }
     }
     S.rays.forEach(function (r) {
