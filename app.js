@@ -7727,6 +7727,7 @@ async function copyVax1Result() {
       S.chart.timeScale().scrollToRealTime();
       $("tradePair").textContent = S.base + "/" + S.quote;
       loadRays();
+      loadTp();
       renderPanel();
       if (S.active) openWs();
       setStatus(S.quote === "USDT" ? "Giá trực tiếp từ Binance" : "Cặp này không định giá bằng USDT", S.quote !== "USDT");
@@ -7973,6 +7974,43 @@ async function copyVax1Result() {
   function lastPrice() { var l = S.candles[S.candles.length - 1]; return l ? l.close : NaN; }
   function sorted() { return S.rays.slice().sort(function (a, b) { return b.price - a.price; }); }
 
+  /* ---------- Đường chốt lời (TP): kéo lên/xuống để ước tính lãi nếu chốt toàn bộ điểm mua ở giá đó ----------
+     Lưu riêng theo từng cặp coin trên máy. Lãi/lỗ chưa trừ phí giao dịch. */
+  var TP_COL = "#8b5cf6";
+  function tpKey() { return "trade_tp_" + S.symbol; }
+  function loadTp() {
+    var v = parseFloat(store(tpKey()));
+    S.tp = isFinite(v) && v > 0 ? v : null;
+    syncTp();
+  }
+  function setTp(v) {
+    S.tp = v || null;
+    store(tpKey(), S.tp ? String(S.tp) : "");
+    syncTp();
+    renderPanel();
+  }
+  // Nút bật/tắt + nhãn giá "TP" trên trục giá (đường kẻ vẽ ở lớp phủ)
+  function syncTp() {
+    var b = $("tradeTpBtn");
+    b.classList.toggle("is-on", !!S.tp);
+    b.setAttribute("aria-pressed", S.tp ? "true" : "false");
+    if (!S.series) return;
+    if (S.tp && !S.tpLine) S.tpLine = S.series.createPriceLine({ price: S.tp, color: TP_COL, lineVisible: false, axisLabelVisible: true, title: "TP" });
+    else if (S.tp) S.tpLine.applyOptions({ price: S.tp });
+    else if (S.tpLine) { S.series.removePriceLine(S.tpLine); S.tpLine = null; }
+  }
+  function toggleTp() {
+    if (!S.symbol) return;
+    if (S.tp) { setTp(null); return; }
+    var px = lastPrice(), base = isFinite(S.avg) ? Math.max(S.avg, px) : px;
+    if (isFinite(base)) setTp(roundTick(base * 1.05));   // đặt sẵn cao hơn 5%, kéo để chỉnh
+  }
+  function tpPnl() {   // { cost, pnl } nếu chốt toàn bộ điểm mua ở S.tp
+    var u = 0, q = 0;
+    S.rays.forEach(function (r) { u += r.usdt; q += qtyOf(r); });
+    return { cost: u, pnl: q * S.tp - u };
+  }
+
   var panelTimer = 0;
   function schedulePanel() {
     if (!panelTimer) panelTimer = setTimeout(function () { panelTimer = 0; renderPanel(); }, 300);
@@ -8022,6 +8060,13 @@ async function copyVax1Result() {
       "<span class='k'>Giá trị hiện tại</span><span class='v'>" + fU(val) + " USDT</span>" +
       '<span class="k">Lãi / Lỗ</span><span class="v ' + (pnl >= 0 ? "trade-pos" : "trade-neg") + '">' +
         (rows.length ? sg(pnl) + fU(pnl) + " USDT (" + sg(pnl) + nf(pnl / aU * 100, 2) + "%)" : "–") + "</span>";
+    if (S.tp) {
+      var tpP = aQ * S.tp - aU;
+      $("tradeSummary").innerHTML += '<span class="trade-sep"></span>' +
+        '<span class="k" style="color:' + TP_COL + '">Chốt ở TP ' + fP(S.tp) + "</span>" +
+        '<span class="v ' + (tpP >= 0 ? "trade-pos" : "trade-neg") + '">' +
+          (rows.length ? sg(tpP) + fU(tpP) + " USDT (" + sg(tpP) + nf(tpP / aU * 100, 2) + "%)" : "–") + "</span>";
+    }
     S.avg = avg;
     updateActiveChipPrice();
   }
@@ -8074,6 +8119,18 @@ async function copyVax1Result() {
         var tU = 0, tQ = 0;
         S.rays.forEach(function (r) { tU += r.usdt; tQ += qtyOf(r); });
         label("Giá TB " + fP(S.avg), paneW - 8, ay, S.colors.avg, "right", pnlExt(tQ * px - tU, tU));
+      }
+    }
+    S.tpLbl = null;
+    if (S.tp) {
+      var ty = S.series.priceToCoordinate(S.tp);
+      if (ty !== null) {
+        var tpDrag = S.drag && S.drag.tp;
+        ctx.strokeStyle = TP_COL; ctx.lineWidth = tpDrag ? 2.5 : 2; ctx.setLineDash([8, 4]);
+        ctx.beginPath(); ctx.moveTo(0, ty + 0.5); ctx.lineTo(paneW, ty + 0.5); ctx.stroke(); ctx.setLineDash([]);
+        var dist = (S.tp / px - 1) * 100, tp = tpPnl();
+        // Sát mép phải như nhãn điểm mua (bên trái là dòng chú thích EMA / VOL)
+        S.tpLbl = label("TP " + fP(S.tp) + " (" + sg(dist) + nf(dist, 1) + "%)", paneW - 8, ty, TP_COL, "right", pnlExt(tp.pnl, tp.cost));
       }
     }
     S.rays.forEach(function (r) {
@@ -8185,6 +8242,12 @@ async function copyVax1Result() {
     }
     return null;
   }
+  function tpHit(x, y) {
+    if (!S.tp || !S.chart) return false;
+    var ty = S.series.priceToCoordinate(S.tp), b = S.tpLbl;
+    if (ty !== null && Math.abs(ty - y) <= 6 && x <= paneWidth()) return true;
+    return !!(b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);   // kéo được cả từ nhãn
+  }
   var swallowMouse = false;
   wrap.addEventListener("pointerdown", function (e) {
     if (S.mode === "ray" || e.button !== 0) return;
@@ -8194,6 +8257,12 @@ async function copyVax1Result() {
       swallowMouse = true;
       S.selected = t.id;
       setTagHidden(t, true);
+      return;
+    }
+    if (tpHit(p.x, p.y)) {   // đường TP ưu tiên hơn đường điểm mua
+      e.stopPropagation(); e.preventDefault();
+      S.drag = { tp: true, moved: false };
+      S.chart.applyOptions({ handleScroll: false, handleScale: false });
       return;
     }
     var r = hit(p.x, p.y);
@@ -8210,6 +8279,11 @@ async function copyVax1Result() {
   window.addEventListener("pointermove", function (e) {
     if (!S.active) return;
     var p = local(e);
+    if (S.drag && S.drag.tp) {
+      var tpPrice = S.series.coordinateToPrice(p.y);
+      if (tpPrice !== null && tpPrice > 0) { S.tp = roundTick(tpPrice); S.tpLine.applyOptions({ price: S.tp }); S.drag.moved = true; schedulePanel(); }
+      return;
+    }
     if (S.drag) {
       var r = S.rays.find(function (q) { return q.id === S.drag.id; });
       var price = S.series.coordinateToPrice(p.y);
@@ -8221,11 +8295,18 @@ async function copyVax1Result() {
     if (e.target && e.target.closest && e.target.closest("#tradeChartWrap")) {
       var onTag = !S.mode && !!tagHit(p.x, p.y);
       wrap.classList.toggle("is-tag", onTag);
-      wrap.classList.toggle("is-hover", !S.mode && !onTag && !!hit(p.x, p.y));
+      wrap.classList.toggle("is-hover", !S.mode && (tpHit(p.x, p.y) || (!onTag && !!hit(p.x, p.y))));
     }
   });
   window.addEventListener("pointerup", function () {
     if (!S.drag) return;
+    if (S.drag.tp) {
+      var tpMoved = S.drag.moved;
+      S.drag = null;
+      S.chart.applyOptions({ handleScroll: true, handleScale: true });
+      if (tpMoved) setTp(S.tp);   // lưu + cập nhật bảng tổng hợp
+      return;
+    }
     var moved = S.drag.moved, dragId = S.drag.id, wasHidden = S.drag.wasHidden;
     S.drag = null;
     S.chart.applyOptions({ handleScroll: true, handleScale: true });
@@ -8263,6 +8344,7 @@ async function copyVax1Result() {
   }
 
   $("tradeRayBtn").addEventListener("click", function () { setMode(S.mode === "ray" ? null : "ray"); });
+  $("tradeTpBtn").addEventListener("click", toggleTp);
 
   $("tradeLoadBtn").addEventListener("click", load);
   $("tradeSym").addEventListener("keydown", function (e) { if (e.key === "Enter") load(); });
@@ -8484,6 +8566,7 @@ async function copyVax1Result() {
     var a = document.activeElement;
     if (a && /INPUT|SELECT|TEXTAREA/.test(a.tagName)) return;
     if (e.key === "h" || e.key === "H") setMode(S.mode === "ray" ? null : "ray");
+    else if (e.key === "t" || e.key === "T") toggleTp();
     else if (e.key === "Escape") setMode(null);
     else if ((e.key === "Delete" || e.key === "Backspace") && S.selected) { e.preventDefault(); removeRay(S.selected); }
   });
