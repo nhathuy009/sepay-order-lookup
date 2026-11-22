@@ -209,6 +209,7 @@ async function loadP2PPrices() {
           <span class="cal-lunar-date">${fmtVndShort(ad.min)}–${fmtVndShort(ad.max)}</span>
         </span>`;
     }).join("");
+    if (data.min_amount) document.getElementById("p2pTitle").textContent = "Mua USDT ≥" + fmtVndShort(data.min_amount);
     const t = new Date(data.updated_at * 1000);
     document.getElementById("p2pUpdated").textContent =
       "Binance P2P · " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");

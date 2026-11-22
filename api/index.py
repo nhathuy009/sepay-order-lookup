@@ -784,6 +784,7 @@ def handle_fetch_vax1(body):
 # Bảng giá P2P Binance: top 3 quảng cáo BÁN USDT lấy VND (góc nhìn người MUA USDT), rẻ nhất trước.
 BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
 P2P_CACHE_SECONDS = 20
+P2P_MIN_AMOUNT = 10_000_000   # chỉ lấy quảng cáo nhận được lệnh 10 triệu VND (bỏ quảng cáo hạn mức nhỏ giá "câu khách")
 _p2p_cache = {"t": 0.0, "payload": None}
 
 
@@ -795,7 +796,7 @@ def handle_p2p_usdt_vnd(body):
         resp = requests.post(
             BINANCE_P2P_URL,
             json={"fiat": "VND", "asset": "USDT", "tradeType": "BUY", "page": 1, "rows": 3,
-                  "payTypes": [], "publisherType": None},
+                  "payTypes": [], "publisherType": None, "transAmount": P2P_MIN_AMOUNT},
             headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
             timeout=10,
         )
@@ -826,7 +827,7 @@ def handle_p2p_usdt_vnd(body):
             "orders": user.get("monthOrderCount") or 0,
             "finish_rate": num(user.get("monthFinishRate")),
         })
-    payload = {"ads": ads, "updated_at": int(now)}
+    payload = {"ads": ads, "min_amount": P2P_MIN_AMOUNT, "updated_at": int(now)}
     _p2p_cache.update(t=now, payload=payload)
     return 200, payload
 
