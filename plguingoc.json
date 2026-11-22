@@ -2,6 +2,296 @@
   "version": 1,
   "plugins": [
     {
+      "id": "live18",
+      "name": "Live18 (XXX)",
+      "version": "1.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/live18_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/live18.png?cache=true",
+      "info": "Tổng hợp các live stream XXX từ khắp nới trên thế giới.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vaxlive",
+      "name": "Vaxlive (MOVIE)",
+      "version": "1.14.0",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxlive_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxlive.png?cache=true",
+      "info": "Nguồn live Sport trực tuyến cho anh em mê thể thao.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "sieutamphim",
+      "name": "Sieutamphim (MOVIE)",
+      "version": "3.5",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/sieutamphim_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/sieutamphim.png?cache=true",
+      "info": "Nguồn siêu tầm phim. Khá nhiều phim khá chất lượng.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "hentaihaven",
+      "name": "Hentaihaven (XXX)",
+      "version": "1.3.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/hentaihaven_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/hentaihaven.png?cache=true",
+      "info": "Phim hentai có vietsub, khá là nét. Vô vàng phim luôn.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "tikporn",
+      "name": "Tikporn (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/tikporn_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/tikporn.png?cache=true",
+      "info": "Phim XXX dạng short như tiktok.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "soopvideo",
+      "name": "Soopvideo (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/soopvideo_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/soopvideo.png?cache=true",
+      "info": "Phim XXX dạng short như tiktok.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "popkontv",
+      "name": "Popkontv (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/popkontv_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/popkontv.png?cache=true",
+      "info": "Phim XXX dạng short như tiktok.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "redgifs",
+      "name": "Redgifs (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/redgifs_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/redgifs.png?cache=true",
+      "info": "Phim XXX dạng short như tiktok.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "huangdou",
+      "name": "Huangdou (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/huangdou_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/huangdou.png?cache=true",
+      "info": "Phim XXX AI khá là xịn xò.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "short91",
+      "name": "Short91 (XXX)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/short91_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/short91.png?cache=true",
+      "info": "Phim XXX AI khá là xịn xò.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "freereels",
+      "name": "FreeReels [SHORT]",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/freereels_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/freereels.png?cache=true",
+      "info": "Phim ngắn của FreeReels, xem miễn phí trên VAXPLAYER.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "iqiyi",
+      "name": "Iqiyi (MOVIE)",
+      "version": "1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/iqiyi_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/iqiyi.png?cache=true",
+      "info": "Nguồn phim siêu xịn từ IQIYI, phim thuyết minh và vietsub chuân.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "dhmedia",
+      "name": "Dhmedia (MOVIE)",
+      "version": "5.0.4",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/dhmedia_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/dhmedia.png?cache=true",
+      "info": "Nguồn phim ngắn Youtube và Facebook.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "langlangson",
+      "name": "Lãng Lãng Sơn (SHORT)",
+      "version": "5.0.4",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/langlangson_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/langlangson.png?cache=true",
+      "info": "Nguồn xem phim ngắn từ Youtube và Facebook.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "coigiday",
+      "name": "Coi Gì Đây (SHORT)",
+      "version": "1.3",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/coigiday_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/coigiday.png?cache=true",
+      "info": "Nguồn phim ngắn Youtube và Facebook.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "youtube",
+      "name": "Youtube (MOVIE)",
+      "version": "6.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/youtube_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/youtube.png?cache=true",
+      "info": "Youtube của mọi nhà, không quảng cáo và play mượt.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vaxgame",
+      "name": "Vaxgame (MOVIE)",
+      "version": "1.2",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxgame_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxgame.png?cache=true",
+      "info": "Chơi Game trên Vax.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vaxtv",
+      "name": "VAX TỔNG HỢP [MOVIE]",
+      "version": "2.5.4",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxtv_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxtv.png?cache=true",
+      "info": "Nguồn xem truyền hình và thể thao của VAXPLAYER.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vax_gemini_translate",
+      "name": "Vax_Gemini_Translate (MOVIE)",
+      "version": "1.0.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_gemini_translate_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
+      "info": "Dịch bằng Google Gemini API. Tùy biến API Key, Model, Token, Request Interval và Prompt riêng cho OCR, Truyện chữ, Phim, Phụ đề & ASR.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vax_pro2_tts",
+      "name": "Vax_Pro2_Tts (MOVIE)",
+      "version": "1.1.0",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_pro2_tts_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
+      "info": "Kho giọng đọc AI tự động căn khớp mốc thời gian phụ đề (Subtitle-to-Voice), đồng bộ động.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "film1",
+      "name": "Film 1 (MOVIE)",
+      "version": "1.0.5",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/film1_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/film1.png?cache=true",
+      "info": "Nguồn phim chất lượng, có phim 4K bên trong.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "dexter",
+      "name": "Dexter (MOVIE)",
+      "version": "1.3.0",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/dexter_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/dexter.png?cache=true",
+      "info": "Nguồn phim nước ngoài, xem rất mượt có 4K chất lượng cao, hỗ trợ sub việt đầy đủ.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "mangadex",
+      "name": "Mangadex (MANGA)",
+      "version": "2.5.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/manga/plugin/mangadex_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/mangadex.png?cache=true",
+      "info": "Nguồn xem truyện tranh nổi tiếng của Mangadex.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "shortflix",
+      "name": "ShortFlix [SHORT]",
+      "version": "2.6.1",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shortflix_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shortflix.png?cache=true",
+      "info": "Phim ngắn hay, một số loại phim nên coi theo chiều dọc sẽ hay hơn.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vax_openai_translate",
+      "name": "Vax_Openai_Translate (MOVIE)",
+      "version": "1.0.0",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_openai_translate_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
+      "info": "Dịch thuật qua chuẩn OpenAI Chat Completions (mặc định gpt-6-luna tại sv.devquote.shop). Tùy biến API Key, Endpoint, Model, Token, Request Interval và Prompt theo tính năng.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "vax_gender_ai",
+      "name": "Vax_Gender_Ai (MOVIE)",
+      "version": "1.0.0",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_gender_ai_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
+      "info": "Mô hình AI phân biệt giọng Nam / Nữ chuyên sâu theo âm sắc đường thanh âm (~16MB)",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "njav",
+      "name": "Njav (XXX)",
+      "version": "1.1.5",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/njav_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/njav.png?cache=true",
+      "info": "XXX dành để tu luyện. Xem ít thôi.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "sexmup",
+      "name": "Sexmup (XXX)",
+      "version": "2.3",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/sexmup_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/sexmup.png?cache=true",
+      "info": "XXX dành để tu luyện. Xem ít thôi.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
+      "id": "hh3d",
+      "name": "HH3D (ANIME)",
+      "version": "1.6.2",
+      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/hh3d_plugin.js",
+      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/hh3d.png?cache=true",
+      "info": "Phim hoạt hình 3D trung quốc hay.",
+      "isVip": false,
+      "openvax": true
+    },
+    {
       "id": "123av",
       "name": "123Av (XXX)",
       "version": "4.0.6",
@@ -33,7 +323,7 @@
     },
     {
       "id": "animevietsubvip",
-      "name": "Animevietsubvip (MOVIE)",
+      "name": "AnimeVietsub (ANIME)",
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/animevietsubvip_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/animevietsubvip.png?cache=true",
@@ -102,16 +392,6 @@
       "openvax": true
     },
     {
-      "id": "vax_pro2_tts",
-      "name": "Vax_Pro2_Tts (MOVIE)",
-      "version": "1.1.0",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_pro2_tts_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
-      "info": "Plugin dành cho các tính năng AI.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
       "id": "vax_translate",
       "name": "Vax_Translate (MOVIE)",
       "version": "1.0.0",
@@ -127,7 +407,7 @@
       "version": "1.0.0",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_offline_asr_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
-      "info": "Plugin dành cho các tính năng AI.",
+      "info": "Nhận diện giọng nói offline trên thiết bị (Cần tải gói mô hình 230MB)",
       "isVip": false,
       "openvax": true
     },
@@ -137,7 +417,7 @@
       "version": "1.0.0",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_cloud_asr_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
-      "info": "Plugin dành cho các tính năng AI.",
+      "info": "Nhận diện và dịch trực tiếp giọng nói qua đám mây VAX AI (Không cần tải mô hình)",
       "isVip": false,
       "openvax": true
     },
@@ -147,7 +427,7 @@
       "version": "1.0.0",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_onnx_tts_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
-      "info": "Plugin dành cho các tính năng AI.",
+      "info": "Giọng đọc AI Offline chạy trực tiếp trên thiết bị (Vax, Nano, Turbo)",
       "isVip": false,
       "openvax": true
     },
@@ -157,17 +437,7 @@
       "version": "1.0.0",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/tts/vax_pro_tts_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxai.png?cache=true",
-      "info": "Plugin dành cho các tính năng AI.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "vaxgame",
-      "name": "Vaxgame (MOVIE)",
-      "version": "1.1.7",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxgame_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxgame.png?cache=true",
-      "info": "Chơi Game trên Vax.",
+      "info": "Kho 200 giọng đọc AI tự động chèn thẻ cảm xúc, gói mẫu audio.zip",
       "isVip": false,
       "openvax": true
     },
@@ -178,26 +448,6 @@
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/phimhdcs_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/phimhdcs.png?cache=true",
       "info": "Nguồn phim của youngbi. Báo tác giả ngay khi có lỗi.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "vaxtv",
-      "name": "Vaxtv (MOVIE)",
-      "version": "2.5.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxtv_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxtv.png?cache=true",
-      "info": "Nguồn xem truyền hình và thể thao của VAXPLAYER.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "vaxlive",
-      "name": "Vaxlive (MOVIE)",
-      "version": "1.14.0",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/vaxlive_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/vaxlive.png?cache=true",
-      "info": "Nguồn live Sport trực tuyến cho anh em mê thể thao.",
       "isVip": false,
       "openvax": true
     },
@@ -222,18 +472,8 @@
       "openvax": true
     },
     {
-      "id": "hh3d",
-      "name": "Hh3D (MOVIE)",
-      "version": "1.0",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/hh3d_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/hh3d.png?cache=true",
-      "info": "Phim hoạt hình 3D trung quốc hay.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
       "id": "animevv",
-      "name": "Animevv (MOVIE)",
+      "name": "Animevv (ANIME)",
       "version": "2.4",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/animevv_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/animevv.png?cache=true",
@@ -243,7 +483,7 @@
     },
     {
       "id": "pinedrama",
-      "name": "Pinedrama (MOVIE)",
+      "name": "PineDrama [SHORT]",
       "version": "1.0.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/pinedrama_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/pinedrama.png?cache=true",
@@ -258,16 +498,6 @@
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/huangguoai_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/huangguoai.png?cache=true",
       "info": "Nguồn xem XXX bằng AI hoàn toàn, siêu khủng.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "njav",
-      "name": "Njav (XXX)",
-      "version": "1.1.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/njav_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/njav.png?cache=true",
-      "info": "XXX dành để tu luyện. Xem ít thôi.",
       "isVip": false,
       "openvax": true
     },
@@ -303,7 +533,7 @@
     },
     {
       "id": "anidoki",
-      "name": "Anidoki (MOVIE)",
+      "name": "Anidoki [ANIME]",
       "version": "1.0.4",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/anidoki_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/anidoki.png?cache=true",
@@ -499,17 +729,7 @@
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/film2.png?cache=true",
       "info": "Nguồn phim có tốc độ nhanh và có subtitle rời.",
       "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "film1",
-      "name": "Film 1 (MOVIE)",
-      "version": "1.0.4",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/film1_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/film1.png?cache=true",
-      "info": "Nguồn phim chất lượng, có phim 4K bên trong.",
-      "isVip": false,
-      "openvax": true
+      "openvax": false
     },
     {
       "id": "saigonphim",
@@ -533,41 +753,11 @@
     },
     {
       "id": "shorthot",
-      "name": "Shorthot (MOVIE)",
+      "name": "ShortHot [SHORT]",
       "version": "1.0.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shorthot_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shorthot.png?cache=true",
       "info": "Nguồn short tổng hợp.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "dhmedia",
-      "name": "Dhmedia (MOVIE)",
-      "version": "5.0.2",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/dhmedia_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/dhmedia.png?cache=true",
-      "info": "Nguồn phim ngắn Youtube và Facebook.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "langlangson",
-      "name": "Lãng Lãng Sơn (SHORT)",
-      "version": "5.0.2",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/langlangson_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/langlangson.png?cache=true",
-      "info": "Nguồn xem phim ngắn từ Youtube và Facebook.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "coigiday",
-      "name": "Coi Gì Đây (SHORT)",
-      "version": "1.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/coigiday_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/coigiday.png?cache=true",
-      "info": "Nguồn phim ngắn Youtube và Facebook.",
       "isVip": false,
       "openvax": true
     },
@@ -613,7 +803,7 @@
     },
     {
       "id": "phimngan",
-      "name": "Phimngan (MOVIE)",
+      "name": "Phimngan [SHORT]",
       "version": "2.8",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/phimngan_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/phimngan.png?cache=true",
@@ -623,7 +813,7 @@
     },
     {
       "id": "theshortfilmshow",
-      "name": "Theshortfilmshow (MOVIE)",
+      "name": "Theshortfilmshow [SHORT]",
       "version": "1.3",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/theshortfilmshow_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/theshortfilmshow.png?cache=true",
@@ -633,7 +823,7 @@
     },
     {
       "id": "minidrama",
-      "name": "Minidrama (MOVIE)",
+      "name": "Minidrama [SHORT]",
       "version": "1.0.4",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/minidrama_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/minidrama.png?cache=true",
@@ -643,7 +833,7 @@
     },
     {
       "id": "shortaura",
-      "name": "Shortaura (MOVIE)",
+      "name": "Shortaura [SHORT]",
       "version": "1.0.4",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shortaura_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shortaura.png?cache=true",
@@ -653,7 +843,7 @@
     },
     {
       "id": "dramabox",
-      "name": "Dramabox (MOVIE)",
+      "name": "Dramabox [SHORT]",
       "version": "2.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/dramabox_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/dramabox.png?cache=true",
@@ -663,7 +853,7 @@
     },
     {
       "id": "animet",
-      "name": "Animet (MOVIE)",
+      "name": "Animet [ANIME]",
       "version": "1.0.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/animet_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/animet.png?cache=true",
@@ -673,7 +863,7 @@
     },
     {
       "id": "shortmax",
-      "name": "Shortmax (MOVIE)",
+      "name": "Shortmax [SHORT]",
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shortmax_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shortmax.png?cache=true",
@@ -683,7 +873,7 @@
     },
     {
       "id": "allshort",
-      "name": "Allshort (MOVIE)",
+      "name": "Allshort [SHORT]",
       "version": "1.0.3",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/allshort_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/allshort.png?cache=true",
@@ -693,7 +883,7 @@
     },
     {
       "id": "shortanywhere",
-      "name": "Shortanywhere (MOVIE)",
+      "name": "Shortanywhere [SHORT]",
       "version": "1.0.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shortanywhere_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shortanywhere.png?cache=true",
@@ -723,7 +913,7 @@
     },
     {
       "id": "netshort",
-      "name": "Netshort (MOVIE)",
+      "name": "Netshort [SHORT]",
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/netshort_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/netshort.png?cache=true",
@@ -733,7 +923,7 @@
     },
     {
       "id": "anime47",
-      "name": "Anime47 (MOVIE)",
+      "name": "Anime47 [ANIME]",
       "version": "2.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/anime47_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/anime47.png?cache=true",
@@ -808,16 +998,6 @@
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/fanxxx_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/fanxxx.png?cache=true",
       "info": "Nguồn XXX AI của Trung Quốc.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "sieutamphim",
-      "name": "Sieutamphim (MOVIE)",
-      "version": "3.3",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/sieutamphim_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/sieutamphim.png?cache=true",
-      "info": "Nguồn siêu tầm phim. Khá nhiều phim khá chất lượng.",
       "isVip": false,
       "openvax": true
     },
@@ -903,21 +1083,11 @@
     },
     {
       "id": "yini",
-      "name": "Yini (MOVIE)",
+      "name": "Yini [SHORT]",
       "version": "1.2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/yini_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/yini.png?cache=true",
       "info": "Nguồn phim ngắn siêu hay, khá nhiều phim nhé.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "youtube",
-      "name": "Youtube (MOVIE)",
-      "version": "2.4.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/youtube_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/youtube.png?cache=true",
-      "info": "Youtube của mọi nhà, không quảng cáo và play mượt.",
       "isVip": false,
       "openvax": true
     },
@@ -933,7 +1103,7 @@
     },
     {
       "id": "bilibili",
-      "name": "Bilibili (MOVIE)",
+      "name": "Bilibili [ANIME]",
       "version": "1.7.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/bilibili_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/bilibili.png?cache=true",
@@ -959,7 +1129,7 @@
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/sexsub.png?cache=true",
       "info": "Nguồn XXX dược lồng tiếng độc lạ.",
       "isVip": false,
-      "openvax": true
+      "openvax": false
     },
     {
       "id": "phimsexai",
@@ -1003,7 +1173,7 @@
     },
     {
       "id": "cartoon",
-      "name": "Cartoon (MOVIE)",
+      "name": "Cartoon [ANIME]",
       "version": "1.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/cartoon_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/cartoon.png?cache=true",
@@ -1282,16 +1452,6 @@
       "openvax": true
     },
     {
-      "id": "mangadex",
-      "name": "Mangadex (MANGA)",
-      "version": "2.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/manga/plugin/mangadex_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/mangadex.png?cache=true",
-      "info": "Nguồn xem truyện tranh nổi tiếng của Mangadex.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
       "id": "fastscans",
       "name": "Fastscans (MANGA)",
       "version": "2.1",
@@ -1373,7 +1533,7 @@
     },
     {
       "id": "nartodrama",
-      "name": "Nartodrama (MOVIE)",
+      "name": "Nartodrama [SHORT]",
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/nartodrama_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/nartodrama.png?cache=true",
@@ -1413,21 +1573,11 @@
     },
     {
       "id": "yanhh3d",
-      "name": "Yanhh3D (MOVIE)",
+      "name": "Yanhh3D [ANIME]",
       "version": "3.4",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/yanhh3d_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/yanhh3d.png?cache=true",
       "info": "Trang này bị nhà mạng chặn nên cần dns để xem. Bạn tải app 1.1.1.1 về dùng hoặc thử bật DNS và DPI trong app này.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "shortflix",
-      "name": "Shortflix (MOVIE)",
-      "version": "2.5",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/shortflix_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/shortflix.png?cache=true",
-      "info": "Phim ngắn hay, một số loại phim nên coi theo chiều dọc sẽ hay hơn.",
       "isVip": false,
       "openvax": true
     },
@@ -1593,7 +1743,7 @@
     },
     {
       "id": "animehay",
-      "name": "Animehay (MOVIE)",
+      "name": "Animehay [ANIME]",
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/animehay_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/animehay.png?cache=true",
@@ -1603,7 +1753,7 @@
     },
     {
       "id": "gamomephim",
-      "name": "Gamomephim (MOVIE)",
+      "name": "Gamomephim [SHORT]",
       "version": "2.2",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/movie/gamomephim_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/gamomephim.png?cache=true",
@@ -1667,16 +1817,6 @@
       "version": "2.1",
       "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/koreaporn_plugin.js",
       "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/koreaporn.png?cache=true",
-      "info": "XXX dành để tu luyện. Xem ít thôi.",
-      "isVip": false,
-      "openvax": true
-    },
-    {
-      "id": "sexmup",
-      "name": "Sexmup (XXX)",
-      "version": "2.1",
-      "scriptUrl": "https://vx2plugin.alokillgtv.workers.dev/Plugins/xxx/sexmup_plugin.js",
-      "iconUrl": "https://vaxplugin.alokillgtv.workers.dev/img/icon/sexmup.png?cache=true",
       "info": "XXX dành để tu luyện. Xem ít thôi.",
       "isVip": false,
       "openvax": true
