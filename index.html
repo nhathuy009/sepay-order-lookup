@@ -1104,6 +1104,7 @@
               <button type="button" data-ind="rsi" aria-pressed="true" title="RSI(14)">RSI</button>
               <button type="button" data-ind="macd" aria-pressed="true" title="MACD(12, 26, 9)">MACD</button>
             </div>
+            <button type="button" class="btn-outline" id="tradeAnalyzeBtn" title="Chụp 3 khung 1D, 4H, 1H (nến + VOL + RSI + MACD) để gửi Claude phân tích">Phân tích</button>
             <span class="trade-status" id="tradeStatus" role="status"></span>
           </div>
           <div class="trade-main">
@@ -1176,6 +1177,24 @@
             <div id="tradeList"></div>
           </section>
         </div>
+
+        <dialog id="tradeAiDlg" class="trade-dlg trade-ai-dlg" aria-labelledby="tradeAiTitle">
+          <h3 id="tradeAiTitle">Gửi chart cho Claude phân tích</h3>
+          <p class="v3-field-hint">Bấm <b>Chép ảnh &amp; mở Claude</b>, rồi dán ảnh vào ô chat (Ctrl+V, trên điện thoại giữ ô chat → Dán) và gửi. Câu lệnh gọi skill đã được điền sẵn.</p>
+          <img id="tradeAiImg" alt="Ảnh ghép 3 khung 1D, 4H, 1H" />
+          <details class="trade-ai-prompt">
+            <summary>Câu lệnh gửi kèm</summary>
+            <pre id="tradeAiPrompt"></pre>
+          </details>
+          <p class="v3-field-hint" id="tradeAiMsg" role="status"></p>
+          <div class="trade-dlg-row">
+            <button type="button" id="tradeAiGo">Chép ảnh &amp; mở Claude</button>
+            <button type="button" class="btn-outline" id="tradeAiDownload">Tải 3 ảnh</button>
+            <button type="button" class="btn-outline" id="tradeAiCopyPrompt">Chép câu lệnh</button>
+            <span class="trade-sp"></span>
+            <button type="button" class="btn-outline" id="tradeAiClose">Đóng</button>
+          </div>
+        </dialog>
 
         <dialog id="tradeDlg" class="trade-dlg">
           <form method="dialog" id="tradeDlgForm">

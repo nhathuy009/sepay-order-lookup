@@ -7700,16 +7700,17 @@ async function copyVax1Result() {
     var sym = $("tradeSym").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     var iv = $("tradeIv").value;
     syncIv();
-    if (!sym || !S.chart) return;
+    if (!sym || !S.chart) return Promise.resolve(false);
     $("tradeSym").value = sym;
     var seq = ++S.loadSeq;
     setStatus("Đang tải " + sym + "…");
     var info;
-    getJSON("/api/v3/exchangeInfo?symbol=" + sym).then(function (j) {
+    // Trả promise (true khi đã vẽ xong) để nút "Phân tích" chờ nạp xong từng khung rồi mới chụp
+    return getJSON("/api/v3/exchangeInfo?symbol=" + sym).then(function (j) {
       info = j.symbols[0];
       return getJSON("/api/v3/klines?symbol=" + sym + "&interval=" + iv + "&limit=1000");
     }).then(function (kl) {
-      if (seq !== S.loadSeq) return;
+      if (seq !== S.loadSeq) return false;
       closeWs();
       S.symbol = sym; S.interval = iv; S.base = info.baseAsset; S.quote = info.quoteAsset;
       S.tick = +info.filters.find(function (f) { return f.filterType === "PRICE_FILTER"; }).tickSize;
@@ -7732,8 +7733,10 @@ async function copyVax1Result() {
       if (indErrShown) setStatus(indErrShown, true);   // giữ thông báo lỗi chỉ báo (nếu có) để dễ báo lại
       store("trade_last", JSON.stringify({ sym: sym, iv: iv }));
       renderWatch();
+      return true;
     }).catch(function (e) {
       if (seq === S.loadSeq) setStatus("Không tải được " + sym + ": " + ((e && e.message) || e), true);
+      return false;
     });
   }
 
@@ -8279,6 +8282,169 @@ async function copyVax1Result() {
     $("tradeIv").value = v;
     load();
   });
+  /* ---------- Nút "Phân tích": chụp 3 khung 1D / 4H / 1H rồi gửi Claude (skill phân tích RSI đa khung) ----------
+     Mỗi khung: nạp nến, hiện 150 nến gần nhất, chụp khung giá (EMA + VOL + Ray), RSI (vùng 30–70 + phân kỳ),
+     MACD kèm dòng chú thích; ghép 3 khung thành 1 ảnh (trên xuống: 1D, 4H, 1H). Xong thì trả lại khung / vị trí đang xem.
+     Trang web không gửi thẳng ảnh vào Claude được -> chép ảnh vào bộ nhớ tạm + mở claude.ai với câu lệnh điền sẵn. */
+  var AI_IVS = [["1d", "1D"], ["4h", "4H"], ["1h", "1H"]];
+  var AI_BARS = 150;
+  var ai = { blob: null, parts: [], prompt: "", busy: false };
+
+  function nextFrame() { return new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); }); }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function toBlob(c) { return new Promise(function (r) { c.toBlob(r, "image/png"); }); }
+
+  // Vẽ lại dòng chú thích (HTML) lên canvas: mỗi <span> con một màu
+  function drawLegend(c, el, x, y, dpr) {
+    c.font = (12 * dpr) + "px " + S.font;
+    c.textBaseline = "top";
+    Array.prototype.forEach.call(el.children, function (sp) {
+      var t = sp.textContent.trim();
+      if (!t) return;
+      c.fillStyle = getComputedStyle(sp).color || S.colors.text;
+      c.fillText(t, x, y);
+      x += c.measureText(t).width + 10 * dpr;
+    });
+  }
+
+  // Chụp 1 khung: trả { canvas, stats }
+  function captureFrame(label) {
+    var dpr = window.devicePixelRatio || 1;
+    var panes = [{ chart: S.chart, overlay: $("tradeOverlay"), legend: $("tradeLegendMain") }];
+    if (IND.rsi) panes.push({ chart: S.rsiChart, overlay: $("tradeOverlayRsi"), legend: $("tradeLegendRsi") });
+    if (IND.macd) panes.push({ chart: S.macdChart, overlay: null, legend: $("tradeLegendMacd") });
+    var shots = panes.map(function (p) { return p.chart.takeScreenshot(); });
+    var w = Math.max.apply(null, shots.map(function (c) { return c.width; }));
+    var head = Math.round(34 * dpr);
+    var h = head + shots.reduce(function (a, c) { return a + c.height; }, 0);
+    var out = document.createElement("canvas");
+    out.width = w; out.height = h;
+    var c = out.getContext("2d");
+    c.fillStyle = S.colors.card; c.fillRect(0, 0, w, h);
+    c.fillStyle = S.colors.text; c.font = "700 " + (17 * dpr) + "px " + S.font; c.textBaseline = "middle";
+    c.fillText(S.symbol + " · " + label + " · Binance", 12 * dpr, head / 2);
+    var y = head;
+    panes.forEach(function (p, k) {
+      var sh = shots[k];
+      c.drawImage(sh, 0, y);
+      if (p.overlay && p.overlay.width) c.drawImage(p.overlay, 0, y, p.overlay.width, p.overlay.height);
+      drawLegend(c, p.legend, 10 * dpr, y + 6 * dpr, dpr);
+      c.strokeStyle = S.colors.border; c.lineWidth = dpr;
+      c.beginPath(); c.moveTo(0, y + 0.5); c.lineTo(w, y + 0.5); c.stroke();
+      y += sh.height;
+    });
+    var n = S.candles.length - 1;
+    var pd = dec(S.tick), md = Math.min(8, pd + 1);
+    return {
+      canvas: out,
+      stats: label + ": đóng cửa " + fx(S.candles[n].close, pd) + ", RSI(14) " + fx(S.ind.rsi[n], 2) +
+        ", MACD " + fx(S.ind.m[n], md) + ", Signal " + fx(S.ind.s[n], md) + ", Hist " + fx(S.ind.h[n], md)
+    };
+  }
+
+  function buildPrompt(stats) {
+    var when = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+    return "Dùng skill phân tích RSI đa khung để phân tích " + S.symbol + " (Binance).\n" +
+      "Ảnh đính kèm ghép 3 khung, từ trên xuống: 1D, 4H, 1H. Mỗi khung gồm nến + EMA(34, 89, 200) + Volume, " +
+      "RSI(14) (vùng 30–70, nhãn phân kỳ nếu có) và MACD(12, 26, 9); các đường ngang có nhãn là điểm mua của tôi.\n" +
+      "Số liệu nến cuối mỗi khung:\n- " + stats.join("\n- ") + "\n" +
+      "Chụp lúc " + when + " (giờ Việt Nam).";
+  }
+
+  function analyze() {
+    if (ai.busy || !S.chart || !S.symbol) return;
+    ai.busy = true;
+    var btn = $("tradeAnalyzeBtn"), oldText = btn.textContent;
+    btn.disabled = true;
+    var keepIv = $("tradeIv").value;
+    var keepRange = S.chart.timeScale().getVisibleLogicalRange();
+    var keepInd = { vol: IND.vol, rsi: IND.rsi, macd: IND.macd };
+    IND.vol = IND.rsi = IND.macd = true;   // ảnh luôn có đủ VOL, RSI, MACD (chỉ bật tạm, không lưu)
+    applyInd();
+    var frames = [];
+    var chain = Promise.resolve();
+    AI_IVS.forEach(function (pair) {
+      chain = chain.then(function () {
+        btn.textContent = "Đang chụp " + pair[1] + "…";
+        $("tradeIv").value = pair[0];
+        return load();
+      }).then(function (ok) {
+        if (!ok) throw new Error("Không tải được khung " + pair[1]);
+        var n = S.candles.length;
+        S.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - AI_BARS), to: n + 3 });
+        S.hoverIdx = null; updateLegend();
+        return nextFrame().then(function () { return wait(120); }).then(nextFrame);
+      }).then(function () { frames.push(captureFrame(pair[1])); });
+    });
+    chain.then(function () {
+      // Ghép 3 khung thành 1 ảnh, cách nhau 1 dải trống
+      var gap = Math.round(10 * (window.devicePixelRatio || 1));
+      var w = Math.max.apply(null, frames.map(function (f) { return f.canvas.width; }));
+      var h = frames.reduce(function (a, f) { return a + f.canvas.height; }, 0) + gap * (frames.length - 1);
+      var all = document.createElement("canvas");
+      all.width = w; all.height = h;
+      var c = all.getContext("2d"), y = 0;
+      c.fillStyle = S.colors.border; c.fillRect(0, 0, w, h);
+      frames.forEach(function (f) { c.drawImage(f.canvas, 0, y); y += f.canvas.height + gap; });
+      ai.prompt = buildPrompt(frames.map(function (f) { return f.stats; }));
+      return Promise.all([toBlob(all)].concat(frames.map(function (f) { return toBlob(f.canvas); })));
+    }).then(function (blobs) {
+      ai.blob = blobs[0];
+      ai.parts = blobs.slice(1);
+      var img = $("tradeAiImg");
+      if (img.src) URL.revokeObjectURL(img.src);
+      img.src = URL.createObjectURL(ai.blob);
+      $("tradeAiPrompt").textContent = ai.prompt;
+      $("tradeAiMsg").textContent = "";
+      $("tradeAiDlg").showModal();
+    }).catch(function (e) {
+      setStatus("Không chụp được chart: " + ((e && e.message) || e), true);
+    }).then(function () {
+      // Trả lại khung, chỉ báo và vị trí đang xem
+      IND.vol = keepInd.vol; IND.rsi = keepInd.rsi; IND.macd = keepInd.macd;
+      applyInd();
+      $("tradeIv").value = keepIv;
+      return load().then(function (ok) {
+        if (ok && keepRange) S.chart.timeScale().setVisibleLogicalRange(keepRange);
+      });
+    }).then(function () {
+      ai.busy = false;
+      btn.disabled = false;
+      btn.textContent = oldText;
+    });
+  }
+  $("tradeAnalyzeBtn").addEventListener("click", analyze);
+
+  function claudeUrl() { return "https://claude.ai/new?q=" + encodeURIComponent(ai.prompt); }
+  $("tradeAiGo").addEventListener("click", function () {
+    var msg = $("tradeAiMsg");
+    var copy = (navigator.clipboard && window.ClipboardItem)
+      ? navigator.clipboard.write([new ClipboardItem({ "image/png": ai.blob })])
+      : Promise.reject(new Error("Trình duyệt không hỗ trợ chép ảnh"));
+    copy.then(function () {
+      msg.textContent = "Đã chép ảnh ✓ — sang tab Claude, dán ảnh vào ô chat rồi gửi.";
+      var w = window.open(claudeUrl(), "_blank");   // không truyền "noopener": khi đó window.open luôn trả null
+      if (w) w.opener = null;
+      else msg.innerHTML = 'Đã chép ảnh ✓ — trình duyệt chặn mở tab mới, <a href="' + claudeUrl() + '" target="_blank" rel="noopener">bấm vào đây để mở Claude</a>.';
+    }).catch(function (e) {
+      msg.textContent = "Không chép được ảnh (" + ((e && e.message) || e) + "). Bấm \"Tải 3 ảnh\" rồi đính kèm vào Claude.";
+    });
+  });
+  $("tradeAiDownload").addEventListener("click", function () {
+    var stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+    ai.parts.forEach(function (b, k) {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(b);
+      a.download = S.symbol + "_" + AI_IVS[k][1] + "_" + stamp + ".png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    });
+  });
+  $("tradeAiCopyPrompt").addEventListener("click", function () {
+    navigator.clipboard.writeText(ai.prompt).then(function () { $("tradeAiMsg").textContent = "Đã chép câu lệnh ✓"; });
+  });
+  $("tradeAiClose").addEventListener("click", function () { $("tradeAiDlg").close(); });
+
   $("tradeClearBtn").addEventListener("click", function () {
     if (!S.rays.length || !confirm("Xoá toàn bộ " + S.rays.length + " điểm mua của " + S.symbol + "?")) return;
     gsMarkDeleted(S.rays.map(function (r) { return r.id; }));

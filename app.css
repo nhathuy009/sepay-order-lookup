@@ -1985,6 +1985,21 @@ body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
 .trade-dlg-row { display: flex; gap: 8px; margin-top: 16px; }
 .trade-dlg-row .trade-sp { flex: 1; order: 1; }
 #tradeDlgOk { order: 3; } #tradeDlgCancel { order: 2; } #tradeDlgDel { order: 0; }
+/* Hộp thoại "Phân tích": xem trước ảnh ghép 3 khung trước khi gửi Claude */
+.trade-ai-dlg { width: min(760px, 94vw); }
+.trade-ai-dlg img {
+  display: block; width: 100%; max-height: 52vh; object-fit: contain; margin-top: 10px;
+  border: 1px solid var(--border); border-radius: var(--v3-radius, 10px); background: var(--card-bg-solid);
+}
+.trade-ai-prompt { margin-top: 10px; font-size: 13px; }
+.trade-ai-prompt summary { cursor: pointer; color: var(--text-muted); font-weight: 600; }
+.trade-ai-prompt pre {
+  margin: 8px 0 0; padding: 10px 12px; max-height: 160px; overflow: auto; white-space: pre-wrap;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border-radius: var(--v3-radius-sm, 8px); background: var(--v3-wash, rgba(0,0,0,.04));
+}
+.trade-ai-dlg .trade-dlg-row { flex-wrap: wrap; }
+#tradeAiClose { order: 2; }
 
 /* Trade: mở rộng hết bề ngang trình duyệt (chỉ khi đang ở #/trade) */
 body.v3.trade-wide { --v3-max: 100%; }
