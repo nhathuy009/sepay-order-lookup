@@ -1,5 +1,5 @@
 /* =====================================================================
-   APP V4 — giao diện kính (glass) kiểu iOS. Nạp SAU app.css, chỉ dùng trong v4.html.
+   APP V4 — giao diện kính (glass) kiểu iOS. Nạp SAU app.css trong index.html (giao diện chính).
    - Chỉ có 2 theme: body.theme-glass-light / body.theme-glass-dark.
    - Lớp 1: token màu + token kính cho từng theme (mọi component cũ đọc token nên tự đổi màu).
    - Lớp 2: vật liệu kính gắn lên các bề mặt (thanh trên, thẻ, modal, popover...).

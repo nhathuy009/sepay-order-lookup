@@ -17,7 +17,8 @@
   }
 
   /* 10X DESIGN SYSTEM - CÁC BIẾN MẶC ĐỊNH LÀ DARK MODE
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN (xem body.light-mode để đọc giải thích đầy đủ). */
+     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. Đây chỉ là giá trị nền dự phòng:
+     2 theme đang dùng (Glass sáng / Glass tối) ghi đè các biến này trong v4.css. */
   :root {
     /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
     /* Thang xanh da trời (Accent) */
@@ -91,468 +92,6 @@
     --cal-active-bg: #C5221F;
     --cal-active-text: #FFFFFF;
     --cal-block-bg: rgba(255,255,255,0.05);
-  }
-
-  /* GIAO DIỆN LIGHT MODE SẼ GHI ĐÈ CÁC BIẾN NÀY
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN (tham khảo VibeCoding UI Color Handbook, chương 4.1):
-       Lớp 1 - Nguyên thủy (Primitive): thang màu 50→900 cho từng hue, không gán ý nghĩa dùng để làm gì.
-       Lớp 2 - Ngữ nghĩa (Semantic)   : biến --accent/--badge-ok-bg/... trỏ vào Primitive, mang ý nghĩa cụ thể.
-       Lớp 3 - Component              : không đổi gì — mọi nơi dùng var(--accent), var(--badge-ok-bg)... trong
-                                         phần CSS phía dưới vẫn giữ nguyên, chỉ đổi NGUỒN cấp giá trị cho chúng.
-     Lợi ích: đổi màu thương hiệu chỉ cần sửa thang --blue-*, không phải dò từng nơi dùng màu trong file. */
-  body.light-mode {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    /* Thang xanh dương (Accent) - giữ đúng 2 mức 600/500 đang dùng làm gradient hiện tại */
-    --blue-50:  #EFF6FF;
-    --blue-100: #DBEAFE;
-    --blue-200: #BFDBFE;
-    --blue-300: #93C5FD;
-    --blue-400: #60A5FA;
-    --blue-500: #3B82F6;
-    --blue-600: #2563EB;
-    --blue-700: #1D4ED8;
-    --blue-800: #1E40AF;
-    --blue-900: #1E3A8A;
-
-    /* Thang trung tính (Neutral) - nền/viền/chữ */
-    --slate-50:  #F8FAFC;
-    --slate-100: #F1F5F9;
-    --slate-200: #E2E8F0;
-    --slate-300: #CBD5E1;
-    --slate-500: #64748B;
-    --slate-600: #475569;
-    --slate-800: #1E293B;
-    --slate-900: #0F172A;
-
-    /* Thang hổ phách (Amber) - dùng cho brand-color & nút cam */
-    --amber-400: #F4AE36;
-    --amber-600: #E08B10;
-
-    /* Thang ngữ nghĩa Thành công (Success) */
-    --green-50:  #F0FDF4;
-    --green-100: #DCFCE7;
-    --green-600: #16A34A;
-    --green-800: #166534;
-
-    /* Thang ngữ nghĩa Lỗi (Error) */
-    --red-50:  #FEF2F2;
-    --red-100: #FEE2E2;
-    --red-600: #DC2626;
-    --red-800: #991B1B;
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) - trỏ vào Primitive ở trên ===== */
-    --bg-app: var(--slate-50);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--blue-500) 6%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--slate-50), var(--slate-100));
-    --header-bg: rgba(255,255,255,0.85);
-    --card-bg: #FFFFFF;
-    --card-bg-solid: #FFFFFF;
-    --border: rgba(0,0,0,0.08);
-    --text-main: var(--slate-800);
-    --text-muted: var(--slate-500);
-    --heading-color: var(--slate-900);
-    --brand-color: var(--amber-600);
-
-    --accent: var(--blue-600);
-    --accent-gradient: linear-gradient(90deg, var(--blue-600), var(--blue-500));
-
-    --btn-orange: linear-gradient(180deg, var(--amber-400), var(--amber-600));
-    --btn-orange-text: #FFFFFF;
-    --btn-text: #FFFFFF;
-
-    --badge-ok-bg: var(--green-100);
-    --badge-ok-text: var(--green-800);
-    --badge-err-bg: var(--red-100);
-    --badge-err-text: var(--red-800);
-
-    --input-bg: var(--slate-50);
-    --input-border: var(--slate-300);
-
-    --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    --table-th-bg: var(--slate-100);
-    --table-th-text: var(--slate-600);
-    --table-row-hover: var(--slate-50);
-
-    --amount-in: var(--green-600);
-    --amount-out: var(--red-600);
-    --total-row-bg: var(--blue-50);
-    --total-row-bg-solid: var(--blue-50);
-    --checkbox-bg: var(--slate-50);
-    --settings-panel-bg: rgba(0,0,0,0.04);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: #FFFFFF;
-  }
-
-  /* ===================== CÁC THEME BỔ SUNG ===================== */
-  /* Theme "Xanh Rêu Chuyên Nghiệp" (nền sáng) — dựa palette #5D8696/#78ABAF/#8FAFCC/#CCA885
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
-  body.theme-teal {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    --teal-400: #78ABAF;
-    --teal-500: #5D8696;
-
-    --sand-400: #CCA885;
-    --sand-600: #B5905F;
-
-    --green-50:  #E1EFE9;
-    --green-600: #2F8F6B;
-    --green-700: #2F6B4F;
-
-    --rust-50:  #FBEAE0;
-    --rust-600: #C1622E;
-    --rust-700: #A15A2A;
-
-    --mist-25:  #F8FAFA;
-    --mist-50:  #F0F4F5;
-    --mist-75:  #F5F8F8;
-    --mist-100: #E4EBEC;
-    --mist-150: #EEF3F3;
-    --mist-total: #E7F0F1;
-    --mist-border: #C7D3D5;
-
-    --ink-500: #6B8288;
-    --ink-600: #4C6367;
-    --ink-800: #2A3B40;
-    --ink-900: #1F2D30;
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
-    --bg-app: var(--mist-50);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--teal-500) 10%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--mist-50), var(--mist-100));
-    --header-bg: rgba(255,255,255,0.85);
-    --card-bg: #FFFFFF;
-    --card-bg-solid: #FFFFFF;
-    --border: color-mix(in srgb, var(--teal-500) 18%, transparent);
-    --text-main: var(--ink-800);
-    --text-muted: var(--ink-500);
-    --heading-color: var(--ink-900);
-    --brand-color: var(--teal-500);
-
-    --accent: var(--teal-500);
-    --accent-gradient: linear-gradient(90deg, var(--teal-500), var(--teal-400));
-    --accent-hover: var(--teal-400);
-
-    --btn-orange: linear-gradient(180deg, var(--sand-400), var(--sand-600));
-    --btn-orange-text: #FFFFFF;
-    --btn-text: #FFFFFF;
-
-    --badge-ok-bg: var(--green-50);
-    --badge-ok-text: var(--green-700);
-    --badge-err-bg: var(--rust-50);
-    --badge-err-text: var(--rust-700);
-
-    --input-bg: var(--mist-25);
-    --input-border: var(--mist-border);
-    --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    --table-th-bg: var(--mist-150);
-    --table-th-text: var(--ink-600);
-    --table-row-hover: var(--mist-75);
-
-    --amount-in: var(--green-600);
-    --amount-out: var(--rust-600);
-    --total-row-bg: var(--mist-total);
-    --total-row-bg-solid: var(--mist-total);
-    --checkbox-bg: var(--mist-25);
-    --settings-panel-bg: rgba(0,0,0,0.03);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: #FFFFFF;
-  }
-
-  /* Theme "Nâu Đất Tối" (dark mode thay thế) — dựa palette #534739/#9E8774/#1F2D33/#0D0D0C
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
-  body.theme-earth-dark {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    --taupe-200: #D8C4B0;
-    --taupe-400: #C2AB94;
-    --taupe-500: #9E8774;
-    --taupe-900: #2A2016;
-
-    --coral-300: #F0A98F;
-    --coral-500: #E86349;
-
-    --mint-300: #A9D8C0;
-
-    --charcoal-800: #1F2D33;
-    --charcoal-900: #14171A;
-    --charcoal-950: #0D0D0C;
-
-    --linen-50: #F0F2F1;
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
-    --bg-app: var(--charcoal-900);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--taupe-500) 14%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--charcoal-900), var(--charcoal-950));
-    --header-bg: color-mix(in srgb, var(--charcoal-900) 40%, transparent);
-    --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--charcoal-800) 90%, transparent), color-mix(in srgb, var(--charcoal-900) 80%, transparent));
-    --card-bg-solid: var(--charcoal-800);
-    --border: color-mix(in srgb, var(--taupe-500) 22%, transparent);
-    --text-main: var(--linen-50);
-    --text-muted: color-mix(in srgb, var(--linen-50) 60%, transparent);
-    --heading-color: #FFFFFF;
-    --brand-color: var(--taupe-500);
-
-    --accent: var(--taupe-500);
-    --accent-gradient: linear-gradient(90deg, var(--taupe-500), var(--taupe-400));
-    --accent-hover: var(--taupe-400);
-
-    --btn-orange: linear-gradient(180deg, var(--taupe-400), var(--taupe-500));
-    --btn-orange-text: var(--charcoal-900);
-    --btn-text: var(--charcoal-900);
-
-    --badge-ok-bg: color-mix(in srgb, var(--taupe-500) 18%, transparent);
-    --badge-ok-text: var(--taupe-200);
-    --badge-err-bg: color-mix(in srgb, var(--coral-500) 18%, transparent);
-    --badge-err-text: var(--coral-300);
-
-    --input-bg: color-mix(in srgb, var(--charcoal-800) 50%, transparent);
-    --input-border: color-mix(in srgb, var(--linen-50) 14%, transparent);
-    --card-shadow: 0 12px 30px -12px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
-    --table-th-bg: rgba(0,0,0,0.25);
-    --table-th-text: var(--taupe-400);
-    --table-row-hover: rgba(255,255,255,0.04);
-
-    --amount-in: var(--mint-300);
-    --amount-out: var(--coral-300);
-    --total-row-bg: color-mix(in srgb, var(--taupe-500) 16%, transparent);
-    --total-row-bg-solid: var(--taupe-900);
-    --checkbox-bg: rgba(255,255,255,0.02);
-    --settings-panel-bg: rgba(0,0,0,0.25);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: rgba(255,255,255,0.05);
-  }
-
-  /* Theme "San Hô Đêm" (dark mode thay thế) — dựa palette #213271/#367098/#79BBCF/#E86349/#DDFAFB
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
-  body.theme-coral-dark {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    --cyan-300: #79BBCF;
-    --cyan-600: #367098;
-
-    /* Ba mức tint nhạt riêng biệt (không cùng 1 thang tuyến tính trong bản gốc, giữ nguyên để không lệch màu) */
-    --sky-100: #C6EEF5;
-    --sky-150: #A9E6EF;
-    --sky-200: #9FC7DA;
-
-    --coral-300: #FFC0AE;
-    --coral-400: #F08066;
-    --coral-500: #E86349;
-
-    --midnight-700: #213271;
-    --midnight-800: #1B2A5C;
-    --midnight-900: #10182E;
-    --midnight-950: #0A0F20;
-
-    --frost-50: #EAF9FA;
-    --steel-300: #8CA0DC;
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
-    --bg-app: var(--midnight-900);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--coral-500) 12%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--midnight-900), var(--midnight-950));
-    --header-bg: color-mix(in srgb, var(--midnight-900) 40%, transparent);
-    --card-bg: linear-gradient(180deg, color-mix(in srgb, var(--midnight-700) 90%, transparent), color-mix(in srgb, var(--midnight-900) 80%, transparent));
-    --card-bg-solid: var(--midnight-700);
-    --border: color-mix(in srgb, var(--steel-300) 20%, transparent);
-    --text-main: var(--frost-50);
-    --text-muted: color-mix(in srgb, var(--frost-50) 60%, transparent);
-    --heading-color: #FFFFFF;
-    --brand-color: var(--coral-500);
-
-    --accent: var(--cyan-600);
-    --accent-gradient: linear-gradient(90deg, var(--cyan-600), var(--cyan-300));
-    --accent-hover: var(--cyan-300);
-
-    --btn-orange: linear-gradient(180deg, var(--coral-400), var(--coral-500));
-    --btn-orange-text: var(--midnight-900);
-    --btn-text: var(--midnight-900);
-
-    --badge-ok-bg: color-mix(in srgb, var(--cyan-300) 18%, transparent);
-    --badge-ok-text: var(--sky-100);
-    --badge-err-bg: color-mix(in srgb, var(--coral-500) 20%, transparent);
-    --badge-err-text: var(--coral-300);
-
-    --input-bg: color-mix(in srgb, var(--midnight-700) 50%, transparent);
-    --input-border: color-mix(in srgb, var(--frost-50) 14%, transparent);
-    --card-shadow: 0 12px 30px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
-    --table-th-bg: rgba(0,0,0,0.22);
-    --table-th-text: var(--sky-200);
-    --table-row-hover: rgba(255,255,255,0.04);
-
-    --amount-in: var(--sky-150);
-    --amount-out: var(--coral-300);
-    --total-row-bg: color-mix(in srgb, var(--cyan-600) 20%, transparent);
-    --total-row-bg-solid: var(--midnight-800);
-    --checkbox-bg: rgba(255,255,255,0.02);
-    --settings-panel-bg: rgba(0,0,0,0.22);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: rgba(255,255,255,0.05);
-  }
-
-  /* Theme "Tím Lavender" (nền sáng) — dựa palette #5D7FE5/#9899EE/#B7C2ED/#FBE8FD/#FDBBDB
-     ĐÃ TÁI CẤU TRÚC THEO 3 LỚP DESIGN TOKEN. */
-  body.theme-lavender {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    --violet-400: #9899EE;
-    --violet-500: #5D7FE5;
-    --violet-600: #4557B5;
-    --violet-700: #3F4FA8;
-
-    --pink-50:  #FDE8F1;
-    --pink-300: #FDBBDB;
-    --pink-500: #F591BC;
-    --pink-600: #C24C82;
-    --pink-700: #B23D74;
-
-    --lilac-50:  #F3F2FC;
-    --lilac-75:  #F7F7FC;
-    --lilac-100: #EDEBF9;
-    --lilac-150: #F1F1FA;
-    --lilac-input: #F8F8FD;
-    --lilac-border: #D6D9F2;
-    --lilac-badge: #E6E9FC;
-    --lilac-total: #ECEDFB;
-
-    --ink-500: #7A7FA6;
-    --ink-600: #5B5F8C;
-    --ink-800: #363A63;
-    --ink-900: #2B2F55;
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) ===== */
-    --bg-app: var(--lilac-50);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--violet-500) 10%, transparent), transparent 70%),
-                   radial-gradient(800px 500px at 50% 120%, color-mix(in srgb, var(--pink-300) 14%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--lilac-50), var(--lilac-100));
-    --header-bg: rgba(255,255,255,0.85);
-    --card-bg: #FFFFFF;
-    --card-bg-solid: #FFFFFF;
-    --border: color-mix(in srgb, var(--violet-500) 16%, transparent);
-    --text-main: var(--ink-800);
-    --text-muted: var(--ink-500);
-    --heading-color: var(--ink-900);
-    --brand-color: var(--violet-500);
-
-    --accent: var(--violet-500);
-    --accent-gradient: linear-gradient(90deg, var(--violet-500), var(--violet-400));
-    --accent-hover: var(--violet-400);
-
-    --btn-orange: linear-gradient(180deg, var(--pink-300), var(--pink-500));
-    --btn-orange-text: #4A1E33;
-    --btn-text: #FFFFFF;
-
-    --badge-ok-bg: var(--lilac-badge);
-    --badge-ok-text: var(--violet-700);
-    --badge-err-bg: var(--pink-50);
-    --badge-err-text: var(--pink-700);
-
-    --input-bg: var(--lilac-input);
-    --input-border: var(--lilac-border);
-    --card-shadow: 0 4px 14px color-mix(in srgb, var(--violet-500) 8%, transparent);
-    --table-th-bg: var(--lilac-150);
-    --table-th-text: var(--ink-600);
-    --table-row-hover: var(--lilac-75);
-
-    --amount-in: var(--violet-600);
-    --amount-out: var(--pink-600);
-    --total-row-bg: var(--lilac-total);
-    --total-row-bg-solid: var(--lilac-total);
-    --checkbox-bg: var(--lilac-input);
-    --settings-panel-bg: color-mix(in srgb, var(--violet-500) 4%, transparent);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: #FFFFFF;
-  }
-  /* ================================================================ */
-
-  /* Theme "Kế Toán" (nền sáng) — xanh navy pha xanh ngọc, xây theo đúng phương pháp
-     VibeCoding UI Color Handbook: 1 màu chủ đạo (H210° S28% L42%) → thang 50-900 →
-     4 màu ngữ nghĩa (success/warning/error/info) → màu trung tính (xám ngả xanh).
-     Mục tiêu cảm giác: Chính xác, Đáng tin cậy, Chuyên nghiệp, Bình tĩnh, An toàn tài chính. */
-  body.theme-accounting {
-    /* ===== LỚP 1: NGUYÊN THỦY (Primitive) ===== */
-    /* Thang Primary - xanh navy ngọc (H210°, S28%, L42%) */
-    --primary-50:  #F5F8FB;
-    --primary-100: #E9EFF5;
-    --primary-200: #D3DDE8;
-    --primary-300: #B5C6D8;
-    --primary-400: #8EA9C2;
-    --primary-500: #6E88A8;
-    --primary-600: #4A6A89;
-    --primary-700: #3C5770;
-    --primary-800: #2F4559;
-    --primary-900: #22313F;
-
-    /* Thang trung tính - xám ngả xanh (không dùng xám thuần) */
-    --gray-50:  #F7F9FB;
-    --gray-100: #EEF2F6;
-    --gray-200: #DCE3EA;
-    --gray-300: #C3CDD7;
-    --gray-400: #9AA7B5;
-    --gray-500: #728190;
-    --gray-600: #556270;
-    --gray-700: #404B57;
-    --gray-800: #2E3640;
-    --gray-900: #20262E;
-
-    /* 4 màu ngữ nghĩa - mỗi màu chỉ cho 1 giá trị gốc, các sắc nhạt/đậm dẫn xuất qua color-mix */
-    --success-500: #2F8F63; /* Đã hạch toán / Thanh toán thành công / Đã đối soát */
-    --warning-500: #D39A28; /* Sắp đến hạn / Cần kiểm tra / Thiếu chứng từ */
-    --error-500:   #C84E4E; /* Sai dữ liệu / Không cân sổ / Lỗi hóa đơn */
-    --info-500:    #3C82C8; /* Thông báo / Đang xử lý / Đang đồng bộ */
-
-    /* ===== LỚP 2: NGỮ NGHĨA (Semantic) - trỏ vào Primitive ở trên =====
-       Quy tắc 60-30-10: 60% nền/xám nhạt (bg-app, card), 30% panel/bảng (table-th-bg,
-       total-row-bg), 10% nút/liên kết/số liệu quan trọng (accent, amount-in/out). */
-    --bg-app: var(--primary-50);
-    --bg-gradient: radial-gradient(900px 480px at 50% -140px, color-mix(in srgb, var(--primary-500) 8%, transparent), transparent 70%),
-                   linear-gradient(180deg, var(--primary-50), var(--gray-100));
-    --header-bg: rgba(255,255,255,0.85);
-    --card-bg: #FFFFFF;
-    --card-bg-solid: #FFFFFF;
-    --border: var(--gray-200);
-    --text-main: var(--gray-900);
-    --text-muted: var(--gray-600);
-    --heading-color: var(--primary-800);
-    --brand-color: var(--primary-600);
-
-    --accent: var(--primary-600);
-    --accent-gradient: linear-gradient(90deg, var(--primary-600), var(--primary-500));
-    --accent-hover: var(--primary-700);
-
-    --btn-orange: linear-gradient(180deg, color-mix(in srgb, var(--warning-500) 78%, white), color-mix(in srgb, var(--warning-500) 78%, black));
-    --btn-orange-text: #FFFFFF;
-    --btn-text: #FFFFFF;
-
-    --badge-ok-bg: color-mix(in srgb, var(--success-500) 15%, white);
-    --badge-ok-text: color-mix(in srgb, var(--success-500) 65%, black);
-    --badge-err-bg: color-mix(in srgb, var(--error-500) 15%, white);
-    --badge-err-text: color-mix(in srgb, var(--error-500) 65%, black);
-
-    --input-bg: var(--gray-50);
-    --input-border: var(--gray-300);
-    --card-shadow: 0 4px 12px color-mix(in srgb, var(--primary-600) 8%, transparent);
-    --table-th-bg: var(--gray-100);
-    --table-th-text: var(--gray-600);
-    --table-row-hover: var(--gray-50);
-
-    --amount-in: var(--success-500);
-    --amount-out: var(--error-500);
-    --total-row-bg: var(--primary-100);
-    --total-row-bg-solid: var(--primary-100);
-    --checkbox-bg: var(--gray-50);
-    --settings-panel-bg: color-mix(in srgb, var(--primary-600) 4%, transparent);
-
-    --cal-active-bg: #C5221F;
-    --cal-active-text: #FFFFFF;
-    --cal-block-bg: #FFFFFF;
   }
 
   * { box-sizing: border-box; }
@@ -795,8 +334,6 @@
   }
   input:checked + .slider { background-color: var(--accent); }
   input:checked + .slider:before { transform: translateX(18px); }
-
-  body.light-mode .slider { background-color: #94a3b8; }
 
   /* TRẠNG THÁI SIDEBAR KHI THU GỌN */
   .sidebar.collapsed { width: 78px; }
@@ -1904,10 +1441,9 @@
 
 
 /* =====================================================================
-   APP V3 — "Trung tâm quy trình" (concept B), nạp SAU app.css.
-   Trang chủ là danh sách công việc; mỗi công cụ có thanh 3 bước
-   (Nhập → Kiểm tra → Xuất) và thanh hành động dính ở đáy.
-   Màu lấy hoàn toàn từ token của theme đang chọn nên 7 theme vẫn chạy.
+   BỐ CỤC CHUNG (trang chủ danh sách công việc + màn hình công cụ).
+   Màu lấy hoàn toàn từ token của theme đang chọn; giao diện kính Liquid Glass
+   (2 theme Glass sáng / Glass tối) nằm trong v4.css, nạp sau file này.
    Mọi rule neo dưới body.v3 để thắng app.css mà không cần !important.
    ===================================================================== */
 
@@ -1921,7 +1457,6 @@ body.v3 {
   --v3-accent-softer: color-mix(in srgb, var(--accent) 7%, transparent);
   --v3-wash: color-mix(in srgb, var(--text-main) 5%, transparent);
   --v3-surface: var(--card-bg-solid, var(--bg-app));
-  --v3-bar-bg: color-mix(in srgb, var(--card-bg-solid, var(--bg-app)) 86%, transparent);
   --v3-focus: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
   --v3-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --v3-dur: 200ms;
@@ -2024,22 +1559,6 @@ body.v3 .v3-task-icon {
 body.v3 .v3-task-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 body.v3 .v3-task-title { font-size: 15.5px; font-weight: 650; color: var(--heading-color); letter-spacing: -0.01em; }
 body.v3 .v3-task-desc { font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
-body.v3 .v3-flow {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 6px;
-  font-size: 12px; font-weight: 500; color: var(--text-main);
-}
-body.v3 .v3-flow { counter-reset: v3flow; }
-body.v3 .v3-flow > span:not(.v3-flow-sep) {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 2px 9px 2px 3px; border-radius: 999px; background: var(--v3-wash); white-space: nowrap;
-}
-body.v3 .v3-flow > span:not(.v3-flow-sep)::before {
-  counter-increment: v3flow; content: counter(v3flow);
-  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
-  background: var(--card-bg-solid, var(--bg-app)); color: var(--text-muted);
-  font-size: 10.5px; font-weight: 700;
-}
-body.v3 .v3-flow-sep { display: none; }
 body.v3 .v3-task-meta {
   grid-column: 2; margin-top: 6px; font-size: 12px; color: var(--text-muted);
 }
@@ -2062,9 +1581,7 @@ body.v3 .v3-chip small { color: var(--text-muted); font-weight: 500; font-size: 
 body.v3 .v3-tool { display: flex; flex-direction: column; min-height: 100%; }
 body.v3 .v3-tool[hidden], body.v3 .v3-home[hidden] { display: none; }
 body.v3 .v3-tool-head,
-body.v3 .v3-stepper,
-body.v3 .v3-panels,
-body.v3 .v3-actionbar > * { width: 100%; }
+body.v3 .v3-panels { width: 100%; }
 body.v3 .v3-tool-head {
   max-width: var(--v3-max); margin: 0 auto; box-sizing: border-box;
   padding: 22px clamp(16px, 4vw, 40px) 18px;
@@ -2080,60 +1597,6 @@ body.v3 .v3-tool-id { display: flex; align-items: flex-start; gap: 16px; }
 body.v3 .v3-tool-id .v3-task-icon { width: 48px; height: 48px; flex-shrink: 0; }
 body.v3 .v3-tool-id h1 { font-size: 24px; }
 
-/* Thanh bước — dính trên cùng vùng cuộn */
-body.v3 .v3-stepper-wrap {
-  position: sticky; top: 0; z-index: 6;
-  background: var(--v3-bar-bg);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-}
-/* Khung giữa: thanh bước + vạch tiến trình cùng bề rộng với nội dung, không kéo hết màn hình rộng */
-body.v3 .v3-stepper-inner {
-  position: relative; max-width: var(--v3-max); margin: 0 auto;
-  padding: 0 clamp(16px, 4vw, 40px); box-sizing: border-box;
-}
-body.v3 .v3-progress {
-  position: absolute; left: clamp(16px, 4vw, 40px); right: clamp(16px, 4vw, 40px);
-  bottom: -1px; height: 2px; border-radius: 2px; background: transparent;
-}
-body.v3 .v3-progress-bar {
-  display: block; height: 100%; width: 0; background: var(--accent);
-  transition: width 320ms var(--v3-ease);
-}
-body.v3 .v3-stepper {
-  list-style: none; margin: 0 -10px; width: calc(100% + 20px) !important; box-sizing: border-box;
-  padding: 8px 0;
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
-}
-body.v3 .v3-step-btn {
-  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
-  padding: 8px 10px; border-radius: var(--v3-radius);
-  background: transparent; color: var(--text-muted); box-shadow: none; font-weight: 500;
-  transition: background-color 150ms ease, color 150ms ease;
-}
-body.v3 .v3-step-btn:hover { background: var(--v3-wash); filter: none; transform: none; box-shadow: none; }
-body.v3 .v3-step-btn:active { transform: scale(0.99); }
-body.v3 .v3-step-dot {
-  position: relative; flex-shrink: 0;
-  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-  border: 1.5px solid var(--input-border); background: var(--v3-surface);
-  font-size: 12.5px; font-weight: 700; color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
-}
-body.v3 .v3-step-dot svg { position: absolute; opacity: 0; transform: scale(0.6); transition: opacity 180ms ease, transform 220ms var(--v3-ease); }
-body.v3 .v3-step-num { transition: opacity 120ms ease; }
-body.v3 .v3-step-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-body.v3 .v3-step-kicker { font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; opacity: 0.8; }
-body.v3 .v3-step-label { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-body.v3 .v3-step.is-current .v3-step-btn { color: var(--heading-color); background: var(--v3-accent-softer); }
-body.v3 .v3-step.is-current .v3-step-dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--v3-accent-soft); }
-body.v3 .v3-step.is-done .v3-step-btn { color: var(--text-main); }
-body.v3 .v3-step.is-done .v3-step-dot { background: var(--accent); border-color: var(--accent); color: var(--btn-text); }
-body.v3 .v3-step.is-done .v3-step-num { opacity: 0; }
-body.v3 .v3-step.is-done .v3-step-dot svg { opacity: 1; transform: scale(1); }
-
 /* Nội dung công cụ */
 body.v3 .v3-panels.main-content {
   flex: 1 0 auto; max-width: var(--v3-max); margin: 0 auto; box-sizing: border-box;
@@ -2145,42 +1608,6 @@ body.v3 .tab-panel { animation: v3PanelIn 240ms var(--v3-ease); }
 body.v3 .tab-panel > h2,
 body.v3 .tab-panel > div:first-child > h2 { display: none; }
 body.v3 #tabBulk > div:first-child { justify-content: flex-end !important; margin-bottom: 8px !important; }
-
-/* Khu vực đang được nhấn mạnh khi bấm vào một bước */
-body.v3 .v3-flash { animation: v3Flash 900ms ease; border-radius: var(--v3-radius-lg); }
-@keyframes v3Flash {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-  25% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-}
-
-/* Thanh hành động dính đáy */
-body.v3 .v3-actionbar {
-  position: sticky; bottom: 0; z-index: 6;
-  display: flex; align-items: center; gap: 12px;
-  /* nội dung thanh đáy thẳng hàng với cột nội dung (tối đa --v3-max), nền vẫn tràn hết chiều ngang */
-  --v3-gutter: clamp(16px, 4vw, 40px);
-  padding: 10px max(var(--v3-gutter), calc((100% - var(--v3-max)) / 2 + var(--v3-gutter)));
-  background: var(--v3-bar-bg);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border);
-}
-body.v3 .v3-actionbar > * { width: auto; }
-body.v3 .v3-actionbar-back {
-  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
-  padding: 8px 10px 8px 6px; border-radius: var(--v3-radius-sm);
-  color: var(--text-muted); font-size: 13px; font-weight: 600; text-decoration: none;
-}
-body.v3 .v3-actionbar-back:hover { color: var(--text-main); background: var(--v3-wash); }
-body.v3 .v3-actionbar-back:focus-visible { outline: none; box-shadow: var(--v3-focus); }
-body.v3 .v3-actionbar-hint {
-  flex: 1 1 auto; min-width: 0; margin: 0; text-align: right;
-  font-size: 13px; color: var(--text-muted);
-}
-body.v3 .v3-next { flex-shrink: 0; }
-body.v3 .v3-next.is-quiet {
-  background: transparent; color: var(--text-main); border: 1px solid var(--input-border); box-shadow: none;
-}
 
 /* ---------- THÀNH PHẦN DÙNG CHUNG ---------- */
 body.v3 .card {
@@ -2494,16 +1921,6 @@ body.v3 .v3-issue-list {
   body.v3 .v3-tool-id h1 { font-size: 20px; }
   body.v3 .v3-tool-id .v3-task-icon { width: 40px; height: 40px; }
   body.v3 .v3-tool-head .v3-lead { display: none; }
-  /* Bước: chỉ hiện nhãn của bước hiện tại để không bị chật */
-  body.v3 .v3-stepper { display: flex; gap: 4px; padding: 6px 0; }
-  body.v3 .v3-step { flex: 0 0 auto; }
-  body.v3 .v3-step.is-current { flex: 1 1 auto; min-width: 0; }
-  body.v3 .v3-step:not(.is-current) .v3-step-text { display: none; }
-  body.v3 .v3-step:not(.is-current) .v3-step-btn { padding: 8px 6px; }
-  body.v3 .v3-actionbar-back span { display: none; }
-  body.v3 .v3-actionbar-hint { display: none; }
-  body.v3 .v3-actionbar { justify-content: space-between; }
-  body.v3 .v3-next { flex: 1 1 auto; }
   body.v3 .card { padding: 16px; }
   /* iOS Safari tự phóng to khi focus ô nhập có font < 16px và không thu lại */
   body.v3 input, body.v3 select, body.v3 textarea { font-size: 16px !important; }
@@ -2511,9 +1928,7 @@ body.v3 .v3-issue-list {
 
 @media (prefers-reduced-motion: reduce) {
   body.v3 .tab-panel { animation: v3Fade 160ms ease; }
-  body.v3 .v3-progress-bar, body.v3 .v3-step-dot, body.v3 .v3-step-dot svg,
   body.v3 .v3-task, body.v3 button { transition: none; }
-  body.v3 .v3-flash { animation: none; outline: 2px solid var(--accent); outline-offset: 2px; }
   ::view-transition-old(root), ::view-transition-new(root), ::view-transition-group(v3-icon) { animation: none; }
 }
 @keyframes v3Fade { from { opacity: 0; } to { opacity: 1; } }
@@ -2580,9 +1995,6 @@ body.v3 .v3-trade .trade-status.is-err { color: #dc2626; }
 
 /* Trade: mở rộng hết bề ngang trình duyệt (chỉ khi đang ở #/trade) */
 body.v3.trade-wide { --v3-max: 100%; }
-/* Trang Trade không cần thanh 3 bước và thanh hành động ở đáy */
-body.v3.trade-wide .v3-stepper-wrap,
-body.v3.trade-wide .v3-actionbar { display: none; }
 
 /* Trade: biểu đồ + cột danh sách coin bên phải */
 .trade-main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; align-items: stretch; }

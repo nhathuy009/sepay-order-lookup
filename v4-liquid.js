@@ -1,4 +1,4 @@
-/* V4 — LIQUID GLASS. Chạy SAU app.js, chỉ dùng trong v4.html. Chỉ thêm hiệu ứng, không đổi logic dữ liệu.
+/* V4 — LIQUID GLASS. Chạy SAU app.js, nạp trong index.html. Chỉ thêm hiệu ứng, không đổi logic dữ liệu.
    1. Khúc xạ mép kính (chỉ Chromium hỗ trợ backdrop-filter: url(#svg)): mỗi bề mặt nổi có 1 bản đồ dịch chuyển
       vẽ theo đúng kích thước + bo góc của nó -> nền phía sau bị bẻ cong dọc mép như thấu kính.
    2. Ánh sáng phản chiếu (specular) đi theo con trỏ / ngón tay.
