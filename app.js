@@ -173,6 +173,55 @@ function renderWeeklyCalendar() {
     wrap.innerHTML = html;
 }
 
+// =======================================================
+// BẢNG GIÁ MUA USDT BẰNG VND (Binance P2P) CẠNH LỊCH TUẦN
+// Top 3 quảng cáo rẻ nhất, qua /api/index (action p2p_usdt_vnd) vì trình duyệt không gọi thẳng Binance được (CORS).
+// =======================================================
+const P2P_REFRESH_MS = 60000;
+const p2pVnd = n => Math.round(n).toLocaleString("vi-VN");
+function fmtVndShort(n) {
+  if (n >= 1e9) return (n / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + " tỷ";
+  if (n >= 1e6) return (n / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "tr";
+  if (n >= 1e3) return Math.round(n / 1e3) + "K";
+  return String(Math.round(n));
+}
+
+async function loadP2PPrices() {
+  const widget = document.getElementById("p2pWidget");
+  const list = document.getElementById("p2pList");
+  if (!widget || !list || document.hidden) return;
+  try {
+    const resp = await fetch("/api/index", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "p2p_usdt_vnd", access_token: getToken() })
+    });
+    if (resp.status === 401) { widget.hidden = true; return; }   // chưa nhập mật khẩu hệ thống
+    const data = await resp.json();
+    if (!resp.ok || !data.ads || !data.ads.length) throw new Error(data.error || "Không có dữ liệu");
+
+    list.innerHTML = data.ads.map((ad, i) => {
+      const tip = `${ad.merchant} · ${p2pVnd(ad.orders)} lệnh/30 ngày · ${(ad.finish_rate * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}% hoàn thành\n`
+        + `Hạn mức: ${p2pVnd(ad.min)} – ${p2pVnd(ad.max)} ₫ · còn ${ad.available.toLocaleString("vi-VN")} USDT\n`
+        + ad.methods.join(", ");
+      return `<span class="cal-day-block p2p-block" title="${escapeHtml(tip)}">
+          <span class="cal-dow">#${i + 1}</span>
+          <span class="cal-date">${p2pVnd(ad.price)}</span>
+          <span class="cal-lunar-date">${fmtVndShort(ad.min)}–${fmtVndShort(ad.max)}</span>
+        </span>`;
+    }).join("");
+    const t = new Date(data.updated_at * 1000);
+    document.getElementById("p2pUpdated").textContent =
+      "Binance P2P · " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+    widget.classList.remove("is-stale");
+    widget.removeAttribute("title");
+    widget.hidden = false;
+  } catch (e) {
+    // Giữ giá cũ (nếu có), làm mờ để báo đang không cập nhật được
+    widget.classList.add("is-stale");
+    widget.title = "Không cập nhật được giá: " + (e.message || e);
+  }
+}
+
 const FIELDS = [
   ["order_code", "Mã đơn/KH"], ["system", "Hệ thống"], ["lead_email", "Email KH"],
   ["lead_phone", "SĐT KH"], ["lead_cccd", "Số CCCD"], ["username", "Username"],
@@ -219,6 +268,7 @@ function saveToken() {
   try {
     localStorage.setItem("sepay_access_token", token);
     setAuthUIState(false);
+    loadP2PPrices();
   } catch(e) { alert("Không thể lưu mật khẩu do trình duyệt chặn."); }
 }
 
@@ -329,6 +379,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // RENDER LỊCH TUẦN LÊN HEADER
   renderWeeklyCalendar();
+  // Bảng giá mua USDT cạnh lịch: nạp ngay, làm mới mỗi 60 giây (bỏ qua khi tab đang ẩn), nạp lại khi quay lại tab
+  loadP2PPrices();
+  setInterval(loadP2PPrices, P2P_REFRESH_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadP2PPrices(); });
   // Tự động thêm 1 dòng điền hàng hóa trống sẵn cho tab eHoadon
   addEhoadonItemRow();
 });

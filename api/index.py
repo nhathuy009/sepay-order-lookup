@@ -7,6 +7,7 @@ import sys
 import urllib.parse
 import requests
 import re
+import time
 import traceback
 from http.server import BaseHTTPRequestHandler
 
@@ -780,6 +781,56 @@ def handle_fetch_vax1(body):
         return 400, {"error": f"Không tải được URL: {e}"}
 
 
+# Bảng giá P2P Binance: top 3 quảng cáo BÁN USDT lấy VND (góc nhìn người MUA USDT), rẻ nhất trước.
+BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
+P2P_CACHE_SECONDS = 20
+_p2p_cache = {"t": 0.0, "payload": None}
+
+
+def handle_p2p_usdt_vnd(body):
+    now = time.time()
+    if _p2p_cache["payload"] and now - _p2p_cache["t"] < P2P_CACHE_SECONDS:
+        return 200, _p2p_cache["payload"]
+    try:
+        resp = requests.post(
+            BINANCE_P2P_URL,
+            json={"fiat": "VND", "asset": "USDT", "tradeType": "BUY", "page": 1, "rows": 3,
+                  "payTypes": [], "publisherType": None},
+            headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, ValueError) as e:
+        return 502, {"error": f"Không lấy được giá Binance P2P: {e}"}
+    if not data.get("success"):
+        return 502, {"error": data.get("message") or "Binance P2P trả lỗi"}
+
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return 0.0
+
+    ads = []
+    for item in (data.get("data") or [])[:3]:
+        adv = item.get("adv") or {}
+        user = item.get("advertiser") or {}
+        ads.append({
+            "price": num(adv.get("price")),
+            "min": num(adv.get("minSingleTransAmount")),
+            "max": num(adv.get("maxSingleTransAmount")),
+            "available": num(adv.get("tradableQuantity")),
+            "methods": [m.get("tradeMethodName") for m in (adv.get("tradeMethods") or []) if m.get("tradeMethodName")],
+            "merchant": user.get("nickName") or "",
+            "orders": user.get("monthOrderCount") or 0,
+            "finish_rate": num(user.get("monthFinishRate")),
+        })
+    payload = {"ads": ads, "updated_at": int(now)}
+    _p2p_cache.update(t=now, payload=payload)
+    return 200, payload
+
+
 class handler(BaseHTTPRequestHandler):
     def _send(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -872,6 +923,8 @@ class handler(BaseHTTPRequestHandler):
             status, payload = handle_parse_customs_declaration(body)
         elif action == "fetch_vax1":
             status, payload = handle_fetch_vax1(body)
+        elif action == "p2p_usdt_vnd":
+            status, payload = handle_p2p_usdt_vnd(body)
         else:
             status, payload = 400, {"error": f"action không hợp lệ: {action}"}       
         self._send(status, payload)
