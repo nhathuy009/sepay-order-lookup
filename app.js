@@ -230,28 +230,21 @@ function toggleSidebar() {
   localStorage.setItem("sidebar_collapsed", isCollapsed ? "true" : "false");
 }
 
-// Danh sách toàn bộ theme hiện có. Mỗi theme khai báo:
-//  - class: class gắn lên <body> ("" nghĩa là theme mặc định, không cần class)
+// Danh sách theme (giao diện Liquid Glass, định nghĩa trong v4.css). Mỗi theme khai báo:
+//  - class: class gắn lên <body>
 //  - flatpickr: bảng màu lịch flatpickr dùng kèm ("light" hoặc "dark")
 const THEMES = {
-  "dark":        { class: "",                 flatpickr: "dark"  },
-  "light":       { class: "light-mode",        flatpickr: "light" },
-  "teal":        { class: "theme-teal",         flatpickr: "light" },
-  "earth-dark":  { class: "theme-earth-dark",   flatpickr: "dark"  },
-  "coral-dark":  { class: "theme-coral-dark",   flatpickr: "dark"  },
-  "lavender":    { class: "theme-lavender",     flatpickr: "light" },
-  "accounting":  { class: "theme-accounting",   flatpickr: "light" },
-  // Chỉ dùng trên bản v4 (v4.html + v4.css)
   "glass-light": { class: "theme-glass-light",  flatpickr: "light" },
   "glass-dark":  { class: "theme-glass-dark",   flatpickr: "dark"  },
 };
 const THEME_CLASSES = Object.values(THEMES).map(t => t.class).filter(Boolean);
-// v4.html khai báo data-theme-store / data-theme-default trên <body> để không dùng chung lựa chọn theme với bản v3
-const THEME_STORE = document.body.dataset.themeStore || "app_theme";
-const THEME_DEFAULT = document.body.dataset.themeDefault || "light";
+const THEME_STORE = "app_theme_v4";
+const THEME_DEFAULT = "glass-light";
+// Người dùng từ giao diện cũ (khóa "app_theme", 7 theme) -> chuyển sang glass sáng/tối tương ứng
+const OLD_DARK_THEMES = ["dark", "earth-dark", "coral-dark"];
 
 function setTheme(themeName) {
-  if (!THEMES[themeName]) themeName = THEME_DEFAULT === "light" ? "dark" : THEME_DEFAULT;
+  if (!THEMES[themeName]) themeName = THEME_DEFAULT;
   const cfg = THEMES[themeName];
 
   // Gỡ hết class theme cũ trước khi gắn theme mới (không đụng tới các class khác như "has-token").
@@ -280,9 +273,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const isCollapsed = localStorage.getItem("sidebar_collapsed") === "true";
     if (isCollapsed) document.getElementById("appSidebar").classList.add("collapsed");
 
-    // Tương thích ngược: người dùng cũ chỉ có "light" hoặc "dark" trong localStorage,
-    // người dùng mới có thể đã chọn "teal" / "earth-dark" / "coral-dark".
-    const savedTheme = localStorage.getItem(THEME_STORE);
+    let savedTheme = localStorage.getItem(THEME_STORE);
+    if (!savedTheme) {
+      const oldTheme = localStorage.getItem("app_theme");
+      if (oldTheme) savedTheme = OLD_DARK_THEMES.includes(oldTheme) ? "glass-dark" : "glass-light";
+    }
     setTheme(savedTheme || THEME_DEFAULT);
   } catch(e) { setTheme(THEME_DEFAULT); }
 
@@ -6587,43 +6582,22 @@ async function copyVax1Result() {
 }
 
 
-/* APP V3 — "Trung tâm quy trình". Chạy SAU app.js.
+/* ĐIỀU HƯỚNG TRANG CHỦ <-> CÔNG CỤ. Chạy SAU app.js.
    - Điều hướng bằng hash: #/ = trang chủ, #/bulk ... = mở công cụ (nút Back của trình duyệt dùng được).
-   - Thanh 3 bước theo dõi trạng thái: có kết quả -> bước 2; bấm Copy/Tải/Lưu -> bước 3 hoàn tất.
    - Không đổi logic xử lý dữ liệu của app.js; chỉ gọi switchTab() để hiện đúng tab. */
 (function () {
   "use strict";
 
-  // ready: phần tử nào hiện ra (có kích thước) thì coi là đã có kết quả để kiểm tra.
-  var TOOLS = {
-    bulk:        { ready: "#bulkTbody tr" },
-    transaction: { ready: "#txSearchResult table, #txSearchResult .card, #txListResult table, #bankTableWrap" },
-    invoice:     { ready: "#invoiceTbody tr, #invoiceTable tbody tr, #invoiceByDateResultsContainer table" },
-    gdt:         { ready: "#gdtResultsContainer table, #gdtResultsContainer .card" },
-    air:         { ready: "#airResultArea" },
-    ehoadon:     { ready: "#ehoadonInvoiceCard, #ehoadonCustomsCard", input: "#ehoadonLoginCard" },
-    employee:    { ready: "#employeeResultCard" },
-    vax1:        { ready: "#vax1ResultCard" },
-    trade:       { ready: "#tradeList .trade-item" }
-  };
-  var EXPORT_RE = /copy|tải|lưu hóa đơn|lưu phiếu|tạo\s*&|tạo và lưu/i;
+  // Các công cụ hợp lệ (khớp data-key trên thẻ trang chủ và hash #/<key>)
+  var TOOLS = { bulk: 1, transaction: 1, invoice: 1, gdt: 1, air: 1, ehoadon: 1, employee: 1, vax1: 1, trade: 1 };
   var RECENT_KEY = "v3_recent";
 
   var $ = function (id) { return document.getElementById(id); };
   var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var state = {};           // key -> { ready: bool, exported: bool }
   var activeKey = null;
   var baseTitle = document.title;
 
-  function panelOf(key) { return $("tab" + key.charAt(0).toUpperCase() + key.slice(1)); }
   function cardOf(key) { return document.querySelector('.v3-task[data-key="' + key + '"]'); }
-  function visible(el) { return !!el && el.getClientRects().length > 0; }
-  function firstVisible(root, selector) {
-    if (!root || !selector) return null;
-    var list = root.querySelectorAll(selector);
-    for (var i = 0; i < list.length; i++) if (visible(list[i])) return list[i];
-    return null;
-  }
 
   /* ---------------- Lưu "dùng gần đây" (chỉ là tiện ích, lỗi thì bỏ qua) ---------------- */
   function readRecent() {
@@ -6680,113 +6654,6 @@ async function copyVax1Result() {
     $("v3Recent").hidden = !wrap.children.length;
   }
 
-  /* ---------------- Thanh bước ---------------- */
-  function stepOf(key) {
-    var s = state[key] || {};
-    return s.exported ? 4 : (s.ready ? 2 : 1);  // 4 = đã xong cả 3 bước
-  }
-
-  function targetFor(key, n) {
-    var panel = panelOf(key), cfg = TOOLS[key];
-    if (n === 1) return (cfg.input && $(cfg.input.slice(1))) || panel.querySelector(".card") || panel;
-    var ready = firstVisible(panel, cfg.ready);
-    var area = ready ? (ready.closest(".card") || ready) : null;
-    if (n === 2) return area;
-    var btns = panel.querySelectorAll("button");
-    for (var i = 0; i < btns.length; i++) {
-      if (visible(btns[i]) && EXPORT_RE.test(btns[i].textContent)) return btns[i];
-    }
-    return area;
-  }
-
-  function goToStep(n) {
-    if (!activeKey) return;
-    var el = targetFor(activeKey, n);
-    if (!el) {
-      $("v3ActionHint").textContent = n === 2
-        ? "Chưa có kết quả. Nhập dữ liệu và bấm nút chạy ở bước 1."
-        : "Chưa có gì để xuất. Hoàn tất bước 2 trước.";
-      return;
-    }
-    el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: n === 3 ? "center" : "start" });
-    var box = el.matches("button") ? el : (el.closest(".card") || el);
-    box.classList.remove("v3-flash");
-    void box.offsetWidth;
-    box.classList.add("v3-flash");
-    setTimeout(function () { box.classList.remove("v3-flash"); }, 950);
-    if (n === 1) {
-      var field = el.querySelector("textarea, input:not([type=hidden]):not([type=file]), select");
-      if (field && visible(field)) field.focus({ preventScroll: true });
-    } else if (el.matches("button")) {
-      el.focus({ preventScroll: true });
-    }
-  }
-
-  function renderSteps() {
-    if (!activeKey || !$("v3Stepper")) return;  // v4 không có thanh 3 bước
-    var labels = (cardOf(activeKey).getAttribute("data-steps") || "").split("|");
-    var cur = stepOf(activeKey);
-    document.querySelectorAll("#v3Stepper .v3-step").forEach(function (li) {
-      var n = Number(li.getAttribute("data-step"));
-      li.classList.toggle("is-done", n < cur);
-      li.classList.toggle("is-current", n === cur);
-      li.querySelector(".v3-step-label").textContent = labels[n - 1] || "";
-      var btn = li.querySelector(".v3-step-btn");
-      if (n === cur) btn.setAttribute("aria-current", "step"); else btn.removeAttribute("aria-current");
-      btn.setAttribute("aria-label", "Bước " + n + ": " + (labels[n - 1] || "") + (n < cur ? " (đã xong)" : ""));
-    });
-    var pct = cur >= 4 ? 100 : ((cur - 1) / 3 + 1 / 6) * 100;
-    $("v3ProgressBar").style.width = pct.toFixed(1) + "%";
-
-    var next = $("v3NextBtn"), hint = $("v3ActionHint");
-    if (cur === 1) {
-      next.textContent = "Đi tới ô nhập";
-      next.className = "v3-next is-quiet";
-      next.onclick = function () { goToStep(1); };
-      hint.textContent = "Bước 1 · " + labels[0] + ". Xong thì bấm nút chạy trong khung bên trên.";
-    } else if (cur === 2) {
-      next.textContent = "Tiếp: " + labels[2];
-      next.className = "v3-next";
-      next.onclick = function () { goToStep(3); };
-      hint.textContent = "Đã có kết quả. Kiểm tra lại trước khi xuất.";
-    } else {
-      next.textContent = "Về danh sách công việc";
-      next.className = "v3-next is-quiet";
-      next.onclick = function () { location.hash = "#/"; };
-      hint.textContent = "Đã xuất. Có thể chạy lại với dữ liệu khác.";
-    }
-  }
-
-  function evaluate() {
-    if (!activeKey) return;
-    var s = state[activeKey] || (state[activeKey] = {});
-    var ready = !!firstVisible(panelOf(activeKey), TOOLS[activeKey].ready);
-    if (ready !== !!s.ready) {
-      s.ready = ready;
-      if (!ready) s.exported = false;
-      renderSteps();
-    }
-  }
-
-  var pending = false;
-  var observer = new MutationObserver(function () {
-    if (pending) return;
-    pending = true;
-    requestAnimationFrame(function () { pending = false; evaluate(); });
-  });
-
-  document.addEventListener("click", function (e) {
-    var btn = e.target.closest && e.target.closest("button");
-    if (!btn || !activeKey) return;
-    var inTool = btn.closest(".tab-panel") === panelOf(activeKey) || btn.closest("#gdtDetailOverlay");
-    if (inTool && EXPORT_RE.test(btn.textContent)) {
-      var s = state[activeKey] || (state[activeKey] = {});
-      s.ready = true;
-      s.exported = true;
-      setTimeout(renderSteps, 0);
-    }
-  }, true);
-
   /* ---------------- Điều hướng ---------------- */
   function setIconName(el, on) { if (el) el.style.viewTransitionName = on ? "v3-icon" : ""; }
 
@@ -6821,9 +6688,6 @@ async function copyVax1Result() {
     document.title = title + " · 10X";
 
     pushRecent(key);
-    state[key] = state[key] || {};
-    state[key].ready = !!firstVisible(panelOf(key), TOOLS[key].ready);
-    renderSteps();
   }
 
   var previousKey = null;
@@ -6860,10 +6724,6 @@ async function copyVax1Result() {
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    observer.observe($("v3Panels"), { subtree: true, childList: true, attributes: true, attributeFilter: ["style", "class", "hidden"] });
-    document.querySelectorAll("#v3Stepper .v3-step-btn").forEach(function (b) {
-      b.addEventListener("click", function () { goToStep(Number(b.getAttribute("data-step"))); });
-    });
     window.addEventListener("hashchange", route);
     // Lần đầu: không chạy hiệu ứng chuyển cảnh
     var m = /^#\/([a-z0-9]+)/i.exec(location.hash || "");
