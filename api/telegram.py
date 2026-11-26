@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.append(os.path.dirname(__file__))
 from _core import lookup_order, detect_system
+from index import handle_p2p_usdt_vnd
+from datetime import datetime, timedelta, timezone
 
 VERCEL_DOMAIN = "https://nhathuy009.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -17,6 +19,7 @@ WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 HELP_TEXT = (
     "👋 <b>Bot tích hợp Đơn hàng & Giải trí</b>\n\n"
     "<b>Tra cứu đơn:</b> Gửi mã <code>DH18700</code> hoặc <code>BIZ02120</code>\n"
+    "<b>Giá USDT P2P:</b> Gửi <code>p2p</code>\n"
 )
 
 def tg_call(method, payload):
@@ -48,6 +51,26 @@ def format_result(d):
     ]
     return "\n".join(lines)
 
+def vnd(n):
+    return f"{n:,.0f}".replace(",", ".")
+
+def format_p2p():
+    status, data = handle_p2p_usdt_vnd({})
+    if status != 200:
+        return f"❌ {esc(data.get('error'))}"
+    if not data.get("ads"):
+        return "❌ Binance P2P không có quảng cáo phù hợp."
+    t = datetime.fromtimestamp(data["updated_at"], timezone(timedelta(hours=7)))
+    lines = [f"💵 <b>Giá mua USDT bằng VND</b> (Binance P2P, lệnh ≥{vnd(data['min_amount'])} ₫)", ""]
+    for i, ad in enumerate(data["ads"], 1):
+        lines.append(f"{i}. <b>{vnd(ad['price'])} ₫</b> · {esc(ad['merchant'])}")
+        rate = f"{ad['finish_rate'] * 100:.1f}".replace(".", ",")
+        lines.append(f"    {vnd(ad['orders'])} lệnh/30 ngày · {rate}% hoàn thành")
+        lines.append(f"    Hạn mức {vnd(ad['min'])} – {vnd(ad['max'])} ₫ · còn {vnd(ad['available'])} USDT")
+    lines.append("")
+    lines.append(f"🕒 {t:%H:%M %d/%m}")
+    return "\n".join(lines)
+
 def handle_update(update):
     if "callback_query" in update:
         query = update["callback_query"]
@@ -62,6 +85,10 @@ def handle_update(update):
 
     if text.startswith("/start") or text.startswith("/help"):
         send_message(chat_id, HELP_TEXT)
+        return
+
+    if text.lower().split("@")[0] in ("p2p", "/p2p"):
+        send_message(chat_id, format_p2p())
         return
 
     lines = [l.strip() for l in text.split("\n") if l.strip()]
