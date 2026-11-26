@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import urllib.request
-import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 sys.path.append(os.path.dirname(__file__))
@@ -11,15 +10,15 @@ from _core import lookup_order, detect_system
 from index import handle_p2p_usdt_vnd
 from datetime import datetime, timedelta, timezone
 
-VERCEL_DOMAIN = "https://nhathuy009.vercel.app"
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 ALLOWED_IDS = set(x.strip() for x in os.environ.get("TELEGRAM_ALLOWED_IDS", "").split(",") if x.strip())
 WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
 HELP_TEXT = (
-    "👋 <b>Bot tích hợp Đơn hàng & Giải trí</b>\n\n"
+    "👋 <b>Bot tra cứu đơn hàng & giá USDT</b>\n\n"
     "<b>Tra cứu đơn:</b> Gửi mã <code>DH18700</code> hoặc <code>BIZ02120</code>\n"
     "<b>Giá USDT P2P:</b> Gửi <code>p2p</code>\n"
+    "<b>Lấy Telegram ID của bạn:</b> Gửi <code>/id</code>\n"
 )
 
 def tg_call(method, payload):
@@ -72,16 +71,21 @@ def format_p2p():
     return "\n".join(lines)
 
 def handle_update(update):
-    if "callback_query" in update:
-        query = update["callback_query"]
-        chat_id = query["message"]["chat"]["id"]
-        data = query["data"]
-
     message = update.get("message") or update.get("edited_message")
     if not message: return
     chat_id = message.get("chat", {}).get("id")
     text = (message.get("text") or "").strip()
     if not text: return
+    user_id = str(message.get("from", {}).get("id", ""))
+
+    # /id luôn trả lời, để người chưa có quyền lấy ID gửi cho admin thêm vào TELEGRAM_ALLOWED_IDS.
+    if text.lower().split("@")[0] == "/id":
+        send_message(chat_id, f"🆔 Telegram ID của bạn: <code>{esc(user_id)}</code>")
+        return
+
+    if ALLOWED_IDS and user_id not in ALLOWED_IDS:
+        send_message(chat_id, f"⛔ Bạn chưa được phép dùng bot này. ID của bạn: <code>{esc(user_id)}</code>")
+        return
 
     if text.startswith("/start") or text.startswith("/help"):
         send_message(chat_id, HELP_TEXT)
@@ -113,6 +117,11 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self): self._ok()
 
     def do_POST(self):
+        # Telegram gửi kèm secret_token đã đặt khi setWebhook; sai/thiếu = request giả mạo, bỏ qua.
+        if WEBHOOK_SECRET and self.headers.get("X-Telegram-Bot-Api-Secret-Token") != WEBHOOK_SECRET:
+            self.send_response(401)
+            self.end_headers()
+            return
         try:
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b"{}"
