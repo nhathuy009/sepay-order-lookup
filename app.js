@@ -7976,8 +7976,10 @@ async function copyVax1Result() {
 
   /* ---------- Đường chốt lời (TP): kéo lên/xuống để ước tính lãi nếu chốt ở giá đó ----------
      Mặc định tính trên toàn bộ điểm mua; chọn trước 1 Horizontal Ray rồi bấm "Chốt lời" thì chỉ tính điểm mua đó
-     (S.tpRay = id ray). Lưu riêng theo từng cặp coin trên máy. Lãi/lỗ chưa trừ phí giao dịch. */
+     (S.tpRay = id ray). Lưu riêng theo từng cặp coin trên máy. Lãi/lỗ tại TP đã trừ phí mua + bán 0,2% vốn
+     (0,1% mỗi chiều); lãi/lỗ theo giá hiện tại vẫn chưa trừ phí. */
   var TP_COL = "#8b5cf6";
+  var TP_FEE = 0.002;
   function tpKey() { return "trade_tp_" + S.symbol; }
   // Ray đang được tính riêng (null = tính tổng; ray đã bị xoá thì cũng quay về tính tổng)
   function tpRay() { return S.tpRay ? S.rays.find(function (r) { return r.id === S.tpRay; }) || null : null; }
@@ -8023,7 +8025,7 @@ async function copyVax1Result() {
   function tpPnl() {   // { cost, pnl, ray } nếu chốt ở S.tp: 1 điểm mua (ray) hoặc toàn bộ (ray = null)
     var only = tpRay(), u = 0, q = 0;
     (only ? [only] : S.rays).forEach(function (r) { u += r.usdt; q += qtyOf(r); });
-    return { cost: u, pnl: q * S.tp - u, ray: only };
+    return { cost: u, pnl: q * S.tp - u - u * TP_FEE, ray: only };
   }
 
   var panelTimer = 0;
